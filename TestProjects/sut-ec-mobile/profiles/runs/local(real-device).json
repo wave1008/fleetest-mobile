@@ -1,0 +1,54 @@
+{
+  "machine": "local+remote",
+  "app": "sut-ec-mobile",
+  "devices": [
+    {
+      "machine": "local",
+      "name": "iPhone wave"
+    },
+    {
+      "machine": "M1Max",
+      "name": "iPhone 17 Pro(iOS 27.0)-01"
+    },
+    {
+      "machine": "M1Max",
+      "name": "iPhone 17 Pro(iOS 27.0)-02"
+    },
+    {
+      "machine": "M1Ultra",
+      "name": "iPhone 17 Pro(iOS 27.0)-01"
+    },
+    {
+      "machine": "M1Ultra",
+      "name": "iPhone 17 Pro(iOS 27.0)-02"
+    },
+    {
+      "machine": "local",
+      "name": "Pixel 3a"
+    },
+    {
+      "machine": "local",
+      "name": "Pixel 4a"
+    },
+    {
+      "machine": "local",
+      "name": "Pixel 9(Android 15)-01"
+    },
+    {
+      "machine": "local",
+      "name": "Pixel 9(Android 15)-02"
+    }
+  ],
+  "containerInference": true,
+  "falsePositiveCheck": false,
+  "fm": true,
+  "heal": false,
+  "homeOnStart": true,
+  "iosInappEngine": true,
+  "record": true,
+  "recoverCpuFallbackToGpu": true,
+  "reportDir": "reports",
+  "updateWebView": true,
+  "wipeDataOnBloat": true,
+  "screenLooksLike": true
+}
