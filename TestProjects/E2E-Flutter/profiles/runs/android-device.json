@@ -1,0 +1,15 @@
+{
+  "machine": "M2Ultra",
+  "app": "ft_e2e_flutter",
+  "devices": [
+    {
+      "machine": "local",
+      "name": "Pixel 4a"
+    }
+  ],
+  "heal": true,
+  "iosInappEngine": false,
+  "reportDir": "reports",
+  "scenarioTimeout": 180,
+  "wipeDataOnBloat": false
+}
