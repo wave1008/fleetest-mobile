@@ -6,14 +6,15 @@
 // 実 VSCode webview との差分は acquireVsCodeApi / getBoundingClientRect / PointerEvent のみ
 // (setPointerCapture は jsdom に無いが、liveTab.js 側が try/catch で握る契約なのでシム不要)。
 //
-// 検証対象: 操作直後の一枚絵が**遷移の途中**だったときの撮り直し(liveTab.js の
-// scheduleSettleRefresh)。
+// 検証対象: 「画面が動いて、止まったら一度だけ撮り直す」(liveTab.js の scheduleSettleRefresh)。
 //
-// 実害(2026-09-21): アプリスイッチャーを開いた状態でホームを押すと、クロスフェード中の絵が
-// 届いてそのまま残った(薄くタスクが写っている)。配信が次のフレームを描けば最新になるが、
-// 遷移が終わると画面は静止して配信も止まるため、誰も絵を差し替えない。
+// 実害は2件とも「操作の応答が操作直後の1枚しか無い」ことから来ている:
+//   - 2026-09-21: アプリスイッチャーからホームを押すとクロスフェード中の絵が残った(絵が古い)
+//   - 2026-09-22: システムアラートが出ても要素一覧・バウンディングボックスが前の画面のまま
+//     (木が古い。アラートはタップから遅れて出るので操作直後の1枚には載らない)
 //
-// 守る性質は2つ: 一度だけ撮り直すこと(静止画面で撮り続けない)と、配信が描けたら撮り直さないこと。
+// 守る性質は3つ: 絵が動いている間は撮らずに先送りすること、止まったら撮ること、
+// 撮り直しの結果では繰り返さないこと(静止画面で撮り続けない)。
 // 実時計で待つのはここだけ —— タイマーの発火そのものが検証対象なので、値を縮める口は作らない。
 
 import assert from "node:assert/strict";
@@ -153,20 +154,31 @@ test("操作直後の snapshot のあと、撮り直しを一度だけ要求す�
   );
 });
 
-test("配信のフレームが描けたら撮り直さない", async (t) => {
+test("絵が動いている間は先送りし、止まってから撮り直す", async (t) => {
   const { window, sendToWebview, liveMessages } = createWebview();
   t.after(() => window.close());
 
   sendToWebview(SNAPSHOT);
   const before = liveMessages().filter((m) => m.type === "refreshSnapshot").length;
-  // mjpeg 配信の 1 枚(host が frame を送る経路)。h264 の onFrameRendered と同じく「最新の絵が
-  // 出た」ことを意味するので撮り直しは要らない
-  sendToWebview({ type: "live", message: { type: "frame", image: "aW1n" } });
+
+  // 600ms 間隔で 2 回チャンクを流す(= まだ動いている)。予約が先送りされるので、
+  // 合計 1200ms 経っても撮り直しは飛ばない
+  for (let i = 0; i < 2; i += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 600));
+    window.dispatchEvent(new window.MessageEvent("message", {
+      data: { type: "liveH264Chunk", keyframe: true, width: 0, height: 0, data: new Uint8Array([0, 0, 1, 0x67]) },
+    }));
+  }
+  assert.equal(
+    liveMessages().filter((m) => m.type === "refreshSnapshot").length,
+    before,
+    "動いている間は撮らないこと(アニメーションの途中で撃たない)",
+  );
 
   await afterSettleWindow();
   assert.equal(
     liveMessages().filter((m) => m.type === "refreshSnapshot").length,
-    before,
-    "絵が来ているのに撮り直しを要求してはいけない",
+    before + 1,
+    "止まったら一度だけ撮ること",
   );
 });
