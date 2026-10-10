@@ -61,11 +61,12 @@ class 画面の静止を待てること {
                     exist("#row_01")
                 }
             }
-            scene(2, "settle: false の flick の直後に 0.8 秒だけ待つと、慣性が残っていて false が返る") {
+            scene(2, "settle: false の flick の直後に 0.6 秒だけ待つと、慣性が残っていて false が返る") {
                 action {
                     flickBottomToTop(scrollFrame: "#list_rows", settle: false)
-                    // 範囲を指定しない(要素を探す時間で 0.8 秒を削らない = 慣性の途中を確実に見る)
-                    writeMemo("early", waitForSettle(quietSeconds: 0.3, throwsException: false, waitSeconds: 0.8) ? "yes" : "no")
+                    // 範囲を指定しない(要素を探す時間で上限を削らない)。窓 0.5 秒・上限 0.6 秒 = 撮り始めから 0.1 秒以内に
+                    // 動きが止まらない限り静止は成立しない(Android の View / Flutter は慣性が 0.6 秒前後で止まる回がある)
+                    writeMemo("early", waitForSettle(quietSeconds: 0.5, throwsException: false, waitSeconds: 0.6) ? "yes" : "no")
                 }.expectation {
                     readMemo("early").thisIs("no")
                 }
