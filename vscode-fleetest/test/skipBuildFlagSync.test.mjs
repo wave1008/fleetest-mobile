@@ -12,16 +12,40 @@ const REPO = path.join(ROOT, "..");
 const SRC = path.join(ROOT, "src");
 const SWIFT_DIR = path.join(REPO, "Sources/fleetest");
 
-/** commandName ごとに、その型の本体(次の commandName まで)に skipBuild の宣言があるか。 */
+const SKIP_BUILD_DECL = /customLong\("skip-build"\)|var skipBuild\b/;
+
+function swiftTexts() {
+  return readdirSync(SWIFT_DIR).filter((f) => f.endsWith(".swift"))
+    .map((name) => readFileSync(path.join(SWIFT_DIR, name), "utf8"));
+}
+
+/** `struct X: ParsableArguments` のうち本体に skipBuild の宣言がある型の名前(`@OptionGroup` で取り込まれる側。
+ * run / api run は共通の宣言を RunCommonOptions に置くので、コマンドの本体だけを見ると宣言が見つからない)。 */
+function optionGroupsWithSkipBuild(texts) {
+  const names = new Set();
+  for (const text of texts) {
+    const marks = [...text.matchAll(/struct\s+(\w+)\s*:\s*ParsableArguments\b/g)];
+    marks.forEach((m, i) => {
+      const end = i + 1 < marks.length ? marks[i + 1].index : text.length;
+      if (SKIP_BUILD_DECL.test(text.slice(m.index, end))) { names.add(m[1]); }
+    });
+  }
+  return names;
+}
+
+/** commandName ごとに、その型の本体(次の commandName まで)に skipBuild の宣言があるか。本体が
+ * `@OptionGroup var …: <型>` で取り込む型が宣言していれば、それも数える。 */
 function swiftSubcommandsWithSkipBuild() {
   const result = new Map();
-  for (const name of readdirSync(SWIFT_DIR).filter((f) => f.endsWith(".swift"))) {
-    const text = readFileSync(path.join(SWIFT_DIR, name), "utf8");
+  const texts = swiftTexts();
+  const groups = optionGroupsWithSkipBuild(texts);
+  for (const text of texts) {
     const marks = [...text.matchAll(/commandName:\s*"([^"]+)"/g)];
     marks.forEach((m, i) => {
       const end = i + 1 < marks.length ? marks[i + 1].index : text.length;
       const body = text.slice(m.index, end);
-      const has = /customLong\("skip-build"\)|var skipBuild\b/.test(body);
+      const viaGroup = [...body.matchAll(/@OptionGroup[^\n]*?:\s*(\w+)/g)].some((g) => groups.has(g[1]));
+      const has = SKIP_BUILD_DECL.test(body) || viaGroup;
       result.set(m[1], (result.get(m[1]) ?? false) || has);
     });
   }
@@ -49,4 +73,10 @@ test("拡張が --skip-build を渡す api サブコマンドは、Swift 側で�
   assert.ok(swift.size > 10, "走査が Sources/fleetest に届いていない");
   const missing = callers.filter((c) => swift.get(c.sub) !== true).map((c) => `${c.file}: api ${c.sub}`);
   assert.deepEqual(missing, [], "--skip-build を持たないサブコマンドへ渡している");
+});
+
+test("共通オプション(@OptionGroup)経由の宣言も数える —— run / api run の --skip-build は RunCommonOptions にある", () => {
+  const swift = swiftSubcommandsWithSkipBuild();
+  assert.equal(swift.get("run"), true, "run は RunCommonOptions の skipBuild を取り込んでいる");
+  assert.ok(optionGroupsWithSkipBuild(swiftTexts()).has("RunCommonOptions"), "走査が RunCommonOptions に届いている");
 });

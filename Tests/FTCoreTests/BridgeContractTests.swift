@@ -130,7 +130,7 @@ final class BridgeContractTests: XCTestCase {
     private static let expectedFingerprints: [BridgeSourceSet: [String: String]] = [
         .inApp: [
             "InAppBridge/Sources/Bridging.h": "08799e6d190f958eed7c6bb4406f1cbbfea1bed1d252ce4572636273c65a5aad",
-            "InAppBridge/Sources/DisplayHeartbeat.swift": "7d907d41d42721c6e7a769aaa610fa74ee0103f95111281cb2231206c748bbc5",
+            "InAppBridge/Sources/DisplayHeartbeat.swift": "1c0c81c27437c805d0cbc1c7f92e59f4e06c8a8b6d5788d2d768aab08a8a8fe7",
             "InAppBridge/Sources/InAppBridge.swift": "377c5915335476ef60c1846bb3f8ea6abc577d90e9d5090da9336e853ce2f1da",
             "InAppBridge/Sources/InAppHTTPServer.swift": "2c0dd9eaa35bb794004378e8c9fb8655fc66b42630bd582dd75e73754d361f9c",
             "InAppBridge/Sources/InAppInput.h": "334537da65d98ae36f9fb11fa0b29d5f0b2586e2e4298415d4637bcc36c113cd",

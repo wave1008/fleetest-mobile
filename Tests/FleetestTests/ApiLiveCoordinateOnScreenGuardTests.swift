@@ -52,7 +52,9 @@ final class ApiLiveCoordinateOnScreenGuardTests: XCTestCase {
 
     func testTapCoordinateFormGoesThroughTheGuardBeforeTouchingTheDriver() throws {
         let body = try caseBody(try liveCommandSource(), cmd: "tap", until: "type")
-        try assertGuardsBeforeDriverCall(body, driverCall: "driver.tap(x:")
+        // 見るのは**受け取った x/y を撃つ呼び出し**。同じ case の先にある `driver.tap(x: point.x, …)` は Android の ref の
+        // 下端の帯を避ける分岐で、座標は要素の枠から作る(利用者の入力ではない = 画面内チェックの対象外)
+        try assertGuardsBeforeDriverCall(body, driverCall: "driver.tap(x: x, y: y)")
     }
 
     func testDoubleTapCoordinateFormGoesThroughTheGuardBeforeTouchingTheDriver() throws {
