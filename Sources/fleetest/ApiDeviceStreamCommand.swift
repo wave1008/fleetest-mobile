@@ -45,8 +45,14 @@ struct ApiDeviceStreamCommand: AsyncParsableCommand {
     @Option(help: "Platform of the device to stream (ios or android)")
     var platform: String
 
-    @Option(help: "Device name exactly as written in the run profile")
+    @Option(help: "Device name exactly as written in the run profile (with --udid / --serial: the device's name, used only as the key of the stream lease)")
     var name: String
+
+    @Option(help: "Simulator UDID to stream directly, without looking the device up in the run profile (iOS virtual devices only; for devices no run profile registers)")
+    var udid: String?
+
+    @Option(help: "Android Emulator serial to stream directly, without looking the device up in the run profile (Android virtual devices only; for devices no run profile registers)")
+    var serial: String?
 
     @Option(help: "Frames per second the helper should aim for")
     var fps: Int = 8
@@ -70,9 +76,81 @@ struct ApiDeviceStreamCommand: AsyncParsableCommand {
         // 起動ストームの最中は determineStates が十数秒かかる(実測: ヘルパーが起きる前に
         // 15 秒の期限が切れ、健全な配信が繰り返し殺されていた。M1Ultra の6台)。
         // v1(mjpeg)には ping レコードが無いので h264 のときだけ。
+        let direct = try Self.directTarget(platform: platform, udid: udid, serial: serial)
         let resolvePing = codec == "h264" ? StreamResolvePing() : nil
         resolvePing?.start()
         defer { resolvePing?.stop() }
+        let argv: [String]
+        if let direct {
+            argv = try directHelperArgv(direct)
+        } else {
+            argv = try await rosterHelperArgv()
+        }
+        // **配信の控えを置いてから化ける**(FTCore.StreamLease)。共有ランナーで同じデバイスを2人が
+        // 眺めると端末側の捕捉コストが人数ぶん重なるので、監視の子がこの控えを読んで
+        // 「他人が配信中」を配り、拡張はそのデバイスの配信を起こさない。**ここでは誰も拒否しない**
+        // (拒否すると起こしては断られる ssh の再試行ループになる)。pid は execv 後も同じ。
+        // 置き場は機械グローバルな `~/.fleetest/streams`(このデバイスが居る機械 = 自分の $HOME)なので
+        // **文脈で分岐しない** —— 手元で起こした配信も同じ1箇所に載る
+        StreamLease.write(platform: platform, name: name,
+                          info: .now(pid: ProcessInfo.processInfo.processIdentifier,
+                                     issuer: LocalConfig.resolveIssuerId()))
+        // **ping を止め切ってから化ける** —— 書き込みの途中で execv するとレコードが切れる
+        resolvePing?.stop()
+        // ヘルパーへ化ける(戻ってこない)。失敗したときだけ下へ落ちる
+        try Self.exec(argv: argv)
+    }
+
+    /// 宛先を直に指定された配信(`--udid` / `--serial`)。**どの実行プロファイルにも載っていないデバイス**
+    /// (拡張のモニターが `registered: false` と言う仮想デバイス)向け —— 登録簿の名前で引けないので、
+    /// モニターが観測した udid / serial をそのまま使う。実機は受けない(iOS 実機はブリッジのポートを
+    /// 登録簿から引く必要があり、どちらの実機も配信の中身はポーリング = モニターの更新と変わらない)
+    enum DirectTarget: Equatable {
+        case simulator(udid: String)
+        case emulator(serial: String)
+    }
+
+    /// 引数の組み合わせの検査(純粋関数)。どちらも無ければ nil = 従来の登録簿の経路
+    static func directTarget(platform: String, udid: String?, serial: String?) throws -> DirectTarget? {
+        switch (udid, serial) {
+        case (nil, nil):
+            return nil
+        case (.some, .some):
+            throw ValidationError("--udid and --serial cannot be used together")
+        case (.some(let udid), nil):
+            guard platform == "ios" else { throw ValidationError("--udid is for --platform ios") }
+            guard !udid.isEmpty else { throw ValidationError("--udid must not be empty") }
+            return .simulator(udid: udid)
+        case (nil, .some(let serial)):
+            guard platform == "android" else { throw ValidationError("--serial is for --platform android") }
+            guard !serial.isEmpty else { throw ValidationError("--serial must not be empty") }
+            return .emulator(serial: serial)
+        }
+    }
+
+    private func directHelperArgv(_ target: DirectTarget) throws -> [String] {
+        let codecArgs = codec == "h264" ? ["--codec", "h264"] : []
+        let sizeArgs = ["--fps", String(fps), "--max-width", String(maxWidth)]
+        switch target {
+        case .simulator(let udid):
+            // **一覧が読めないことは「居ない」に畳まない**(読めないなら進め、居なければヘルパーが言う)
+            switch SimulatorCatalog.lookupUDID(udid: udid) {
+            case .simulator, .unreadable:
+                break
+            case .physical:
+                throw ValidationError("\(udid) is a physical device — physical devices are streamed by --name only")
+            case .notFound:
+                throw ValidationError("no simulator with UDID \(udid) on this machine")
+            }
+            return [try helperPath(StreamHelpers.simstream), "--udid", udid] + sizeArgs + codecArgs
+        case .emulator(let serial):
+            return [try helperPath(StreamHelpers.androidstream), "--serial", serial,
+                    "--adb", try AndroidDriver.findADB()] + sizeArgs + codecArgs
+        }
+    }
+
+    /// 従来の経路: 実行プロファイルの登録簿から名前で引き、monitor と同じ判定で宛先を解決する
+    private func rosterHelperArgv() async throws -> [String] {
         let machineProfile = try DeviceRosterLoad.load(
             project: project, profile: profile, deviceMachine: deviceMachine,
             foreign: .notHandled,  // 1台ぶんの配信。警告は捨てているので表示は変わらない
@@ -93,20 +171,7 @@ struct ApiDeviceStreamCommand: AsyncParsableCommand {
         guard let state = states.first else {
             throw ValidationError("could not determine the state of \(name)")
         }
-        let argv = try helperArgv(target: target, state: state)
-        // **配信の控えを置いてから化ける**(FTCore.StreamLease)。共有ランナーで同じデバイスを2人が
-        // 眺めると端末側の捕捉コストが人数ぶん重なるので、監視の子がこの控えを読んで
-        // 「他人が配信中」を配り、拡張はそのデバイスの配信を起こさない。**ここでは誰も拒否しない**
-        // (拒否すると起こしては断られる ssh の再試行ループになる)。pid は execv 後も同じ。
-        // 置き場は機械グローバルな `~/.fleetest/streams`(このデバイスが居る機械 = 自分の $HOME)なので
-        // **文脈で分岐しない** —— 手元で起こした配信も同じ1箇所に載る
-        StreamLease.write(platform: platform, name: name,
-                          info: .now(pid: ProcessInfo.processInfo.processIdentifier,
-                                     issuer: LocalConfig.resolveIssuerId()))
-        // **ping を止め切ってから化ける** —— 書き込みの途中で execv するとレコードが切れる
-        resolvePing?.stop()
-        // ヘルパーへ化ける(戻ってこない)。失敗したときだけ下へ落ちる
-        try Self.exec(argv: argv)
+        return try helperArgv(target: target, state: state)
     }
 
     /// 起こすヘルパーと引数。**選び方は拡張の monitorDeviceStreamController.ts と同じ規則**

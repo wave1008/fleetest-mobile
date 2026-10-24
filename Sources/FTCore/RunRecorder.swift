@@ -12,11 +12,17 @@ public struct ScenarioRecording: Sendable {
     public let recorder: RunRecorder
     public let worker: String?
     public let title: String?
+    /// 人のライブ操作の台帳(`HumanOperationLedger`)を引く `.fleetest`(ツール本体のもの。serve と同じ
+    /// `RepoRoot.find()/.fleetest` = FTCore は RepoRoot を呼べないので呼び手が渡す)。nil = 引かない。
+    /// 渡し忘れは `HumanOperationWiringTests` が走査で落とす
+    public let humanOperationsStateDir: URL?
 
-    public init(recorder: RunRecorder, worker: String? = nil, title: String? = nil) {
+    public init(recorder: RunRecorder, worker: String? = nil, title: String? = nil,
+                humanOperationsStateDir: URL? = nil) {
         self.recorder = recorder
         self.worker = worker
         self.title = title
+        self.humanOperationsStateDir = humanOperationsStateDir
     }
 }
 

@@ -610,6 +610,8 @@ public enum ScenarioRunner {
                               /// ScenarioHost.run(registerChildProcess:) への素通し
                               /// (RunOrchestrator が中断口として保持する同名プロパティ参照)
                               registerChildProcess: (@Sendable (Process) -> @Sendable () -> Void)? = nil,
+                              /// ScenarioRecording.humanOperationsStateDir への素通し
+                              humanOperationsStateDir: URL? = nil,
                               /// ScenarioHost.run(stillFramesDir:) への素通し(静止画方式の録画)
                               stillFramesDir: URL? = nil,
                               onEvent: @escaping (RunEvent) -> Void) async -> ScenarioOutcome {
@@ -619,7 +621,7 @@ public enum ScenarioRunner {
         // worker id 形式は ApiRunCommand.swift の workerID 変換表・workersReadyInfo と同一規則
         let recording = recorder.map {
             ScenarioRecording(recorder: $0, worker: Self.recordingWorker(worker),
-                              title: item.info.title)
+                              title: item.info.title, humanOperationsStateDir: humanOperationsStateDir)
         }
         var reportURL: URL?
         var fmUsage: FMUsageRecord?
@@ -981,6 +983,8 @@ public final class RunOrchestrator: Sendable {
     private let registerChildProcess: (@Sendable (Process) -> @Sendable () -> Void)?
     /// 連続失敗の台帳(LaneFailureStreakStore)の置き場 = リポジトリの `.fleetest/`。nil = 引き継がない
     private let laneStreakStateDir: URL?
+    /// 人のライブ操作の台帳の置き場(`ScenarioRecording.humanOperationsStateDir` へ運ぶ)。nil = 引かない
+    private let humanOperationsStateDir: URL?
 
     /// ワーカー離脱を通知(イベント yield + 劣化ワーカー収集)を1箇所に集約する。
     /// **cause は呼び出し側が型から決めて渡す**(message の文字列を後から解析しない。既定値を置かない =
@@ -1061,8 +1065,10 @@ public final class RunOrchestrator: Sendable {
                 appBundleIDs: [String: String] = [:],
                 appTargets: [String: ResolvedAppTarget] = [:],
                 registerChildProcess: (@Sendable (Process) -> @Sendable () -> Void)? = nil,
-                laneStreakStateDir: URL? = nil) {
+                laneStreakStateDir: URL? = nil,
+                humanOperationsStateDir: URL? = nil) {
         self.laneStreakStateDir = laneStreakStateDir
+        self.humanOperationsStateDir = humanOperationsStateDir
         (self.events, self.continuation) = AsyncStream.makeStream(of: RunEvent.self)
         self.workers = workers
         self.settings = settings
@@ -1731,6 +1737,7 @@ public final class RunOrchestrator: Sendable {
                     .packagePath(physical: worker.connection.physical),
                 hostNotices: residualAlertNotice.map { [$0] } ?? [],
                 registerChildProcess: registerChildProcess,
+                humanOperationsStateDir: humanOperationsStateDir,
                 stillFramesDir: stillFramesDir,
                 onEvent: { [continuation, fmCounter = self.fmUnavailable] event in
                     // **FM 全滅のまま走ったシナリオを数える**(合否は変えない。summary の

@@ -932,7 +932,10 @@ struct ApiRunCommand: AsyncParsableCommand {
                 // 宛先・実機判定は記録から引く(PortDirectIOSTarget。`fleetest run` と同じ判定)
                 : PortDirectIOSTarget(port: effectivePort).connection(simulatorUDID: iosUdid)
             // --platform/--port/--serial 直指定経路にはデバイス論理名が無いため worker は nil
-            let recording = recorder.map { ScenarioRecording(recorder: $0, title: info.title) }
+            let recording = recorder.map {
+                ScenarioRecording(recorder: $0, title: info.title,
+                                  humanOperationsStateDir: HumanOperationStateDir.current)
+            }
 
             let scenarioStart = Date()
             var declaredNotApplicable = false
@@ -1096,7 +1099,8 @@ struct ApiRunCommand: AsyncParsableCommand {
                 continue
             }
             let recording = recorder.map {
-                ScenarioRecording(recorder: $0, worker: recordingWorker, title: info.title)
+                ScenarioRecording(recorder: $0, worker: recordingWorker, title: info.title,
+                                  humanOperationsStateDir: HumanOperationStateDir.current)
             }
             sessionTargets[sessionKey] = (connection, scenarioPlatform)
 

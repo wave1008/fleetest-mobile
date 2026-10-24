@@ -17,7 +17,7 @@ final class ScenarioSandboxTests: XCTestCase {
         for sub in ["reports", "project/.fleetest", "repo/.fleetest/hooks", "tool/.fleetest/hooks",
                     "repo/.fleetest/services", "tool/.fleetest/services",
                     "repo/.fleetest/services.lock", "tool/.fleetest/services.lock",
-                    "repo/.fleetest/mcp-runs", "tool/.fleetest/mcp-runs", "stills", "home/.ssh", "home/.config/fleetest", "home/.config/gh",
+                    "repo/.fleetest/mcp-runs", "tool/.fleetest/mcp-runs", "repo/.fleetest/human-ops", "tool/.fleetest/human-ops", "stills", "home/.ssh", "home/.config/fleetest", "home/.config/gh",
                     "home/Library/Caches/fleetest", "outside",
                     container + "/Data/Application/APP-1/Library", container + "/Bundle/Application/APP-1"] {
             try FileManager.default.createDirectory(
@@ -200,6 +200,14 @@ final class ScenarioSandboxTests: XCTestCase {
         XCTAssertNotEqual(try touch("tool/.fleetest/mcp-runs/run-1.log.refusal.json"), 0)
         XCTAssertFalse(FileManager.default.fileExists(atPath: path("repo/.fleetest/mcp-runs/run-1.log.refusal.json")))
         XCTAssertEqual(try touch("repo/.fleetest/other.json"), 0, "隣は書ける(拒否は mcp-runs だけ)")
+    }
+
+    /// `human-ops/` は人のライブ操作の台帳(`HumanOperationLedger`)。子が書けると、存在しない介入が結果とレポートに載る
+    func testHumanOperationsLedgerDirectoryStaysReadOnlyInsideTheWritableStateDirectory() throws {
+        XCTAssertNotEqual(try touch("repo/.fleetest/human-ops/UDID-1.ndjson"), 0)
+        XCTAssertNotEqual(try touch("tool/.fleetest/human-ops/UDID-1.ndjson"), 0)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: path("repo/.fleetest/human-ops/UDID-1.ndjson")))
+        XCTAssertEqual(try touch("repo/.fleetest/other.json"), 0, "隣は書ける(拒否は human-ops だけ)")
     }
 
     /// 拒否の記録の置き場は `FT_` で始まっても子へ渡さない(親だけが書く)

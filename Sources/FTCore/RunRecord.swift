@@ -660,6 +660,7 @@ public struct ScenarioRunRecord: Codable, Sendable {
         case schemaVersion, runID, scenarioID, title, platform, worker, host, profile
         case passed, timedOut, startedAt, durationMs, scenes, steps, reportPath, failedSteps
         case fixSuggestions, errorLogs, fm, timeline, skipKind, skipReason, interrupted, appCrash, mode
+        case humanOperations
     }
 
     public init(from decoder: Decoder) throws {
@@ -689,6 +690,7 @@ public struct ScenarioRunRecord: Codable, Sendable {
         interrupted = try c.decodeIfPresent(Bool.self, forKey: .interrupted)
         appCrash = try c.decodeIfPresent(AppCrashRecord.self, forKey: .appCrash)
         mode = try c.decodeIfPresent(String.self, forKey: .mode)
+        humanOperations = try c.decodeIfPresent([HumanOperationRecord].self, forKey: .humanOperations)
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -718,6 +720,7 @@ public struct ScenarioRunRecord: Codable, Sendable {
         try c.encodeIfPresent(interrupted, forKey: .interrupted)
         try c.encodeIfPresent(appCrash, forKey: .appCrash)
         try c.encodeIfPresent(mode, forKey: .mode)
+        try c.encodeIfPresent(humanOperations, forKey: .humanOperations)
     }
 
     public var schemaVersion: Int
@@ -772,6 +775,10 @@ public struct ScenarioRunRecord: Codable, Sendable {
     /// iOS でそのシナリオを走らせたデバイスの実効モード(`inapp` / `xcuitest`)。Android・合成レコード・
     /// 古い記録は nil(= 不明。xcuitest と読まない)。頼んだモードからの縮退とその理由は run.json の `workerModes`
     public var mode: String?
+    /// そのシナリオの実行中に、人が同じデバイスをライブ操作(`api live serve`)で触った事実(時刻順)。無ければ欄ごと省く。
+    /// 介入が原因の赤をアプリの不具合に見せないための事実で、分類はしない。入力した文字列は載せない
+    /// (`HumanOperationLedger`・docs/results-json.md)
+    public var humanOperations: [HumanOperationRecord]?
 
     public init(schemaVersion: Int = RunRecordSchema.current, runID: String = "",
                 scenarioID: String, title: String? = nil, platform: String, worker: String? = nil,
@@ -786,8 +793,10 @@ public struct ScenarioRunRecord: Codable, Sendable {
                 skipKind: ScenarioSkipKind? = nil,
                 skipReason: String? = nil,
                 appCrash: AppCrashRecord? = nil,
-                mode: String? = nil) {
+                mode: String? = nil,
+                humanOperations: [HumanOperationRecord]? = nil) {
         self.mode = mode
+        self.humanOperations = humanOperations
         self.fm = fm
         self.skipKind = skipKind
         self.skipReason = skipReason
@@ -958,8 +967,9 @@ public struct ScenarioRecordBuilder {
                                         skipped: event.skipped == true ? true : nil))
     }
 
+    /// `humanOperations` = 窓 [startedAt, 確定] の人の操作(`ScenarioHost` が `HumanOperationLedger` から引く)。空なら欄ごと省く
     public func build(passed: Bool, timedOut: Bool, startedAt: Date, durationMs: Int,
-                      packageRoot: URL?) -> ScenarioRunRecord {
+                      packageRoot: URL?, humanOperations: [HumanOperationRecord] = []) -> ScenarioRunRecord {
         let formatter = ISO8601DateFormatter()
         // [occlusion-guard] ガードに1度でも入ったシナリオでは、素通りの2欄を0でも必ず書く
         // (欄が無い=ガードに入っていない、0=入ったが素通りは起きなかった。run 合計と同じ規律で、
@@ -990,7 +1000,8 @@ public struct ScenarioRecordBuilder {
             // アプリのクラッシュも成否によらず残す(検出は失敗経路でしか起きないが、fm/timeline と
             // 同じ規律で条件分岐を増やさない)
             appCrash: appCrash,
-            mode: mode)
+            mode: mode,
+            humanOperations: humanOperations.isEmpty ? nil : humanOperations)
     }
 
     private static func relativize(_ path: String?, packageRoot: URL?) -> String? {

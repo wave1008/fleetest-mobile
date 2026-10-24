@@ -1375,7 +1375,8 @@ struct RunScenarios: AsyncParsableCommand {
                 reportDir: URL(fileURLWithPath: reportDir),
                 recorder: recorder,
                 appBundleID: common.appID,
-                registerChildProcess: { interruptState.registerChildProcess($0) }) { event in
+                registerChildProcess: { interruptState.registerChildProcess($0) },
+                humanOperationsStateDir: HumanOperationStateDir.current) { event in
                 let lines = RunLogFormatter.lines(for: event)
                 if quiet {
                     buffer.append(contentsOf: lines)
@@ -1482,7 +1483,8 @@ struct RunScenarios: AsyncParsableCommand {
                                                    worker: worker, profile: nil)
                                            },
                                            appBundleIDs: Self.appBundleIDs(common.appID),
-                                           registerChildProcess: { interruptState.registerChildProcess($0) })
+                                           registerChildProcess: { interruptState.registerChildProcess($0) },
+                                           humanOperationsStateDir: HumanOperationStateDir.current)
         // **新しい InterruptRelay は登録しない**(1プロセス1組)。供給中に既に中断済みなら
         // ここで即 orchestrator.requestInterrupt() が呼ばれる
         interruptState.attachLateSubscriber { orchestrator.requestInterrupt() }

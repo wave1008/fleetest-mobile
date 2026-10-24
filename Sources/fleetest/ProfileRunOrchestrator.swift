@@ -211,6 +211,7 @@ enum ProfileRunOrchestrator {
             appBundleIDs: resolved.apps.mapValues(\.bundleID),
             appTargets: resolved.apps,
             registerChildProcess: { interruptState.registerChildProcess($0) },
-            laneStreakStateDir: repoRoot.appendingPathComponent(".fleetest"))
+            laneStreakStateDir: repoRoot.appendingPathComponent(".fleetest"),
+            humanOperationsStateDir: repoRoot.appendingPathComponent(".fleetest"))
     }
 }

@@ -493,7 +493,9 @@ public enum ScenarioSandbox {
             // `mcp-ask-offered.json` = 承認(ask)の提示済みの台帳(`ProjectScaffold`)。子が「提示済み」と書けると ask が足されない。
             // `services.lock/` = サービスの排他(固定ファイルの flock。`ServicesLock`)。子が消す・置き換えると別の inode を握った 2 者が同時に入る
             // `mcp-runs/` = MCP の ft_start_run のログと拒否の記録(`DispatchRefusalReport`)。子が記録を置けると緑の run が「始まらなかった」に化ける
-            ["hooks", "services", "services.lock", "mcp-ask-offered.json", "mcp-runs", "DerivedData", "DerivedData-device", "cleanup.log", "recording-probe"]
+            // `human-ops/` = 人のライブ操作の台帳(`HumanOperationLedger`)。子が偽の「人の操作」を書けると、結果と
+            // レポートに存在しない介入が載る(親が結果へ載せる前提の事実)
+            ["hooks", "human-ops", "services", "services.lock", "mcp-ask-offered.json", "mcp-runs", "DerivedData", "DerivedData-device", "cleanup.log", "recording-probe"]
                 .map { root + "/.fleetest/" + $0 }
         } + [scope.projectRoot + "/.fleetest/" + HealWriteBack.lockFileName]
             + ["ftbridge.apk", "dispatch.lock", "dispatch.queue", "retention-sweep.lock"]

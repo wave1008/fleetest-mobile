@@ -45,7 +45,27 @@ struct LiveDeviceLease {
         }
     }
 
+    /// run がこのデバイスを使用中か(自分以外の生きた run-lease の持ち主が居る)。判定は `LiveHumanOperation.shouldRecord`
+    func runIsUsingDevice(now: Date = Date()) -> Bool {
+        LiveHumanOperation.shouldRecord(
+            runHolderPID: RunLease.holderPID(stateDir: stateDir, key: key, now: now), ownPID: pid)
+    }
+
+    /// 人の操作1件を台帳へ(`HumanOperationLedger`)。呼び手は `runIsUsingDevice()` が true のときだけ呼ぶ。ベストエフォート。
+    /// `at` = 操作を撃ち始めた時刻(終わりではない。長い操作が読み手の窓の外へはみ出さないように)
+    func recordHumanOperation(label: String, ok: Bool, at: Date) {
+        HumanOperationLedger.append(stateDir: stateDir, key: key,
+                                    entry: HumanOperationRecord(at: at, label: label, ok: ok), now: Date())
+    }
+
     func release() {
         MCPDeviceLease.removeAll(stateDir: stateDir, pid: pid)
     }
+}
+
+/// `HumanOperationLedger` の置き場 = ライブ操作(`LiveDeviceLease.make`)と同じ `RepoRoot.find()/.fleetest`。
+/// run の側(`ScenarioRecording.humanOperationsStateDir`)もここから取る —— 書き手と読み手の置き場を揃える1箇所。
+/// リモートのランナー機では serve も run も同じ workDir で動くので、同じ場所になる
+enum HumanOperationStateDir {
+    static var current: URL? { (try? RepoRoot.find())?.appendingPathComponent(".fleetest") }
 }

@@ -605,6 +605,14 @@ public enum ScenarioHost {
         // **FT_EVENT_LOG_PATH / EventLogAppender(下のベンチ用)とは無関係の別物**
         let eventLog: ScenarioEventLog? = (dryRun ? nil : recording)
             .flatMap { ScenarioEventLog.start(runDir: $0.recorder.runDir) }
+        // このシナリオの窓 [startedAt, 確定] の間に人が同じデバイスをライブ操作で触った事実(`HumanOperationLedger`)。
+        // 鍵は run-lease と同じ(`serial ?? udid`)。iOS の --port 直指定で udid が無いときは引かない。
+        // 確定点3つ(起動前の失敗・タイムアウト・通常終了)が必ず通る
+        let humanOperations: () -> [HumanOperationRecord] = {
+            guard let stateDir = recording?.humanOperationsStateDir,
+                  let key = connection.serial ?? connection.udid else { return [] }
+            return HumanOperationLedger.entries(stateDir: stateDir, key: key, from: startedAt, to: Date())
+        }
         let emit: (ScenarioEvent) -> Void = { event in
             builder?.consume(event)
             onEvent(event)
@@ -640,7 +648,8 @@ public enum ScenarioHost {
             if let recording, let builder {
                 let fileName = recording.recorder.record(builder.build(
                     passed: false, timedOut: false, startedAt: startedAt,
-                    durationMs: continuousClockMs(clock.now - clockStart), packageRoot: packageRoot()))
+                    durationMs: continuousClockMs(clock.now - clockStart), packageRoot: packageRoot(),
+                    humanOperations: humanOperations()))
                 eventLog?.finish(fileBase: fileName)
             }
             return false
@@ -1018,7 +1027,8 @@ public enum ScenarioHost {
             if let recording, let builder {
                 let fileName = recording.recorder.record(builder.build(
                     passed: false, timedOut: true, startedAt: startedAt,
-                    durationMs: continuousClockMs(clock.now - clockStart), packageRoot: packageRoot()))
+                    durationMs: continuousClockMs(clock.now - clockStart), packageRoot: packageRoot(),
+                    humanOperations: humanOperations()))
                 eventLog?.finish(fileBase: fileName)
             }
             return false
@@ -1032,10 +1042,18 @@ public enum ScenarioHost {
                                     profile: settings.profileName)
         }
         if let recording, let builder {
-            let fileName = recording.recorder.record(builder.build(
+            let operations = humanOperations()
+            let record = builder.build(
                 passed: result, timedOut: false, startedAt: startedAt,
-                durationMs: continuousClockMs(clock.now - clockStart), packageRoot: packageRoot()))
+                durationMs: continuousClockMs(clock.now - clockStart), packageRoot: packageRoot(),
+                humanOperations: operations)
+            let fileName = recording.recorder.record(record)
             eventLog?.finish(fileBase: fileName)
+            // 子が書いた Markdown レポートの末尾へも同じ事実を足す(失敗は黙らず1行)
+            if let problem = HumanOperationReport.patch(reportPath: record.reportPath, packageRoot: packageRoot(),
+                                                        operations: operations) {
+                onEvent(ScenarioEvent.log("⚠️ Could not append the human operations to the report: \(problem)"))
+            }
         }
         return result
     }

@@ -745,12 +745,23 @@ struct ApiLiveServe: AsyncParsableCommand {
             return
         }
         if command.cmd != "refresh" {
+            // run がこのデバイスを使用中の間の人の操作は、結果に時刻つきで残す(`HumanOperationLedger`)。
+            // 要素名は操作の**前**に引く(撃つと木が変わる)。台帳が書けなくても操作は止めない
+            let humanLabel: String? = await { () async -> String? in
+                guard command.drivesDevice, deviceLease?.runIsUsingDevice() == true else { return nil }
+                let name: String?
+                if let ref = command.ref { name = await screenMemo.name(ofRef: ref) } else { name = nil }
+                return LiveHumanOperation.label(for: command, elementName: name)
+            }()
+            let operatedAt = Date()
             do {
                 try await perform(command: command, driver: driver, follower: follower,
                                   ownAppBundleID: ownAppBundleID, screenMemo: screenMemo)
+                if let humanLabel { deviceLease?.recordHumanOperation(label: humanLabel, ok: true, at: operatedAt) }
                 emitLine(ApiLiveActionResultEvent(ok: true, error: nil, app: follower?.sessionTarget,
                                                   bridgeStarting: await bridgeStartingFlag(starter)))
             } catch {
+                if let humanLabel { deviceLease?.recordHumanOperation(label: humanLabel, ok: false, at: operatedAt) }
                 let message = await annotated(error, starter: starter, triggering: true, port: port)
                 // **annotated の後で読む**: noteConnectionRefused() が idle→starting へ遷移させ得るため
                 emitLine(ApiLiveActionResultEvent(ok: false, error: message, app: follower?.sessionTarget,
@@ -1286,6 +1297,7 @@ struct ApiLiveServe: AsyncParsableCommand {
             let notes = await staleFrameTracker.staleNotes(png: png, elements: snap.elements)
                 + runnerHealth.takeNotes()
             await screenMemo.note(snap.screen)
+            await screenMemo.noteNames(LiveHumanOperation.names(from: snap.elements))
             emitLine(ApiLiveSnapshotEvent(
                 ok: true, error: nil,
                 platform: driverOptions.resolvedPlatform,
@@ -1424,6 +1436,12 @@ actor LiveRunnerHealthMemo {
 actor LiveScreenMemo {
     private(set) var screen: FTRect?
     func note(_ screen: FTRect) { self.screen = screen }
+
+    /// 直近の観測の ref → 表示名(`LiveHumanOperation.names`)。人の操作の label に要素名を添えるための控え
+    /// (操作の前に木を撮り直さない = ref の番号を動かさない)
+    private var names: [Int: String] = [:]
+    func noteNames(_ names: [Int: String]) { self.names = names }
+    func name(ofRef ref: Int) -> String? { names[ref] }
 }
 
 /// 引数不足・未知の cmd 等、コマンドの中身が不正なときのエラー(JSON 自体は壊れていない場合)
