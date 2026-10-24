@@ -12,8 +12,8 @@ extension MCPServer {
     /// 探索の操作列から Swift シナリオの**下書き**を組む(F)。
     ///
     /// **ファイルには書かない**(F-2): 置き場所と命名はスキルの仕事で、MCP は文字列を返すだけ。
-    /// 生成そのものは `ScenarioCodeGen.render` に委ねる —— 記録機能(`fleetest api gen-scenario`)と
-    /// 同じ生成器を通すので、CAE の形も DSL の綴りも1箇所で決まる(2つ目の実装を作らない)。
+    /// 生成そのものは `ScenarioCodeGen.render` に委ねる —— CAE の形も DSL の綴りも1箇所で決める
+    /// (2つ目の実装を作らない)。
     ///
     /// **アサーションは推測で作らない**(F-5): expectation は空の骨格で出し、
     /// ft_dry_run の「アサーションの無い expectation ブロック」検出に埋めさせる。

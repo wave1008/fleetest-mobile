@@ -19,7 +19,6 @@ public struct TestProject: Sendable, Hashable, Identifiable {
     public var productName: String { "fleetest-scenarios-\(name)" }
 
     public var scenariosDir: URL { rootURL.appendingPathComponent("scenarios") }
-    public var generatedDir: URL { scenariosDir.appendingPathComponent("Generated") }
     public var disabledDir: URL { scenariosDir.appendingPathComponent("_disabled") }
     public var profilesDir: URL { rootURL.appendingPathComponent("profiles") }
     public var appsDir: URL { profilesDir.appendingPathComponent("apps") }

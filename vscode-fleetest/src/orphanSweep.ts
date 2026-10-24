@@ -13,7 +13,7 @@ const ORPHAN_PPID = 1;
 // 問わずサブコマンド位置で判定する(`remote exec <machine> -- api device-stream …` もこの形で
 // 拾える — "api" の前に任意の前置句が入るだけ)。`api run` は非常駐だが、孤児化するとプロファイル
 // 全デバイスのブリッジを占有し続け(親死亡で結果も届かない)、新セッションのモニター表示・実行を
-// 阻害するため対象に含める。`api gen-scenario` 等その他の非常駐コマンドや、引数中に "monitor" 等の
+// 阻害するため対象に含める。`api list-devices` 等その他の非常駐コマンドや、引数中に "monitor" 等の
 // 語が偶然出るだけの無関係コマンドは対象外。
 //
 // 配信ヘルパー(fleetest-simstream / fleetest-androidstream / fleetest-devicepoll)も別枝で拾う ——

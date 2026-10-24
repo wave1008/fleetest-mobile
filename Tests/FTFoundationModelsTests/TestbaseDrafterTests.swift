@@ -51,7 +51,7 @@ final class TestbaseDrafterTests: XCTestCase {
     }
 
     func testCleanStripsModelNoise() {
-        // 箇条書き記号・引用符・改行は 3B モデルが指示を無視して混ぜてくる(ScenarioNamer と同じ事情)
+        // 箇条書き記号・引用符・改行は 3B モデルが指示を無視して混ぜてくる
         XCTAssertEqual(TestbaseDrafter.clean("- 「ボタンを押す」", maxCount: 60), "ボタンを押す")
         XCTAssertEqual(TestbaseDrafter.clean("* 一行目\n二行目", maxCount: 60), "一行目 二行目")
         XCTAssertEqual(TestbaseDrafter.clean(String(repeating: "あ", count: 80), maxCount: 60).count, 60)

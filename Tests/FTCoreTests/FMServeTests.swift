@@ -253,7 +253,6 @@ final class FMServeTests: XCTestCase {
             if code.contains("LanguageModelSession(") { owners.insert((path as NSString).lastPathComponent) }
         }
         XCTAssertEqual(owners, ["FMServeServer.swift",       // 画像を伴う実呼び出しの唯一の持ち主
-                                "ScenarioNamer.swift",       // シナリオ作成時のテキスト(run の中では使わない)
                                 "TestbaseDrafter.swift",     // テストベース作成時のテキスト(同上)
                                 "FMLoadGenerator.swift"],    // 負荷計測の道具(run の中では使わない)
                        "セッションを作る場所が増えた/減った。画像を伴う呼び出しなら FMServeServer へ頼む形にする")

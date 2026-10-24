@@ -2896,7 +2896,7 @@ run 終了時の「FM 呼び出しが全て失敗しました」警告と結果 
   監査は `FMAccountingAuditTests`(**関数単位**。ファイル単位だと同一ファイルの複数機能に
   一致して欠落を見逃す。判定前にコメントを落とすのも必須 —
   記録の必要性を説明したコメント自身に一致して一度素通りした)。
-  作成時の経路(FMDoctor / ScenarioNamer / TestbaseDrafter)は run の実績ではないので免除リスト
+  作成時の経路(FMDoctor / TestbaseDrafter)は run の実績ではないので免除リスト
 
 ### Vision(画像特徴量)まで死ぬことがある —— 画像に依存する E2E は判定に使えない(2026-09-19)
 
@@ -3045,7 +3045,7 @@ FM は**ホスト全体で共有される資源**。2026-07-22 時点の実測�
 
 - **リポジトリ単位ではなくホスト単位**。別リポジトリの fleetest とも枠を共有する
 - **全ての FM 呼び出しがこのロックを通る**のが不変条件(occlusion / screenLooksLike /
-  ScenarioNamer / TestbaseDrafter。自己修復は 2026-09-15 に FM を呼ばなくなり対象外)。
+  TestbaseDrafter。自己修復は 2026-09-15 に FM を呼ばなくなり対象外)。
   新しい FM 呼び出しを足すときは必ず通すこと。画像を伴う 2 つ(occlusion / screenLooksLike)は FM の常駐プロセスへ頼む側で通す
   (実呼び出しは常駐プロセスが撃つ。maintainer-notes §81)。
   監査は `FMAccountingAuditTests`(セッションを作る関数と常駐プロセスへ頼む関数の両方)と
@@ -3105,8 +3105,7 @@ FM は死んだら**再起動まで回復しない**ので、死んだ後も呼�
 - **入場は FMCallAdmission に一本化**している。`FMCallAdmission.enter()` が ①ブレーカ ②許可枠のロック(FMCallSlots)
   を順に見る。
   **新しい FM 呼び出しを足すときは必ずここを通す**(監査: `grep -c "FMCallAdmission.enter" Sources/FTFoundationModels/*.swift`
-  と、頼む側の関数(`FMServeWire.Request(kind: .transcribe` / `.screen`)・テキストの呼び出し(`ScenarioNamer` /
-  `TestbaseDrafter`)の数を突き合わせる。FMDoctor は可用性判定、FMServeServer は頼まれた実呼び出しなので対象外)
+  と、頼む側の関数(`FMServeWire.Request(kind: .transcribe` / `.screen`)・テキストの呼び出し(`TestbaseDrafter`)の数を突き合わせる。FMDoctor は可用性判定、FMServeServer は頼まれた実呼び出しなので対象外)
 - **ホスト単位**(~/Library/Caches/fleetest/fm-breaker.state の mtime)。全滅はホスト全体の事象で
   ワーカーはプロセスが別なので、プロセス内カウンタだけだと 14 ワーカー分を無駄打ちする
 - **成功したら即座に復帰**する。10 分(cooldown)経過後は 1 回試させる(half-open)ので、

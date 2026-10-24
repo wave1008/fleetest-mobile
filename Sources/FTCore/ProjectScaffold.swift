@@ -1,6 +1,6 @@
 // ProjectScaffold.swift
 // fleetest project create のテストプロジェクト雛形生成。
-// scenarios/(_Main.swift・Generated/・_disabled/)、profiles/(apps/runs)、reports/ を作る。
+// scenarios/(_Main.swift・_disabled/)、profiles/(apps/runs)、reports/ を作る。
 
 import Foundation
 
@@ -510,7 +510,7 @@ public enum ProjectScaffold {
     /// 実体は /fleetest-profiles = `profile setup` が作る)。シナリオは置かない(_Main.swift だけ)
     public static func create(project: TestProject) throws {
         let fm = FileManager.default
-        for dir in [project.generatedDir, project.disabledDir,
+        for dir in [project.disabledDir,
                     project.appsDir, project.runsDir,
                     project.reportsDir, project.testbasesDir] {
             try fm.createDirectory(at: dir, withIntermediateDirectories: true)
@@ -554,7 +554,7 @@ public enum ProjectScaffold {
     コンパイル対象外の退避場所(Package.swift の `exclude` 指定)。
 
     - 並列デモなど普段の「全実行」に含めたくないシナリオはここに置く(有効化は scenarios/ 直下へ移動)
-    - gen-scenario の生成コードがビルドに失敗した場合もここに隔離される
+    - draft-scenario の生成コードがビルドに失敗した場合もここに隔離される
     """
 
     static let testbasesReadme = """

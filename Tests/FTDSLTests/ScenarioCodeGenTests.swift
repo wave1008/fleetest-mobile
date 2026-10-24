@@ -3,7 +3,7 @@ import XCTest
 @testable import FTDSL
 import FTCore
 
-/// Flow → Swift DSL コードの生成(`fleetest api gen-scenario` が使う)。
+/// Flow → Swift DSL コードの生成(MCP の ft_draft_scenario が使う)。
 /// **生成物は利用者がそのまま実行するコード**なので、秒引数が Double 化された後も
 /// `duration: 1` / `waitSeconds: 1.2` の形で出る(`1.0` や `1.2000000000000002` にしない)ことを固定する。
 final class ScenarioCodeGenTests: XCTestCase {
@@ -49,23 +49,6 @@ final class ScenarioCodeGenTests: XCTestCase {
         let both = render([FlowStep(action: "tap", locator: FlowLocator(id: "btn"), x: 1, y: 2)])
         XCTAssertTrue(both.contains("tap(\"#btn\")"), both)
         XCTAssertFalse(both.contains("x:"), both)
-    }
-
-    /// ライブ操作の軌跡モードの記録(拡張の `recordedGestureFingers` が書く JSON)は、`FlowStep` の
-    /// 自動の Codable でそのまま読めること(型の効かない TS ⇄ Swift の境界。キー名がずれると
-    /// gen-scenario が記録ごと読めなくなる)。JSON は拡張が書く形をそのまま写したもの
-    func testLiveTraceRecordingDecodesIntoAGestureStep() throws {
-        let json = """
-        {"action":"gesture","gesture":[{"x":0.1,"y":0.2,"startSeconds":0,
-          "steps":[{"hold":{"seconds":0.25}},{"move":{"x":0.5,"y":0.2,"durationSeconds":0.3}}]}]}
-        """
-        let step = try JSONDecoder().decode(FlowStep.self, from: Data(json.utf8))
-        XCTAssertEqual(step.gesture, [
-            FTFinger(x: 0.1, y: 0.2).hold(seconds: 0.25).move(x: 0.5, y: 0.2, durationSeconds: 0.3),
-        ])
-        XCTAssertTrue(render([step]).contains(
-            "gesture { FTFinger(x: 0.1, y: 0.2).hold(seconds: 0.25).move(x: 0.5, y: 0.2, durationSeconds: 0.3) }"),
-            render([step]))
     }
 
     /// gesture は指ごとの経路をそのまま DSL へ戻す(MCP の ft_gesture の下書きがここを通る)。

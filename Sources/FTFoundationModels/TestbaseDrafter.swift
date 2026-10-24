@@ -85,7 +85,7 @@ public enum TestbaseDrafter {
     }
 
     /// 箇条書き記号・引用符などのノイズを落として頭打ちにする
-    /// (オンデバイス FM は「N 文字以内・記号なし」の指示を守り切らない。ScenarioNamer と同じ事情)
+    /// (オンデバイス FM は「N 文字以内・記号なし」の指示を守り切らない)
     static func clean(_ raw: String, maxCount: Int) -> String {
         var noise = CharacterSet.whitespacesAndNewlines
         noise.formUnion(CharacterSet(charactersIn: "-*・「」『』\"'“”‘’　"))

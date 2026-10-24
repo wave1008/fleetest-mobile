@@ -26,7 +26,6 @@ final class FMAccountingAuditTests: XCTestCase {
         "FMLivenessProbe.swift": "死活プローブ。**実仕事ではない**ので FMHealth/FMUsageLedger には"
             + "載せない(載せると誰も run を回していないのにモニターの FM レートが動く ="
             + " 測る対象を自分で消費して見せる)。ブレーカは probeOnce が直接養う",
-        "ScenarioNamer.swift": "シナリオ作成時(explore/gen-scenario)。run の結果に紐づかない",
         "TestbaseDrafter.swift": "テストベース作成時。run の結果に紐づかない",
         "FMServeServer.swift": "FM の常駐プロセス。記録は要求した側(シナリオ・プローブ)が自分の所要で行う"
             + "(ここで記録すると run の結果 JSON = シナリオのプロセスの集計と食い違い、暖機も呼び出しに数えてしまう)",

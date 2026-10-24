@@ -81,7 +81,7 @@ CLAUDE.md から移した規則(本文は移設前と同一)。この領域の�
   `LanguageModelSession` を持たず、`FMServeClient` で要求を送る(起こすのは `FMServeHost.ensureRunning` = run の2実装・
   死活の確かめ)。**理由**: FM の死(ANE の `no memory`)は「降ろされたモデルを載せ直す瞬間」に起き、入れ替わる多数のプロセスが
   各自セッションを作る形はそれを絶えず起こした。1 プロセスが撃ち続けた形はデバイス実行の横でも死ななかった → maintainer-notes §81。
-  守る規律: ①**セッションを作ってよいファイルは4つ**(`FMServeServer` / `ScenarioNamer` / `TestbaseDrafter` / `FMLoadGenerator`。
+  守る規律: ①**セッションを作ってよいファイルは3つ**(`FMServeServer` / `TestbaseDrafter` / `FMLoadGenerator`。
   `FMServeTests.testOnlyTheFMProcessAndAuthoringToolsCreateSessions`)②**常駐プロセスに届かなかった回は FM の失敗に数えない**
   (`FMHealth.recordSkip`。ブレーカ・死活の台帳を落とさない = FM の死ではない)③**記録は頼んだ側が自分の所要で行う**
   (常駐プロセスは FMHealth に書かない = 結果 JSON はシナリオのプロセスの集計のまま)④**常駐プロセスに `FT_PARENT_PID` を渡さない**

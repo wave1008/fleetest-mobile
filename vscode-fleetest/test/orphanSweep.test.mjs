@@ -40,8 +40,8 @@ test("parseOrphanPids: PPID=1 の api recorder-watch は候補にしない(親�
   assert.deepEqual(parseOrphanPids(out), []);
 });
 
-test("parseOrphanPids: PPID=1 でも api run 以外の非常駐コマンド(api gen-scenario 等)は除外する", () => {
-  const psOutput = "  222     1 .build/debug/fleetest api gen-scenario --project SampleApp";
+test("parseOrphanPids: PPID=1 でも api run 以外の非常駐コマンド(api list-devices 等)は除外する", () => {
+  const psOutput = "  222     1 .build/debug/fleetest api list-devices --project SampleApp";
   assert.deepEqual(parseOrphanPids(psOutput), []);
 });
 
@@ -97,8 +97,8 @@ test("parseOrphanPids: PPID が 1 でない配信プロセスは除外する", (
   assert.deepEqual(parseOrphanPids(psOutput), []);
 });
 
-test("parseOrphanPids: PPID=1 でも `api gen-scenario --name monitor` は除外する(引数中の語に誤爆しない)", () => {
-  const psOutput = "  999     1 .build/debug/fleetest api gen-scenario --name monitor";
+test("parseOrphanPids: PPID=1 でも `api list-devices --name monitor` は除外する(引数中の語に誤爆しない)", () => {
+  const psOutput = "  999     1 .build/debug/fleetest api list-devices --name monitor";
   assert.deepEqual(parseOrphanPids(psOutput), []);
 });
 
