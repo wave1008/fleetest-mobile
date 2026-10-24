@@ -46,9 +46,15 @@ let target = null;
 // 一致するときだけ出す(ライブ操作タブで別のデバイスを操作した失敗をここに出さない)
 let liveSelectedId = null;
 let busy = false;
+// busy の原因が画面を変えない観測か(host の busy.observing)。この間の画面の操作・ボタンは受け付ける
+// (host が観測の終わりを待って撃つ)。捨てると、撮り直しの窓に押したタップが黙って空振りしていた
+let busyObserving = false;
+function operationBlocked() {
+  return busy && !busyObserving;
+}
 let dragStart = null;
 function applyButtonState() {
-  for (const button of buttons) { button.disabled = busy; }
+  for (const button of buttons) { button.disabled = operationBlocked(); }
 }
 
 // 拡大表示の絵の描き替わりをパネルへ渡す購読(gridLivePanel.js の waitingForImage)。**読み込み時に購読しない** ——
@@ -63,6 +69,7 @@ export function syncGridLiveControls(id, previewEl) {
     onMirrorFrame(noteMirrorFrame);
   }
   if (target && (target.id !== id || target.previewEl !== previewEl)) {
+    releaseTraceOverlay();
     cancelDrag();
     target.previewEl.removeEventListener('pointerdown', handlePointerDown);
     parking.appendChild(controls);
@@ -108,15 +115,26 @@ export function applyGridLiveMessage(message) {
       break;
     case 'busy':
       busy = !!message.busy;
+      busyObserving = busy && !!message.observing;
       applyButtonState();
+      if (traceHold !== null) {
+        if (busy && !busyObserving) {
+          traceHold.sawBusy = true; // 軌跡の実行が始まった
+        } else if (!busy && traceHold.sawBusy) {
+          releaseTraceOverlay(); // なぞり終えた
+        }
+      }
       break;
     case 'actionError':
       if (target && liveSelectedId === target.id) {
         showError(message.message || '', !!message.neutral);
       }
+      // busy を立てずに返った失敗 = 撃つ前に断られた(撃った後の失敗は busy の間に届く)
+      if (message.message && !busy) { releaseTraceOverlay(); }
       break;
     case 'gridActionError':
       if (target && message.id === target.id) {
+        releaseTraceOverlay();
         showError(message.message);
       }
       break;
@@ -133,9 +151,9 @@ function showError(text, neutral = false) {
   relayoutPreviewsForResize();
 }
 
-/** 送れたら true(busy・1台表示でないときは送らない) */
+/** 送れたら true(操作の最中・1台表示でないときは送らない。観測の最中は送る = operationBlocked) */
 function postAction(action) {
-  if (!target || busy) {
+  if (!target || operationBlocked()) {
     return false;
   }
   showError('');
@@ -187,7 +205,7 @@ function handlePointerDown(event) {
   // 絵の上の押下は操作として扱う(テキスト選択を始めない)
   event.preventDefault();
   event.stopPropagation();
-  if (busy) {
+  if (operationBlocked()) {
     return;
   }
   const rect = media.getBoundingClientRect();
@@ -197,6 +215,7 @@ function handlePointerDown(event) {
   const x = event.clientX - rect.left;
   const y = event.clientY - rect.top;
   // **押した時点の修飾キーを採る**(liveTab.js の handleScreenPointerDown と同じ理由)
+  releaseTraceOverlay(); // 前の軌跡の線は、次のドラッグで消す
   dragStart = {
     id: target.id, media, pointerId: event.pointerId, downAt: performance.now(), x, y,
     doubleTap: event.altKey, trace: event.shiftKey, moveAt: null,
@@ -235,7 +254,26 @@ function updateOverlay(x, y) {
 
 function cancelDrag() {
   dragStart = null;
-  dragOverlay.classList.remove('visible');
+  if (traceHold === null) { dragOverlay.classList.remove('visible'); }
+}
+
+// **軌跡は離した後も、デバイスがなぞり終えるまで線を残す**(ユーザー決定)—— デバイスは描いた時間ぶんかけて同じ軌跡を
+// 再生するので、離した瞬間に消すと何をなぞっているのか分からない。消すのは: その操作の busy(observing なし)が立って
+// 解けたとき・撃つ前に断られたとき(gridActionError / busy の外の actionError)・次のドラッグ・対象の変更。
+// 上限[ms]: 終わりの知らせが来ない異常の保険 = 軌跡の長さ + host の待ち(切り替え・観測の終わり = SERVE_REQUEST_TIMEOUT_MS
+// 20 秒)+ serve の応答待ち(同 20 秒)
+const TRACE_HOLD_MARGIN_MS = 40000;
+let traceHold = null; // { timer, sawBusy } = 実行の終わりを待って線を残している
+
+function holdTraceOverlay(durationMs) {
+  releaseTraceOverlay();
+  traceHold = { sawBusy: false, timer: setTimeout(releaseTraceOverlay, durationMs + TRACE_HOLD_MARGIN_MS) };
+}
+function releaseTraceOverlay() {
+  if (traceHold === null) { return; }
+  clearTimeout(traceHold.timer);
+  traceHold = null;
+  if (dragStart === null) { dragOverlay.classList.remove('visible'); }
 }
 
 window.addEventListener('pointermove', (event) => {
@@ -289,11 +327,13 @@ window.addEventListener('pointerup', (event) => {
     }
   } else if (start.trace) {
     const endT = Math.max(1, Math.round(upAt - start.downAt));
-    postAction({
-      type: 'tracePoints',
-      points: thinTracePoints(start.points.concat([{ x, y, t: endT }])),
-      ...display,
-    });
+    const points = start.points.concat([{ x, y, t: endT }]);
+    if (postAction({ type: 'tracePoints', points: thinTracePoints(points), ...display })) {
+      // 描いた軌跡をそのまま残す(holdTraceOverlay の doc)
+      dragTrace.setAttribute('points', points.map((p) => p.x + ',' + p.y).join(' '));
+      dragOverlay.classList.add('trace', 'visible');
+      holdTraceOverlay(endT);
+    }
   } else {
     const moveAt = start.moveAt ?? upAt;
     postAction({

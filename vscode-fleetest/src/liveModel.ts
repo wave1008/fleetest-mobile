@@ -1036,7 +1036,9 @@ export type LiveToWebviewMessage =
   /** neutral: true のときは失敗(エラー)としての見た目(赤)にしない。省略 = false
    * (bridgeStarting 中の操作失敗だけが true を送る。live.bridgeStartingActionNotice)。 */
   | { readonly type: "actionError"; readonly message: string; readonly neutral?: boolean }
-  | { readonly type: "busy"; readonly busy: boolean }
+  /** observing: busy の原因が画面を変えない観測か(MonitorLiveController.busyObserving)。webview はこの間の画面の操作を
+   * 捨てずに送る(host が観測の終わりを待って撃つ) */
+  | { readonly type: "busy"; readonly busy: boolean; readonly observing: boolean }
   | { readonly type: "connection"; readonly connected: boolean; readonly message: string | null }
   | { readonly type: "busyOverlay"; readonly message: string | null }
   /** LiveBridgeAutoStarter が自動起動を進行中かどうか(契約: ApiLiveCommand.swift 冒頭の

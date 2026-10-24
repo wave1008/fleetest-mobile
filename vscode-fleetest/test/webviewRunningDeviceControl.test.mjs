@@ -227,3 +227,56 @@ test("グリッド: 実行中は自動の撮り直しが無いので、操作の
   timers[0]();
   assert.equal(rects(), 1, "打ち切りで描く");
 });
+
+// ---- 観測(画面を変えない busy)の最中の操作 ----------------------------------------------------------
+// 撮り直しは操作の結果のたびに走るので、その窓に押したタップを捨てると「止まった画面へのタップが空振り」になる(実地)。
+// 観測の最中は送り(host が観測の終わりを待って撃つ)、操作の最中は従来どおり受け付けない。
+
+test("グリッド: 観測の最中(busy.observing)はタップを送り、操作の最中は送らない", (t) => {
+  const { window, media, gridActions } = setupGrid(t);
+  live(window, { type: "busy", busy: true, observing: true });
+  tap(window, media);
+  assert.equal(gridActions().length, 1, "観測の最中のタップは送る");
+  live(window, { type: "busy", busy: true, observing: false });
+  tap(window, media);
+  assert.equal(gridActions().length, 1, "操作の最中のタップは送らない");
+  live(window, { type: "busy", busy: false, observing: false });
+  tap(window, media);
+  assert.equal(gridActions().length, 2);
+});
+
+test("ライブ操作タブ: 観測の最中(busy.observing)はタップを送り、操作の最中は送らない。「更新」は観測中も重ねない", (t) => {
+  const { window, document, screenshot, liveMessages } = setupLiveTab(t);
+  const taps = () => liveMessages().filter((m) => m.type === "tapPoint").length;
+  live(window, { type: "busy", busy: true, observing: true });
+  screenshot.dispatchEvent(pointerEvent(window, "pointerdown", { x: 10, y: 10 }));
+  window.dispatchEvent(pointerEvent(window, "pointerup", { x: 10, y: 10 }));
+  assert.equal(taps(), 1, "観測の最中のタップは送る");
+  assert.equal(document.getElementById("live-btn-home").disabled, false, "デバイスを操作するボタンも押せる");
+  assert.equal(document.getElementById("live-btn-refresh-snapshot").disabled, true, "観測そのもの(更新)は重ねない");
+  live(window, { type: "busy", busy: true, observing: false });
+  screenshot.dispatchEvent(pointerEvent(window, "pointerdown", { x: 10, y: 10 }));
+  window.dispatchEvent(pointerEvent(window, "pointerup", { x: 10, y: 10 }));
+  assert.equal(taps(), 1, "操作の最中のタップは送らない");
+  assert.equal(document.getElementById("live-btn-home").disabled, true);
+});
+
+test("ライブ操作タブ: 軌跡は離した後も、デバイスがなぞり終えるまで線を残す", (t) => {
+  const { window, document, screenshot } = setupLiveTab(t);
+  window.Element.prototype.setPointerCapture = () => {};
+  window.Element.prototype.releasePointerCapture = () => {};
+  const overlay = document.getElementById("live-drag-overlay");
+  const shift = (type, x, y) => {
+    const event = new window.MouseEvent(type, { bubbles: true, cancelable: true, clientX: x, clientY: y, button: 0, shiftKey: true });
+    Object.defineProperty(event, "pointerId", { value: 1 });
+    return event;
+  };
+  screenshot.dispatchEvent(shift("pointerdown", 10, 10));
+  window.dispatchEvent(shift("pointermove", 100, 100));
+  window.dispatchEvent(shift("pointerup", 100, 100));
+  assert.ok(overlay.classList.contains("visible"), "離した後も線を残す");
+  live(window, { type: "busy", busy: true, observing: false });
+  assert.ok(overlay.classList.contains("visible"), "なぞっている間は残す");
+  live(window, { type: "busy", busy: false, observing: false });
+  assert.equal(overlay.classList.contains("visible"), false, "なぞり終えたら消す");
+});

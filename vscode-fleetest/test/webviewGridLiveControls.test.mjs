@@ -450,3 +450,42 @@ test("操作のカラムは 上=戻る / 中=デバイス操作のグループ /
   assert.match(parts[0], /1fr/);
   assert.equal(parts[1], "auto");
 });
+
+test("軌跡は離した後も、デバイスがなぞり終えるまで線を残す(その操作の busy が立って解けたら消す)", (t) => {
+  const { window, document } = createWebview();
+  t.after(() => window.close());
+  sendDevices(window, 1);
+  const media = selectOneWithPicture(window, document, 0);
+  const overlay = () => document.querySelector(".grid-live-drag-overlay");
+  const live = (message) => send(window, { type: "live", message });
+  media.dispatchEvent(pointerEvent(window, "pointerdown", { x: 110, y: 60, shiftKey: true }));
+  window.dispatchEvent(pointerEvent(window, "pointermove", { x: 200, y: 200, shiftKey: true }));
+  window.dispatchEvent(pointerEvent(window, "pointerup", { x: 200, y: 200, shiftKey: true }));
+  assert.ok(overlay().classList.contains("visible"), "離した後も線を残す");
+  assert.ok(overlay().classList.contains("trace"), "軌跡の線のまま");
+  assert.match(overlay().querySelector("polyline").getAttribute("points"), /^10,10 /, "描いた軌跡そのもの");
+  live({ type: "busy", busy: true, observing: true });
+  live({ type: "busy", busy: false, observing: false });
+  assert.ok(overlay().classList.contains("visible"), "観測の busy の終わりでは消さない(まだなぞっていない)");
+  live({ type: "busy", busy: true, observing: false });
+  assert.ok(overlay().classList.contains("visible"), "なぞっている間は残す");
+  live({ type: "busy", busy: false, observing: false });
+  assert.equal(overlay().classList.contains("visible"), false, "なぞり終えたら消す");
+});
+
+test("軌跡の線は、撃つ前に断られたら(gridActionError)消し、素のドラッグの線は離したら消す", (t) => {
+  const { window, document } = createWebview();
+  t.after(() => window.close());
+  sendDevices(window, 1);
+  const media = selectOneWithPicture(window, document, 0);
+  const overlay = () => document.querySelector(".grid-live-drag-overlay");
+  media.dispatchEvent(pointerEvent(window, "pointerdown", { x: 110, y: 60, shiftKey: true }));
+  window.dispatchEvent(pointerEvent(window, "pointermove", { x: 200, y: 200, shiftKey: true }));
+  window.dispatchEvent(pointerEvent(window, "pointerup", { x: 200, y: 200, shiftKey: true }));
+  send(window, { type: "live", message: { type: "gridActionError", id: "d0", message: "refused" } });
+  assert.equal(overlay().classList.contains("visible"), false, "断られたら消す");
+  media.dispatchEvent(pointerEvent(window, "pointerdown", { x: 110, y: 60 }));
+  window.dispatchEvent(pointerEvent(window, "pointermove", { x: 200, y: 200 }));
+  window.dispatchEvent(pointerEvent(window, "pointerup", { x: 200, y: 200 }));
+  assert.equal(overlay().classList.contains("visible"), false, "素のドラッグ(スワイプ)は従来どおり離したら消す");
+});

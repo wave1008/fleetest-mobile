@@ -163,9 +163,20 @@ const busyButtons = [
 function isSelectedDeviceRunning() {
   return !!deviceSelect.value && isDeviceRunning(deviceSelect.value);
 }
-function setBusy(value) {
+// busy の原因が画面を変えない観測か(host の busy.observing)。この間の画面の操作は捨てずに送る(host が観測の終わりを
+// 待って撃つ = MonitorLiveController.handleWebviewMessage)。撮り直しは操作の結果のたびに走るので、捨てると止まった
+// 画面へのタップが黙って空振りしていた
+let busyObserving = false;
+const OBSERVATION_BUTTON_IDS = new Set(['live-btn-refresh-devices', 'live-btn-refresh-snapshot']);
+/** 画面の操作を受け付けないか(操作の最中だけ。観測の最中は受け付ける) */
+function operationBlocked() {
+  return busy && !busyObserving;
+}
+function setBusy(value, observing = false) {
   busy = value;
-  for (const b of busyButtons) { b.disabled = value; }
+  busyObserving = value && observing;
+  // 観測の最中も押せるのはデバイスを操作するボタン(観測そのもの = 「更新」・一覧の取り直しは重ねない)
+  for (const b of busyButtons) { b.disabled = value && (!busyObserving || OBSERVATION_BUTTON_IDS.has(b.id)); }
   deviceSelect.disabled = value;
   busyLabel.textContent = value ? t('wvMonitor.live.processing') : '';
   // **操作を撃った時点で枠を消す**(ユーザー決定) —— これから画面が変わるので、
@@ -174,7 +185,8 @@ function setBusy(value) {
   //
   // **撮り直し(scheduleSettleRefresh)の間は消さない** —— あれは画面を変えない観測で、
   // 消すと遷移後に「出る → 消える → 出る」とちらつく
-  if (value && !settleRefreshRequested) { deferBoxesUntilSettled(); }
+  // 観測の busy(撮り直し・一覧)も同じ理由で消さない(画面は変わらない)
+  if (value && !busyObserving && !settleRefreshRequested) { deferBoxesUntilSettled(); }
   // 「レコーディング開始」も busy を見る(updateRecordButton が updateProfileActionButtons を呼ぶ)
   updateRecordButton();
 }
@@ -660,7 +672,25 @@ function updateDragOverlay(start, x, y) {
   dragOverlay.classList.add('visible');
 }
 function hideDragOverlay() {
-  dragOverlay.classList.remove('visible');
+  if (traceHold === null) { dragOverlay.classList.remove('visible'); }
+}
+
+// **軌跡は離した後も、デバイスがなぞり終えるまで線を残す**(ユーザー決定。グリッドビューの gridLiveControls.js と同じ規則)。
+// 消すのは: その操作の busy(observing なし)が立って解けたとき・busy を立てずに返った失敗(撃つ前に断られた)・次のドラッグ。
+// 上限[ms]: 終わりの知らせが来ない異常の保険 = 軌跡の長さ + host の待ち(観測の終わり = SERVE_REQUEST_TIMEOUT_MS 20 秒)
+// + serve の応答待ち(同 20 秒)
+const TRACE_HOLD_MARGIN_MS = 40000;
+let traceHold = null; // { timer, sawBusy }
+
+function holdTraceOverlay(durationMs) {
+  releaseTraceOverlay();
+  traceHold = { sawBusy: false, timer: setTimeout(releaseTraceOverlay, durationMs + TRACE_HOLD_MARGIN_MS) };
+}
+function releaseTraceOverlay() {
+  if (traceHold === null) { return; }
+  clearTimeout(traceHold.timer);
+  traceHold = null;
+  if (dragStart === null) { dragOverlay.classList.remove('visible'); }
 }
 
 // 軌跡モードは Shift だけで決める: 押下時に Shift を押していたドラッグは dragPoints(1回のスワイプ
@@ -678,7 +708,8 @@ window.addEventListener('keyup', (event) => { if (event.key === 'Shift') { setTr
 window.addEventListener('blur', () => setTraceIndicator(false));
 
 function handleScreenPointerDown(event) {
-  if (busy || !lastScreen || event.button !== 0) { return; }
+  if (operationBlocked() || !lastScreen || event.button !== 0) { return; }
+  releaseTraceOverlay(); // 前の軌跡の線は、次のドラッグで消す
   // 既定動作(画像ドラッグ・テキスト選択の開始)の抑止。dragstart 抑止だけでは環境により
   // ネイティブドラッグが始まることがあるため両方必要。
   event.preventDefault();
@@ -778,7 +809,7 @@ window.addEventListener('pointerup', (event) => {
   } catch {
     // 未 capture なら何もしない
   }
-  if (busy || !lastScreen) { return; }
+  if (operationBlocked() || !lastScreen) { return; }
   const rect = start.el.getBoundingClientRect();
   // キャプチャ中は画像外で離せるため表示範囲にクランプする
   const endX = Math.min(Math.max(event.clientX - rect.left, 0), rect.width);
@@ -814,6 +845,9 @@ window.addEventListener('pointerup', (event) => {
       points: thinTracePoints(points),
       displayWidth: rect.width, displayHeight: rect.height,
     });
+    // 描いた軌跡をそのまま残す(holdTraceOverlay の doc)
+    updateDragOverlay(start, endX, endY);
+    holdTraceOverlay(endT);
   } else {
     const moveAt = start.moveAt ?? upAt;
     post({
@@ -1017,10 +1051,10 @@ function submitTypeText() {
 }
 // テキスト送信は Enter のみ(「入力」ボタンは置かない)。IME変換中(日本語変換の確定)の Enter は
 // 送信しない: isComposing が true、環境により keyDown が keyCode 229(IME処理中)で届くため両方を除外する。
-// busy 中も送らない(処理中の多重送信を防ぐ)。
+// 操作の最中も送らない(処理中の多重送信を防ぐ)。観測の最中は送る(operationBlocked の doc)。
 typeTextInput.addEventListener('keydown', (event) => {
   if (event.key !== 'Enter' || event.isComposing || event.keyCode === 229) { return; }
-  if (busy) { return; }
+  if (operationBlocked()) { return; }
   event.preventDefault();
   submitTypeText();
 });
@@ -1109,9 +1143,18 @@ export function applyLiveMessage(message) {
       break;
     case 'actionError':
       showActionError(message.message, !!message.neutral);
+      // busy を立てずに返った失敗 = 撃つ前に断られた(撃った後の失敗は busy の間に届く)
+      if (message.message && !busy) { releaseTraceOverlay(); }
       break;
     case 'busy':
-      setBusy(!!message.busy);
+      setBusy(!!message.busy, !!message.observing);
+      if (traceHold !== null) {
+        if (busy && !busyObserving) {
+          traceHold.sawBusy = true; // 軌跡の実行が始まった
+        } else if (!busy && traceHold.sawBusy) {
+          releaseTraceOverlay(); // なぞり終えた
+        }
+      }
       break;
     case 'connection':
       if (message.connected === false) {

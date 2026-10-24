@@ -60,7 +60,7 @@ test("booted の台へ切り替えたら観測を撃つ(切り替えの全経路
 // busy の原因が画面取得・操作だと applyDevices が来ず、選択が黙って捨てられていた。
 test("busy が解けたら保留中の選択と観測を消化する", () => {
   const source = codeOnly(fs.readFileSync(path.join(root, "src/monitorLiveController.ts"), "utf8"));
-  const setBusy = methodBody(source, "private setBusy(busy: boolean): void {");
+  const setBusy = methodBody(source, "private setBusy(busy: boolean, observing = false): void {");
   assert.match(setBusy, /this\.pendingSelectId = undefined;\s*void this\.openDevice\(pendingId\);/,
     "保留中の選択を開くこと");
   assert.match(setBusy, /this\.openObservationPending = false;\s*void this\.refreshSnapshot\(\);/,

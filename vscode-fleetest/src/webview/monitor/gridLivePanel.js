@@ -59,6 +59,7 @@ let target = null;
 // 一致するときだけ採る
 let liveSelectedId = null;
 let busy = false;
+let busyObserving = false; // busy の原因が観測か(入力欄は観測の最中も送る = gridLiveControls.js の operationBlocked)
 let screen = null;
 let elements = [];
 let showBoxes = persistedState.gridLiveShowBoxes === true;
@@ -119,14 +120,25 @@ export function noteMirrorFrame(id) {
 
 // **操作と無関係に絵が変わったら、止まってから木を撮り直す**(ライブ操作タブの scheduleSettleRefresh と同じ考え方)。
 // OS のダイアログ(位置情報の許可等)・遅れて出る画面は操作の結果と撮り直しより後に出るので、撮り直さないと前の画面の
-// 木の枠が新しい絵の上に残る(実地: マップの位置情報の許可で、マップの画面の枠がダイアログの上に出た)。絵が変わった
-// 時点で枠は消し(要素一覧は消さない)、SETTLE_REFRESH_MS 新しいフレームが来なければ撮り直す。止まらない絵
-// (アニメーション)はライブ操作タブと同じ BOXES_SETTLE_CAP_MS で打ち切って撮る。
+// 木の枠が新しい絵の上に残る(実地: マップの位置情報の許可で、マップの画面の枠がダイアログの上に出た)。
+// SETTLE_REFRESH_MS 新しいフレームが来なければ撮り直し、届いた木で描き直す。**絵が変わった時点では枠を消さない**
+// (ライブ操作タブと同じ)—— 文字カーソルの点滅のように中身の変わらない描き替わりにも反応し、消す → 撮り直して描く →
+// 消す、で枠が点滅した(実地)。止まらない絵(アニメーション)は BOXES_SETTLE_CAP_MS で打ち切って撮るが、**打ち切りで
+// 撮った木が前と同じなら、その動きは中身を変えないとみなして以後の打ち切りをやめる**(capBackoff。点滅のたびに
+// 2.8 秒ごとの撮り直しを続けない)。止まったときの撮り直し・木の変化・操作で打ち切りを戻す。
 // 何もしないとき: 操作の途中(その流れが撮る)・ライブ操作が別のデバイスにつないでいる(接続しない規律)。
 // **実行中は枠を消すが撮り直さない**(整定のための自動の撮り直しは撃たない = XCUITest ブリッジをシナリオと取り合わない。
 // 実行中は絵がどんどん変わるので、古い木の枠を残すとずれたまま)
 let pictureSettleTimer = null;
 let pictureMotionSince = null; // 絵が動き始めた時刻(打ち切りの起点)。止まっていれば null
+let capBackoff = false;        // 打ち切りの撮り直しをやめている(打ち切りで撮った木が前と同じだった)
+let capRefreshPending = false; // 直近に撃った撮り直しが打ち切りによるもの(結果の木で capBackoff を決める)
+let lastTreeSig = null;        // 直近に採った木の署名(treeSignature)
+
+/** 木の同一性の署名(表示文字列と枠)。ref は撮るたびに振り直されるので含めない */
+function treeSignature(list) {
+  return JSON.stringify(list.map((e) => [e.line, e.frame.x, e.frame.y, e.frame.width, e.frame.height]));
+}
 
 function cancelPictureSettle() {
   if (pictureSettleTimer !== null) {
@@ -138,19 +150,22 @@ function cancelPictureSettle() {
 
 function notePictureChanged() {
   if (liveSelectedId !== target.id || opPhase !== null || awaitSettled) { return; }
-  if (!boxesStale) {
-    boxesStale = true;
-    clearBoxes();
+  if (isRunning(target.id)) {
+    // 撮り直さないので、古い木の枠は残さない(実行中は絵がどんどん変わる)
+    if (!boxesStale) {
+      boxesStale = true;
+      clearBoxes();
+    }
+    return;
   }
-  if (isRunning(target.id)) { return; }
   if (pictureSettleTimer !== null) { clearTimeout(pictureSettleTimer); }
   const now = performance.now();
   if (pictureMotionSince === null) { pictureMotionSince = now; }
-  const delay = now - pictureMotionSince >= BOXES_SETTLE_CAP_MS ? 0 : SETTLE_REFRESH_MS;
-  pictureSettleTimer = setTimeout(refreshAfterPictureSettled, delay);
+  const byCap = !capBackoff && now - pictureMotionSince >= BOXES_SETTLE_CAP_MS;
+  pictureSettleTimer = setTimeout(() => refreshAfterPictureSettled(byCap), byCap ? 0 : SETTLE_REFRESH_MS);
 }
 
-function refreshAfterPictureSettled() {
+function refreshAfterPictureSettled(byCap) {
   pictureSettleTimer = null;
   if (!target || liveSelectedId !== target.id || opPhase !== null || isRunning(target.id)) {
     pictureMotionSince = null;
@@ -158,10 +173,12 @@ function refreshAfterPictureSettled() {
   }
   if (busy) {
     // 処理中(ライブ操作タブの操作・撮り直し)。終わってから撃つ(その結果の木が先に来れば、ここで撮るのは重複だが害は無い)
-    pictureSettleTimer = setTimeout(refreshAfterPictureSettled, SETTLE_REFRESH_MS);
+    pictureSettleTimer = setTimeout(() => refreshAfterPictureSettled(byCap), SETTLE_REFRESH_MS);
     return;
   }
   pictureMotionSince = null;
+  if (!byCap) { capBackoff = false; } // 止まった = 動きの区切り。次の動きでは打ち切りを戻す
+  capRefreshPending = byCap;
   postAction({ type: 'refreshSnapshot' });
 }
 
@@ -219,6 +236,9 @@ function discardSnapshot() {
 
 function discardAll() {
   opPhase = null;
+  capBackoff = false;
+  capRefreshPending = false;
+  lastTreeSig = null;
   discardSnapshot();
 }
 
@@ -294,6 +314,7 @@ export function noteScreenAction() {
   cancelCap();
   cancelImageWait();
   cancelPictureSettle();
+  capBackoff = false;
   awaitSettled = false;
   opPhase = 'posted';
   boxesStale = true;
@@ -330,6 +351,7 @@ export function applyGridLivePanelMessage(message) {
     case 'busy': {
       const wasBusy = busy;
       busy = !!message.busy;
+      busyObserving = busy && !!message.observing;
       refreshBusy();
       // 操作が終わったのに直接の結果が来なかった(失敗): 次の snapshot か上限で描く
       if (wasBusy && !busy && opPhase === 'started') {
@@ -402,6 +424,15 @@ function adoptSnapshot(message) {
     awaitSettled = false;
     boxesStale = false;
   }
+  // 打ち切りの撮り直しの結果が前と同じ木なら、以後の打ち切りをやめる(notePictureChanged の doc)。木が変われば戻す
+  const sig = treeSignature(elements);
+  if (capRefreshPending && sig === lastTreeSig) {
+    capBackoff = true;
+  } else if (sig !== lastTreeSig) {
+    capBackoff = false;
+  }
+  capRefreshPending = false;
+  lastTreeSig = sig;
   renderElements();
 }
 
@@ -596,7 +627,7 @@ boxesToggle.addEventListener('change', () => {
 // 環境により keyDown が keyCode 229 で届くため両方除外する。busy 中も送らない(多重送信を防ぐ)
 typeInput.addEventListener('keydown', (event) => {
   if (event.key !== 'Enter' || event.isComposing || event.keyCode === 229) { return; }
-  if (busy) { return; }
+  if (busy && !busyObserving) { return; }
   event.preventDefault();
   if (postAction({ type: 'typeText', text: typeInput.value })) {
     typeInput.value = '';

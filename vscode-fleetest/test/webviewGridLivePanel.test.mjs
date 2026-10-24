@@ -661,15 +661,14 @@ const ALERT_ELEMENTS = [
 ];
 const refreshes = (gridActions) => gridActions().filter((m) => m.action.type === "refreshSnapshot").length;
 
-test("操作と無関係に絵が変わったら枠を消し、700ms 止まったら撮り直して新しい木(ダイアログ)の枠を描く", async (t) => {
+test("操作と無関係に絵が変わったら、700ms 止まってから撮り直して新しい木(ダイアログ)の枠を描く(変わった時点では消さない)", async (t) => {
   const { window, document, gridActions } = setupConnected(t);
   toggleBoxes(window, document, true);
   live(window, snapshot());
   assert.equal(boxRects(document).length, 2);
   const before = refreshes(gridActions);
   imageLoaded(window, document); // 配信・ポーリングで絵が変わった(遅れて出たダイアログ)
-  assert.equal(boxRects(document).length, 0, "絵が変わった時点で古い木の枠を消す");
-  assert.equal(rowsOf(document).length, 2, "要素一覧は消さない");
+  assert.equal(boxRects(document).length, 2, "変わった時点では消さない(文字カーソルの点滅でも消える = 点滅になる)");
   await sleep(400);
   assert.equal(refreshes(gridActions), before, "まだ止まっていない");
   await sleep(400);
@@ -713,4 +712,27 @@ test("実行中は絵が変わると枠を消すが、撮り直さない", async
   assert.equal(boxRects(document).length, 0, "古い木の枠は残さない");
   await sleep(800);
   assert.equal(refreshes(gridActions), before, "実行中は撮り直さない");
+});
+
+test("文字カーソルの点滅のように描き替わり続けても枠は消えず、打ち切りで撮った木が同じなら撮り直しを繰り返さない", async (t) => {
+  const { window, document, gridActions } = setupConnected(t);
+  toggleBoxes(window, document, true);
+  live(window, snapshot());
+  const before = refreshes(gridActions);
+  let minBoxes = Infinity;
+  let answered = false;
+  const started = Date.now();
+  // 9 秒 = 打ち切り(2.8 秒)で1回撮った後、止めなければ次の打ち切りが来る長さ(約 3 秒 + 2.8 秒)を含める
+  while (Date.now() - started < 9000) {
+    imageLoaded(window, document); // 0.5 秒ごとの点滅
+    minBoxes = Math.min(minBoxes, boxRects(document).length);
+    if (!answered && refreshes(gridActions) > before) {
+      live(window, snapshot()); // 打ち切りで撮った木 = 前と同じ(点滅は木を変えない)
+      answered = true;
+    }
+    await sleep(500);
+    minBoxes = Math.min(minBoxes, boxRects(document).length);
+  }
+  assert.equal(minBoxes, 2, "点滅の間、枠は一度も消えない");
+  assert.equal(refreshes(gridActions), before + 1, "打ち切りで1回撮り、木が同じならその後は点滅が続いても撮らない");
 });

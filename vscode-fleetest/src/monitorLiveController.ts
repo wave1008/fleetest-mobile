@@ -174,6 +174,13 @@ interface PendingServeRequest {
   readonly timeout: ReturnType<typeof setTimeout>;
 }
 
+/** 観測(画面を変えない busy)の最中に届いたら、観測の終わりを待って撃つ操作(handleWebviewMessage)。
+ * 画面の操作とツールバーだけ —— 一覧の取り直し・録画・インストール等は従来どおり busy で断る */
+const OBSERVATION_DEFERRABLE_ACTIONS: ReadonlySet<LiveFromWebviewMessage["type"]> = new Set<LiveFromWebviewMessage["type"]>([
+  "tapPoint", "doubleTapPoint", "pressPoint", "dragPoints", "tracePoints", "typeText",
+  "home", "appSwitcher", "pinch", "fold",
+]);
+
 export class MonitorLiveController implements vscode.Disposable {
   private devices: LiveDeviceOption[] = [];
   /** タイル右クリックで開いた**他の機械のデバイス**(registerRemoteDevice)。list-devices はこの Mac のデバイスしか
@@ -198,6 +205,10 @@ export class MonitorLiveController implements vscode.Disposable {
   /** 直近の snapshot の要素一覧。レコーディング中のヒットテスト・ref 解決に使う。 */
   private lastElements: readonly LiveElement[] = [];
   private busy = false;
+  /** busy の原因が**画面を変えない観測**(画面の撮り直し・デバイス一覧の取り直し)か。webview はこの間の画面の操作を
+   * 捨てずに送り、handleWebviewMessage が観測の終わりを待って撃つ(OBSERVATION_DEFERRABLE_ACTIONS)。操作の busy
+   * (runAction)では false —— その間は画面が変わっている最中なので、これまでどおり受け付けない */
+  private busyObserving = false;
   /** busy が解けるのを待つ手(waitForIdle)。setBusy(false) の後もなお busy でなければ全件起こす。 */
   private idleWaiters: Array<() => void> = [];
   /** 自動フレームの連続失敗回数(スキップ回はカウントしない)。3で connectionLost に切り替える
@@ -332,9 +343,10 @@ export class MonitorLiveController implements vscode.Disposable {
     this.deps.post({ type: "live", message });
   }
 
-  private setBusy(busy: boolean): void {
+  private setBusy(busy: boolean, observing = false): void {
     this.busy = busy;
-    this.post({ type: "busy", busy });
+    this.busyObserving = busy && observing;
+    this.post({ type: "busy", busy, observing: this.busyObserving });
     if (busy) {
       return;
     }
@@ -566,7 +578,7 @@ export class MonitorLiveController implements vscode.Disposable {
       return;
     }
 
-    this.setBusy(true);
+    this.setBusy(true, true);
     try {
       // --profile が無いと machines/ が複数のとき「マシン名が未登録」で落ちる(monitorDeviceOps.ts と同経路)
       const listArgs = ["api", "list-devices", "--project", resolution.project];
@@ -1388,7 +1400,7 @@ export class MonitorLiveController implements vscode.Disposable {
     if (this.busy) {
       return;
     }
-    this.setBusy(true);
+    this.setBusy(true, true);
     try {
       await this.fetchSnapshot();
     } catch (error) {
@@ -1717,6 +1729,13 @@ export class MonitorLiveController implements vscode.Disposable {
   // isMonitorFromWebviewMessage の "live" ケース)側で済んでいるためここでは行わない。
 
   handleWebviewMessage(message: LiveFromWebviewMessage): void {
+    // **観測の最中に届いた画面の操作は、観測が終わってから撃つ**(断らない)。画面の撮り直しは操作の結果のたびに
+    // 走る(webview の整定の撮り直し・グリッドビューの絵の変化)ので、その窓に押したタップが黙って消えていた
+    // (実地: 画面が止まっているのにタップが空振りした)。まだ撃っていない操作を後で撃つだけ = 撃ち直しではない
+    if (this.busy && this.busyObserving && OBSERVATION_DEFERRABLE_ACTIONS.has(message.type)) {
+      void this.waitForIdle(SERVE_REQUEST_TIMEOUT_MS).then(() => this.handleWebviewMessage(message));
+      return;
+    }
     switch (message.type) {
       case "refreshDevices":
         void this.refreshDevices();

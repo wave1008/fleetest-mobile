@@ -103,3 +103,22 @@ test("runAction: 操作記録に撃ったデバイスの id を付け、テス�
   assert.match(inject, /this\.postOperationLog\(label, event\.status !== "failed"\);/, "デバイスが分からない行には付けない");
   assert.match(source, /\.\.\.\(deviceId !== undefined \? \{ deviceId \} : \{\}\)/);
 });
+
+test("観測(画面の撮り直し・一覧の取り直し)は busy.observing を立て、その最中に届いた画面の操作は観測の終わりを待って撃つ", () => {
+  const source = fs.readFileSync(path.join(root, "src/monitorLiveController.ts"), "utf8");
+  const body = (start, end) => source.slice(source.indexOf(start), source.indexOf(end, source.indexOf(start)));
+  assert.match(body("private async refreshSnapshot(", "// ---- ライブ映像の供給元切り替え"), /this\.setBusy\(true, true\);/,
+    "画面の撮り直しは観測");
+  assert.match(body("private async runAction(", "private async runTapAtPoint("), /this\.setBusy\(true\);/,
+    "操作は観測ではない(画面が変わる最中は受け付けない)");
+  const handle = body("handleWebviewMessage(message: LiveFromWebviewMessage): void {", "switch (message.type) {");
+  assert.match(handle, /if \(this\.busy && this\.busyObserving && OBSERVATION_DEFERRABLE_ACTIONS\.has\(message\.type\)\) \{\s*void this\.waitForIdle\(SERVE_REQUEST_TIMEOUT_MS\)\.then\(\(\) => this\.handleWebviewMessage\(message\)\);\s*return;/,
+    "観測の最中の画面の操作は断らずに待って撃つ");
+  const set = body("const OBSERVATION_DEFERRABLE_ACTIONS", "]);");
+  for (const type of ["tapPoint", "doubleTapPoint", "pressPoint", "dragPoints", "tracePoints", "typeText", "home"]) {
+    assert.ok(set.includes(`"${type}"`), `${type} は観測の終わりを待って撃つ`);
+  }
+  for (const type of ["startRecord", "installApp", "launchApp", "refreshDevices"]) {
+    assert.ok(!set.includes(`"${type}"`), `${type} は従来どおり busy で断る`);
+  }
+});
