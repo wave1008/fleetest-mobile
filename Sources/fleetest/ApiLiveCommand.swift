@@ -1288,8 +1288,8 @@ struct ApiLiveServe: AsyncParsableCommand {
                                  screenMemo: LiveScreenMemo,
                                  runnerHealth: LiveRunnerHealthMemo) async {
         do {
-            ResidentProcessGuard.noteCommandProgress()
             let capturedAt = Date()
+            ResidentProcessGuard.noteCommandProgress()
             let png = try await driver.screenshot()
             let jpeg = try MonitorImage.downscaledJPEG(pngData: png, maxWidth: maxWidth)
             let snap = try await snapshotWithSessionFallback(driver: driver, follower: follower)
