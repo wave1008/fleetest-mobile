@@ -204,8 +204,19 @@ export interface ScenarioRunRecord {
   /** "notApplicable"(対象プラットフォーム外)/ "noWorker"(ワーカー不在等の事故)/ "interrupted"(run の中断で始まらなかった)。 */
   readonly skipKind?: string | null;
   readonly fixSuggestions?: readonly FixSuggestionRecord[] | null;
+  /** 実行中に人が介入して撃った操作(CLI が結果 JSON に残す)。欄が無い記録もある。
+   * 検証はしない(壊れた値で記録ごと捨てない。表示側 runDetail.js が形の合うものだけ描く) */
+  readonly humanOperations?: readonly HumanOperationRecord[] | null;
   /** 録画再生 UI 向け。ダッシュボードの表示には使わない(Array であることだけ検証)。 */
   readonly timeline?: readonly unknown[] | null;
+}
+
+/** 実行中に人が撃った操作1件。label は CLI が作る英語の事実文(翻訳しない)。 */
+export interface HumanOperationRecord {
+  /** ISO8601(ミリ秒) */
+  readonly at: string;
+  readonly label: string;
+  readonly ok: boolean;
 }
 
 /** 各欄は直近 N run の窓だけで計算されている(N = RunResultsQuery.recentScenarioRunsWindow)。 */

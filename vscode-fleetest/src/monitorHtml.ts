@@ -439,6 +439,10 @@ function renderDevicesPanel(): string {
         <span id="grid-view-title" class="lanes-title"></span>
         <!-- 選択中の台数(laneLog.js が書く。ラインビュー側と同じ規律で 0台でも出す) -->
         <span id="lanes-selection-status" class="header-count"></span>
+        <!-- 「バウンディングボックスを表示」(グリッドビューの操作パネルの枠。ユーザー決定で台数の右)。**1台表示のときだけ**
+             gridLivePanel.js が hidden を外す(枠は1台表示にしか無い)。見出し行のクリック(開閉)へ波及させないので
+             gridLivePanel.js が stopPropagation し、切り替えは change で受ける -->
+        <label class="profile-label header-toggle grid-view-boxes-toggle" hidden><input id="grid-live-show-boxes" type="checkbox" class="toggle-switch" role="switch">${t("panels.live.showBoxes")}</label>
       </div>
       <!-- グリッドビュー非表示中の「デバイスを待機しています」(出し入れは waitingNote.js) -->
       <div id="lanes-waiting" class="lanes-waiting" style="display: none;">${t("panels.devices.emptyMessage")}</div>
@@ -448,7 +452,13 @@ function renderDevicesPanel(): string {
            それ以外はこの置き場(非表示)へ戻す。ボタンの文言・説明はライブ操作タブと同じキー -->
       <div id="grid-live-parking" hidden>
         <div id="grid-live-controls" class="grid-live-controls">
-          <div class="screenshot-actions">
+          <!-- 縦のカラム = 3段(上: 戻る / 中: デバイス操作のグループ = 上下中央 / 下: 失敗の文言)。style.css の .grid-live-controls -->
+          <div class="grid-live-top">
+            <!-- 1台だけの選択を抜ける(deviceTiles.js の exitSingleSelection)。busy でも止めない(デバイスを触らない)。
+                 見た目は青い地の角丸の正方形に矢印だけ(ユーザー決定)。名前は aria-label、説明は title -->
+            <button id="grid-live-btn-back" class="grid-live-back" type="button" title="${t("panels.devices.gridBackTitle")}" aria-label="${t("panels.devices.gridBackButton")}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5M12 19l-7-7 7-7"/></svg></button>
+          </div>
+          <div class="screenshot-actions grid-live-device-group">
             <button id="grid-live-btn-home" class="secondary" type="button" title="${t("panels.live.homeButtonTitle")}">${t("panels.live.homeButton")}</button>
             <button id="grid-live-btn-app-switcher" class="secondary" type="button" title="${t("panels.live.appSwitcherTitle")}">${t("panels.live.appSwitcherButton")}</button>
             <button id="grid-live-btn-zoom-in" class="secondary" type="button" title="${t("panels.live.zoomInTitle")}">${t("panels.live.zoomInButton")}</button>
@@ -460,7 +470,33 @@ function renderDevicesPanel(): string {
               title="${t("panels.live.traceModeTitle")}">${t("panels.live.traceModeButton")}</span>
             <span class="screenshot-hint" title="${t("panels.devices.gridGestureHintTitle")}">${t("panels.live.gestureHint")}</span>
           </div>
-          <div id="grid-live-error" class="grid-live-error"></div>
+          <div class="grid-live-bottom">
+            <div id="grid-live-error" class="grid-live-error"></div>
+          </div>
+        </div>
+        <!-- 入力するテキスト。1台表示のとき gridLivePanel.js が拡大表示の絵のすぐ下(.lane-preview-frame の直後)へ移す
+             (ユーザー決定)。文言はライブ操作タブと同じキー -->
+        <div id="grid-live-type-row" class="grid-live-type-row">
+          <input id="grid-live-type-text" type="text" placeholder="${t("panels.live.typeTextPlaceholder")}">
+        </div>
+        <!-- 1台表示のとき gridLivePanel.js が .lane-pair の中の操作カラムの右隣へ移す(要素一覧・入力するテキスト・操作記録)。
+             文言はライブ操作タブと同じキー。インストール・レコーディング・アプリを起動は置かない -->
+        <div id="grid-live-panel" class="grid-live-panel">
+          <div class="grid-live-elements-section">
+            <div class="elements-header">
+              <span>${t("panels.live.elementsHeader")}</span>
+              <button id="grid-live-btn-refresh-snapshot" class="secondary" type="button" title="${t("panels.live.refreshSnapshotTitle")}">${t("panels.live.refreshSnapshot")}</button>
+            </div>
+            <div id="grid-live-elements-empty" class="grid-live-elements-empty">${t("panels.live.gridElementsEmpty")}</div>
+            <div id="grid-live-elements-list" class="elements-list"></div>
+          </div>
+          <div class="grid-live-oplog-section">
+            <div class="oplog-header">
+              <span>${t("panels.live.oplogHeader")}</span>
+              <button id="grid-live-btn-oplog-clear" class="secondary" type="button">${t("panels.live.oplogClear")}</button>
+            </div>
+            <div id="grid-live-oplog-list" class="oplog-list"></div>
+          </div>
         </div>
       </div>
     </div>

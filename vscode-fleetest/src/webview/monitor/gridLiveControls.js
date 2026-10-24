@@ -1,27 +1,34 @@
 // グリッドビュー(1台だけ選択したときの拡大表示)のライブ操作: ツールバー(ホーム・タスク切替・拡大・縮小・
 // 折りたたみ機なら折りたたむ・開く)と
-// 画面の操作(クリック = タップ / Option+クリック = ダブルタップ / Shift+ドラッグ = 軌跡)。送り先は host の
+// 画面の操作(クリック = タップ / Option+クリック = ダブルタップ / 500ms 以上ホールド = 長押し /
+// ドラッグ = スワイプ / Shift+ドラッグ = 軌跡)。ライブ操作タブと同じ。送り先は host の
 // MonitorLiveController.handleGridAction(ライブ操作タブと同じ serve。選択中のデバイスが違えば切り替える)。
 // 契約: monitorWebviewMessages.ts の gridLiveAction / liveModel.ts の GridLiveAction・gridActionError。
 // ツールバーの DOM は monitorHtml.ts(#grid-live-controls。文言は host 側 t() 済み)が持ち、ここで
-// 1台表示の .lane-preview の末尾へ移す(laneLog.js の updateLaneVisibility が syncGridLiveControls を呼ぶ)。
+// 1台表示の .lane-pair の中、拡大表示の右隣へ縦のカラムとして移す(laneLog.js の updateLaneVisibility が
+// syncGridLiveControls を呼ぶ)。
 // 画面(絵)の上のダブルクリックは2回のタップで、「このデバイスのみ選択」の切り替えは絵の外側だけ
-// (laneLog.js が isGridLiveScreenTarget で除く)。素のドラッグ(スワイプ)・長押しは送らない。
+// (laneLog.js が isGridLiveScreenTarget で除く)。
+// 要素一覧・枠・入力するテキスト・操作記録のパネルは gridLivePanel.js(ここから postAction を渡す)。
+// **テスト実行中でも操作を止めない**(ユーザー決定: 介入は利用者の自己責任)。run が使用中のデバイスへの操作は
+// serve が台帳へ残し、そのシナリオの結果に「人の操作」として載る(HumanOperationLedger)。
 
 import { t } from '../i18n.js';
 import { vscode } from './vscodeApi.js';
 import { thinTracePoints } from './traceThinning.js';
 import { setHoverTip } from './hoverTip.js';
-import { liveRemoteTargetFor } from './deviceTiles.js';
-import { DRAG_MIN_PX, TRACE_MAX_MS } from './liveTab.js';
+import { exitSingleSelection, liveRemoteTargetFor } from './deviceTiles.js';
+import { DRAG_MIN_PX, LONG_PRESS_MS, TRACE_MAX_MS } from './liveTab.js';
 import { relayoutPreviewsForResize } from './laneLog.js';
 import { bindFoldButtons } from './foldButtons.js';
+import { applyGridLivePanelMessage, initGridLivePanel, noteScreenAction, syncGridLivePanel } from './gridLivePanel.js';
 
 const parking = document.getElementById('grid-live-parking');
 const controls = document.getElementById('grid-live-controls');
 const errorEl = document.getElementById('grid-live-error');
 const traceIndicator = document.getElementById('grid-live-trace-indicator');
-const buttons = [...controls.querySelectorAll('button')];
+// 「戻る」は選択を変えるだけでデバイスを触らないので busy の対象にしない
+const buttons = [...controls.querySelectorAll('button')].filter((button) => button.id !== 'grid-live-btn-back');
 
 const svgNS = 'http://www.w3.org/2000/svg';
 const dragOverlay = document.createElementNS(svgNS, 'svg');
@@ -30,7 +37,8 @@ dragOverlay.setAttribute('aria-hidden', 'true');
 const dragTrace = document.createElementNS(svgNS, 'polyline');
 const dragStartDot = document.createElementNS(svgNS, 'circle');
 dragStartDot.setAttribute('r', '6');
-dragOverlay.append(dragTrace, dragStartDot);
+const dragLine = document.createElementNS(svgNS, 'line');
+dragOverlay.append(dragLine, dragTrace, dragStartDot);
 
 // 操作の対象(1台表示のデバイス)。1台表示でない間は null
 let target = null;
@@ -39,6 +47,9 @@ let target = null;
 let liveSelectedId = null;
 let busy = false;
 let dragStart = null;
+function applyButtonState() {
+  for (const button of buttons) { button.disabled = busy; }
+}
 
 /** id: 1台表示のデバイス(1台表示でなければ null)。previewEl: その拡大表示の .lane-preview */
 export function syncGridLiveControls(id, previewEl) {
@@ -52,6 +63,7 @@ export function syncGridLiveControls(id, previewEl) {
     refreshFoldButtons();
   }
   if (id === null || !previewEl) {
+    syncGridLivePanel(null, null);
     return;
   }
   if (!target) {
@@ -59,10 +71,15 @@ export function syncGridLiveControls(id, previewEl) {
     previewEl.addEventListener('pointerdown', handlePointerDown);
     refreshFoldButtons();
   }
-  // 拡大表示は作り直すときに中身を空にする(deviceTiles.js の attachDeviceMirror)ので毎回見る
-  if (controls.parentElement !== previewEl) {
-    previewEl.appendChild(controls);
+  // 操作のカラムは .lane-pair の中で拡大表示の右隣(拡大表示 | 操作 | 操作パネル | 実行ログ)。laneLog.js の
+  // syncLogMirror が組を作り直す(拡大表示を取り出して入れ直す)ので毎回位置を確かめる。**ずれているときだけ動かす**
+  // (毎周動かすとマウスを載せたボタンのツールチップが点滅する)
+  if (previewEl.parentElement && previewEl.nextElementSibling !== controls) {
+    previewEl.after(controls);
   }
+  // パネルはこのカラムの右隣(先にカラムを置いてから並べる = 2つが互いを押しのけて毎周入れ替わらない)
+  syncGridLivePanel(id, previewEl, controls);
+  // 拡大表示は作り直すときに中身を空にする(deviceTiles.js の attachDeviceMirror)ので毎回見る
   if (dragOverlay.parentElement !== previewEl) {
     previewEl.appendChild(dragOverlay);
   }
@@ -75,13 +92,14 @@ export function isGridLiveScreenTarget(el) {
 
 /** host からの live メッセージ(main.js が liveTab.js と両方へ配る)。 */
 export function applyGridLiveMessage(message) {
+  applyGridLivePanelMessage(message);
   switch (message.type) {
     case 'devices':
       liveSelectedId = message.selectedId ?? null;
       break;
     case 'busy':
       busy = !!message.busy;
-      for (const button of buttons) { button.disabled = busy; }
+      applyButtonState();
       break;
     case 'actionError':
       if (target && liveSelectedId === target.id) {
@@ -106,15 +124,21 @@ function showError(text, neutral = false) {
   relayoutPreviewsForResize();
 }
 
+/** 送れたら true(busy・1台表示でないときは送らない) */
 function postAction(action) {
   if (!target || busy) {
-    return;
+    return false;
   }
   showError('');
   const remote = liveRemoteTargetFor(target.id);
   vscode.postMessage({ type: 'gridLiveAction', id: target.id, action, ...(remote ? { remote } : {}) });
+  // 「更新」以外は画面を変える操作 = パネルの枠を消す(gridLivePanel.js の枠の鮮度)
+  if (action.type !== 'refreshSnapshot') { noteScreenAction(); }
+  return true;
 }
+initGridLivePanel({ postAction });
 
+document.getElementById('grid-live-btn-back').addEventListener('click', () => exitSingleSelection());
 document.getElementById('grid-live-btn-home').addEventListener('click', () => postAction({ type: 'home' }));
 document.getElementById('grid-live-btn-app-switcher').addEventListener('click', () => postAction({ type: 'appSwitcher' }));
 document.getElementById('grid-live-btn-zoom-in').addEventListener('click', () => postAction({ type: 'pinch', zoomIn: true }));
@@ -166,13 +190,12 @@ function handlePointerDown(event) {
   // **押した時点の修飾キーを採る**(liveTab.js の handleScreenPointerDown と同じ理由)
   dragStart = {
     id: target.id, media, pointerId: event.pointerId, downAt: performance.now(), x, y,
-    doubleTap: event.altKey, trace: event.shiftKey, moved: false,
+    doubleTap: event.altKey, trace: event.shiftKey, moveAt: null,
     points: [{ x, y, t: 0 }],
   };
-  if (dragStart.trace) {
-    placeOverlay(rect);
-    updateOverlay(x, y);
-  }
+  // 構成中のジェスチャを見せる(デバイス側のスワイプは離したときに1回で実行される。liveTab.js の drag-overlay と同じ)
+  placeOverlay(rect);
+  updateOverlay(x, y);
 }
 
 // 軌跡の SVG を絵の矩形にぴったり重ねる(.lane-preview の padding box 基準)
@@ -186,10 +209,18 @@ function placeOverlay(mediaRect) {
   dragOverlay.setAttribute('viewBox', `0 0 ${mediaRect.width} ${mediaRect.height}`);
 }
 
+// 軌跡モードは送る中身(指の軌跡)をそのまま描く。直線を描くと送るものと見えるものが食い違う
 function updateOverlay(x, y) {
   dragStartDot.setAttribute('cx', dragStart.x);
   dragStartDot.setAttribute('cy', dragStart.y);
-  dragTrace.setAttribute('points', dragStart.points.map((p) => p.x + ',' + p.y).concat([x + ',' + y]).join(' '));
+  dragLine.setAttribute('x1', dragStart.x);
+  dragLine.setAttribute('y1', dragStart.y);
+  dragLine.setAttribute('x2', x);
+  dragLine.setAttribute('y2', y);
+  dragOverlay.classList.toggle('trace', dragStart.trace);
+  if (dragStart.trace) {
+    dragTrace.setAttribute('points', dragStart.points.map((p) => p.x + ',' + p.y).concat([x + ',' + y]).join(' '));
+  }
   dragOverlay.classList.add('visible');
 }
 
@@ -205,14 +236,15 @@ window.addEventListener('pointermove', (event) => {
   }
   const rect = dragStart.media.getBoundingClientRect();
   const { x, y } = clampToRect(event, rect);
-  if (!dragStart.moved && Math.hypot(x - dragStart.x, y - dragStart.y) >= DRAG_MIN_PX) {
-    dragStart.moved = true;
+  if (dragStart.moveAt === null && Math.hypot(x - dragStart.x, y - dragStart.y) >= DRAG_MIN_PX) {
+    dragStart.moveAt = performance.now();
   }
   if (!dragStart.trace) {
+    updateOverlay(x, y);
     return;
   }
   const elapsed = performance.now() - dragStart.downAt;
-  if (elapsed > TRACE_MAX_MS && dragStart.moved) {
+  if (elapsed > TRACE_MAX_MS && dragStart.moveAt !== null) {
     // なぞっている最中に上限を超えたら中止して言う(離すまで気付けないと操作が無駄になる)
     cancelDrag();
     showError(t('wvMonitor.live.traceTooLong', { max: TRACE_MAX_MS / 1000 }));
@@ -234,19 +266,32 @@ window.addEventListener('pointerup', (event) => {
   const rect = start.media.getBoundingClientRect();
   const { x, y } = clampToRect(event, rect);
   const display = { displayWidth: rect.width, displayHeight: rect.height };
+  const upAt = performance.now();
   if (Math.hypot(x - start.x, y - start.y) < DRAG_MIN_PX) {
-    // 動かさずに離した: Option ならダブルタップ、それ以外はタップ(Shift だけのクリックもタップ = ライブ操作タブと同じ)
+    // 動かさずに離した: Option ならダブルタップ、LONG_PRESS_MS 以上押していれば長押し、それ以外はタップ
+    // (Shift だけのクリックもタップ = ライブ操作タブと同じ)
+    const holdMs = Math.max(0, Math.round(upAt - start.downAt));
     if (start.doubleTap) {
       postAction({ type: 'doubleTapPoint', clickX: x, clickY: y, ...display });
+    } else if (holdMs >= LONG_PRESS_MS) {
+      postAction({ type: 'pressPoint', clickX: x, clickY: y, ...display, holdMs });
     } else {
       postAction({ type: 'tapPoint', clickX: x, clickY: y, ...display });
     }
   } else if (start.trace) {
-    const endT = Math.max(1, Math.round(performance.now() - start.downAt));
+    const endT = Math.max(1, Math.round(upAt - start.downAt));
     postAction({
       type: 'tracePoints',
       points: thinTracePoints(start.points.concat([{ x, y, t: endT }])),
       ...display,
+    });
+  } else {
+    const moveAt = start.moveAt ?? upAt;
+    postAction({
+      type: 'dragPoints',
+      fromX: start.x, fromY: start.y, toX: x, toY: y, ...display,
+      pressMs: Math.max(0, Math.round(moveAt - start.downAt)),
+      dragMs: Math.max(1, Math.round(upAt - moveAt)),
     });
   }
 });

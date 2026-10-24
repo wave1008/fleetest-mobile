@@ -71,6 +71,11 @@ function reorderLanes() {
 // worker id(またはタイルが存在しない全体レーン)ごとの「実行中」状態。
 export const runningWorkers = new Set();
 
+/** そのデバイス(タイルの id = `platform:name`)がシナリオを回しているか。ライブ操作タブが実行中の自動の撮り直しを止めるのに使う */
+export function isDeviceRunning(id) {
+  return runningWorkers.has(id);
+}
+
 function setTileRunning(id, running) {
   if (running) {
     runningWorkers.add(id);

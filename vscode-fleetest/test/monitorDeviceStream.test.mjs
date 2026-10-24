@@ -434,7 +434,7 @@ test("プラットフォームの配信を切っていればリモートも起�
   }
 });
 
-test("未登録のリモートデバイスは張らない(向こうの device-stream が名前を解決できない)", async () => {
+test("未登録のリモートの実機は張らない(向こうの device-stream は実機を名前でしか受けない)", async () => {
   // 典型: WiFi ペアリングだけで別の機械から見えている実機。向こうの monitor は
   // 「未登録だが connected」で報告するが、device-stream は登録簿の名前でしか宛先を
   // 解決できず(ApiDeviceStreamCommand.swift)、必ず exit 64 → 約30秒周期の再試行ループになる
@@ -449,6 +449,54 @@ test("未登録のリモートデバイスは張らない(向こうの device-st
     controller.applyDevices([{ ...remoteDevice, kind: "physical", registered: false }]);
     assert.equal(await waitForArgv(dir, "fleetest", 300), undefined,
       "登録簿に無い名前で device-stream を張りに行ってはいけない");
+  } finally {
+    controller.setVisible(false);
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("未登録のリモートの仮想デバイスは宛先(udid / serial)を直に渡して張る — 登録簿を引かない", async () => {
+  // 張らないとモニターのポーリング(2秒毎)でしか絵が変わらず、グリッドビューで操作した結果が遅れて見えた(実地)
+  const { dir, binaryPath } = makeMockBinaryDir(["fleetest"]);
+  const { deps } = makeDeps(binaryPath);
+  deps.getConfig = () => ({
+    binaryPath, iosStreamEnabled: true, androidStreamEnabled: true,
+    streamCodec: "h264", liveFps: 12, monitorMaxWidth: 960, project: "demo", profile: "ios-inapp",
+  });
+  const controller = new MonitorDeviceStreamController(deps);
+  try {
+    controller.applyDevices([{ ...remoteDevice, kind: "virtual", registered: false }]);
+    const argv = await waitForArgv(dir, "fleetest");
+    assert.ok(argv, "未登録でも仮想デバイスなら張る");
+    assert.match(argv, /remote exec M1Max -- api device-stream/);
+    assert.match(argv, /--platform ios --name iPhone 17 Pro/, "名前は控え(StreamLease)の鍵としてそのまま渡す");
+    assert.match(argv, /--udid AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE/, "宛先は向こうのモニターが観測した udid");
+    assert.doesNotMatch(argv, /--project|--profile/, "登録簿を引かない");
+    assert.match(argv, /--codec h264/);
+  } finally {
+    controller.setVisible(false);
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("未登録のリモートの Android Emulator は --serial で張る", async () => {
+  const { dir, binaryPath } = makeMockBinaryDir(["fleetest"]);
+  const { deps } = makeDeps(binaryPath);
+  deps.getConfig = () => ({
+    binaryPath, iosStreamEnabled: true, androidStreamEnabled: true,
+    streamCodec: "h264", liveFps: 12, monitorMaxWidth: 960, project: "demo",
+  });
+  const controller = new MonitorDeviceStreamController(deps);
+  try {
+    controller.applyDevices([{
+      id: "android:M1Ultra/Pixel 9", name: "Pixel 9", platform: "android", state: "connected",
+      serial: "emulator-5554", machine: "M1Ultra", detail: "", kind: "virtual", registered: false,
+    }]);
+    const argv = await waitForArgv(dir, "fleetest");
+    assert.ok(argv);
+    assert.match(argv, /--platform android --name Pixel 9/);
+    assert.match(argv, /--serial emulator-5554/);
+    assert.doesNotMatch(argv, /--project/);
   } finally {
     controller.setVisible(false);
     fs.rmSync(dir, { recursive: true, force: true });

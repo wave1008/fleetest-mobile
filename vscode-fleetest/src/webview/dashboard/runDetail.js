@@ -238,6 +238,49 @@ function errorLogsBlock(errorLogs) {
   return wrap;
 }
 
+/** 形の合う記録だけ(欠けた・壊れた値は捨てる。記録ごと落とさない) */
+function humanOperationsOf(scenario) {
+  const list = Array.isArray(scenario.humanOperations) ? scenario.humanOperations : [];
+  return list.filter((op) => op && typeof op.label === 'string');
+}
+
+// **ローカル時刻**で出す(at は UTC の ISO = 末尾 Z。文字列から切り出すと UTC の時刻になり、同じ操作を載せた
+// Markdown レポート(HumanOperationReport = ローカル時刻)と食い違う)。読めない値は '–'
+function timeOfDay(iso) {
+  const date = new Date(String(iso));
+  if (Number.isNaN(date.getTime())) { return '–'; }
+  const pad = (n) => String(n).padStart(2, '0');
+  return pad(date.getHours()) + ':' + pad(date.getMinutes()) + ':' + pad(date.getSeconds());
+}
+
+function humanOperationsBlock(operations) {
+  const wrap = document.createElement('div');
+  wrap.className = 'detail-subsection';
+  const h = document.createElement('h3');
+  h.textContent = t('wvDashboard.runDetail.headingHumanOperations');
+  h.title = t('wvDashboard.runDetail.humanOperationsNote');
+  const table = document.createElement('table');
+  table.className = 'dash-table human-operations';
+  const head = document.createElement('tr');
+  for (const key of [t('wvDashboard.runDetail.colTime'), t('wvDashboard.runDetail.colOperation')]) {
+    const th = document.createElement('th');
+    th.textContent = key;
+    head.appendChild(th);
+  }
+  const thead = document.createElement('thead');
+  thead.appendChild(head);
+  const tbody = document.createElement('tbody');
+  for (const op of operations) {
+    const tr = document.createElement('tr');
+    if (op.ok === false) tr.className = 'human-operation-failed';
+    tr.append(td(timeOfDay(op.at)), td((op.ok === false ? '✗ ' : '') + op.label));
+    tbody.appendChild(tr);
+  }
+  table.append(thead, tbody);
+  wrap.append(h, table);
+  return wrap;
+}
+
 function scenarioDetailRow(scenario, colSpan) {
   const tr = document.createElement('tr');
   tr.className = 'step-detail-row';
@@ -251,6 +294,10 @@ function scenarioDetailRow(scenario, colSpan) {
   }
   if (scenario.errorLogs && scenario.errorLogs.length > 0) {
     wrap.appendChild(errorLogsBlock(scenario.errorLogs));
+  }
+  const humanOperations = humanOperationsOf(scenario);
+  if (humanOperations.length > 0) {
+    wrap.appendChild(humanOperationsBlock(humanOperations));
   }
 
   const actions = document.createElement('div');
@@ -292,7 +339,8 @@ function scenarioRow(scenario, colSpan) {
     idCell.title = scenario.title;
   }
 
-  if (scenario.passed) {
+  // 成功したシナリオは畳む詳細が無い。ただし人の操作が残っていれば開けるようにする
+  if (scenario.passed && humanOperationsOf(scenario).length === 0) {
     return [tr];
   }
   tr.className = 'scenario-row-clickable';

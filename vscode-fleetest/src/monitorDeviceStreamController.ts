@@ -225,10 +225,18 @@ export class MonitorDeviceStreamController {
         if (!enabled) {
           continue;
         }
-        // 未登録デバイスは張らない —— 向こうの device-stream は登録簿の名前でしか宛先を
-        // 解決できず(ApiDeviceStreamCommand.swift)、必ず exit 64 → 約30秒周期の再試行ループになる。
-        // 典型は WiFi ペアリングだけで見えている別機の実機(wired 不在だと mergedDevices も隠さない)
-        if (device.registered === false) {
+        // **未登録の仮想デバイスは宛先を直に渡す**(`--udid` / `--serial`。ApiDeviceStreamCommand.directTarget)——
+        // 登録簿の名前では引けないので、向こうのモニターが観測した udid / serial をそのまま使う。張らないと
+        // 絵がモニターのポーリング(2秒毎)でしか変わらず、グリッドビューで操作した結果が遅れて見えていた(実地)。
+        // **未登録の実機は張らない**(向こうは実機を名前でしか受けない = 必ず exit 64 → 約30秒周期の再試行ループ。
+        // 典型は WiFi ペアリングだけで見えている別機の実機。実機の配信はどのみちポーリング)
+        const unregistered = device.registered === false;
+        const directTarget = !unregistered || device.kind === "physical"
+          ? undefined
+          : device.platform === "ios"
+            ? (device.udid ? ["--udid", device.udid] : undefined)
+            : (device.serial ? ["--serial", device.serial] : undefined);
+        if (unregistered && !directTarget) {
           continue;
         }
         qualifying.set(device.id, {
@@ -250,8 +258,8 @@ export class MonitorDeviceStreamController {
             "api", "device-stream", "--device-machine", "local",
             "--platform", device.platform, "--name", device.name,
             "--fps", String(config.liveFps), "--max-width", String(config.monitorMaxWidth),
-            ...remoteProjectArgs(),
-            ...(config.profile ? ["--profile", config.profile] : []),
+            // 宛先を直に渡すときは登録簿を引かない(プロジェクト・プロファイルは要らない)
+            ...(directTarget ?? [...remoteProjectArgs(), ...(config.profile ? ["--profile", config.profile] : [])]),
             ...(device.kind === "physical" ? [] : codecArgs),
           ],
         });

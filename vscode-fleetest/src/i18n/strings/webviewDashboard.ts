@@ -55,6 +55,13 @@ export const webviewDashboardStrings = {
   "wvDashboard.runDetail.headingBlankRepairs": { ja: "blank 修復", en: "Blank Repairs" },
   "wvDashboard.runDetail.headingBlankExclusions": { ja: "blank 除外", en: "Blank Exclusions" },
   "wvDashboard.runDetail.headingScenarios": { ja: "シナリオ", en: "Scenarios" },
+  "wvDashboard.runDetail.headingHumanOperations": { ja: "人の操作", en: "Human operations" },
+  "wvDashboard.runDetail.humanOperationsNote": {
+    ja: "シナリオの実行中に利用者がモニターから撃った操作です(入力した文字列は記録されません)",
+    en: "Operations a user sent from the monitor while the scenario was running (typed text is not recorded)",
+  },
+  "wvDashboard.runDetail.colTime": { ja: "時刻", en: "Time" },
+  "wvDashboard.runDetail.colOperation": { ja: "操作", en: "Operation" },
   "wvDashboard.runDetail.headingErrorLogs": { ja: "エラーログ", en: "Error Logs" },
   "wvDashboard.runDetail.colKind": { ja: "種別", en: "Kind" },
   "wvDashboard.runDetail.colWorker": { ja: "worker", en: "worker" },

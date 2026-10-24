@@ -2,7 +2,8 @@
 // (実 HTML + 実バンドルを jsdom で動かす)。
 //
 // 契約: **1台だけ選択したとき**だけ拡大表示の下にツールバー(ホーム・タスク切替・拡大・縮小・軌跡の表示灯・
-// 修飾キーの案内)を出し、操作は gridLiveAction で host へ送る。絵の上のクリックはタップで、
+// 修飾キーの案内)を出し、操作は gridLiveAction で host へ送る。絵の上のクリックはタップ・素のドラッグはスワイプ・
+// 500ms 以上のホールドは長押し(ライブ操作タブと同じ)で、
 // **絵の上のダブルクリックは選択の切り替えにしない**(切り替えは絵の外側のダブルクリック)。
 
 import assert from "node:assert/strict";
@@ -111,17 +112,29 @@ function pointerEvent(window, type, { x, y, pointerId = 1, button = 0, altKey = 
 }
 
 const controlsHost = (document) => document.getElementById("grid-live-controls").parentElement;
+/** 1台表示の操作カラム = .lane-pair の中で拡大表示の右隣 */
+const inSingleView = (document) => {
+  const controls = document.getElementById("grid-live-controls");
+  return controls.parentElement.classList.contains("lane-pair")
+    && !!controls.previousElementSibling?.classList.contains("lane-preview");
+};
 
-test("ツールバーは1台選択のときだけ拡大表示の中に出し、2台に増やすと置き場へ戻す", (t) => {
+test("ツールバーは1台選択のときだけ拡大表示の右隣のカラムに出し、2台に増やすと置き場へ戻す", (t) => {
   const { window, document } = createWebview();
   t.after(() => window.close());
   sendDevices(window, 2);
   assert.equal(controlsHost(document).id, "grid-live-parking", "選択0台では出さない");
 
   clickTile(document, 0);
-  assert.ok(controlsHost(document).classList.contains("lane-preview"), "1台なら拡大表示の中");
-  const labels = [...document.querySelectorAll("#grid-live-controls button")].filter((b) => !b.hidden).map((b) => b.textContent);
-  assert.deepEqual(labels, ["ホーム", "タスク切替", "拡大", "縮小"]);
+  assert.ok(inSingleView(document), "1台なら拡大表示の右隣のカラム");
+  // 「戻る」は矢印だけのアイコンボタン = 名前は aria-label
+  const labels = [...document.querySelectorAll("#grid-live-controls button")].filter((b) => !b.hidden)
+    .map((b) => b.getAttribute("aria-label") || b.textContent);
+  assert.deepEqual(labels, ["戻る", "ホーム", "タスク切替", "拡大", "縮小"]);
+  const back = document.getElementById("grid-live-btn-back");
+  assert.equal(back.textContent.trim(), "", "文字は出さない(矢印だけ)");
+  assert.ok(back.querySelector("svg"), "矢印のアイコン");
+  assert.ok(back.title, "説明はツールチップ");
   assert.equal(document.getElementById("grid-live-trace-indicator").textContent, "軌跡");
   assert.match(document.querySelector("#grid-live-controls .screenshot-hint").textContent, /Option\(⌥\)\+クリック/);
 
@@ -157,7 +170,7 @@ test("クリックはタップ・Option+クリックはダブルタップを送�
   clickTile(document, 0);
   document.querySelectorAll("#preview-grid .lane-preview")[0]
     .dispatchEvent(new window.MouseEvent("dblclick", { bubbles: true, cancelable: true }));
-  assert.equal(controlsHost(document).classList.contains("lane-preview"), true, "1台表示になった");
+  assert.equal(inSingleView(document), true, "1台表示になった");
   send(window, { type: "frame", device: "d0", jpegBase64: "QUJD", stream: true });
   const media = document.querySelector("#preview-grid .lane-preview .lane-preview-media");
   media.getBoundingClientRect = () => ({ left: 100, top: 50, width: 200, height: 400, right: 300, bottom: 450, x: 100, y: 50 });
@@ -171,29 +184,61 @@ test("クリックはタップ・Option+クリックはダブルタップを送�
   ]);
   // クリックを続けて押したときに来る dblclick は2回のタップで、選択の切り替えにしない
   media.dispatchEvent(new window.MouseEvent("dblclick", { bubbles: true, cancelable: true }));
-  assert.equal(controlsHost(document).classList.contains("lane-preview"), true, "1台表示のまま");
+  assert.equal(inSingleView(document), true, "1台表示のまま");
 
-  // 素のドラッグは送らない
+  // 素のドラッグはスワイプ(dragPoints)として送る
   media.dispatchEvent(pointerEvent(window, "pointerdown", { x: 150, y: 150 }));
   window.dispatchEvent(pointerEvent(window, "pointermove", { x: 200, y: 250 }));
   window.dispatchEvent(pointerEvent(window, "pointerup", { x: 200, y: 250 }));
-  assert.equal(gridActions().length, 1, "素のドラッグはデバイスへ送らない");
+  assert.equal(gridActions().length, 2, "素のドラッグもデバイスへ送る");
+  const drag = gridActions()[1].action;
+  assert.equal(drag.type, "dragPoints");
+  assert.deepEqual([drag.fromX, drag.fromY, drag.toX, drag.toY, drag.displayWidth, drag.displayHeight], [50, 100, 100, 200, 200, 400]);
+  assert.ok(drag.pressMs >= 0 && drag.dragMs >= 1, "押してから動かすまで・動かしてから離すまでの時間");
 
   const down = pointerEvent(window, "pointerdown", { x: 150, y: 150, altKey: true });
   media.dispatchEvent(down);
   assert.equal(down.defaultPrevented, true);
   window.dispatchEvent(pointerEvent(window, "pointerup", { x: 151, y: 151, altKey: true }));
-  assert.deepEqual(gridActions().map((m) => m.action).slice(1), [
+  assert.deepEqual(gridActions().map((m) => m.action).slice(2), [
     { type: "doubleTapPoint", clickX: 51, clickY: 101, displayWidth: 200, displayHeight: 400 },
   ]);
 
   media.dispatchEvent(new window.MouseEvent("dblclick", { bubbles: true, cancelable: true, altKey: true }));
-  assert.equal(controlsHost(document).classList.contains("lane-preview"), true, "1台表示のまま");
+  assert.equal(inSingleView(document), true, "1台表示のまま");
 
   // 絵の外側(デバイス名の段)のダブルクリックは従来どおり選択の切り替え(直前の2台へ戻る)
   document.querySelector("#preview-grid .lane-preview .lane-preview-header")
     .dispatchEvent(new window.MouseEvent("dblclick", { bubbles: true, cancelable: true }));
   assert.equal(controlsHost(document).id, "grid-live-parking", "2台選択へ戻った");
+});
+
+const selectedTileCount = (document) => document.querySelectorAll("#grid .tile.selected").length;
+
+test("「戻る」は「このデバイスのみ選択」の直前の選択へ戻し、控えが無ければ選択を解除する", (t) => {
+  const { window, document, gridActions } = createWebview();
+  t.after(() => window.close());
+  sendDevices(window, 3);
+  // 2台選択 → 絵の外側のダブルクリックで1台だけ → 戻るで2台へ
+  clickTile(document, 1);
+  clickTile(document, 0);
+  document.querySelectorAll("#preview-grid .lane-preview")[0]
+    .dispatchEvent(new window.MouseEvent("dblclick", { bubbles: true, cancelable: true }));
+  assert.equal(selectedTileCount(document), 1);
+  document.getElementById("grid-live-btn-back").click();
+  assert.equal(selectedTileCount(document), 2, "直前の2台へ戻った");
+  assert.equal(controlsHost(document).id, "grid-live-parking", "1台表示を抜けた");
+
+  // タイルを1枚だけ選んだ(控えが無い)ときは選択を解除する
+  clickTile(document, 0);
+  clickTile(document, 1);
+  assert.equal(selectedTileCount(document), 0);
+  clickTile(document, 2);
+  assert.equal(selectedTileCount(document), 1);
+  document.getElementById("grid-live-btn-back").click();
+  assert.equal(selectedTileCount(document), 0, "選択を解除した");
+  assert.equal(controlsHost(document).id, "grid-live-parking");
+  assert.equal(gridActions().length, 0, "デバイスへは何も送らない");
 });
 
 test("Shift+ドラッグは軌跡(tracePoints)を送り、Shift だけのクリックはタップ", (t) => {
@@ -239,10 +284,13 @@ test("失敗はその台のものだけ出し、処理中はボタンを止め�
   send(window, { type: "live", message: { type: "actionError", message: "" } });
   assert.equal(error.textContent, "");
 
+  // 「戻る」は選択を変えるだけ(デバイスを触らない)なので処理中も押せる
+  const deviceButtons = () => [...document.querySelectorAll("#grid-live-controls button")].filter((b) => b.id !== "grid-live-btn-back");
   send(window, { type: "live", message: { type: "busy", busy: true } });
-  assert.ok([...document.querySelectorAll("#grid-live-controls button")].every((b) => b.disabled));
+  assert.ok(deviceButtons().length > 0 && deviceButtons().every((b) => b.disabled));
+  assert.equal(document.getElementById("grid-live-btn-back").disabled, false);
   send(window, { type: "live", message: { type: "busy", busy: false } });
-  assert.ok([...document.querySelectorAll("#grid-live-controls button")].every((b) => !b.disabled));
+  assert.ok(deviceButtons().every((b) => !b.disabled));
 });
 
 test("グリッドビューの絵のカーソルはライブ操作タブと同じ定義(--touch-cursor)を使う", async () => {
@@ -298,4 +346,107 @@ test("ライブ操作タブの開閉ボタンも選択中のデバイスが折�
   document.getElementById("live-btn-unfold").click();
   const live = posts.filter((p) => p.type === "live").map((p) => JSON.parse(JSON.stringify(p.message)));
   assert.deepEqual(live.at(-1), { type: "fold", state: "unfold" });
+});
+
+function fakeClock(window) {
+  let now = 1000;
+  window.performance.now = () => now;
+  return (ms) => { now += ms; };
+}
+
+test("動かさずに押し続けた時間が LONG_PRESS_MS(500ms)未満ならタップ・以上なら長押し(pressPoint)", (t) => {
+  const { window, document, gridActions } = createWebview();
+  t.after(() => window.close());
+  sendDevices(window, 1);
+  const media = selectOneWithPicture(window, document, 0);
+  const advance = fakeClock(window);
+
+  media.dispatchEvent(pointerEvent(window, "pointerdown", { x: 150, y: 150 }));
+  advance(499);
+  window.dispatchEvent(pointerEvent(window, "pointerup", { x: 150, y: 150 }));
+  assert.equal(gridActions().at(-1).action.type, "tapPoint", "499ms はタップ");
+
+  media.dispatchEvent(pointerEvent(window, "pointerdown", { x: 150, y: 150 }));
+  advance(500);
+  window.dispatchEvent(pointerEvent(window, "pointerup", { x: 150, y: 150 }));
+  assert.deepEqual(gridActions().at(-1).action,
+    { type: "pressPoint", clickX: 50, clickY: 100, displayWidth: 200, displayHeight: 400, holdMs: 500 }, "500ms は長押し");
+
+  // Option 押下はホールドしてもダブルタップ(ライブ操作タブと同じ優先順)
+  media.dispatchEvent(pointerEvent(window, "pointerdown", { x: 150, y: 150, altKey: true }));
+  advance(900);
+  window.dispatchEvent(pointerEvent(window, "pointerup", { x: 150, y: 150, altKey: true }));
+  assert.equal(gridActions().at(-1).action.type, "doubleTapPoint");
+});
+
+test("素のドラッグの最中は始点から現在位置への直線を描き、Shift ドラッグは軌跡の線に切り替える", (t) => {
+  const { window, document } = createWebview();
+  t.after(() => window.close());
+  sendDevices(window, 1);
+  const media = selectOneWithPicture(window, document, 0);
+  const overlay = document.querySelector(".grid-live-drag-overlay");
+
+  media.dispatchEvent(pointerEvent(window, "pointerdown", { x: 150, y: 150 }));
+  window.dispatchEvent(pointerEvent(window, "pointermove", { x: 200, y: 250 }));
+  const line = overlay.querySelector("line");
+  assert.ok(overlay.classList.contains("visible"));
+  assert.equal(overlay.classList.contains("trace"), false);
+  assert.deepEqual(["x1", "y1", "x2", "y2"].map((a) => line.getAttribute(a)), ["50", "100", "100", "200"]);
+  window.dispatchEvent(pointerEvent(window, "pointerup", { x: 200, y: 250 }));
+  assert.equal(overlay.classList.contains("visible"), false, "離したら消える");
+
+  media.dispatchEvent(pointerEvent(window, "pointerdown", { x: 150, y: 150, shiftKey: true }));
+  assert.equal(overlay.classList.contains("trace"), true);
+  window.dispatchEvent(pointerEvent(window, "pointerup", { x: 150, y: 150, shiftKey: true }));
+});
+
+test("操作のカラムは拡大表示の右隣・パネルの左隣に並び、devices の周期で並べ替えない(ツールチップが点滅しない)", async (t) => {
+  const { window, document } = createWebview();
+  t.after(() => window.close());
+  sendDevices(window, 1);
+  clickTile(document, 0);
+  const pair = document.querySelector("#preview-grid .lane-pair");
+  assert.deepEqual([...pair.children].map((el) => el.id || el.className.split(" ")[0]),
+    ["lane-preview", "grid-live-controls", "grid-live-panel", "lane"], "拡大表示 | 操作 | 操作パネル | 実行ログ");
+  assert.equal(document.querySelector("#preview-grid .lane-preview #grid-live-controls"), null, "絵の下には置かない");
+
+  let moved = 0;
+  const observer = new window.MutationObserver((records) => {
+    moved += records.filter((r) => r.type === "childList").length;
+  });
+  observer.observe(pair, { childList: true });
+  sendDevices(window, 1); // 約2秒ごとの devices サイクルと同じ経路
+  sendDevices(window, 1);
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  observer.disconnect();
+  assert.equal(moved, 0, "周期のたびに並びを組み直さない");
+});
+
+test("操作のカラムは 上=戻る / 中=デバイス操作のグループ / 下=失敗の文言 の3段で、グループは上下中央(上下の段が同じ 1fr)", async (t) => {
+  const { window, document } = createWebview();
+  t.after(() => window.close());
+  sendDevices(window, 1);
+  clickTile(document, 0);
+  const controls = document.getElementById("grid-live-controls");
+  assert.deepEqual([...controls.children].map((el) => el.className),
+    ["grid-live-top", "screenshot-actions grid-live-device-group", "grid-live-bottom"]);
+  const group = controls.querySelector(".grid-live-device-group");
+  assert.equal(group.querySelector("#grid-live-btn-back"), null, "戻るはグループの外");
+  assert.ok(controls.querySelector(".grid-live-top #grid-live-btn-back"), "戻るは上の段");
+  assert.deepEqual(
+    [...group.children].map((el) => el.id || el.className),
+    ["grid-live-btn-home", "grid-live-btn-app-switcher", "grid-live-btn-zoom-in", "grid-live-btn-zoom-out",
+      "grid-live-btn-fold", "grid-live-btn-unfold", "grid-live-trace-indicator", "screenshot-hint"],
+    "ホーム〜修飾キーの案内(開閉ボタンを含む)を1つのグループに");
+  assert.ok(controls.querySelector(".grid-live-bottom #grid-live-error"), "失敗の文言は下の段");
+
+  const fs = await import("node:fs");
+  const css = fs.readFileSync(path.resolve("src/webview/monitor/style.css"), "utf8");
+  const rule = css.match(/\.grid-live-controls\s*\{([^}]*)\}/)[1];
+  const rows = rule.match(/grid-template-rows:\s*([^;]+);/)[1].trim();
+  const parts = rows.match(/minmax\([^)]*\)|\S+/g);
+  assert.equal(parts.length, 3, rows);
+  assert.equal(parts[0], parts[2], "上と下の段が同じ伸び方 = 中の段が上下中央");
+  assert.match(parts[0], /1fr/);
+  assert.equal(parts[1], "auto");
 });

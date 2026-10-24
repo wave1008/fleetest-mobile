@@ -539,6 +539,14 @@ button.bulk-cancel:hover:not(:disabled) {
 .line-view-select-all {
   margin-left: 10px;
 }
+/* グリッドビューの見出しの「バウンディングボックスを表示」。台数から離す量は「すべて選択」と同じ。
+   [hidden] を明示する —— .profile-label の display:flex が UA の hidden に勝つ */
+.grid-view-boxes-toggle {
+  margin-left: 10px;
+}
+.grid-view-boxes-toggle[hidden] {
+  display: none;
+}
 /* 見出しの台数(ラインビュー・グリッドビューの「N台」)。**幅を固定する**
    (ユーザー決定)—— 桁が変わるたびに右隣のトグルが動くため。数字は等幅にし、
    箱は 3 桁(999台)まで入る幅を持つ。**文言の長さが言語で違うので幅も言語ごと** ——
@@ -1498,6 +1506,10 @@ html.select-all-guard * {
 .lane-pair > .lane {
   flex: 1 1 auto;
 }
+/* 1台表示は3列(拡大表示 | 操作パネル | 実行ログの複製)。拡大表示の幅は laneLog.js が決め、残りを後ろ2つで等分する */
+.lane-pair > .lane-log-mirror {
+  flex: 1 1 0;
+}
 /* 1台だけ選択(左 = 拡大表示・右 = 実行ログ)。拡大表示の幅は laneLog.js が絵に合わせて決める */
 .lanes-grid.single-device .lane-preview {
   flex: 0 0 auto;
@@ -1573,13 +1585,64 @@ html.select-all-guard * {
   height: auto;
   display: block;
 }
-/* グリッドビューのライブ操作(1台表示の拡大表示の下。gridLiveControls.js)。高さは
-   layoutSinglePreview が拡大表示の固定費として実測するので、ここで固定しない */
+/* グリッドビューのライブ操作(1台表示のとき .lane-pair の中で拡大表示の右隣に置く縦のカラム。gridLiveControls.js)。
+   幅は中身(一番長いボタン)で決まり、案内文だけ折り返す。拡大表示の幅は laneLog.js が残りから決める。
+   3段のグリッド: 上 = 戻る / 中 = デバイス操作のグループ / 下 = 失敗の文言。**上と下を同じ 1fr に
+   するのがグループを上下中央に置く仕掛け**(margin:auto だと「戻る」の高さぶん下へずれる)。中身が収まらない
+   高さでは 1fr が 0 まで縮み、カラム自身がスクロールする */
 .grid-live-controls {
   flex: 0 0 auto;
+  display: grid;
+  grid-template-rows: minmax(min-content, 1fr) auto minmax(min-content, 1fr);
+  gap: 8px;
+  min-height: 0;
+  max-width: 11em;
+  overflow-y: auto;
+}
+.grid-live-top {
+  align-self: start;
+  display: flex;
+  flex-direction: column;
+}
+.grid-live-bottom {
+  align-self: end;
   display: flex;
   flex-direction: column;
   gap: 4px;
+}
+/* デバイス操作のグループ(ホーム〜修飾キーの案内)。縦に積み、枠で1まとまりに見せる
+   (ライブ操作タブの横並びの .screenshot-actions を上書き) */
+#grid-live-controls .grid-live-device-group {
+  flex-direction: column;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  justify-content: flex-start;
+  box-sizing: border-box;
+  border: 1px solid var(--vscode-widget-border, var(--vscode-panel-border));
+  border-radius: 4px;
+  padding: 6px;
+}
+#grid-live-controls .grid-live-device-group > button,
+#grid-live-controls .trace-indicator {
+  justify-content: center;
+  text-align: center;
+}
+/* 「戻る」(1台だけの選択を抜ける)。青い地(主ボタンの色)の角丸の正方形に白い矢印だけ(ユーザー決定)。
+   カラムの上段で左に寄せる(.grid-live-top の stretch で横に伸ばさない) */
+.grid-live-back {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: flex-start;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border-radius: 6px;
+  background-color: var(--vscode-button-background, #0078d4);
+  color: var(--vscode-button-foreground, #ffffff);
+}
+.grid-live-back:hover:not(:disabled) {
+  background-color: var(--vscode-button-hoverBackground, #026ec1);
 }
 .grid-live-error {
   font-size: 11px;
@@ -1590,6 +1653,45 @@ html.select-all-guard * {
 .grid-live-error:empty { display: none; }
 /* 自動起動の進行中など、エラーではない知らせ(actionError の neutral) */
 .grid-live-error.neutral { color: var(--vscode-descriptionForeground, inherit); }
+/* グリッドビューの操作パネル(gridLivePanel.js。1台表示のとき .lane-pair の中、拡大表示の直後)。
+   縦に [要素一覧(伸びる) | 入力行 | 操作記録(伸びる)] で、一覧は内部スクロール。
+   一覧・操作記録・入力行の見た目は #panel-live と共有(下の #grid-live-panel 併記) */
+.grid-live-panel {
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  min-height: 0;
+  box-sizing: border-box;
+  border: 1px solid var(--vscode-widget-border, var(--vscode-panel-border));
+  border-radius: 4px;
+  padding: 6px;
+  overflow: hidden;
+}
+.grid-live-elements-section,
+.grid-live-oplog-section {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+#grid-live-panel .elements-header { flex-wrap: wrap; }
+.grid-live-elements-empty {
+  font-size: 12px;
+  color: var(--vscode-descriptionForeground);
+  padding: 4px 6px;
+}
+/* 枠の SVG は絵の矩形に合わせて JS が left/top/width/height を入れる(.lane-preview の padding box 基準)。
+   見た目(色・線幅・hot の赤)は #live-boxes-overlay と共有 */
+.grid-live-boxes-overlay {
+  position: absolute;
+  display: none;
+  pointer-events: none;
+  overflow: visible;
+}
+.grid-live-boxes-overlay.visible { display: block; }
 /* 絵の上の操作(gridLiveControls.js)。軌跡の位置は絵の矩形に合わせて書く */
 .lanes-grid.single-device .lane-preview { position: relative; }
 .lanes-grid.single-device .lane-preview-media { cursor: var(--touch-cursor); }
@@ -1600,6 +1702,10 @@ html.select-all-guard * {
   overflow: visible;
 }
 .grid-live-drag-overlay.visible { display: block; }
+.grid-live-drag-overlay polyline { display: none; }
+.grid-live-drag-overlay.trace line { display: none; }
+.grid-live-drag-overlay.trace polyline { display: inline; }
+.grid-live-drag-overlay line,
 .grid-live-drag-overlay polyline {
   fill: none;
   stroke-linejoin: round;
@@ -2592,6 +2698,7 @@ input[type="radio"]:focus-visible {
    が既に担うため、body由来のリセット(margin/padding/height:100vh等)はここでは不要。
    .toolbar/button/button.secondary/select/.banner は既存のグローバルルールと同一のためここでは
    再定義しない(class名の再利用でそのまま効く)。 */
+#grid-live-panel input[type="text"],
 #panel-live select,
 #panel-live input[type="text"] {
   font-family: inherit;
@@ -2808,7 +2915,8 @@ input[type="radio"]:focus-visible {
   pointer-events: none;
 }
 #live-boxes-overlay.visible { display: block; }
-#live-boxes-overlay rect {
+#live-boxes-overlay rect,
+.grid-live-boxes-overlay rect {
   fill: none;
   stroke: var(--vscode-charts-green, #89d185);
   stroke-width: 1;
@@ -2817,12 +2925,14 @@ input[type="radio"]:focus-visible {
 /* 画像上でマウスが載っている要素。**通常の枠の色を変えるのではなく、同じ矩形をもう1枚
    最前面に重ねる**(SVG は DOM 順に描かれるので、色だけ変えても後続の枠の下に隠れる)。
    対になる要素一覧の行(.element-row.hot)も同時に光る */
-#live-boxes-overlay rect.hot {
+#live-boxes-overlay rect.hot,
+.grid-live-boxes-overlay rect.hot {
   stroke: var(--vscode-charts-red, #f14c4c);
   stroke-width: 2;
   opacity: 1;
 }
-#live-hover-box {
+#live-hover-box,
+.grid-live-hover-box {
   position: absolute;
   display: none;
   border: 2px solid var(--vscode-focusBorder, #007acc);
@@ -2892,15 +3002,25 @@ input[type="radio"]:focus-visible {
   overflow-y: auto;
   padding-right: 4px;
 }
+#grid-live-panel .row,
 #panel-live .row {
   display: flex;
   align-items: center;
   gap: 6px;
 }
+#grid-live-panel .row input[type="text"],
 #panel-live .row input[type="text"] { flex: 1 1 auto; min-width: 0; }
+#grid-live-panel .row select,
 #panel-live .row select { flex: 1 1 auto; min-width: 0; }
 /* 入力欄(要素一覧の直下)と下のスプリッターの間に少し余白を空ける。 */
 #panel-live .live-type-row { margin-bottom: 8px; }
+/* グリッドビューの入力するテキスト(1台表示のとき拡大表示の絵のすぐ下。gridLivePanel.js)。高さは
+   layoutSinglePreview が拡大表示の固定費として実測するので、ここで固定しない */
+.grid-live-type-row {
+  flex: 0 0 auto;
+  display: flex;
+}
+.grid-live-type-row input[type="text"] { flex: 1 1 auto; min-width: 0; }
 /* #panel-live(縦 flex)の直下に置き .content の上に独立した行として表示。
    タブ横幅いっぱいに広がり(既定 align: stretch)、表示時は .content ごと下へ押し下げる
    (更新ボタンが下がるのは許容)。非表示時は display:none で行を畳む。左寄せは既定。 */
@@ -2930,12 +3050,14 @@ input[type="radio"]:focus-visible {
 #live-stale-notice-text { flex: 1 1 auto; min-width: 0; }
 /* 「アプリを起動」の右に並ぶトグル。見た目は .header-toggle + .toggle-switch(「ライブ更新」と共通)で、
    ここは位置だけ持つ */
+#grid-live-panel .elements-header-toggle,
 #panel-live .elements-header-toggle {
   flex: 0 0 auto;
   margin-left: 8px; /* 左隣のボタンとの間(ツールバーの gap に足す) */
   /* .profile-label の既定(descriptionForeground)より明るく(ユーザー決定: 視認性) */
   color: var(--vscode-foreground);
 }
+#grid-live-panel .elements-header,
 #panel-live .elements-header {
   display: flex;
   align-items: center;
@@ -2944,8 +3066,10 @@ input[type="radio"]:focus-visible {
   color: var(--vscode-descriptionForeground);
 }
 /* 「更新」は見出しのすぐ右へ左寄せで置く(右端へ飛ばさない)。 */
+#grid-live-panel .elements-header > button,
 #panel-live .elements-header > button { margin-left: 16px; }
 /* 見出しラベルは幅が足りなければ省略し、右のボタン(更新)を押し出さない。 */
+#grid-live-panel .elements-header > span,
 #panel-live .elements-header > span {
   min-width: 0;
   overflow: hidden;
@@ -2954,6 +3078,7 @@ input[type="radio"]:focus-visible {
 }
 /* 2カラム(矩形 / 本文)。列幅は一覧の側で決め、各行は subgrid で乗る = 矩形の幅が全行で揃い、
    本文の開始位置も揃う(.recordings-sessions と同じ形)。狭いとき縮むのは本文列(ellipsis)だけ */
+#grid-live-panel .elements-list,
 #panel-live .elements-list {
   flex: 1 1 auto;
   min-height: 0;
@@ -2965,6 +3090,7 @@ input[type="radio"]:focus-visible {
   align-content: start;
   column-gap: 12px;
 }
+#grid-live-panel .element-row,
 #panel-live .element-row {
   grid-column: 1 / -1;
   display: grid;
@@ -2974,24 +3100,29 @@ input[type="radio"]:focus-visible {
   font-size: 11px;
   white-space: nowrap;
 }
+#grid-live-panel .element-cell-main,
 #panel-live .element-cell-main {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 /* 矩形は補助情報なので淡く */
+#grid-live-panel .element-cell-frame,
 #panel-live .element-cell-frame { color: var(--vscode-descriptionForeground); }
 /* ホバーだけ(行のクリックでは何もしない)。画像側に枠が出ることと対。
    .hot は**画像側でその要素にマウスが載っている**ときで、行ホバーと同じ見た目にする
    (どちらから指しても同じ効果に見えるように)。
    .run-profile-device-row-item/.device-pick-row と同じ式(50%透過)。 */
+#grid-live-panel .element-row:hover,
 #panel-live .element-row:hover,
+#grid-live-panel .element-row.hot,
 #panel-live .element-row.hot { background-color: color-mix(in srgb, var(--vscode-list-hoverBackground) 50%, transparent); }
 /* 画像側の枠(#live-boxes-overlay rect.hot)と同じ赤で囲う。**枠を出しているときだけ**
    (.boxes-on) —— 枠が無いのに行だけ赤いと、何と対応しているのか分からない。OFF のときは
    背景のハイライトだけが付く。
    **outline** を使うのは行の高さを変えないため(border だと 1px ぶん全行がずれる)。
    offset:-1px で内側に描き隣の行と重ねない。 */
+#grid-live-panel .elements-list.boxes-on .element-row.hot,
 #panel-live .elements-list.boxes-on .element-row.hot {
   outline: 1px solid var(--vscode-charts-red, #f14c4c);
   outline-offset: -1px;
@@ -3021,6 +3152,7 @@ input[type="radio"]:focus-visible {
   /* スプリッターと操作記録の間の余白。padding なのでスプリッターの高さ計算には影響しない。 */
   padding-top: 8px;
 }
+#grid-live-panel .oplog-header,
 #panel-live .oplog-header {
   display: flex;
   align-items: center;
@@ -3029,13 +3161,17 @@ input[type="radio"]:focus-visible {
   color: var(--vscode-descriptionForeground);
 }
 /* 「クリア」は見出しのすぐ右へ左寄せで置く(右端へ飛ばさない。要素一覧の「更新」と同じ) */
+#grid-live-panel .oplog-header > button,
 #panel-live .oplog-header > button { margin-left: 16px; }
+#grid-live-panel .oplog-header button,
 #panel-live .oplog-header button,
+#grid-live-panel .elements-header button,
 #panel-live .elements-header button {
   flex: 0 0 auto;
   padding: 0 6px;
   font-size: 11px;
 }
+#grid-live-panel .oplog-list,
 #panel-live .oplog-list {
   --oplog-label-width: 220px; /* 操作列の幅。liveTab.js の DEFAULT_OPLOG_LABEL_WIDTH と揃えること(ドラッグで上書き) */
   flex: 1 1 auto;
@@ -3046,6 +3182,8 @@ input[type="radio"]:focus-visible {
 }
 /* 3列: 時刻(固定 = 等幅 8 文字)/ 操作(ドラッグで幅を決める・中で省略)/ MCP のコマンド(中身の幅のまま =
    はみ出したぶんは一覧の横スクロール)。3列とも幅が行に依らないので、行ごとに列がずれない */
+#grid-live-panel .oplog-row,
+#grid-live-panel .oplog-head,
 #panel-live .oplog-row,
 #panel-live .oplog-head {
   display: grid;
@@ -3060,19 +3198,24 @@ input[type="radio"]:focus-visible {
   font-size: 11px;
   white-space: nowrap;
 }
+#grid-live-panel .oplog-row .oplog-label,
 #panel-live .oplog-row .oplog-label {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+#grid-live-panel .oplog-row .oplog-time,
 #panel-live .oplog-row .oplog-time {
   color: var(--vscode-descriptionForeground);
 }
+#grid-live-panel .oplog-row .oplog-mcp,
 #panel-live .oplog-row .oplog-mcp {
   color: var(--vscode-textLink-foreground);
   cursor: pointer;
 }
+#grid-live-panel .oplog-row .oplog-mcp:empty,
 #panel-live .oplog-row .oplog-mcp:empty { cursor: default; }
 /* 見出し行: 縦スクロールしても上に留まる(横には行と一緒に動く = 列がずれない) */
+#grid-live-panel .oplog-head,
 #panel-live .oplog-head {
   position: sticky;
   top: 0;
@@ -3081,8 +3224,10 @@ input[type="radio"]:focus-visible {
   color: var(--vscode-descriptionForeground);
   border-bottom: 1px solid var(--vscode-widget-border, var(--vscode-panel-border));
 }
+#grid-live-panel .oplog-head .oplog-label,
 #panel-live .oplog-head .oplog-label { position: relative; }
 /* 操作列の右端の境目。当たりは 8px 幅・見た目は中央の 1px 線 */
+#grid-live-panel .oplog-col-resizer,
 #panel-live .oplog-col-resizer {
   position: absolute;
   top: -2px;
@@ -3092,6 +3237,7 @@ input[type="radio"]:focus-visible {
   cursor: col-resize;
   touch-action: none;
 }
+#grid-live-panel .oplog-col-resizer::after,
 #panel-live .oplog-col-resizer::after {
   content: '';
   position: absolute;
@@ -3101,12 +3247,15 @@ input[type="radio"]:focus-visible {
   width: 1px;
   background: var(--vscode-widget-border, var(--vscode-panel-border));
 }
+#grid-live-panel .oplog-col-resizer:hover::after,
 #panel-live .oplog-col-resizer:hover::after,
+#grid-live-panel .oplog-col-resizer.dragging::after,
 #panel-live .oplog-col-resizer.dragging::after {
   background: var(--vscode-focusBorder, #007acc);
   width: 2px;
   left: 3px;
 }
+#grid-live-panel .oplog-row.failed .oplog-label,
 #panel-live .oplog-row.failed .oplog-label {
   color: var(--vscode-errorForeground, #f14c4c);
 }
@@ -4140,3 +4289,4 @@ button.settings-remote-hosts-color-swatch:focus-visible {
 .lane-host {
   margin-left: 6px;
 }
+

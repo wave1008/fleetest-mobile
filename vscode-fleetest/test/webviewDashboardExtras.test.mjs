@@ -1072,3 +1072,65 @@ test("flaky: 最新の結果は「直近」列、それ以前は「履歴(新→
   assert.equal(headers.length, 3);
   assert.deepEqual(headers.slice(1), ["直近", "履歴(新→旧)"]);
 });
+
+function sendRunDetail(sendToWebview, scenarios) {
+  sendToWebview({
+    type: "dashboard",
+    message: { type: "runDetail", payloads: [{ schemaVersion: 1, project: "P", run: RUN, scenarios }] },
+  });
+}
+
+const BASE_SCENARIO = {
+  runID: RUN.runID, scenarioID: "Foo.S0010", platform: "ios", host: "H", passed: true,
+  startedAt: "2026-09-01T00:00:00Z", durationMs: 500, scenes: [],
+  steps: { total: 1, passed: 1, failed: 0, skipped: 0, healed: 0, passedViaFallback: 0 },
+};
+
+test("run 詳細: humanOperations があれば「人の操作」ブロックに時刻・操作・失敗の ✗ を出す(成功したシナリオでも開ける)", (t) => {
+  const { window, posts, sendToWebview } = createWebview();
+  t.after(() => window.close());
+  sendToWebview({ type: "dashboard", message: { type: "data", payload: basePayload() } });
+  window.document.querySelector("#table-runs-body tr").click();
+  assert.ok(posts.find((p) => p.type === "dashboard" && p.message?.type === "runDetail"));
+  sendRunDetail(sendToWebview, [{
+    ...BASE_SCENARIO,
+    humanOperations: [
+      { at: "2026-09-01T00:00:12.345Z", label: "Tapped (120, 340)", ok: true },
+      { at: "2026-09-01T00:00:15.000Z", label: "Home failed", ok: false },
+      { at: 5, label: 7 },
+    ],
+  }]);
+  const row = window.document.querySelector("#run-detail-body .scenario-row-clickable");
+  assert.ok(row, "成功したシナリオも人の操作があれば開ける");
+  row.click();
+  const rows = [...window.document.querySelectorAll("#run-detail-body table.human-operations tbody tr")];
+  // 時刻はローカル時刻(at は UTC の ISO。文字列から切り出すと UTC になる)。期待値も実行環境のタイムゾーンで作る
+  const local = (iso) => {
+    const d = new Date(iso);
+    return [d.getHours(), d.getMinutes(), d.getSeconds()].map((n) => String(n).padStart(2, "0")).join(":");
+  };
+  assert.deepEqual(rows.map((r) => [...r.children].map((c) => c.textContent)), [
+    [local("2026-09-01T00:00:12.345Z"), "Tapped (120, 340)"],
+    [local("2026-09-01T00:00:15.000Z"), "✗ Home failed"],
+  ], "形の合わない記録は捨てて残りを描く");
+  assert.match(window.document.querySelector("#run-detail-body .human-operations").parentElement.querySelector("h3").textContent, /人の操作/);
+});
+
+test("run 詳細: humanOperations の欄が無い記録は従来どおり描く(成功は畳む詳細なし・失敗は失敗ステップのみ)", (t) => {
+  const { window, sendToWebview } = createWebview();
+  t.after(() => window.close());
+  sendToWebview({ type: "dashboard", message: { type: "data", payload: basePayload() } });
+  window.document.querySelector("#table-runs-body tr").click();
+  sendRunDetail(sendToWebview, [
+    BASE_SCENARIO,
+    {
+      ...BASE_SCENARIO, scenarioID: "Foo.S0020", passed: false,
+      failedSteps: [{ index: 0, description: "tap(#login)", file: "Foo.swift", line: 10 }],
+    },
+  ]);
+  const clickable = window.document.querySelectorAll("#run-detail-body .scenario-row-clickable");
+  assert.equal(clickable.length, 1, "成功した欄なしのシナリオは開けない");
+  clickable[0].click();
+  assert.equal(window.document.querySelectorAll("#run-detail-body .human-operations").length, 0);
+  assert.ok(window.document.querySelector("#run-detail-body .scenario-detail table"));
+});

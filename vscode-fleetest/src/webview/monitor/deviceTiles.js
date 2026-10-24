@@ -1209,6 +1209,24 @@ export function toggleSelectOnlyDevice(deviceId) {
     selectOnlyDevice(deviceId);
     return;
   }
+  restoreSelectOnly(restore);
+}
+
+// グリッドビューの「戻る」(gridLiveControls.js。1台表示のときだけ出る)。「このデバイスのみ選択」の直後なら
+// 直前の選択へ戻し(ダブルクリックの戻しと同じ)、控えが無ければ(タイルを1枚だけ選んだ等)選択を解除する
+export function exitSingleSelection() {
+  const restore = selectOnlyRestore;
+  if (restore && selectedDeviceIds.size === 1 && selectedDeviceIds.has(restore.deviceId)) {
+    restoreSelectOnly(restore);
+    return;
+  }
+  selectOnlyRestore = null;
+  selectedDeviceIds.clear();
+  updateSelectionUi();
+  dropTextSelection();
+}
+
+function restoreSelectOnly(restore) {
   selectOnlyRestore = null;
   if (restore.wasSelectAll) {
     // 全選択は旗ごと戻す(その後に現れたデバイスも選ばれる = 全選択の意味のまま)

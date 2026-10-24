@@ -99,12 +99,17 @@ export const panelsStrings = {
   "panels.devices.selectDevices": { ja: "デバイスを選択して下さい", en: "Select a device" },
   /// グリッドビューの tooltip。画面のダブルクリックは2回のタップ(選択の切り替えは画面の外側。laneLog.js)
   "panels.devices.gridGestureHintTitle": {
-    ja: "クリック=タップ / Option(⌥)+クリック=ダブルタップ / Shift(⇧)+ドラッグ=軌跡どおりになぞる。"
-      + "素のドラッグはデバイスへ送りません。選択の切り替えは画面の外側をダブルクリック",
-    en: "Click = tap / Option(⌥)+click = double tap / Shift(⇧)+drag = trace the exact path."
-      + " Plain drags are not sent to the device. Double-click outside the screen to toggle the selection",
+    ja: "クリック=タップ / Option(⌥)+クリック=ダブルタップ / 500ms 以上ホールド=長押し /"
+      + " ドラッグ=スワイプ / Shift(⇧)+ドラッグ=軌跡どおりになぞる。選択の切り替えは画面の外側をダブルクリック",
+    en: "Click = tap / Option(⌥)+click = double tap / hold 500ms+ = long press /"
+      + " drag = swipe / Shift(⇧)+drag = trace the exact path. Double-click outside the screen to toggle the selection",
   },
-  "panels.devices.selectAllLabel": { ja: "すべて選択", en: "Select all" },
+  "panels.devices.gridBackButton": { ja: "戻る", en: "Back" },
+  "panels.devices.gridBackTitle": {
+    ja: "1台だけの選択を解除して、その前の選択に戻します(前の選択が無ければ選択を解除します)",
+    en: "Leave the single-device selection and restore the previous selection (clears the selection if there was none)",
+  },
+  "panels.devices.selectAllLabel":{ ja: "すべて選択", en: "Select all" },
   "panels.runBoard.splitAriaLabel": { ja: "デバイスとステータスの分割境界線", en: "Divider between devices and status" },
   "panels.runBoard.platformFilterTitle": {
     ja: "実行中・デバイス一覧・選択したデバイス・実行ログに出すデバイスをプラットフォームで絞ります",
@@ -497,6 +502,11 @@ export const panelsStrings = {
   "panels.live.refreshSnapshotTitle": {
     ja: "要素一覧とタップ座標を現在の画面で取り直します。映像は自動更新されますが、操作なしで画面が変わった直後(非同期ロード・端末を直接操作など)に押すと要素一覧を拾い直せます。",
     en: "Re-captures the element list and tap coordinates from the current screen. Video updates automatically, but press this right after the screen changes without an action (async loads, direct device manipulation, etc.) to pick up the elements again.",
+  },
+  /// グリッドビューの操作パネル。選択しただけでは観測しない(ブリッジの自動起動・実行中のテストへの相乗りを避ける)
+  "panels.live.gridElementsEmpty": {
+    ja: "要素一覧は未取得です。「更新」を押すか、画面を操作すると取得します",
+    en: "The element list has not been fetched yet. Press Refresh or operate the screen to fetch it",
   },
   "panels.live.typeTextPlaceholder": { ja: "入力するテキスト(Enterで送信)", en: "Text to type (Enter to send)" },
   "panels.live.listsSplitterTitle": {

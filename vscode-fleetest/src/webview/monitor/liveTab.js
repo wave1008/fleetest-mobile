@@ -11,6 +11,8 @@ import { displayAspect, fitScreenSize } from './liveScreenFit.js';
 import { thinTracePoints } from './traceThinning.js';
 import { flashTip, setHoverTip } from './hoverTip.js';
 import { bindFoldButtons } from './foldButtons.js';
+import { isDeviceRunning } from './laneLog.js';
+import { createOplogView, frameToDisplayRect, hitTestRef, renderElementRows } from './liveListViews.js';
 
 function post(message) {
   vscode.postMessage({ type: 'live', message });
@@ -120,7 +122,7 @@ let liveStallSent = false;
 // 値: 既定 12fps の配信で数フレーム分の空白を「止まった」と見なす長さ。短くするとアニメーションの
 // 途中で撃ち、長くすると追随が遅れる。
 // 尽きたとき: 画面が動かないまま内容だけ変わる場合は追随しない(一覧の「更新」で撮り直す)。
-const SETTLE_REFRESH_MS = 700;
+export const SETTLE_REFRESH_MS = 700;
 // 「バウンディングボックスを表示」を ON にしたときに整定を待つ上限(ms)。
 // **ループするアニメーションの画面は何秒待っても静まらない**ので必ず打ち切る —— DSL の整定
 // (Sources/FTCore/StepExecutor+Settle.swift・SettleMotion.swift)と同じ考え方で、あちらも
@@ -130,7 +132,7 @@ const SETTLE_REFRESH_MS = 700;
 // 減速かどうかの判定材料(木の変位)が無いので、借りるのは**この 4 倍だけ**。
 // 尽きたとき: 打ち切って最新の木で描く(動いている画面の枠を出さないより、止まらない画面で
 // 永久に出ないほうが害が大きい)。
-const BOXES_SETTLE_CAP_MS = SETTLE_REFRESH_MS * 4;
+export const BOXES_SETTLE_CAP_MS = SETTLE_REFRESH_MS * 4;
 // 要素の枠を画像に重ねて出すか(「バウンディングボックスを表示」)。vscode.setState に永続化。
 let showBoxes = persistedState.liveShowBoxes === true;
 // 枠を消してから**次の木が届くまで**は描き直さない。fitScreenshot も枠を引き直すので、
@@ -153,6 +155,14 @@ const busyButtons = [
   'live-btn-zoom-in', 'live-btn-zoom-out', 'live-btn-fold', 'live-btn-unfold',
 ].map((id) => document.getElementById(id));
 
+// **テスト実行中でも操作を止めない**(ユーザー決定: 介入は利用者の自己責任)。run が使用中のデバイスへの操作は
+// serve が台帳へ残し、そのシナリオの結果に「人の操作」として載る(HumanOperationLedger)。
+
+/** 選択中のデバイスがシナリオを回しているか。**整定のための自動の撮り直し**はこの間撃たない: XCUITest ブリッジは
+ * 1件ずつしか処理しないので、シナリオの操作と口を取り合う。人が「更新」を押したときと操作の直後の結果だけ撃つ */
+function isSelectedDeviceRunning() {
+  return !!deviceSelect.value && isDeviceRunning(deviceSelect.value);
+}
 function setBusy(value) {
   busy = value;
   for (const b of busyButtons) { b.disabled = value; }
@@ -474,6 +484,7 @@ function armBoxesSettleCap(delayMs) {
   boxesSettleCapTimer = setTimeout(() => {
     boxesSettleCapTimer = null;
     if (!showBoxes || !boxesStale) { return; } // 既に描けた
+    if (isSelectedDeviceRunning()) { return; } // 実行中は撮り直さない(isSelectedDeviceRunning の doc)
     if (busy) { armBoxesSettleCap(SETTLE_REFRESH_MS); return; } // 操作中。結果の木が来なくても次で撃つ
     settleRefreshRequested = true; // 画面を変えない観測 = 次の applySnapshot で再予約しない
     post({ type: 'refreshSnapshot' });
@@ -484,6 +495,7 @@ function scheduleSettleRefresh() {
   settleRefreshTimer = setTimeout(() => {
     settleRefreshTimer = null;
     if (!lastScreen) { return; }
+    if (isSelectedDeviceRunning()) { return; } // 実行中は撮り直さない(isSelectedDeviceRunning の doc)
     if (busy) { scheduleSettleRefresh(); return; } // 操作中は待ち直す(結果の木が来れば予約は引き直される)
     settleRefreshRequested = true;
     post({ type: 'refreshSnapshot' });
@@ -560,35 +572,8 @@ function disposeLiveH264() {
   }
 }
 
-// liveModel.ts の pointFromClick / hitTestElement と同じ規則(webview は CSP により import 不可の
-// ため複製。liveModel.ts 側を変更したらここも追随させること)。返すのは ref だけで足りる。
 function hitTestRefAt(clickX, clickY, display) {
-  if (!lastScreen || display.width <= 0 || display.height <= 0) { return null; }
-  const x = Math.min(Math.max((clickX / display.width) * lastScreen.width, 0), lastScreen.width);
-  const y = Math.min(Math.max((clickY / display.height) * lastScreen.height, 0), lastScreen.height);
-  let best = null;
-  let bestArea = Infinity;
-  for (const element of lastElements) {
-    const f = element.frame;
-    if (x < f.x || x > f.x + f.width || y < f.y || y > f.y + f.height) { continue; }
-    const area = f.width * f.height; // 重なりの中で最も具体的なもの = 面積最小
-    if (area < bestArea) { bestArea = area; best = element.ref; }
-  }
-  return best;
-}
-
-// liveModel.ts の frameToDisplayRect と同じ計算(webview は CSP により import 不可のため複製。
-// liveModel.ts 側を変更したらここも追随させること)。
-function frameToDisplayRect(frame, screen, display) {
-  if (screen.width <= 0 || screen.height <= 0) {
-    return { x: 0, y: 0, width: 0, height: 0 };
-  }
-  const scaleX = display.width / screen.width;
-  const scaleY = display.height / screen.height;
-  return {
-    x: frame.x * scaleX, y: frame.y * scaleY,
-    width: frame.width * scaleX, height: frame.height * scaleY,
-  };
+  return hitTestRef(lastElements, lastScreen, clickX, clickY, display);
 }
 
 // デバイスが切り替わった(host の clearSnapshotCache)。前のデバイスの画面サイズ・要素一覧で
@@ -654,7 +639,8 @@ export const DRAG_MIN_PX = 5;
 // と同値。**なぞっている最中に超えた時点で中止して言う**(離すまで気付けないと、それまでの操作が無駄になる)。
 // host 側の gestureCapFor も同じ上限で断る(こちらは早く知らせるための先回り)
 export const TRACE_MAX_MS = 60000;
-const LONG_PRESS_MS = 500;
+// 動かさずに押し続けて長押しとみなす時間(ms)。グリッドビュー(gridLiveControls.js)も同じ値を使う
+export const LONG_PRESS_MS = 500;
 let dragStart = null; // el: pointerdown を受けた要素(screenshot か liveCanvas)。以後の rect 計算に使う
 
 // デバイス側のスワイプは pointerup 時に1回で実行される(XCUITest にタッチ逐次移動 API が無く
@@ -970,32 +956,14 @@ showBoxesToggle.addEventListener('change', () => {
 });
 
 function renderElements() {
+  // 枠を出している間(showBoxes)は **hot(赤)へ一本化** —— 単一枠(青)と重ねると同じ要素に
+  // 2つ枠が出る。画像側から指したときと見た目が揃うので、どちらから指しても同じに見える。
   rowByRef.clear();
-  elementsList.innerHTML = '';
-  for (const element of lastElements) {
-    const row = document.createElement('div');
-    row.className = 'element-row';
-    // 2カラム(矩形 | 本文)。列幅は .elements-list 側が決め、行は subgrid で乗る
-    // = 矩形の幅が全行で揃い、本文の開始位置も揃う(liveModel.ts の frameText / line と対)
-    const frameCell = document.createElement('span');
-    frameCell.className = 'element-cell-frame';
-    frameCell.textContent = element.frameText;
-    const main = document.createElement('span');
-    main.className = 'element-cell-main';
-    main.textContent = element.line;
-    row.append(frameCell, main);
-    // **行のクリックでは何もしない**(ユーザー決定) —— 一覧は読むためのもので、
-    // 触れたつもりのないタップがデバイスへ飛ばないようにする。ホバーで枠を出すだけ。
-    // 枠を出している間(showBoxes)は **hot(赤)へ一本化** —— 単一枠(青)と重ねると同じ要素に
-    // 2つ枠が出る。画像側から指したときと見た目が揃うので、どちらから指しても同じに見える。
-    row.addEventListener('mouseenter', () => {
-      if (showBoxes) { setHot(element.ref, false); } else { showHover(element); }
-    });
-    row.addEventListener('mouseleave', () => {
-      if (showBoxes) { setHot(null, false); } else { hideHover(); }
-    });
-    rowByRef.set(element.ref, row);
-    elementsList.appendChild(row);
+  for (const [ref, row] of renderElementRows(elementsList, lastElements, {
+    onEnter: (element) => { if (showBoxes) { setHot(element.ref, false); } else { showHover(element); } },
+    onLeave: () => { if (showBoxes) { setHot(null, false); } else { hideHover(); } },
+  })) {
+    rowByRef.set(ref, row);
   }
   applyHot();
   renderBoxes();
@@ -1003,134 +971,43 @@ function renderElements() {
 
 // ---- 操作記録(host の operationLog を追記。対向: monitorLiveController.ts の postOperationLog) ----
 
-const OPLOG_MAX_ROWS = 200; // DOM/メモリ肥大防止。超えたら最古行から捨てる
-function pad2(n) { return n < 10 ? '0' + n : '' + n; }
-// 行は「時刻 / 操作 / MCP のコマンド」の3列(grid は CSS の .oplog-row / .oplog-head)。MCP 列は同じ操作を
-// ft_* で撃つ形(host の mcpCommandForServeCommand)で、**クリックでコピー**する(貼って使うもの)。
-// テスト実行由来の行には無い(空のまま = 列は揃える)。
-// **一覧は左右にもスクロールする**(MCP 列は省略しない = 行の幅は中身で決まり、.oplog-list が overflow:auto)。
-// 操作列の幅は見出し行(.oplog-head)の境目をドラッグして変える(--oplog-label-width。vscode.setState に永続化)
-const MIN_OPLOG_LABEL_WIDTH = 60; // px。操作列を潰し切らない下限
-const DEFAULT_OPLOG_LABEL_WIDTH = 220; // px。CSS の --oplog-label-width の既定と揃えること
-let oplogLabelWidth =
-  typeof persistedState.liveOplogLabelWidth === 'number' && persistedState.liveOplogLabelWidth >= MIN_OPLOG_LABEL_WIDTH
-    ? persistedState.liveOplogLabelWidth
-    : DEFAULT_OPLOG_LABEL_WIDTH;
-function applyOplogLabelWidth(width) {
-  oplogLabelWidth = Math.max(MIN_OPLOG_LABEL_WIDTH, Math.round(width));
-  oplogList.style.setProperty('--oplog-label-width', oplogLabelWidth + 'px');
-}
-// 見出し行は一覧の中に置く(外に置くと横スクロールで列がずれる)。クリア・行数の上限では消さない
-const oplogHead = document.createElement('div');
-oplogHead.className = 'oplog-head';
-{
-  const timeHead = document.createElement('span');
-  timeHead.className = 'oplog-time';
-  const labelHead = document.createElement('span');
-  labelHead.className = 'oplog-label';
-  labelHead.textContent = t('wvMonitor.live.oplogColOperation');
-  const resizer = document.createElement('span');
-  resizer.className = 'oplog-col-resizer';
-  resizer.title = t('wvMonitor.live.oplogColResize');
-  labelHead.appendChild(resizer);
-  const mcpHead = document.createElement('span');
-  mcpHead.className = 'oplog-mcp';
-  mcpHead.textContent = t('wvMonitor.live.oplogColMcp');
-  oplogHead.append(timeHead, labelHead, mcpHead);
-  let resizePointerId = null;
-  let resizeStartX = 0;
-  let resizeStartWidth = 0;
-  resizer.addEventListener('pointerdown', (event) => {
-    if (event.button !== 0) { return; }
-    resizePointerId = event.pointerId;
-    resizeStartX = event.clientX;
-    resizeStartWidth = oplogLabelWidth;
-    resizer.setPointerCapture(event.pointerId);
-    resizer.classList.add('dragging');
-    event.preventDefault();
-  });
-  resizer.addEventListener('pointermove', (event) => {
-    if (resizePointerId !== event.pointerId) { return; }
-    applyOplogLabelWidth(resizeStartWidth + (event.clientX - resizeStartX));
-  });
-  const endResize = (event) => {
-    if (resizePointerId !== event.pointerId) { return; }
-    resizePointerId = null;
-    resizer.classList.remove('dragging');
-    resizer.releasePointerCapture(event.pointerId);
-    vscode.setState(Object.assign({}, vscode.getState(), { liveOplogLabelWidth: oplogLabelWidth }));
-  };
-  resizer.addEventListener('pointerup', endResize);
-  resizer.addEventListener('pointercancel', endResize);
-}
-oplogList.appendChild(oplogHead);
-applyOplogLabelWidth(oplogLabelWidth);
-
-function appendOperationLog(label, ok, mcp) {
-  const row = document.createElement('div');
-  row.className = ok ? 'oplog-row' : 'oplog-row failed';
-  const now = new Date();
-  const time = document.createElement('span');
-  time.className = 'oplog-time';
-  time.textContent = pad2(now.getHours()) + ':' + pad2(now.getMinutes()) + ':' + pad2(now.getSeconds());
-  const text = document.createElement('span');
-  text.className = 'oplog-label';
-  text.textContent = (ok ? '' : '✗ ') + label;
-  const command = document.createElement('span');
-  command.className = 'oplog-mcp';
-  if (mcp) {
-    command.textContent = mcp;
-    command.title = mcp + '\n' + t('wvMonitor.live.oplogMcpCopy');
-    command.addEventListener('click', () => { vscode.postMessage({ type: 'copyText', text: mcp }); });
-  }
-  row.appendChild(time);
-  row.appendChild(text);
-  row.appendChild(command);
-  oplogList.appendChild(row);
-  // 見出し行(.oplog-head)は数えない・消さない
-  const rows = oplogList.querySelectorAll('.oplog-row');
-  for (let i = 0; i < rows.length - OPLOG_MAX_ROWS; i++) {
-    rows[i].remove();
-  }
-  oplogList.scrollTop = oplogList.scrollHeight; // 最新行を見せる
-}
-oplogClearBtn.addEventListener('click', () => {
-  for (const row of oplogList.querySelectorAll('.oplog-row')) { row.remove(); }
-});
+// 操作列の既定幅(px)は CSS の --oplog-label-width の既定と揃えること。保存キーはグリッドビューの操作記録とは別
+const oplogView = createOplogView(oplogList, { persistKey: 'liveOplogLabelWidth', defaultLabelWidth: 220 });
+oplogClearBtn.addEventListener('click', () => oplogView.clear());
 
 // ---- 操作ボタン ------------------------------------------------------------------
+
+/** デバイスへ送る操作 */
+function postDeviceAction(message) {
+  showActionError('');
+  post(message);
+}
 
 document.getElementById('live-btn-refresh-devices').addEventListener('click', () => {
   post({ type: 'refreshDevices' });
 });
 document.getElementById('live-btn-refresh-snapshot').addEventListener('click', () => {
-  showActionError('');
-  post({ type: 'refreshSnapshot' });
+  postDeviceAction({ type: 'refreshSnapshot' });
 });
 document.getElementById('live-btn-zoom-in').addEventListener('click', () => {
-  showActionError('');
-  post({ type: 'pinch', zoomIn: true });
+  postDeviceAction({ type: 'pinch', zoomIn: true });
 });
 document.getElementById('live-btn-zoom-out').addEventListener('click', () => {
-  showActionError('');
-  post({ type: 'pinch', zoomIn: false });
+  postDeviceAction({ type: 'pinch', zoomIn: false });
 });
 document.getElementById('live-btn-home').addEventListener('click', () => {
-  showActionError('');
-  post({ type: 'home' });
+  postDeviceAction({ type: 'home' });
 });
 // 折りたたみ機の開閉(折りたためるデバイスのときだけ出す。foldButtons.js)
 const refreshFoldButtons = bindFoldButtons(
   [document.getElementById('live-btn-fold'), document.getElementById('live-btn-unfold')],
   () => deviceSelect.value || null,
   (state) => {
-    showActionError('');
-    post({ type: 'fold', state });
+    postDeviceAction({ type: 'fold', state });
   },
 );
 document.getElementById('live-btn-app-switcher').addEventListener('click', () => {
-  showActionError('');
-  post({ type: 'appSwitcher' });
+  postDeviceAction({ type: 'appSwitcher' });
 });
 function submitTypeText() {
   showActionError('');
@@ -1151,6 +1028,8 @@ typeTextInput.addEventListener('keydown', (event) => {
 // frame/liveH264Chunk は screen(タップ/ドラッグ座標変換の基準)を持たない。snapshot 未取得のまま
 // 流れているとポインタ操作が無反応になるため、一度だけ全量更新を要求する(パネル開き直しでライブ
 // タブが復元された直後に起きる)。フラグは applySnapshot で戻す。
+// **実行中でも撃つ**(画面サイズが無いと画面の操作が黙って無視される)。これは最初の1回だけの撮影で、
+// 整定のための撮り直し(scheduleSettleRefresh)は実行中は撃たない(isSelectedDeviceRunning の doc)
 function requestSnapshotIfNeeded() {
   if (!lastScreen && !autoSnapshotRequested && !busy) {
     autoSnapshotRequested = true;
@@ -1282,7 +1161,7 @@ export function applyLiveMessage(message) {
       typeTextInput.select();
       break;
     case 'operationLog':
-      appendOperationLog(message.label, !!message.ok, typeof message.mcp === 'string' ? message.mcp : '');
+      oplogView.append(message.label, !!message.ok, typeof message.mcp === 'string' ? message.mcp : '');
       break;
     default:
       break;

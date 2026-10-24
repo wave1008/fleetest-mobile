@@ -84,17 +84,27 @@ is unavailable.
   in the Run Log View). With exactly one device selected, the Grid View shows the enlarged screen and
   that device's run log side by side, and the Run Log View below folds itself so the same log is not
   shown twice.
-  The enlarged screen then gets **Home**, **App Switcher**, **Zoom in** and **Zoom out** buttons, so you
-  can operate that device in place. On the screen, **click taps**, **Option(⌥)+click double-taps** and
-  **Shift(⇧)+drag traces the exact finger path** ("Trace" lights up while Shift is held). Plain drags
-  are not sent to the device. A double-click on the screen is two taps, so to toggle the selection
+  A column to the right of the enlarged screen then stacks **Back**, **Home**, **App Switcher**, **Zoom in** and **Zoom out** buttons, so you
+  can operate that device in place (**Back** leaves the single-device view: it restores the selection you had before
+  "Select only this device", or clears the selection if there was none). On the screen, **click taps**, **Option(⌥)+click double-taps**,
+  **holding 500ms or more long-presses**, **dragging swipes** and **Shift(⇧)+drag traces the exact finger
+  path** ("Trace" lights up while Shift is held). Between the enlarged screen and the run log you get the same
+  **element list** (Refresh re-reads it; "Show bounding boxes", next to the device count in the header, overlays frames on the screen) and
+  **operation log** as the Live Control tab, and **text to type** (Enter sends) sits right below the enlarged screen. Selecting a device does not connect to it, so the
+  element list appears after your first operation or Refresh (or right away when "Show bounding boxes" is on). The operation log is kept per device.
+  A double-click on the screen is two taps, so to toggle the selection
   double-click outside the screen (the device name row or the margin). On a foldable device (the iPhone Duo
   Simulator or a foldable Android Emulator) **Fold** and **Unfold** buttons appear as well (also in the
   Live Control tab's button row; never for physical devices).
   These go through the same path as the Live Control tab, so if the Live Control tab had another device
   open it switches to this one (while another device is being recorded, the switch is refused).
-- The **iOS** / **Android** / **All** radio in the run board header (**All** by default) limits
-  which devices appear in all four sections (Running, Device list, Selected devices and Run log).
+- You can operate a device even while it is running a test (the Live Control tab too). Your operations interfere
+  with the run, so use your own judgment. They are recorded in the result of the scenario running at that moment
+  (shown under "Human operations" in the Dashboard and in the report); text you type is not recorded. Operations
+  made between two scenarios belong to neither, so they do not appear in any result.
+- The **iOS** and **Android** badges in the Line View header (to the right of Live Updates; both on by default) limit
+  which devices appear in all four sections (Running, Device list, Selected devices and Run log). Each badge toggles
+  on its own; you cannot turn both off (pressing the only one that is on swaps to the other).
   The devices themselves keep running; only the display changes.
 - Turning **Live Updates** (in the Line View header) off stops streaming and capturing every
   device's screen to reduce the Mac's load. Tiles keep their last frame, dimmed (status keeps updating).

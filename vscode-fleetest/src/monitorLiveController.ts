@@ -16,7 +16,7 @@
 // - webview 資産は src/webview/monitor/liveTab.js(src/webview/monitor/main.js から applyLiveMessage を
 //   import)。frameToDisplayRect の計算だけを手書きで複製している(要素一覧の表示テキストは host 側で
 //   事前整形して送るため複製不要)。liveModel.ts の frameToDisplayRect を変更したら
-//   liveTab.js 側も追随させること。
+//   liveListViews.js 側も追随させること。
 
 import { type ChildProcessByStdio, spawn } from "node:child_process";
 import type { Readable, Writable } from "node:stream";
@@ -398,8 +398,12 @@ export class MonitorLiveController implements vscode.Disposable {
 
   /** 「操作記録」1行を webview へ送る(対向: liveTab.js の operationLog ハンドラ)。
    * 全ユーザー操作(tap/swipe/type/press/home/appSwitcher)の成否をここへ流す。 */
-  private postOperationLog(label: string, ok: boolean, mcp?: string): void {
-    this.post({ type: "operationLog", label, ok, ...(mcp !== undefined ? { mcp } : {}) });
+  private postOperationLog(label: string, ok: boolean, mcp?: string, deviceId?: string): void {
+    this.post({
+      type: "operationLog", label, ok,
+      ...(mcp !== undefined ? { mcp } : {}),
+      ...(deviceId !== undefined ? { deviceId } : {}),
+    });
   }
 
   /** テスト実行(RunEventBus の step)由来の操作を「操作記録」へ流す。section=action のみ・
@@ -785,7 +789,8 @@ export class MonitorLiveController implements vscode.Disposable {
    * id へ切り替えてから撃つ(serve は1本だけ = 同じデバイスへ2本の常駐を立てない)。
    * 座標の操作は画面サイズ(lastScreen)が要るので、切り替え直後の観測が済むのを待ってから撃つ。 */
   async handleGridAction(id: string, action: GridLiveAction): Promise<void> {
-    if (this.selectedDeviceId !== id) {
+    const switching = this.selectedDeviceId !== id;
+    if (switching) {
       if (this.appActions.isRecordingInProgress()) {
         this.post({ type: "gridActionError", id, message: t("live.gridRecordingOtherDevice") });
         return;
@@ -801,8 +806,12 @@ export class MonitorLiveController implements vscode.Disposable {
         return;
       }
     }
-    if ((action.type === "tapPoint" || action.type === "doubleTapPoint" || action.type === "tracePoints")
-      && !this.lastScreen) {
+    // 切り替えの中で観測が済んで画面サイズが揃っているなら「更新」を二重に撃たない
+    if (switching && action.type === "refreshSnapshot" && this.lastScreen) {
+      return;
+    }
+    if ((action.type === "tapPoint" || action.type === "doubleTapPoint" || action.type === "tracePoints"
+      || action.type === "dragPoints" || action.type === "pressPoint") && !this.lastScreen) {
       // 上限は観測1回の応答待ち(sendServeCommand のタイムアウト)と同じ
       await this.waitForIdle(SERVE_REQUEST_TIMEOUT_MS);
       if (!this.lastScreen) {
@@ -811,6 +820,10 @@ export class MonitorLiveController implements vscode.Disposable {
     } else {
       await this.waitForIdle(SERVE_REQUEST_TIMEOUT_MS);
     }
+    // **撃つ直前に合図する**(gridLivePanel.js の枠の鮮度)。切り替え・待ちの間に届いた観測(開いたときの観測・
+    // ライブ操作タブの撮り直し)を、webview が「この操作の直接の結果」と取り違えないため。handleWebviewMessage は
+    // 同期で runAction へ入り、最初の await より前に busy を立てるので、合図と操作の結果の間に別の観測は割り込まない
+    this.post({ type: "gridActionStarted", id });
     this.handleWebviewMessage(action);
   }
 
@@ -1637,6 +1650,8 @@ export class MonitorLiveController implements vscode.Disposable {
       return false;
     }
     this.setBusy(true);
+    // 操作中に選択が変わっても、行は操作を撃ったデバイスのものとして届ける
+    const loggedDeviceId = this.selectedDeviceId;
     // 要素一覧は sendServeCommand の観測で入れ替わるので、送る前の(利用者が見ていた)木で引く
     const mcp = mcpCommandForServeCommand(command, this.lastElements);
     try {
@@ -1654,7 +1669,7 @@ export class MonitorLiveController implements vscode.Disposable {
           this.postActionError(action.error);
         }
         if (options?.logLabel) {
-          this.postOperationLog(options.logLabel, false, mcp);
+          this.postOperationLog(options.logLabel, false, mcp, loggedDeviceId);
         }
         return false;
       }
@@ -1667,7 +1682,7 @@ export class MonitorLiveController implements vscode.Disposable {
       // 記録するのは対象アプリの上での操作だけ(LiveAppActions.recordStep の operationBelongsToApp doc)
       this.appActions.recordStep(recordStep, action?.app);
       if (options?.logLabel) {
-        this.postOperationLog(options.logLabel, true, mcp);
+        this.postOperationLog(options.logLabel, true, mcp, loggedDeviceId);
       }
       if (options?.silentObservation) {
         return true;  // action は成功。観測は反映も表示もしない(直後の launch が画面を出す)

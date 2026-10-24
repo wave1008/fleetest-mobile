@@ -5295,6 +5295,15 @@ backboardd のこのエラーは、モニターが画面を配信しているデ
 入れる)**。3つとも常設で、**見出し行はどこを押しても開閉**(run ボードのヘッダと同じ規律。
 三角は状態の表示で文字は常に ▶)。
 
+- **テスト実行中のデバイスも操作を止めない**(ヒューマンインザループ。ユーザー決定 2026-10-25「常に介入可能・
+  利用者の自己責任」)。トグルも確認も置かない(再提案しない)。人の操作の事実は CLI が
+  結果 JSON の `humanOperations` に残し、ダッシュボードのシナリオ詳細と Markdown レポートに出す(§13.3 (0b))。
+  止めるのは**整定のための自動の撮り直し**だけ(ライブ操作タブの `scheduleSettleRefresh` / `armBoxesSettleCap`。
+  判定は `laneLog.js` の `isDeviceRunning(id)` = `workerRunning` / hydrate の `runningWorkers`。id はタイルの
+  `platform:name`)—— XCUITest ブリッジは1件ずつしか処理せず、シナリオの操作と口を取り合う。**最初の1回の撮影
+  (`requestSnapshotIfNeeded` = 画面サイズを得る)は実行中でも撃つ**(無いと画面の操作が黙って無視される)。
+  そのためグリッドの枠の整定(`gridLivePanel.js`)は実行中は「次の snapshot」が来ず、`BOXES_SETTLE_CAP_MS` の打ち切りで
+  手元の木で描く。
 - **「実行中」と「デバイス」の間にもセパレーター**(`#devices-separator`。ユーザー決定 2026-09-22)。
   **見た目も挙動も `#splitter-log` と同じ**(`.splitter`)で、下げると run ボードが伸びる。
   見出し行どうしの区切りを地色だけで付ける規律(2026-09-21)の**唯一の例外**。守る規律4つ:
@@ -5327,15 +5336,52 @@ backboardd のこのエラーは、モニターが画面を配信しているデ
   旗 ∧ グリッドビューが開いている)—— グリッドビューを畳んだときに旗のほうを捨てると、開き直した
   瞬間に同じログが上下へ出たまま次の選択変更まで戻らない。**見出しクリックは「見えている状態」を
   反転する**(旗が効いているかで分岐を変えると、押しても何も起きない空振りができる)
-- **1台表示のときだけ、拡大表示の下にライブ操作のツールバー**(ホーム・タスク切替・拡大・縮小・軌跡の表示灯・
-  修飾キーの案内。`gridLiveControls.js`。DOM は `monitorHtml.ts` の `#grid-live-controls` を置き場から移す)。
-  受けるのは **クリック(タップ)・Option+クリック(ダブルタップ)・Shift+ドラッグ(軌跡)だけ** —— 素のドラッグ・
-  長押しは送らない。**絵の上のダブルクリックは2回のタップで、選択の切り替えにしない**(`laneLog.js` が
-  `isGridLiveScreenTarget` と修飾キーで除く。切り替えは絵の外側のダブルクリック)。
-  送り先は `gridLiveAction` → `MonitorLiveController.handleGridAction` で、**ライブ操作タブと同じ serve を使う**
-  (同じデバイスへ常駐を2本立てない)。選択中が別のデバイスなら `openDevice` で切り替えてから撃ち、
-  **別のデバイスをレコーディング中は切り替えずに断る**(`gridActionError`)。座標の操作は切り替え直後の観測で
-  `lastScreen` が揃うのを待つ。失敗は**ライブ操作が今つないでいるデバイスが対象と一致するときだけ**グリッド側にも出す
+- **1台表示のときだけ、ライブ操作と同等の操作**ができる(`gridLiveControls.js` = ツールバーと画面の操作、
+  `gridLivePanel.js` = 操作パネル。インストール・レコーディング開始・アプリを起動は持たない)。
+  - **ツールバー**(拡大表示の右隣の縦のカラム。並びは「拡大表示 | 操作 | 操作パネル | 実行ログ」): 戻る・ホーム・タスク切替・
+    拡大・縮小・軌跡の表示灯・修飾キーの案内を縦に積む。カラムは3段(上 = 戻る / 中 = ホーム〜修飾キーの案内を枠で
+    囲んだデバイス操作のグループ / 下 = 失敗の文言)で、**上と下の段を同じ 1fr にしてグループを上下中央に置く**。DOM は `monitorHtml.ts` の `#grid-live-controls` を置き場から
+    `.lane-pair` の中へ移し、操作パネルはその右隣へ置く(**ずれているときだけ動かす** —— devices の周期ごとに並べ直すと
+    載せたボタンのツールチップが点滅する)。**「戻る」は1台表示を抜ける**(`deviceTiles.js` の
+    `exitSingleSelection`): 「このデバイスのみ選択」の直後なら直前の選択へ戻し(絵の外側のダブルクリックと同じ戻し)、
+    控えが無ければ選択を解除する。デバイスを触らないので busy でも押せる。
+  - **画面の操作**(絵の上。ライブ操作タブと同じ割り当て): クリック=タップ / Option+クリック=ダブルタップ /
+    `LONG_PRESS_MS`(500ms、`liveTab.js` と共有)以上のホールド=長押し(`pressPoint`)/ 素のドラッグ=スワイプ
+    (`dragPoints`。ドラッグ中は始点からの直線を描く)/ Shift+ドラッグ=軌跡(`tracePoints`)。
+    **絵の上のダブルクリックは2回のタップで、選択の切り替えにしない**(`laneLog.js` が
+    `isGridLiveScreenTarget` と修飾キーで除く。切り替えは絵の外側のダブルクリック)。
+  - **操作パネル**(`#grid-live-panel`): `.lane-pair` の中、操作カラムの右隣に置く(`syncLogMirror` が組を作り直すので
+    `syncGridLivePanel` が毎回位置を確かめる)。1台表示は「拡大表示 | 操作 | 操作パネル | 実行ログの複製」の4列。
+    中身は要素一覧(見出し・「更新」。「バウンディングボックスを表示」はグリッドビューの見出し行の台数の右に置き、
+    1台表示のときだけ出す・クリックは見出しの開閉へ伝えない)・操作記録(列幅は `gridLiveOplogLabelWidth` に保存)。**入力するテキスト**(Enter 送信・IME 変換中と
+    処理中は送らない)だけは拡大表示の絵のすぐ下(`.lane-preview-frame` の直後。`#grid-live-type-row`)に置き、中の
+    ダブルクリック・右クリックは拡大表示(選択の切り替え・デバイスのメニュー)へ伝えない。当たり判定・行の描画・操作記録の描画は
+    ライブ操作タブと共有(`liveListViews.js`)。
+  - **選択しただけでは serve へ接続しない(観測を自動で撃たない)** —— ブリッジの自動起動や実行中のテストへの
+    相乗りを避けるため。接続は最初の操作・「更新」・枠トグル ON のときに起こる。**枠トグルが既に ON のまま
+    1台表示を開いたときも1回取りに行く**(ON は利用者の明示の意思。撮らないと描く木が無く、ON なのに枠が出なかった)。一覧は host の `devices.selectedId`
+    (ライブ操作が今つないでいるデバイス)が対象と一致するときの `snapshot`(screen と elements だけ。絵は
+    モニター自身の配信)でだけ描き、`clearSnapshot` や別デバイスへのつなぎ替わりで捨てる。未取得の間は案内を出す。
+  - **操作記録はデバイスごと**: host の `operationLog` が手動操作の行にだけ `deviceId`(操作を撃った時点の選択)を付け、
+    パネルはデバイスごとに最大200行を控えて対象の行だけ出す。`deviceId` の無い行(テスト実行由来 = `injectTestStep`)は
+    出さない。「クリア」は対象のぶんだけ。
+  - **枠の整定**: 画面を変える操作(「更新」以外)を送った時点で枠を消し(一覧は消さない)、**その操作の直接の結果の
+    `snapshot` では描かず**、次の `snapshot` で描く。**この依存**: `liveTab.js` は `applySnapshot` のたびに
+    `SETTLE_REFRESH_MS`(700ms)後の撮り直しを1回撃つ(`scheduleSettleRefresh`)ので、操作の結果の次には整定後の木が
+    必ず続く。続かない場合のため、直接の結果から `BOXES_SETTLE_CAP_MS`(= 700ms×4)で手元の最新の木で描く。
+    **「直接の結果」は host の合図 `gridActionStarted` の後に届いた最初の `snapshot` だけ**(`handleGridAction` が撃つ直前に
+    送る。`runAction` は最初の await より前に busy を立てるので、合図と結果の間に別の観測は割り込まない)。host は撃つ前に
+    デバイスの切り替え(開いたときの観測)や直前の処理の終わりを待つので、送った直後に届く `snapshot` は操作前の画面 ——
+    取り違えると本物の結果を「整定後」と読み、遷移の途中の位置に枠を一度描いていた。操作の段(`opPhase`)は
+    `clearSnapshot` で消さない(切り替えの途中で消すと同じ取り違えに戻る)。撃つ前に断られたら(`gridActionError`・
+    busy を立てずに返る `actionError`)手元の木で描き直す。
+    トグル ON で木が無い/古いときは「更新」を撃ち、届いた木で描く。ホバーはライブ操作タブと同じ(絵の上の点の
+    最小の要素を一覧の行と枠で対に光らせる。一覧送りは枠 ON のときだけ)。
+  - 送り先は `gridLiveAction` → `MonitorLiveController.handleGridAction` で、**ライブ操作タブと同じ serve を使う**
+    (同じデバイスへ常駐を2本立てない)。選択中が別のデバイスなら `openDevice` で切り替えてから撃ち、
+    **別のデバイスをレコーディング中は切り替えずに断る**(`gridActionError`)。座標の操作(tap/doubleTap/press/drag/
+    trace)は切り替え直後の観測で `lastScreen` が揃うのを待つ。切り替えの中で観測が済んでいれば「更新」は二重に撃たない。
+    失敗は**ライブ操作が今つないでいるデバイスが対象と一致するときだけ**グリッド側にも出す
 - **折りたたみ機の開閉ボタン**(「折りたたむ」「開く」。グリッドビューとライブ操作タブ)は**モニターの `devices[].foldable` が
   true のデバイスだけ**に出す(`webview/monitor/foldButtons.js`。判定は `api monitor` の `DeviceFoldabilitySampler` が裏で1台1回 =
   iOS Simulator は devicectl の内蔵画面の枚数・Android Emulator は device_state の CLOSED。実機は測らず false・未確定は欄ごと省く)。
@@ -5403,6 +5449,25 @@ run → monitor 方向の `RunLease`(§12 の「監視と実行の協調」)は�
 ライブ操作パネルは常駐 CLI(`ApiLiveServe`。プロトコルは `Sources/fleetest/ApiLiveCommand.swift`
 冒頭)で、run / MCP とは別に自分でブリッジへ繋ぎに行く。§13.1/13.2 と同じ「相乗り・未導入 launch」の
 危険がここにも及ぶことが実地で分かったので、判定は既存の1箇所へ寄せた。
+
+**(0) 実行中も操作を止めない**: ライブ操作タブも §12.6 と同じく、選択中のデバイスがシナリオを回している間も
+操作を受け付ける(利用者の自己責任。止めるのは整定のための自動の撮り直しだけ)。
+
+**(0b) run 中の人の操作の台帳**(`FTCore.HumanOperationLedger`): run の実行中に人がライブ操作で触った事実を、
+そのときそのデバイスで回っていたシナリオの結果へ時刻つきで残す(介入が原因の赤をアプリの不具合に見せない。
+**分類はしない・事実だけ**)。契約:
+- **置き場** `<RepoRoot>/.fleetest/human-ops/<UDID または adb serial>.ndjson`(鍵は run-lease と同じ)。
+  1行 = `{"at"(ISO 8601・UTC・ミリ秒), "label", "ok"}`。リモートのランナー機では serve も run も同じ workDir で動くので同じ置き場
+- **書き手は run がそのデバイスを使用中のときの serve だけ**(`RunLease.holderPID` が自分以外の生きた pid。判定は
+  `LiveHumanOperation.shouldRecord`)。普段のライブ操作では台帳を育てない。操作の成否を問わず撃ち始めの時刻で1件
+  (`ApiLiveServe.handle`)。**入力した文字列は残さない**(`type` は文字数だけ。`LiveHumanOperation.label`)。
+  ref の要素名は直近の観測の表(`LiveScreenMemo.names`)から引く —— 操作の前に木を撮り直すと ref の番号を動かすので撮らない
+- **読み手は `ScenarioHost.run` の確定点3つ**(起動前の失敗・タイムアウト・通常終了)。窓 [`startedAt`, 確定] の行を結果の
+  `humanOperations` へ載せ(空なら欄ごと省く。Optional で足したので版は上げない)、通常終了では子が書いた Markdown レポートの末尾に
+  `## Human operations` 節も足す(`HumanOperationReport`)。引くのは `ScenarioRecording.humanOperationsStateDir`(FTCore は `RepoRoot` を
+  呼べないので呼び手が `HumanOperationStateDir.current` を渡す。渡し忘れは `HumanOperationWiringTests` が落とす)
+- **保持** 24 時間(`retentionSeconds`)。追記のついでに古い行を flock の内側で間引き、一時ファイルから rename で書き直す
+- **子に偽造させない**: `ScenarioSandbox.writeDeniedPaths` に `human-ops` がある
 
 **(a) 宛先の本人確認**: `XCUIBridgeResolver.resolve` が返した宛先は `FTCore.BridgeIdentityCheck`
 (F8b・2026-09-15。run 側の `RunOrchestrator.bridgeUnreachable` 再プローブと同じ判定)で `--udid` と

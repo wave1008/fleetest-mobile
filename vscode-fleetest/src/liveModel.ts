@@ -1054,10 +1054,21 @@ export type LiveToWebviewMessage =
   | { readonly type: "focusTypeInput" }
   // 「操作記録」1行(レコーディング機能とは無関係。受け手: liveTab.js の operationLog ハンドラ)。
   // mcp: 同じ操作を MCP で撃つコマンド(mcpCommandForServeCommand)。テスト実行由来の行(injectTestStep)には無い
-  | { readonly type: "operationLog"; readonly label: string; readonly ok: boolean; readonly mcp?: string }
+  // deviceId: 手動操作の行だけが持つ(操作したときの selectedDeviceId。グリッドビューがデバイスごとに振り分ける)。
+  // injectTestStep の行は対象デバイスが分からないので付けない
+  | {
+      readonly type: "operationLog";
+      readonly label: string;
+      readonly ok: boolean;
+      readonly mcp?: string;
+      readonly deviceId?: string;
+    }
   // グリッドビューの操作(GridLiveAction)が、ライブ操作へ流す前に断られた(受け手: gridLiveControls.js)。
   // 流した後の失敗は通常の actionError で届く(グリッド側は選択中のデバイスが id と一致するときだけ出す)
-  | { readonly type: "gridActionError"; readonly id: string; readonly message: string };
+  | { readonly type: "gridActionError"; readonly id: string; readonly message: string }
+  // グリッドビューの操作を今から撃つ(切り替え・待ちが済んだ直後。受け手: gridLivePanel.js)。この後に届く最初の
+  // snapshot がその操作の直接の結果(MonitorLiveController.handleGridAction)
+  | { readonly type: "gridActionStarted"; readonly id: string };
 
 export function toSnapshotMessage(snapshot: LiveSnapshot): LiveToWebviewMessage {
   return {
@@ -1221,15 +1232,19 @@ export function isLiveFromWebviewMessage(value: unknown): value is LiveFromWebvi
 }
 
 /** グリッドビュー(1台だけ選択したときの拡大表示)から撃てる操作。ライブ操作と同じ命令へ流す
- * (MonitorLiveController.handleGridAction。送り手: src/webview/monitor/gridLiveControls.js)。
- * 素のドラッグ(スワイプ)・長押しは入れない(グリッドビューで受けるのはクリック・修飾キー付きの操作・ツールバーだけ)。 */
+ * (MonitorLiveController.handleGridAction。送り手: src/webview/monitor/gridLiveControls.js・gridLivePanel.js)。
+ * ライブ操作の画面操作とツールバーに相当するものだけ。入れないのは install / launch / 録画系 / selectDevice 等。 */
 export type GridLiveAction = Extract<
   LiveFromWebviewMessage,
-  { readonly type: "home" | "appSwitcher" | "pinch" | "fold" | "tapPoint" | "doubleTapPoint" | "tracePoints" }
+  {
+    readonly type: "home" | "appSwitcher" | "pinch" | "fold" | "tapPoint" | "doubleTapPoint" | "tracePoints"
+      | "dragPoints" | "pressPoint" | "typeText" | "refreshSnapshot";
+  }
 >;
 
 const GRID_LIVE_ACTION_TYPES: ReadonlySet<string> = new Set([
   "home", "appSwitcher", "pinch", "fold", "tapPoint", "doubleTapPoint", "tracePoints",
+  "dragPoints", "pressPoint", "typeText", "refreshSnapshot",
 ] satisfies GridLiveAction["type"][]);
 
 export function isGridLiveAction(value: unknown): value is GridLiveAction {

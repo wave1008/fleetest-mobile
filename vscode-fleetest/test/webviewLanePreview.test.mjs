@@ -161,10 +161,12 @@ test("1台選択で実行ログビューはその台だけに絞り、グリッ�
   const previewGrid = document.getElementById("preview-grid");
   assert.ok(previewGrid.classList.contains("single-device"));
   const pair = previewGrid.querySelector(".lane-pair");
-  assert.ok(pair, "1台のときは .lane-pair で拡大表示とログの複製を束ねる");
+  assert.ok(pair, "1台のときは .lane-pair で拡大表示と操作のカラムと操作パネルとログの複製を束ねる");
   assert.equal(pair.children[0].className, "lane-preview", "左が動画");
-  assert.equal(pair.children[1].className, "lane lane-log-mirror", "右がログの複製");
-  assert.equal(pair.children[1].querySelector(".lane-log-title").textContent, "実行ログ");
+  assert.equal(pair.children[1].id, "grid-live-controls", "動画の右隣が操作のカラム");
+  assert.equal(pair.children[2].id, "grid-live-panel", "その右が操作パネル");
+  assert.equal(pair.children[3].className, "lane lane-log-mirror", "右端がログの複製");
+  assert.equal(pair.children[3].querySelector(".lane-log-title").textContent, "実行ログ");
   assert.equal(document.getElementById("grid-view-title").textContent, "選択したデバイス");
 });
 
