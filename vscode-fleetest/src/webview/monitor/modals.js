@@ -604,7 +604,7 @@ deviceAddOverlay.addEventListener('click', (event) => {
 });
 // Enter で OK。**入力欄・選択欄のどこにいても効かせる**(名前を打ってそのまま Enter が自然)。
 // ボタン上の Enter は既定のクリック動作に任せる(二重発火を避ける)。IME の変換確定 Enter は
-// 拾わない(isComposing / keyCode 229。liveTab.js と同じ規律 —— 日本語入力で確定した瞬間に
+// 拾わない(isComposing / keyCode 229。日本語入力で確定した瞬間に
 // ダイアログが閉じると入力し直しになる)。
 deviceAddOverlay.addEventListener('keydown', (event) => {
   if (event.key !== 'Enter' || event.isComposing || event.keyCode === 229) {

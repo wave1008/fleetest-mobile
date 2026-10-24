@@ -1,8 +1,8 @@
 // グリッドビュー(1台だけ選択したときの拡大表示)のライブ操作: ツールバー(ホーム・タスク切替・拡大・縮小・
 // 折りたたみ機なら折りたたむ・開く)と
-// 画面の操作(クリック = タップ / Option+クリック = ダブルタップ / 500ms 以上ホールド = 長押し /
-// ドラッグ = スワイプ / Shift+ドラッグ = 軌跡)。ライブ操作タブと同じ。送り先は host の
-// MonitorLiveController.handleGridAction(ライブ操作タブと同じ serve。選択中のデバイスが違えば切り替える)。
+// 画面の操作(クリック = タップ / Command+クリック = ダブルタップ / 500ms 以上ホールド = 長押し /
+// ドラッグ = スワイプ / Option+ドラッグ = 軌跡)。送り先は host の
+// MonitorLiveController.handleGridAction(serve は1本。選択中のデバイスが違えば切り替える)。
 // 契約: monitorWebviewMessages.ts の gridLiveAction / liveModel.ts の GridLiveAction・gridActionError。
 // ツールバーの DOM は monitorHtml.ts(#grid-live-controls。文言は host 側 t() 済み)が持ち、ここで
 // 1台表示の .lane-pair の中、拡大表示の右隣へ縦のカラムとして移す(laneLog.js の updateLaneVisibility が
@@ -15,10 +15,10 @@
 
 import { t } from '../i18n.js';
 import { vscode } from './vscodeApi.js';
-import { thinTracePoints } from './traceThinning.js';
-import { setHoverTip } from './hoverTip.js';
+import { firstMoveT, thinTracePoints, tracePrefix } from './traceThinning.js';
+import { setHoverTip, setHeldTip } from './hoverTip.js';
 import { exitSingleSelection, liveRemoteTargetFor, onMirrorFrame, showMirrorStill } from './deviceTiles.js';
-import { DRAG_MIN_PX, LONG_PRESS_MS, TRACE_MAX_MS } from './liveTab.js';
+import { DRAG_MIN_PX, HELD_TIP_DELAY_MS, LONG_PRESS_MS, TRACE_MAX_MS } from './liveConstants.js';
 import { isDeviceRunning, relayoutPreviewsForResize } from './laneLog.js';
 import { bindFoldButtons } from './foldButtons.js';
 import { applyGridLivePanelMessage, initGridLivePanel, noteMirrorFrame, noteScreenAction, syncGridLivePanel } from './gridLivePanel.js';
@@ -27,6 +27,7 @@ const parking = document.getElementById('grid-live-parking');
 const controls = document.getElementById('grid-live-controls');
 const errorEl = document.getElementById('grid-live-error');
 const traceIndicator = document.getElementById('grid-live-trace-indicator');
+const doubleTapIndicator = document.getElementById('grid-live-doubletap-indicator');
 // 「戻る」は選択を変えるだけでデバイスを触らないので busy の対象にしない
 const buttons = [...controls.querySelectorAll('button')].filter((button) => button.id !== 'grid-live-btn-back');
 
@@ -35,15 +36,22 @@ const dragOverlay = document.createElementNS(svgNS, 'svg');
 dragOverlay.setAttribute('class', 'grid-live-drag-overlay');
 dragOverlay.setAttribute('aria-hidden', 'true');
 const dragTrace = document.createElementNS(svgNS, 'polyline');
+// 離した後の再生中だけ使う「操作が済んだ部分」(なぞった線 dragTrace を薄くし、こちらを太く重ねる)
+const dragTraceDone = document.createElementNS(svgNS, 'polyline');
+dragTraceDone.setAttribute('class', 'done');
 const dragStartDot = document.createElementNS(svgNS, 'circle');
 dragStartDot.setAttribute('r', '6');
 const dragLine = document.createElementNS(svgNS, 'line');
-dragOverlay.append(dragLine, dragTrace, dragStartDot);
+// 押したまま動かさずに LONG_PRESS_MS を過ぎた印(.long-press)。デバイスは止まっていた時間ごと再生するので長押しになる
+// (iOS のマップはピンを立て、続けて動かしてもパンしない)。意図しない長押しに、離す前に気付かせる
+const longPressLabel = document.createElementNS(svgNS, 'text');
+longPressLabel.setAttribute('class', 'long-press-label');
+dragOverlay.append(dragLine, dragTrace, dragTraceDone, dragStartDot, longPressLabel);
 
 // 操作の対象(1台表示のデバイス)。1台表示でない間は null
 let target = null;
-// ライブ操作が今つないでいるデバイス(host の devices.selectedId)。actionError はこれが target と
-// 一致するときだけ出す(ライブ操作タブで別のデバイスを操作した失敗をここに出さない)
+// host の serve が今つないでいるデバイス(host の devices.selectedId)。actionError はこれが target と
+// 一致するときだけ出す(別のデバイスを操作した失敗をここに出さない)
 let liveSelectedId = null;
 let busy = false;
 // busy の原因が画面を変えない観測か(host の busy.observing)。この間の画面の操作・ボタンは受け付ける
@@ -53,6 +61,8 @@ function operationBlocked() {
   return busy && !busyObserving;
 }
 let dragStart = null;
+// 実行中に押されて送らなかった旨を出している(busy が解けたら消す)
+let blockedNoticeShown = false;
 function applyButtonState() {
   for (const button of buttons) { button.disabled = operationBlocked(); }
 }
@@ -66,7 +76,10 @@ let mirrorFrameSubscribed = false;
 export function syncGridLiveControls(id, previewEl) {
   if (!mirrorFrameSubscribed && id !== null) {
     mirrorFrameSubscribed = true;
-    onMirrorFrame(noteMirrorFrame);
+    onMirrorFrame((deviceId) => {
+      noteMirrorFrame(deviceId);
+      noteTracePicture(deviceId);
+    });
   }
   if (target && (target.id !== id || target.previewEl !== previewEl)) {
     releaseTraceOverlay();
@@ -75,6 +88,8 @@ export function syncGridLiveControls(id, previewEl) {
     parking.appendChild(controls);
     dragOverlay.remove();
     target = null;
+    // 置き場へ戻した表示灯の位置に、押している間のツールチップを残さない
+    cancelHeldTips();
     showError('');
     refreshFoldButtons();
   }
@@ -106,7 +121,7 @@ export function isGridLiveScreenTarget(el) {
   return !!target && el instanceof Element && target.previewEl.contains(el) && !!el.closest('.lane-preview-media');
 }
 
-/** host からの live メッセージ(main.js が liveTab.js と両方へ配る)。 */
+/** host からの live メッセージ(main.js から)。 */
 export function applyGridLiveMessage(message) {
   applyGridLivePanelMessage(message);
   switch (message.type) {
@@ -117,9 +132,15 @@ export function applyGridLiveMessage(message) {
       busy = !!message.busy;
       busyObserving = busy && !!message.observing;
       applyButtonState();
+      if (blockedNoticeShown && !operationBlocked()) {
+        blockedNoticeShown = false;
+        // 後から届いた失敗の文言(前の操作の actionError)は消さない
+        if (errorEl.textContent === t('wvMonitor.live.blockedWhileBusy')) { showError(''); }
+      }
       if (traceHold !== null) {
         if (busy && !busyObserving) {
-          traceHold.sawBusy = true; // 軌跡の実行が始まった
+          if (!traceHold.sawBusy) { startTracePlayback(); } // 軌跡の実行が始まった
+          traceHold.sawBusy = true;
         } else if (!busy && traceHold.sawBusy) {
           releaseTraceOverlay(); // なぞり終えた
         }
@@ -131,6 +152,9 @@ export function applyGridLiveMessage(message) {
       }
       // busy を立てずに返った失敗 = 撃つ前に断られた(撃った後の失敗は busy の間に届く)
       if (message.message && !busy) { releaseTraceOverlay(); }
+      break;
+    case 'gestureActionDone':
+      finishTracePlayback(!!message.ok);
       break;
     case 'gridActionError':
       if (target && message.id === target.id) {
@@ -178,14 +202,60 @@ const refreshFoldButtons = bindFoldButtons(
 // ボタンの押下を拡大表示のダブルクリック(選択の切り替え)へ伝えない
 controls.addEventListener('dblclick', (event) => event.stopPropagation());
 
-// 軌跡の表示灯: Shift を押している間だけ点ける(liveTab.js の setTraceIndicator と同じ)
+// 修飾キーの表示灯: ダブルタップ = Command(Meta)・軌跡 = Option(Alt)を押している間だけ点け、押し続けたら
+// HELD_TIP_DELAY_MS 後に説明のツールチップも出す。**ツールチップを出すのは1台表示の間だけ**で、入力欄で押したとき
+// (⌘V 等)・他のキーと一緒に押したとき(⌘C・⌘⇧P 等のショートカット)は出さない。
+// 点け消しは状態が変わったときだけ(pointermove が毎回呼ぶ = 毎回置き直すとツールチップが揺れる)
 setHoverTip(traceIndicator, traceIndicator.title);
-function setTraceIndicator(on) {
-  traceIndicator.classList.toggle('active', !!on);
+setHoverTip(doubleTapIndicator, doubleTapIndicator.title);
+const heldTipTimers = new Map(); // 表示灯 → ツールチップを出す setTimeout
+function cancelHeldTip(indicator) {
+  clearTimeout(heldTipTimers.get(indicator));
+  heldTipTimers.delete(indicator);
+  setHeldTip(indicator, false);
 }
-window.addEventListener('keydown', (event) => { if (event.key === 'Shift') { setTraceIndicator(true); } });
-window.addEventListener('keyup', (event) => { if (event.key === 'Shift') { setTraceIndicator(false); } });
-window.addEventListener('blur', () => setTraceIndicator(false));
+function cancelHeldTips() {
+  cancelHeldTip(traceIndicator);
+  cancelHeldTip(doubleTapIndicator);
+}
+function setModifierIndicator(indicator, on, showTip = true) {
+  if (indicator.classList.contains('active') === !!on) { return; }
+  indicator.classList.toggle('active', !!on);
+  cancelHeldTip(indicator);
+  if (on && showTip && target !== null) {
+    heldTipTimers.set(indicator, setTimeout(() => {
+      heldTipTimers.delete(indicator);
+      if (indicator.classList.contains('active') && target !== null) { setHeldTip(indicator, true); }
+    }, HELD_TIP_DELAY_MS));
+  }
+}
+function setTraceIndicator(on, showTip) { setModifierIndicator(traceIndicator, on, showTip); }
+function setDoubleTapIndicator(on, showTip) { setModifierIndicator(doubleTapIndicator, on, showTip); }
+function isTextEntry(el) {
+  return el instanceof Element && (el.closest('input, textarea, select, [contenteditable="true"]') !== null);
+}
+const MODIFIER_KEYS = new Set(['Meta', 'Alt', 'Shift', 'Control']);
+window.addEventListener('keydown', (event) => {
+  if (!MODIFIER_KEYS.has(event.key)) {
+    cancelHeldTips(); // ショートカットの途中 = 表示灯は点けたまま、説明は出さない
+    return;
+  }
+  const showTip = !isTextEntry(event.target);
+  if (event.key === 'Meta') { setDoubleTapIndicator(true, showTip); }
+  if (event.key === 'Alt') { setTraceIndicator(true, showTip); }
+});
+window.addEventListener('keyup', (event) => {
+  if (event.key === 'Meta') { setDoubleTapIndicator(false); }
+  if (event.key === 'Alt') { setTraceIndicator(false); }
+});
+window.addEventListener('blur', () => { setTraceIndicator(false); setDoubleTapIndicator(false); });
+
+// 座標がウィンドウの原点ちょうど (0,0) のポインターイベントは採らない。押したまま動かしている最中に (0,0) の
+// イベントが1つだけ混ざり、軌跡が絵の左上の角を経由してデバイスにもその形で送られた(実地: Option+ドラッグ)。
+// 原点は拡大表示の絵の上ではない(上にツールバー・見出しがある)ので、本物の (0,0) を捨てても失うものは無い
+function isOriginPointer(event) {
+  return event.clientX === 0 && event.clientY === 0;
+}
 
 function clampToRect(event, rect) {
   return {
@@ -206,6 +276,11 @@ function handlePointerDown(event) {
   event.preventDefault();
   event.stopPropagation();
   if (operationBlocked()) {
+    // **黙って捨てない**(iOS は操作の後の観測まで busy が続き、続けて押すと2回目が空振りに見えた)。溜めて後で撃つ
+    // こともしない —— 前の操作で画面が変わった後に届くと、押したつもりと違う物に当たる(観測の最中の操作を host が
+    // 待って撃てるのは、観測が画面を変えないから)
+    showError(t('wvMonitor.live.blockedWhileBusy'), true);
+    blockedNoticeShown = true;
     return;
   }
   const rect = media.getBoundingClientRect();
@@ -214,16 +289,25 @@ function handlePointerDown(event) {
   }
   const x = event.clientX - rect.left;
   const y = event.clientY - rect.top;
-  // **押した時点の修飾キーを採る**(liveTab.js の handleScreenPointerDown と同じ理由)
+  // **押した時点の修飾キーを採る**(離す前に修飾キーが変わっても、構えた時点のモードで撃つ)
   releaseTraceOverlay(); // 前の軌跡の線は、次のドラッグで消す
   dragStart = {
     id: target.id, media, pointerId: event.pointerId, downAt: performance.now(), x, y,
-    doubleTap: event.altKey, trace: event.shiftKey, moveAt: null,
+    doubleTap: event.metaKey, trace: event.altKey, moveAt: null, lastX: x, lastY: y,
     points: [{ x, y, t: 0 }],
   };
-  // 構成中のジェスチャを見せる(デバイス側のスワイプは離したときに1回で実行される。liveTab.js の drag-overlay と同じ)
+  // 構成中のジェスチャを見せる(デバイス側のスワイプは離したときに1回で実行される)
   placeOverlay(rect);
   updateOverlay(x, y);
+  dragOverlay.classList.remove('long-press');
+  longPressLabel.setAttribute('x', String(x + 14));
+  longPressLabel.setAttribute('y', String(y - 10));
+  longPressLabel.textContent = t('wvMonitor.live.longPressMark');
+  const pressed = dragStart;
+  // ダブルタップのモード(Command)は押していた時間に関係なくダブルタップを送るので出さない(送るものと食い違う)
+  pressed.longPressTimer = pressed.doubleTap ? null : setTimeout(() => {
+    if (dragStart === pressed && pressed.moveAt === null) { dragOverlay.classList.add('long-press'); }
+  }, LONG_PRESS_MS);
 }
 
 // 軌跡の SVG を絵の矩形にぴったり重ねる(.lane-preview の padding box 基準)
@@ -253,6 +337,8 @@ function updateOverlay(x, y) {
 }
 
 function cancelDrag() {
+  if (dragStart) { clearTimeout(dragStart.longPressTimer); }
+  dragOverlay.classList.remove('long-press');
   dragStart = null;
   if (traceHold === null) { dragOverlay.classList.remove('visible'); }
 }
@@ -263,26 +349,91 @@ function cancelDrag() {
 // 上限[ms]: 終わりの知らせが来ない異常の保険 = 軌跡の長さ + host の待ち(切り替え・観測の終わり = SERVE_REQUEST_TIMEOUT_MS
 // 20 秒)+ serve の応答待ち(同 20 秒)
 const TRACE_HOLD_MARGIN_MS = 40000;
-let traceHold = null; // { timer, sawBusy } = 実行の終わりを待って線を残している
+// 実行の終わりを待って線を残している軌跡(holdTraceOverlay が作る。欄の意味はそこと下の doc)
+let traceHold = null;
 
-function holdTraceOverlay(durationMs) {
+// 離した後は、なぞった線を薄く(.playing)、再生が済んだ部分を太く(dragTraceDone)描く。**済んだ部分は推定**:
+// デバイスは指の位置を返さないので、経過時間をなぞった点の t に当てて伸ばす。
+// **起点は見えている絵に合わせる**: 実行の開始(host の busy)の後、拡大表示の絵が初めて描き替わった時刻を
+// 「指が動き始めた点(firstMoveT)が画面に映った時刻」とみなす。busy から起点にすると、ブリッジの合成の遅れと
+// 配信の遅れ(撮影 → 符号化 → 転送 → 復号)の分だけ線が絵より先走る。起点は busy の時刻より前へは戻さない
+// (無関係な描き替わりを拾っても、busy 起点より先走らない)。絵が変わらない操作では、再生が終わるまで太い線を出さない。
+// **速さは実際の再生に合わせる**: iOS(XCUITest の合成タッチ)はなぞった時間どおりに再生しない(maintainer-notes §50.6:
+// Simulator で +0.4〜1 秒・実機で +0.9〜2 秒)。操作の応答(gestureActionDone = 再生の終わり)が届いたら線を描き切り、
+// 「起点から終わりまでの実際の時間 ÷ なぞった時間」をデバイスごとに覚えて、次の軌跡の線の速さにする
+// (直近の1回だけ。固定の倍率を置かない = 端末・負荷で変わる)
+const traceRates = new Map(); // デバイス id → 実際の再生時間 ÷ なぞった時間
+function holdTraceOverlay(durationMs, points) {
   releaseTraceOverlay();
-  traceHold = { sawBusy: false, timer: setTimeout(releaseTraceOverlay, durationMs + TRACE_HOLD_MARGIN_MS) };
+  traceHold = {
+    sawBusy: false, busyAt: null, points, deviceId: target.id, rate: traceRates.get(target.id) ?? 1,
+    anchorAt: null, anchorT: 0, finished: false, frame: null,
+    timer: setTimeout(releaseTraceOverlay, durationMs + TRACE_HOLD_MARGIN_MS),
+  };
+  dragTraceDone.setAttribute('points', '');
+  dragOverlay.classList.add('playing');
+}
+function startTracePlayback() {
+  traceHold.busyAt = performance.now();
+}
+function noteTracePicture(deviceId) {
+  if (traceHold === null || traceHold.busyAt === null || traceHold.anchorAt !== null || traceHold.finished
+      || deviceId !== traceHold.deviceId) { return; }
+  const now = performance.now();
+  traceHold.anchorAt = now;
+  traceHold.anchorT = Math.min(firstMoveT(traceHold.points, DRAG_MIN_PX), now - traceHold.busyAt);
+  drawTracePlayback();
+}
+function traceEndT() {
+  return traceHold.points[traceHold.points.length - 1].t;
+}
+function drawTracePlayback() {
+  if (traceHold === null || (traceHold.anchorAt === null && !traceHold.finished)) { return; }
+  const elapsed = traceHold.finished
+    ? traceEndT()
+    : traceHold.anchorT + (performance.now() - traceHold.anchorAt) / traceHold.rate;
+  dragTraceDone.setAttribute('points',
+    tracePrefix(traceHold.points, elapsed).map((p) => p.x + ',' + p.y).join(' '));
+  traceHold.frame = !traceHold.finished && elapsed < traceEndT() ? requestAnimationFrame(drawTracePlayback) : null;
+}
+function finishTracePlayback(ok) {
+  if (traceHold === null || traceHold.finished || traceHold.busyAt === null) { return; }
+  if (!ok) {
+    releaseTraceOverlay(); // 再生できなかった = 描き切ると終わったように見える。速さも覚えない
+    return;
+  }
+  if (traceHold.anchorAt !== null) {
+    const actual = performance.now() - traceHold.anchorAt;
+    const traced = traceEndT() - traceHold.anchorT;
+    if (actual > 0 && traced > 0) { traceRates.set(traceHold.deviceId, actual / traced); }
+  }
+  traceHold.finished = true;
+  if (traceHold.frame !== null) { cancelAnimationFrame(traceHold.frame); }
+  drawTracePlayback();
 }
 function releaseTraceOverlay() {
   if (traceHold === null) { return; }
   clearTimeout(traceHold.timer);
+  if (traceHold.frame !== null) { cancelAnimationFrame(traceHold.frame); }
   traceHold = null;
+  dragTraceDone.setAttribute('points', '');
+  dragOverlay.classList.remove('playing');
   if (dragStart === null) { dragOverlay.classList.remove('visible'); }
 }
 
 window.addEventListener('pointermove', (event) => {
-  setTraceIndicator(event.shiftKey);
+  if (isOriginPointer(event)) {
+    return; // 修飾キーの表示灯もこのイベントの修飾キーで切り替えない
+  }
+  setTraceIndicator(event.altKey);
+  setDoubleTapIndicator(event.metaKey);
   if (!dragStart || event.pointerId !== dragStart.pointerId) {
     return;
   }
   const rect = dragStart.media.getBoundingClientRect();
   const { x, y } = clampToRect(event, rect);
+  dragStart.lastX = x;
+  dragStart.lastY = y;
   if (dragStart.moveAt === null && Math.hypot(x - dragStart.x, y - dragStart.y) >= DRAG_MIN_PX) {
     dragStart.moveAt = performance.now();
   }
@@ -311,12 +462,13 @@ window.addEventListener('pointerup', (event) => {
     return;
   }
   const rect = start.media.getBoundingClientRect();
-  const { x, y } = clampToRect(event, rect);
+  // 離した位置が原点 (0,0) なら、最後に採った位置で離したことにする(isOriginPointer)
+  const { x, y } = isOriginPointer(event) ? { x: start.lastX, y: start.lastY } : clampToRect(event, rect);
   const display = { displayWidth: rect.width, displayHeight: rect.height };
   const upAt = performance.now();
   if (Math.hypot(x - start.x, y - start.y) < DRAG_MIN_PX) {
-    // 動かさずに離した: Option ならダブルタップ、LONG_PRESS_MS 以上押していれば長押し、それ以外はタップ
-    // (Shift だけのクリックもタップ = ライブ操作タブと同じ)
+    // 動かさずに離した: Command ならダブルタップ、LONG_PRESS_MS 以上押していれば長押し、それ以外はタップ
+    // (Option だけのクリックもタップ)
     const holdMs = Math.max(0, Math.round(upAt - start.downAt));
     if (start.doubleTap) {
       postAction({ type: 'doubleTapPoint', clickX: x, clickY: y, ...display });
@@ -332,7 +484,7 @@ window.addEventListener('pointerup', (event) => {
       // 描いた軌跡をそのまま残す(holdTraceOverlay の doc)
       dragTrace.setAttribute('points', points.map((p) => p.x + ',' + p.y).join(' '));
       dragOverlay.classList.add('trace', 'visible');
-      holdTraceOverlay(endT);
+      holdTraceOverlay(endT, points);
     }
   } else {
     const moveAt = start.moveAt ?? upAt;

@@ -1,11 +1,11 @@
 // deviceStream.ts
-// ライブ操作タブ・デバイスモニタータイル向けの、デバイス画面を映像ストリーミングする常駐 helper の
+// デバイスモニタータイル向けの、デバイス画面を映像ストリーミングする常駐 helper の
 // プロセス管理。iOS(fleetest-simstream)・Android(fleetest-androidstream)共通。両者の違いは
 // spawn する command/args のみ(呼び出し側が組み立てる。StreamPipeline 自体はどちらのプラット
-// フォームかを知らない)。ポーリング(monitorLiveController.ts の frameTick)に対する低負荷な代替
+// フォームかを知らない)。ポーリング(monitor の monitorFrame)に対する低負荷な代替
 // として、helper が JPEG(v1)または H.264 AU(v2、--codec h264)を stdout へ流し続けるのを
 // 逐次パースして onFrame/onChunk へ渡す。
-// プロセス管理は monitorLiveController.ts の serve と同じ思想: SIGTERM→2秒後 SIGKILL・
+// プロセス管理は monitorProcessManager.ts の host-metrics と同じ思想: SIGTERM→2秒後 SIGKILL・
 // 予期しない終了は一定間隔で自動再起動・起動直後の異常終了が連続したら諦める。
 //
 // stdout フレームフォーマット(契約。対向: Sources/fleetest-simstream/main.m(iOS)・
@@ -17,8 +17,7 @@
 //     HEIGHT: uint16 big-endian(エンコード済み画像の高さpx)
 //     LEN   : uint32 big-endian(続く JPEG のバイト数)
 //     JPEG  : LEN バイト
-//   ライブ操作タブは w/h を使わない(タップ座標変換は serve snapshot の screen を基準にする)。
-//   デバイスモニタータイルも**表示には使わない**(アスペクト比はデコード後の実寸から決める。
+//   デバイスモニタータイルは w/h を**表示には使わない**(アスペクト比はデコード後の実寸から決める。
 //   deviceTiles.js の setTileAspect)。w/h はレコード境界の妥当性検査(ingestMjpeg)に使う。
 //
 // v2(helper を --codec h264 で起動、StreamPipelineOptions.codec="h264" のときのみ):
@@ -93,8 +92,8 @@ const TIME_LIMIT_EXIT_CODE = 6;
  * 失敗ではないので連続失敗に数えず、張り直し(helper が新しい画面を選ぶ) */
 const DISPLAY_SWITCHED_EXIT_CODE = 7;
 
-/** iOS/Android 共通のストリーミング helper 制御インターフェース(monitorLiveController.ts・
- * monitorDeviceStreamController.ts が両プラットフォームを1つのフィールド/Mapで扱えるようにする)。 */
+/** iOS/Android 共通のストリーミング helper 制御インターフェース(monitorDeviceStreamController.ts が
+ * 両プラットフォームを1つのフィールド/Mapで扱えるようにする)。 */
 export interface LiveStreamPipeline {
   start(): void;
   isRunning(): boolean;

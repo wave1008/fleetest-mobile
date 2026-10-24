@@ -101,9 +101,9 @@ test("メニューの項目を選んだら印を解く", (t) => {
   rightClick(window, tiles(document)[0]);
   assert.equal(marked(document).length, 1, "前提: 付いている");
 
-  document.getElementById("device-op-menu-live").dispatchEvent(new window.MouseEvent("click", { bubbles: true }));
+  document.getElementById("device-op-menu-item").dispatchEvent(new window.MouseEvent("click", { bubbles: true }));
 
-  assert.ok(posted.some((m) => m.type === "openLiveForDevice"), "前提: 項目が効いている");
+  assert.ok(posted.some((m) => m.type === "deviceOp"), "前提: 項目が効いている");
   assert.equal(marked(document).length, 0, "項目を選んだら解くこと");
 });
 

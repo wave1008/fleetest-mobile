@@ -28,7 +28,7 @@ function makePanel() {
 
 test("リモートの wipeStatus は machine を付けたまま webview へ送る・手元は省く", () => {
   const { panel, wipes } = makePanel();
-  panel.handleBusMessage({ type: "runStarted", runId: 1, isDryRun: false, liveFollow: false });
+  panel.handleBusMessage({ type: "runStarted", runId: 1, isDryRun: false });
   panel.handleBusMessage({
     type: "event", runId: 1, event: { kind: "wipeStatus", device: "Pixel 10", machine: "M1Max", phase: "rebooting" },
   });
@@ -43,7 +43,7 @@ test("リモートの wipeStatus は machine を付けたまま webview へ送�
 
 test("run が done を送らずに終わったら、残った分を machine ごとに畳む(同名の手元とリモートを混ぜない)", () => {
   const { panel, wipes } = makePanel();
-  panel.handleBusMessage({ type: "runStarted", runId: 1, isDryRun: false, liveFollow: false });
+  panel.handleBusMessage({ type: "runStarted", runId: 1, isDryRun: false });
   panel.handleBusMessage({
     type: "event", runId: 1, event: { kind: "wipeStatus", device: "Pixel 10", machine: "M1Max", phase: "rebooting" },
   });

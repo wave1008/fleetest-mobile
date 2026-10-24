@@ -7,11 +7,10 @@ import { closeDeviceOpMenu } from './deviceTiles.js';
 import { closeDeviceMenu as closeRunProfileDeviceMenu } from './runProfileDevicesTab.js';
 import { reapplyPaneHeights } from './splitter.js';
 
-export const TAB_IDS = ['dashboard', 'devices', 'live', 'recordings', 'profiles', 'processes', 'settings'];
+export const TAB_IDS = ['dashboard', 'devices', 'recordings', 'profiles', 'processes', 'settings'];
 const tabButtons = {
   dashboard: document.getElementById('tab-dashboard'),
   devices: document.getElementById('tab-devices'),
-  live: document.getElementById('tab-live'),
   profiles: document.getElementById('tab-profiles'),
   processes: document.getElementById('tab-processes'),
   recordings: document.getElementById('tab-recordings'),
@@ -20,7 +19,6 @@ const tabButtons = {
 const tabPanels = {
   dashboard: document.getElementById('panel-dashboard'),
   devices: devicesPanel,
-  live: document.getElementById('panel-live'),
   profiles: document.getElementById('panel-profiles'),
   processes: document.getElementById('panel-processes'),
   recordings: document.getElementById('panel-recordings'),
@@ -28,7 +26,7 @@ const tabPanels = {
 };
 
 // 起動時はタブボタンを出さないタブ。activateTab で開いたときに現れる(パネルを開き直すまで残る)。
-export const HIDDEN_AT_STARTUP = ['live', 'processes'];
+export const HIDDEN_AT_STARTUP = ['processes'];
 
 let currentTabId = null;
 
@@ -72,8 +70,8 @@ export function activateTab(tab) {
 }
 
 // 閉じられるタブ → 表示中に閉じたときの移り先。閉じたタブは activateTab で開くと再び現れる
-// (開く口: processes は設定タブ「ツール」・live はコマンド/タイル右クリック/Run Test)。
-const CLOSE_FALLBACK = { live: 'devices', processes: 'settings' };
+// (開く口: processes は設定タブ「ツール」)。
+const CLOSE_FALLBACK = { processes: 'settings' };
 
 export function hideTab(tab) {
   tabButtons[tab].style.display = 'none';

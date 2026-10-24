@@ -541,15 +541,18 @@ test("isMonitorFromWebviewMessage: 未知の type や不正値は false", () => 
   assert.equal(isMonitorFromWebviewMessage("devicesUp"), false);
 });
 
-test("isMonitorFromWebviewMessage: streamStall は scope=live なら device 不要、tile/未指定は device 必須", () => {
-  // ライブタブ餓死自己修復(scope=live): device なしで有効
-  assert.equal(isMonitorFromWebviewMessage({ type: "streamStall", scope: "live" }), true);
-  // タイル(未指定=従来互換)は device 必須
+test("isMonitorFromWebviewMessage: streamStall は tile/未指定で device 必須(scope=live は無い)", () => {
   assert.equal(isMonitorFromWebviewMessage({ type: "streamStall", device: "sim-1" }), true);
   assert.equal(isMonitorFromWebviewMessage({ type: "streamStall", scope: "tile", device: "sim-1" }), true);
-  // device も scope=live も無ければ不正
+  assert.equal(isMonitorFromWebviewMessage({ type: "streamStall", scope: "live" }), false);
   assert.equal(isMonitorFromWebviewMessage({ type: "streamStall" }), false);
   assert.equal(isMonitorFromWebviewMessage({ type: "streamStall", device: "" }), false);
+});
+
+test("isMonitorFromWebviewMessage: codecError は scope=tile と device が要る(scope=live は無い)", () => {
+  assert.equal(isMonitorFromWebviewMessage({ type: "codecError", scope: "tile", device: "sim-1" }), true);
+  assert.equal(isMonitorFromWebviewMessage({ type: "codecError", scope: "tile" }), false);
+  assert.equal(isMonitorFromWebviewMessage({ type: "codecError", scope: "live" }), false);
 });
 
 test("isMonitorFromWebviewMessage: setTileAutoFit は受理しない(自動フィットは無い)", () => {
@@ -644,22 +647,20 @@ test("isMonitorFromWebviewMessage: deviceOp の udid/serial/registered は型が
   );
 });
 
-test("isMonitorFromWebviewMessage: openLiveForDevice は id(非空文字列)があれば true", () => {
-  assert.equal(isMonitorFromWebviewMessage({ type: "openLiveForDevice", id: "ios:iPhone" }), true);
-  assert.equal(isMonitorFromWebviewMessage({ type: "openLiveForDevice", id: "" }), false);
-  assert.equal(isMonitorFromWebviewMessage({ type: "openLiveForDevice" }), false);
-  assert.equal(isMonitorFromWebviewMessage({ type: "openLiveForDevice", id: 1 }), false);
+test("isMonitorFromWebviewMessage: openLiveForDevice は受理しない(ライブ操作タブは無い)", () => {
+  assert.equal(isMonitorFromWebviewMessage({ type: "openLiveForDevice", id: "ios:iPhone" }), false);
 });
 
-// 他の機械のタイルは開くのに要る属性を remote で運ぶ(LiveTabHost.openForDevice → registerRemoteDevice)
-test("isMonitorFromWebviewMessage: openLiveForDevice の remote は機械名・名前・platform・state・kind が揃うときだけ通す", () => {
+// 他の機械のタイルは開くのに要る属性を remote で運ぶ(LiveTabHost.gridAction → registerRemoteDevice)
+test("isMonitorFromWebviewMessage: gridLiveAction の remote は機械名・名前・platform・state・kind が揃うときだけ通す", () => {
   const remote = { machine: "M1Ultra", name: "iPhone wave", platform: "ios", state: "connected", kind: "physical", udid: "U" };
-  assert.equal(isMonitorFromWebviewMessage({ type: "openLiveForDevice", id: "ios:M1Ultra/iPhone wave", remote }), true);
-  assert.equal(isMonitorFromWebviewMessage({ type: "openLiveForDevice", id: "x", remote: { ...remote, machine: "" } }), false);
-  assert.equal(isMonitorFromWebviewMessage({ type: "openLiveForDevice", id: "x", remote: { ...remote, platform: "tvos" } }), false);
-  assert.equal(isMonitorFromWebviewMessage({ type: "openLiveForDevice", id: "x", remote: { ...remote, state: "weird" } }), false);
-  assert.equal(isMonitorFromWebviewMessage({ type: "openLiveForDevice", id: "x", remote: { ...remote, udid: 1 } }), false);
-  assert.equal(isMonitorFromWebviewMessage({ type: "openLiveForDevice", id: "x", remote: "M1Ultra" }), false);
+  const base = { type: "gridLiveAction", action: { type: "home" } };
+  assert.equal(isMonitorFromWebviewMessage({ ...base, id: "ios:M1Ultra/iPhone wave", remote }), true);
+  assert.equal(isMonitorFromWebviewMessage({ ...base, id: "x", remote: { ...remote, machine: "" } }), false);
+  assert.equal(isMonitorFromWebviewMessage({ ...base, id: "x", remote: { ...remote, platform: "tvos" } }), false);
+  assert.equal(isMonitorFromWebviewMessage({ ...base, id: "x", remote: { ...remote, state: "weird" } }), false);
+  assert.equal(isMonitorFromWebviewMessage({ ...base, id: "x", remote: { ...remote, udid: 1 } }), false);
+  assert.equal(isMonitorFromWebviewMessage({ ...base, id: "x", remote: "M1Ultra" }), false);
 });
 
 test("isMonitorFromWebviewMessage: selectProfile は profile(string、空文字も可)があれば true", () => {

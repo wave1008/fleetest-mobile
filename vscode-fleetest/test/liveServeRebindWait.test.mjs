@@ -37,19 +37,14 @@ function body(source, marker) {
   return source.slice(start, end);
 }
 
-test("serve へ送る2経路とも再バインドの完了を待ってから不在を判定する", () => {
+test("serve へ送る経路は再バインドの完了を待ってから不在を判定する", () => {
   const source = controllerSource();
-  for (const marker of [
-    "private async sendServeCommandNow(",
-    "private async sendServeFrameNow(",
-  ]) {
-    const fn = body(source, marker);
-    assert.match(
-      fn,
-      /await this\.awaitServeRebind\(\)[\s\S]*serveProcess/,
-      `${marker} は serveProcess を見る前に再バインドを待つこと`,
-    );
-  }
+  const fn = body(source, "private async sendServeCommandNow(");
+  assert.match(
+    fn,
+    /await this\.awaitServeRebind\(\)[\s\S]*serveProcess/,
+    "sendServeCommandNow は serveProcess を見る前に再バインドを待つこと",
+  );
 });
 
 test("待つのは再バインド中だけ・上限を置く", () => {

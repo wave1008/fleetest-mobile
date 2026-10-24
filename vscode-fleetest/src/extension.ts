@@ -152,11 +152,8 @@ export function activate(context: vscode.ExtensionContext): void {
       }
     }),
   );
-  // registerRunHandler の Run Test 前ライブ連携(prepareForRun)に使うため先に生成する
-  // (デバイスタイル右クリック「ライブ操作」はモニター自身の webview メッセージ経由で
-  // LiveTabHost を直接呼ぶので、コールバックの受け渡しは不要)。
   const monitorPanel = registerMonitorPanel(
-    context, workspaceRoot, getConfig, outputChannel, cli, testTree, runEventBus);
+    context, workspaceRoot, getConfig, outputChannel, cli, runEventBus);
   registerRunHandler(
     context, cli, workspaceRoot, getConfig, testTree, watcher, outputChannel, runEventBus,
     (executedScenarioIds) => {
@@ -167,7 +164,6 @@ export function activate(context: vscode.ExtensionContext): void {
       // run 中に来ていたプロジェクト切替(registerCommands の onDidChangeConfiguration)を拾う。
       testTree.flushPendingProjectSwitch();
     },
-    monitorPanel.prepareForRun,
   );
   registerDebugAdapter(context, workspaceRoot, getConfig, outputChannel);
   registerStepsView(context, cli, workspaceRoot, getConfig, testTree, watcher, outputChannel);

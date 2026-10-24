@@ -1,12 +1,11 @@
 // バッチB 辞書。namespace: panels.
-// 対象ソース: monitorHtml.ts(静的 HTML のタブ名・ボタン・title 属性など。「ライブ操作」タブも含む)
+// 対象ソース: monitorHtml.ts(静的 HTML のタブ名・ボタン・title 属性など。グリッドビューのライブ操作も含む)
 // キーは "panels." 始まり。ja は元の日本語と byte-identical(既存テスト互換)。
 import type { MessageDict } from "../core";
 
 export const panelsStrings = {
   "panels.tabs.dashboard": { ja: "ダッシュボード", en: "Dashboard" },
   "panels.tabs.testRun": { ja: "デバイスモニター", en: "Device Monitor" },
-  "panels.tabs.live": { ja: "ライブ操作", en: "Live Control" },
   "panels.tabs.profiles": { ja: "プロファイル", en: "Profiles" },
   "panels.profiles.platformScopeLabel": { ja: "対象 OS", en: "Target OS" },
   "panels.profiles.platformScopeHybrid": { ja: "ハイブリッド", en: "Hybrid" },
@@ -16,8 +15,8 @@ export const panelsStrings = {
   },
   "panels.tabs.processes": { ja: "プロセス", en: "Processes" },
   "panels.tabs.close": { ja: "タブを閉じる", en: "Close tab" },
+  "panels.live.panelSplitterTitle": { ja: "ドラッグで操作パネルと実行ログの幅を調整", en: "Drag to resize the panel and the run log" },
   "panels.live.showBoxes": { ja: "バウンディングボックスを表示", en: "Show bounding boxes" },
-  "panels.live.staleNoticeLabel": { ja: "⚠ 表示が古い可能性:", en: "⚠ Possible stale display:" },
   "panels.tabs.recordings": { ja: "テストセッション", en: "Test Sessions" },
   "panels.tabs.settings": { ja: "設定", en: "Settings" },
 
@@ -60,8 +59,6 @@ export const panelsStrings = {
   "panels.common.runProfile": { ja: "実行プロファイル", en: "Run Profile" },
   "panels.common.appProfile": { ja: "アプリプロファイル", en: "App Profile" },
   "panels.runProfile.devicesInUseLabel": { ja: "使用するデバイス", en: "Devices to use" },
-  "panels.common.deviceLabelColon": { ja: "デバイス:", en: "Device:" },
-  "panels.common.refreshDeviceList": { ja: "デバイス一覧を更新", en: "Refresh Device List" },
   "panels.common.cancel": { ja: "キャンセル", en: "Cancel" },
   "panels.common.runLog": { ja: "実行ログ", en: "Run Log" },
   "panels.common.port": { ja: "ポート", en: "Port" },
@@ -97,13 +94,6 @@ export const panelsStrings = {
 
   "panels.devices.emptyMessage": { ja: "デバイスを待機しています", en: "Waiting for devices" },
   "panels.devices.selectDevices": { ja: "デバイスを選択して下さい", en: "Select a device" },
-  /// グリッドビューの tooltip。画面のダブルクリックは2回のタップ(選択の切り替えは画面の外側。laneLog.js)
-  "panels.devices.gridGestureHintTitle": {
-    ja: "クリック=タップ / Option(⌥)+クリック=ダブルタップ / 500ms 以上ホールド=長押し /"
-      + " ドラッグ=スワイプ / Shift(⇧)+ドラッグ=軌跡どおりになぞる。選択の切り替えは画面の外側をダブルクリック",
-    en: "Click = tap / Option(⌥)+click = double tap / hold 500ms+ = long press /"
-      + " drag = swipe / Shift(⇧)+drag = trace the exact path. Double-click outside the screen to toggle the selection",
-  },
   "panels.devices.gridBackButton": { ja: "戻る", en: "Back" },
   "panels.devices.gridBackTitle": {
     ja: "1台だけの選択を解除して、その前の選択に戻します(前の選択が無ければ選択を解除します)",
@@ -385,7 +375,6 @@ export const panelsStrings = {
   },
   "panels.settings.cleanupNowButton": { ja: "今すぐクリーンアップ", en: "Clean up now" },
 
-  "panels.deviceMenu.liveControl": { ja: "ライブ操作", en: "Live Control" },
   "panels.deviceMenu.restartWithGpu": { ja: "GPUで再起動", en: "Restart with GPU" },
   // ラインビューの右クリック(タイルの上でも空きエリアでも出る。deviceTiles.js openDeviceOpMenu)
   "panels.deviceMenu.selectAll": { ja: "すべて選択", en: "Select All" },
@@ -439,22 +428,8 @@ export const panelsStrings = {
     en: "Unchecking and pressing OK unregisters the device (the simulator/AVD itself is not deleted)",
   },
 
-  "panels.live.appProfileLabelColon": { ja: "アプリプロファイル:", en: "App Profile:" },
-  "panels.live.startRecording": { ja: "レコーディング開始", en: "Start Recording" },
-  "panels.live.stopRecording": { ja: "レコーディング終了", en: "Stop Recording" },
-  "panels.live.screenshotAlt": { ja: "スクリーンショット", en: "Screenshot" },
-  "panels.live.screenshotPlaceholder": {
-    ja: "デバイスに接続されていません",
-    en: "Device is not connected",
-  },
-  "panels.live.connectionErrorTitle": { ja: "⚠ デバイスに接続できません", en: "⚠ Cannot connect to device" },
-  "panels.live.connectionErrorNote": {
-    ja: "表示中の画面は最後に取得した状態です",
-    en: "The screen shown is the last captured state",
-  },
   // ブリッジの自動起動が進行中(bridgeStarting)の間、画面領域に出す中立表示(エラーではない)。
   // 契約: Sources/fleetest/ApiLiveCommand.swift 冒頭の bridgeStarting フィールド
-  "panels.live.connectingMessage": { ja: "デバイスに接続しています…", en: "Connecting to the device…" },
   "panels.live.homeButton": { ja: "ホーム", en: "Home" },
   "panels.live.homeButtonTitle": { ja: "ホーム画面に戻ります", en: "Return to the home screen" },
   "panels.live.zoomInButton": { ja: "拡大", en: "Zoom in" },
@@ -462,25 +437,21 @@ export const panelsStrings = {
     ja: "画面全体をピンチで拡大します(マップ・画像ビューア用)",
     en: "Pinch the whole screen to zoom in (for maps and image viewers)",
   },
-  /// **改行を含む**(CSS の white-space: pre-line で2行に出す)。マークアップを文言へ
-  /// 入れない(訳文に <br> が混ざると i18n の検査・エスケープ文脈で扱いが割れる)
-  "panels.live.gestureHint": { ja: "Option(⌥)+クリック\nでダブルタップ", en: "Option(⌥)+click\nfor double tap" },
   /// 画面領域の tooltip。**割り当ての一覧はここが唯一の表示**(README にも同じ表がある)
-  "panels.live.gestureHintTitle": {
-    ja: "クリック=タップ / Option(⌥)+クリック=ダブルタップ / 500ms 以上ホールド=長押し /"
-      + " ドラッグ=スワイプ / Shift(⇧)+ドラッグ=軌跡どおりになぞる。拡大・縮小は下のボタン",
-    en: "Click = tap / Option(⌥)+click = double tap / hold 500ms+ = long press /"
-      + " drag = swipe / Shift(⇧)+drag = trace the exact path. Zoom is on the buttons below",
-  },
   "panels.live.zoomOutButton": { ja: "縮小", en: "Zoom out" },
   "panels.live.zoomOutTitle": {
     ja: "画面全体をピンチで縮小します",
     en: "Pinch the whole screen to zoom out",
   },
+  "panels.live.doubleTapModeButton": { ja: "ダブルタップ", en: "Double tap" },
+  "panels.live.doubleTapModeTitle": {
+    ja: "Command(⌘)を押しながらクリックするとダブルタップします",
+    en: "Hold Command(⌘) while clicking to double tap",
+  },
   "panels.live.traceModeButton": { ja: "軌跡", en: "Trace" },
   "panels.live.traceModeTitle": {
-    ja: "Shift(⇧)を押しながらドラッグすると、指の軌跡どおりに再生します",
-    en: "Hold Shift(⇧) while dragging to replay the exact finger path",
+    ja: "Option(⌥)を押しながらドラッグすると、指の軌跡どおりに再生します",
+    en: "Hold Option(⌥) while dragging to replay the exact finger path",
   },
   "panels.live.foldButton": { ja: "折りたたむ", en: "Fold" },
   "panels.live.foldTitle": {
@@ -509,24 +480,6 @@ export const panelsStrings = {
     en: "The element list has not been fetched yet. Press Refresh or operate the screen to fetch it",
   },
   "panels.live.typeTextPlaceholder": { ja: "入力するテキスト(Enterで送信)", en: "Text to type (Enter to send)" },
-  "panels.live.listsSplitterTitle": {
-    ja: "ドラッグで要素一覧と操作記録の高さを調整",
-    en: "Drag to resize the elements list and operation log",
-  },
-  "panels.live.screenSplitterTitle": {
-    ja: "ドラッグでデバイス画像の幅を調整",
-    en: "Drag to resize the device image width",
-  },
   "panels.live.oplogHeader": { ja: "操作記録", en: "Operation Log" },
   "panels.live.oplogClear": { ja: "クリア", en: "Clear" },
-  "panels.live.installButton": { ja: "インストール", en: "Install" },
-  "panels.live.installButtonTitle": {
-    ja: "選択中プロファイルのパッケージを選択デバイスにインストールします",
-    en: "Install the selected profile's package to the selected device",
-  },
-  "panels.live.launchButton": { ja: "アプリを起動", en: "Launch App" },
-  "panels.live.launchButtonTitle": {
-    ja: "選択中プロファイルのアプリを選択デバイスで起動します",
-    en: "Launch the selected profile's app on the selected device",
-  },
 } satisfies MessageDict;

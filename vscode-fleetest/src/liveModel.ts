@@ -1,5 +1,5 @@
 // liveModel.ts
-// 「ライブ操作」タブ(liveTabHost.ts)向けの vscode 非依存ロジック(検証・型定義・座標変換・
+// グリッドビューのライブ操作(liveTabHost.ts)向けの vscode 非依存ロジック(検証・型定義・座標変換・
 // webview プロトコル)。
 //
 // 契約(Sources/fleetest/ApiListDevicesCommand.swift・ApiLiveCommand.swift):
@@ -13,7 +13,6 @@
 //   コマンドを1行ずつ受け、逐次処理する。コマンド/イベントの形は LiveServeCommand/LiveServeEvent
 //   型を参照): イベントは refresh 以外は actionResult→snapshot の順で2行、refresh は snapshot の
 //   1行のみ(parseLiveServeEvent が "kind" で判別)。
-//   frame は画像のみの frame イベント1行(AXツリーは取らない。自動画面更新用)。
 
 import { t, type MessageKey } from "./i18n";
 import type { MonitorDeviceState, MonitorPlatform } from "./monitorModel";
@@ -218,25 +217,6 @@ export function parseLiveSnapshotResult(value: unknown): LiveSnapshot | LiveErro
   return undefined;
 }
 
-export interface LiveFrame {
-  readonly ok: true;
-  readonly image: string;
-  /** LiveSnapshot.bridgeStarting と同じ。 */
-  readonly bridgeStarting: boolean;
-}
-export type LiveFrameResult = LiveFrame | LiveErrorResult;
-
-export function parseLiveFrameResult(value: unknown): LiveFrameResult | undefined {
-  if (isRecord(value) && value.ok === true && typeof value.image === "string"
-      && typeof value.bridgeStarting === "boolean") {
-    return { ok: true, image: value.image, bridgeStarting: value.bridgeStarting };
-  }
-  if (isLiveErrorResult(value)) {
-    return value;
-  }
-  return undefined;
-}
-
 export function parseLiveActionResult(value: unknown): LiveActionResult | undefined {
   // app は**在るときだけ載せる**(undefined の欄を作らない。serve は分からなければ null を送る)
   const app = isRecord(value) && typeof value.app === "string" ? { app: value.app } : {};
@@ -279,7 +259,7 @@ export type LiveServeCommand =
     }
   | { readonly cmd: "press"; readonly x: number; readonly y: number; readonly duration: number }
   | { readonly cmd: "doubleTap"; readonly x: number; readonly y: number }
-  /** 軌跡モード専用(ライブ操作パネルの Shift+ドラッグ)。ワイヤ形は
+  /** 軌跡モード専用(グリッドビューの Option+ドラッグ)。ワイヤ形は
    * `Sources/FTCore/BridgeDTO.swift` の `GestureRequest.fingers` と同じ(`GesturePoint.t` は
    * ジェスチャ開始からの**秒**)。座標は既に device 座標(pointFromClick 済み)。呼び手
    * (monitorLiveController.ts の tracePoints ハンドラ)がここへ揃える前は webview の点列は
@@ -295,11 +275,7 @@ export type LiveServeCommand =
   | { readonly cmd: "home" }
   /** 折りたたみ機の開閉(FTCore.FoldControl。折りたためない端末は serve が何も送らずに断る) */
   | { readonly cmd: "fold"; readonly state: "fold" | "unfold" }
-  | { readonly cmd: "terminate" }
-  | { readonly cmd: "refresh" }
-  | { readonly cmd: "frame" }
-  | { readonly cmd: "launch"; readonly bundle: string }
-  | { readonly cmd: "install"; readonly path: string };
+  | { readonly cmd: "refresh" };
 
 export interface GestureStepMove {
   readonly kind: "move";
@@ -343,7 +319,7 @@ export function gestureStepsFromPoints(
  * **要素番号(ref)は座標に畳む** —— ref はスナップショットごとの採番で、ライブ操作の serve と MCP の
  * ft_snapshot は別プロセスなので同じ番号が同じ要素を指さない。座標(スナップショットの枠と同じ
  * pt / px)ならそのまま撃てる。枠を引けない ref は ref のまま出す(黙って落とさない)。
- * 観測だけの refresh / frame は操作ではないので nil。 */
+ * 観測だけの refresh は操作ではないので nil。 */
 export function mcpCommandForServeCommand(
   command: LiveServeCommand,
   elements: readonly LiveElement[],
@@ -395,14 +371,7 @@ export function mcpCommandForServeCommand(
       return line("ft_navigate", { target: command.cmd });
     case "fold":
       return line("ft_fold", { state: command.state });
-    case "terminate":
-      return line("ft_terminate", {});
-    case "launch":
-      return line("ft_launch", { bundleId: command.bundle });
-    case "install":
-      return line("ft_install", { packagePath: command.path });
     case "refresh":
-    case "frame":
       return undefined;
   }
 }
@@ -422,12 +391,6 @@ export function gestureCapFor(totalSeconds: number): number | undefined | "tooLo
   return Math.min(GESTURE_SECONDS_CEILING, Math.ceil(totalSeconds));
 }
 
-/** launch/activate の内側の上限(ms)。`BridgeClient.Timeout.session`(45秒。
- * Sources/FTBridgeClient/BridgeClient.swift)と同値 —— 片方だけ変えない。 */
-const LAUNCH_ALLOWANCE_MS = 45_000;
-/** install の内側の上限(ms)。`BridgeClient.Timeout.physicalInstall`(実機 devicectl install の
- * 600秒。Sources/FTBridgeClient/BridgeClient.swift)と同値 —— 片方だけ変えない。 */
-const INSTALL_ALLOWANCE_MS = 600_000;
 /** fold の開閉の確かめを待つ上限(ms)。serve の既定(`FTCore.DefaultWait.seconds` = 5秒。
  * ApiLiveServeCommand.watchdogAllowanceSeconds の fold)と同値 —— 片方だけ変えない。 */
 const FOLD_ALLOWANCE_MS = 5_000;
@@ -450,10 +413,6 @@ export function serveCommandAllowanceMs(command: LiveServeCommand): number {
       return Math.ceil((command.press + command.duration) * 1000);
     case "pinch":
       return Math.ceil(command.duration * 1000);
-    case "launch":
-      return LAUNCH_ALLOWANCE_MS;
-    case "install":
-      return INSTALL_ALLOWANCE_MS;
     case "fold":
       return FOLD_ALLOWANCE_MS;
     default:
@@ -467,8 +426,7 @@ export function serializeLiveServeCommand(command: LiveServeCommand): string {
 
 export type LiveServeEvent =
   | { readonly kind: "actionResult"; readonly result: LiveActionResult }
-  | { readonly kind: "snapshot"; readonly result: LiveSnapshot | LiveErrorResult }
-  | { readonly kind: "frame"; readonly result: LiveFrameResult };
+  | { readonly kind: "snapshot"; readonly result: LiveSnapshot | LiveErrorResult };
 
 /**
  * NDJSON 1行を "kind" で actionResult/snapshot に振り分ける。中身の検証は
@@ -505,18 +463,6 @@ export function parseLiveServeEvent(value: unknown): LiveServeEvent | undefined 
             bridgeStarting: result.bridgeStarting,
             capturedAtMs: result.capturedAtMs,
           }
-        : { ok: false, error: result.error, bridgeStarting: result.bridgeStarting },
-    };
-  }
-  if (value.kind === "frame") {
-    const result = parseLiveFrameResult(value);
-    if (!result) {
-      return undefined;
-    }
-    return {
-      kind: "frame",
-      result: result.ok
-        ? { ok: true, image: result.image, bridgeStarting: result.bridgeStarting }
         : { ok: false, error: result.error, bridgeStarting: result.bridgeStarting },
     };
   }
@@ -567,7 +513,7 @@ export function isTextInputElement(element: LiveElement): boolean {
 }
 
 /** click の変換先ポイント座標を含む要素のうち、面積最小のもの(=重なりの中で最も具体的なもの)を返す。
- * 一致なしは undefined(レコーディング時、対象要素が無いタップ・長押しは記録しない判定に使う)。 */
+ * 一致なしは undefined。 */
 export function hitTestElement(point: LivePoint, elements: readonly LiveElement[]): LiveElement | undefined {
   let best: LiveElement | undefined;
   let bestArea = Infinity;
@@ -583,152 +529,6 @@ export function hitTestElement(point: LivePoint, elements: readonly LiveElement[
     }
   }
   return best;
-}
-
-/** その操作を**記録対象のアプリの上で行ったか**。ライブ操作はセッションを前面のものへ追従させる
- * (Sources/fleetest/LiveSessionFollower.swift)ので、ホーム画面・別のアプリを触った操作も
- * actionResult として返ってくる —— 記録すると、対象アプリでは決して解決しないロケータ
- * (ホーム画面のアイコン等)がシナリオに入る。
- * app が無い(Android・不明)ときは true(判定材料が無いのに落とさない)。 */
-export function operationBelongsToApp(app: string | undefined, recordedBundle: string | undefined): boolean {
-  return !app || !recordedBundle || app === recordedBundle;
-}
-
-// ---- レコーディング → FlowStep 変換(契約: Sources/FTCore/Flow.swift。gen-scenario --steps の入力) ----
-
-/** Flow.swift FlowLocator の使用フィールドのみ(raw は生成側では使わない)。 */
-export interface FlowLocatorShape {
-  readonly id?: string;
-  readonly label?: string;
-  readonly type?: string;
-  readonly index?: number;
-}
-
-/** Flow.swift FlowStep の使用フィールドのみ。gen-scenario --steps に渡す JSON 配列の要素形。
- * home/appSwitcher/terminate はロケータ無し(ScenarioCodeGen が home()/appSwitcher()/terminateApp() に写像)。 */
-export interface RecordedStep {
-  readonly action:
-    | "tap" | "type" | "press" | "swipe" | "home" | "appSwitcher" | "terminate"
-    // マップ系(Sources/FTDSL/Commands.swift と同名。生成は ScenarioCodeGen.command(for:))
-    | "doubleTap" | "pinchOut" | "pinchIn"
-    // 軌跡モード(gesture)。DSL の gesture { } と同名(ScenarioCodeGen.command(for:) の "gesture")
-    | "gesture";
-  readonly locator?: FlowLocatorShape;
-  readonly fallbacks?: readonly FlowLocatorShape[];
-  readonly text?: string;
-  readonly direction?: "up" | "down" | "left" | "right";
-  /** action: "gesture" 専用。**キー名は "gesture"**(FlowStep.gesture と同名。
-   * Sources/FTCore/Flow.swift)—— `fleetest api gen-scenario --steps` は RecordedStep を
-   * そのまま Swift の `FlowStep`(Decodable)として読むため、キー名が違うと黙って読み飛ばされる。
-   * 中身は `FTFinger` の Codable そのまま(`Sources/FTCore/TouchGesture.swift`。x/y は対象への
-   * 比率、steps は `{move:{x,y,durationSeconds}}` / `{hold:{seconds}}` の enum ケース名)。 */
-  readonly gesture?: readonly RecordedGestureFinger[];
-  /** 長押し・ジェスチャの秒数上限をこの1回だけ上げる(FlowStep.maxGestureSeconds と同名) */
-  readonly maxGestureSeconds?: number;
-  /** action: "press" の押した秒数(FlowStep.duration と同名)。**入れないと生成コードは常に
-   * `holdSeconds: 1`**(ScenarioCodeGen が欠落を 1.0 で埋める) */
-  readonly duration?: number;
-}
-
-/** RecordedStep.gesture の1本の指。FTFinger(Codable)と同じキー名・型で組む(recordedGestureFingers
- * が唯一の生成元)。 */
-export interface RecordedGestureFinger {
-  readonly x: number;
-  readonly y: number;
-  readonly startSeconds: number;
-  readonly steps: readonly RecordedGestureFingerStep[];
-}
-export type RecordedGestureFingerStep =
-  | { readonly move: { readonly x: number; readonly y: number; readonly durationSeconds: number } }
-  | { readonly hold: { readonly seconds: number } };
-
-/** 軌跡モードの device 座標の指の経路 → `RecordedStep.gesture`(FTFinger の比率表現)。
- * `screen`(snapshot 時点の画面サイズ)で割るだけ(Sources/fleetest-mcp/MCPServer+Gesture.swift の
- * gestureFingersRatio と同じ考え方 —— 絶対座標→比率は screen で割るだけで、resolve 後の点列から
- * move/hold を推測し直すより単純)。screen が不明(0以下)なら記録できないので空配列。 */
-export function recordedGestureFingers(
-  fingers: readonly LiveGestureFinger[],
-  screen: LiveSize,
-): RecordedGestureFinger[] {
-  if (!(screen.width > 0) || !(screen.height > 0)) {
-    return [];
-  }
-  return fingers
-    .filter((finger) => finger.points.length > 0)
-    .map((finger) => {
-      const first = finger.points[0]!;
-      const steps: RecordedGestureFingerStep[] = gestureStepsFromPoints(finger.points).map((step) =>
-        step.kind === "hold"
-          ? { hold: { seconds: step.seconds } }
-          : { move: { x: step.x / screen.width, y: step.y / screen.height, durationSeconds: step.seconds } },
-      );
-      return { x: first.x / screen.width, y: first.y / screen.height, startSeconds: first.t, steps };
-    });
-}
-
-/**
- * ライブ録画(モニターの Live タブ)専用の軽量ヒューリスティック。優先度:
- * identifier > label > (同じ type 内での位置)index。全て無ければ type+index:0 のみを返す。
- * ただし id があるときは位置依存の type+index フォールバックは足さない(id は安定なので
- * `.TextField` 等は冗長・ノイズ。生成コードの `#id||.Type` を `#id` にする)。
- *
- * **もう Swift 側の双子は無い**: 旧 `Sources/FTCore/Flow.swift
- * FlowLocatorBuilder.chain` は画面内の一意性を見ずに id/label をそのまま採っていたため、
- * StepExecutor の自己修復(結果をユーザーの .swift ソースへ書き戻す経路)で「別要素に解決する
- * セレクタ」を書く欠陥のもとになり、一意性を検査する `FTCore.SelectorNaming` に統合されて
- * 廃止された。この関数はそちらへ統合しない ——
- * ここが作るのは `fleetest api gen-scenario` に渡す**下書き**(生成先は新規ファイルで、
- * 利用者がコンパイル→dry-run→デバイス実行の3段で必ず目を通してから使う)。
- * 自己修復の書き戻しのように**既存のシナリオへ無人で反映される**経路ではないので、
- * 一意性を検査できない(=書けないと拒否する)より、多少ゆるくても記録を止めない方を優先する。
- * 厳密化したい場合は `fleetest api` を同期的に呼ぶ形に作り直す必要があり、この関数の
- * 呼び出し元(1タップごとに同期的に呼ばれる)を非同期化する規模の変更になるため見送っている。
- */
-export function locatorChainForElement(
-  element: LiveElement,
-  elements: readonly LiveElement[],
-): { locator: FlowLocatorShape; fallbacks: FlowLocatorShape[] } {
-  const locators: FlowLocatorShape[] = [];
-  let hasId = false;
-  if (element.identifier !== null && element.identifier.length > 0) {
-    locators.push({ id: element.identifier });
-    hasId = true;
-  }
-  if (element.label !== null && element.label.length > 0) {
-    locators.push({ label: element.label });
-  }
-  if (!hasId) {
-    const sameType = elements.filter((e) => e.type === element.type);
-    const index = sameType.findIndex((e) => e.ref === element.ref);
-    if (index !== -1) {
-      locators.push({ type: element.type, index });
-    }
-  }
-  if (locators.length === 0) {
-    locators.push({ type: element.type, index: 0 });
-  }
-  return { locator: locators[0]!, fallbacks: locators.slice(1) };
-}
-
-// ---- gen-scenario(レコーディング→シナリオ生成)NDJSON イベント ---------------------------------
-// 契約: `fleetest api gen-scenario --project <p> --steps <path>` の stdout NDJSON。
-
-export type GenScenarioEvent =
-  | { readonly event: "scenarioGenerated"; readonly file: string; readonly className: string }
-  | { readonly event: "error"; readonly message: string };
-
-/** "genStarted" 等の未知イベントは undefined(呼び出し側で無視する)。 */
-export function parseGenScenarioEvent(value: unknown): GenScenarioEvent | undefined {
-  if (!isRecord(value) || typeof value.event !== "string") {
-    return undefined;
-  }
-  if (value.event === "scenarioGenerated" && typeof value.file === "string" && typeof value.className === "string") {
-    return { event: "scenarioGenerated", file: value.file, className: value.className };
-  }
-  if (value.event === "error" && typeof value.message === "string") {
-    return { event: "error", message: value.message };
-  }
-  return undefined;
 }
 
 // ---- 要素一覧の1行表示フォーマット --------------------------------------------------------
@@ -773,34 +573,7 @@ export function describeElementShort(element: LiveElement): string {
   return element.type;
 }
 
-/** セレクタ(`||` 区切り節)から表示ラベルを抽出する。Sources/FTDSL/StepDescription.swift の
- * objectPhrase(ofSelector:)(節分類は FTSelector.parse)と同期(label を持つ最初の節を採用。無ければセレクタ全体を返す)。 */
-export function selectorObjectPhrase(selector: string): string {
-  for (const clause of selector.split("||")) {
-    if (clause.startsWith("=")) {
-      return clause.slice(1);
-    }
-    if (clause.startsWith("#")) {
-      continue;
-    }
-    if (clause.startsWith(".") && clause.length > 1) {
-      const body = clause.slice(1);
-      if (body.includes("#")) {
-        continue;
-      }
-      const eq = body.indexOf("=");
-      if (eq !== -1) {
-        return body.slice(eq + 1);
-      }
-      continue;
-    }
-    return clause;
-  }
-  return selector;
-}
-
-/** 「操作記録」ラベル("入力: {text}")の表示テキストを20文字に切り詰める(monitorLiveController.ts の
- * typeText ハンドラと共用。同じ切り詰めルールを2箇所に複製しないための export)。 */
+/** 「操作記録」ラベル("入力: {text}")の表示テキストを20文字に切り詰める(monitorLiveController.ts の typeText ハンドラ)。 */
 export function truncateOperationLabelText(text: string): string {
   return text.length > 20 ? `${text.slice(0, 20)}…` : text;
 }
@@ -812,69 +585,9 @@ const SWIPE_DIRECTION_KEYS = {
   right: "live.direction.right",
 } as const satisfies Record<string, MessageKey>;
 
-/** スワイプ方向の訳文("上"/"下"/"左"/"右" 等)。monitorLiveController.ts の dragPoints ハンドラと
- * stepDescriptionToOperationLabel(下記)が同じ訳文を使うための共用関数。 */
+/** スワイプ方向の訳文("上"/"下"/"左"/"右" 等)。monitorLiveController.ts の dragPoints ハンドラが使う。 */
 export function swipeDirectionLabel(direction: "up" | "down" | "left" | "right"): string {
   return t(SWIPE_DIRECTION_KEYS[direction]);
-}
-
-/** StepEvent.description(RunEventBus 由来)を「操作記録」用の表示ラベルへ変換する。description の
- * 構文は Sources/FTDSL/Commands.swift 各コマンドの perform(description:) と、セレクタ→ラベル抽出は
- * selectorObjectPhrase(= StepDescription.objectPhrase(ofSelector:))と同期が必要。 */
-export function stepDescriptionToOperationLabel(description: string): string {
-  const verb = description.split(/\s/, 1)[0] ?? "";
-  const quoted = description.match(/"([^"]*)"/g)?.map((s) => s.slice(1, -1));
-  switch (verb) {
-    case "tap":
-      return quoted?.[0] !== undefined
-        ? t("live.opLabel.tap", { target: selectorObjectPhrase(quoted[0]) })
-        : description;
-    case "press":
-      return quoted?.[0] !== undefined
-        ? t("live.opLabel.press", { target: selectorObjectPhrase(quoted[0]) })
-        : description;
-    case "type": {
-      const text = quoted?.[quoted.length - 1];
-      return text !== undefined ? t("live.opLabel.type", { text: truncateOperationLabelText(text) }) : description;
-    }
-    case "scrollTo":
-      return quoted?.[0] !== undefined
-        ? t("live.opLabel.scrollTo", { target: selectorObjectPhrase(quoted[0]) })
-        : description;
-    case "swipe": {
-      const dir = description.split(/\s+/)[1];
-      const isDirection = (value: string): value is "up" | "down" | "left" | "right" =>
-        value === "up" || value === "down" || value === "left" || value === "right";
-      return dir !== undefined && isDirection(dir)
-        ? t("live.opLabel.swipe", { direction: swipeDirectionLabel(dir) })
-        : description;
-    }
-    case "doubleTap":
-      return quoted?.[0] !== undefined
-        ? t("live.opLabel.doubleTap", { target: selectorObjectPhrase(quoted[0]) })
-        : t("live.opLabel.doubleTapPlain");
-    case "pinchOut":
-      return t("live.opLabel.pinchOut");
-    case "pinchIn":
-      return t("live.opLabel.pinchIn");
-    case "home":
-      return t("live.opLabel.home");
-    case "appSwitcher":
-      return t("live.opLabel.appSwitcher");
-    case "launch": {
-      const bundle = description.split(/\s+/)[1];
-      return bundle !== undefined ? t("live.opLabel.launch", { bundle }) : description;
-    }
-    case "terminate":
-      return t("live.opLabel.terminate");
-    case "wait": {
-      const arg = description.split(/\s+/)[1];
-      const seconds = arg?.endsWith("s") ? arg.slice(0, -1) : undefined;
-      return seconds !== undefined ? t("live.opLabel.wait", { seconds }) : description;
-    }
-    default:
-      return description;
-  }
 }
 
 // ---- デバイス → CLI引数組み立て -----------------------------------------------------------
@@ -902,7 +615,7 @@ export function buildDeviceArgs(device: LiveDeviceRef): string[] {
   return args;
 }
 
-/** デバイス参照の同一性判定(liveTabHost.ts の serve 再バインド要否判定に使う)。 */
+/** デバイス参照の同一性判定(monitorLiveController.ts の serve 再バインド要否判定に使う)。 */
 export function sameLiveDeviceRef(a: LiveDeviceRef, b: LiveDeviceRef): boolean {
   return a.platform === b.platform && a.port === b.port && a.serial === b.serial && a.udid === b.udid
     && a.machine === b.machine;
@@ -940,15 +653,14 @@ export interface LiveDeviceOption {
   readonly port: number | null;
   readonly serial: string | null;
   readonly udid: string | null;
-  /** 映像の供給元の選択に使う(monitorLiveController.ts の updateLiveFrameSource)。フォールバックは
-   * 実体が分からないので virtual を既定にする。 */
+  /** 実体種別。フォールバックは実体が分からないので virtual を既定にする。 */
   readonly kind: LiveDeviceKind;
   /** LiveDeviceRef.machine と同じ。list-devices(この Mac)由来は常に省略 */
   readonly machine?: string;
 }
 
 /** 他の機械のデバイス(モニターのタイル)をライブ操作の選択肢にする。id はモニターのタイル id
- * (`<platform>:<machine>/<name>`)のまま —— タイル右クリックの openDevice がこの id で引く。
+ * (`<platform>:<machine>/<name>`)のまま —— handleGridAction がこの id で引く。
  * **port は渡さない**: 向こうの serve が udid で自分のブリッジを探す(既定ポートの本人確認 →
  * 走査 → 無ければ空きポートで自動起動。ApiLiveCommand.makeLiveDriver)。 */
 export function remoteDeviceOption(source: {
@@ -1003,20 +715,19 @@ export function fallbackDeviceOption(source: FallbackDeviceSource): LiveDeviceOp
 
 // ---- webview メッセージプロトコル ---------------------------------------------------------
 
-/** webview へ渡す要素一覧の1件分(表示テキストを host 側で事前整形して付与する)。 */
-/** 要素一覧の行。line は左の列・frameText は右の列(liveTab.js の renderElements と対)。 */
+/** webview へ渡す要素一覧の行。line は左の列・frameText は右の列(表示テキストを host 側で事前整形して付与する)。 */
 export interface LiveElementView extends LiveElement {
   readonly line: string;
   readonly frameText: string;
 }
 
+/** host → グリッドビュー(gridLiveControls.js・gridLivePanel.js)。封筒は LiveToWebviewEnvelope。 */
 export type LiveToWebviewMessage =
   | {
       readonly type: "devices";
       readonly devices: readonly LiveDeviceOption[];
       readonly selectedId: string | undefined;
     }
-  | { readonly type: "banner"; readonly message: string | null }
   | {
       readonly type: "snapshot";
       readonly platform: string;
@@ -1027,11 +738,9 @@ export type LiveToWebviewMessage =
       /** LiveSnapshot.capturedAtMs(グリッドビューの古い絵の除外に使う) */
       readonly capturedAtMs: number;
     }
-  | { readonly type: "frame"; readonly image: string }
   /** 直前のデバイスのスナップショット(画面サイズ・要素一覧)を捨てさせる。デバイスを
    * 切り替えたのに残っていると、タップ座標が前のデバイスの画面サイズで換算され、要素一覧の
-   * 行タップが**別のデバイスの ref** を叩く。webview はこれを受けたら次のフレームで
-   * refreshSnapshot を要求し直す(liveTab.js の requestSnapshotIfNeeded)。 */
+   * 行タップが**別のデバイスの ref** を叩く。 */
   | { readonly type: "clearSnapshot" }
   /** neutral: true のときは失敗(エラー)としての見た目(赤)にしない。省略 = false
    * (bridgeStarting 中の操作失敗だけが true を送る。live.bridgeStartingActionNotice)。 */
@@ -1039,32 +748,11 @@ export type LiveToWebviewMessage =
   /** observing: busy の原因が画面を変えない観測か(MonitorLiveController.busyObserving)。webview はこの間の画面の操作を
    * 捨てずに送る(host が観測の終わりを待って撃つ) */
   | { readonly type: "busy"; readonly busy: boolean; readonly observing: boolean }
-  | { readonly type: "connection"; readonly connected: boolean; readonly message: string | null }
-  | { readonly type: "busyOverlay"; readonly message: string | null }
-  /** LiveBridgeAutoStarter が自動起動を進行中かどうか(契約: ApiLiveCommand.swift 冒頭の
-   * bridgeStarting)。画面領域に中立の「接続中」表示を出す/消す(webview 側の固定文言。
-   * connection:false のエラー表示とは別の状態 —— starting はまだエラーではない)。 */
-  | { readonly type: "bridgeStarting"; readonly starting: boolean }
-  | {
-      readonly type: "appProfiles";
-      readonly profiles: readonly string[];
-      readonly selectedId: string | undefined;
-    }
-  | {
-      readonly type: "appProfileDetail";
-      readonly appProfile: string;
-      readonly appName: string | null;
-      readonly bundle: string | null;
-      readonly appPath: string | null;
-    }
-  | { readonly type: "recording"; readonly active: boolean; readonly generating?: boolean }
-  | { readonly type: "recordStatus"; readonly message: string; readonly file: string | null }
-  // テキスト入力欄をタップした直後に「入力するテキスト」欄へフォーカスを移す指示(受け手: liveTab.js)。
+  // テキスト入力欄をタップした直後に「入力するテキスト」欄へフォーカスを移す指示(受け手: gridLivePanel.js)。
   | { readonly type: "focusTypeInput" }
-  // 「操作記録」1行(レコーディング機能とは無関係。受け手: liveTab.js の operationLog ハンドラ)。
-  // mcp: 同じ操作を MCP で撃つコマンド(mcpCommandForServeCommand)。テスト実行由来の行(injectTestStep)には無い
-  // deviceId: 手動操作の行だけが持つ(操作したときの selectedDeviceId。グリッドビューがデバイスごとに振り分ける)。
-  // injectTestStep の行は対象デバイスが分からないので付けない
+  // 「操作記録」1行(受け手: gridLivePanel.js)。
+  // mcp: 同じ操作を MCP で撃つコマンド(mcpCommandForServeCommand)。
+  // deviceId: 操作したときの selectedDeviceId(グリッドビューがデバイスごとに振り分ける)
   | {
       readonly type: "operationLog";
       readonly label: string;
@@ -1072,12 +760,15 @@ export type LiveToWebviewMessage =
       readonly mcp?: string;
       readonly deviceId?: string;
     }
-  // グリッドビューの操作(GridLiveAction)が、ライブ操作へ流す前に断られた(受け手: gridLiveControls.js)。
+  // グリッドビューの操作(GridLiveAction)が、serve へ流す前に断られた(受け手: gridLiveControls.js)。
   // 流した後の失敗は通常の actionError で届く(グリッド側は選択中のデバイスが id と一致するときだけ出す)
   | { readonly type: "gridActionError"; readonly id: string; readonly message: string }
   // グリッドビューの操作を今から撃つ(切り替え・待ちが済んだ直後。受け手: gridLivePanel.js)。この後に届く最初の
   // snapshot がその操作の直接の結果(MonitorLiveController.handleGridAction)
-  | { readonly type: "gridActionStarted"; readonly id: string };
+  | { readonly type: "gridActionStarted"; readonly id: string }
+  // 軌跡(gesture)の操作の応答が届いた = デバイスでの再生が終わった(受け手: gridLiveControls.js の太い線)。
+  // 応答は続く観測(snapshot)より先に届くので、busy の終わりより早く・再生の終わりに近い時刻で知らせられる
+  | { readonly type: "gestureActionDone"; readonly ok: boolean };
 
 export function toSnapshotMessage(snapshot: LiveSnapshot): LiveToWebviewMessage {
   return {
@@ -1095,10 +786,9 @@ export function toSnapshotMessage(snapshot: LiveSnapshot): LiveToWebviewMessage 
   };
 }
 
-export type LiveFromWebviewMessage =
-  | { readonly type: "refreshDevices" }
-  | { readonly type: "selectDevice"; readonly id: string }
-  | { readonly type: "openDevice"; readonly id: string }
+/** グリッドビュー(1台だけ選択したときの拡大表示)から撃てる操作(MonitorLiveController.handleGridAction が
+ * serve の命令へ流す。送り手: src/webview/monitor/gridLiveControls.js・gridLivePanel.js)。 */
+export type GridLiveAction =
   | { readonly type: "refreshSnapshot" }
   | {
       readonly type: "tapPoint";
@@ -1135,7 +825,7 @@ export type LiveFromWebviewMessage =
       readonly pressMs: number;
       readonly dragMs: number;
     }
-  /** 軌跡モード(トグル ON、または pointerdown 時に Shift を押していた)のドラッグ。点は表示px・
+  /** 軌跡モード(pointerdown 時に Shift を押していた)のドラッグ。点は表示px・
    * t は pointerdown からの**ミリ秒**(host 側の tracePoints ハンドラが device 座標・秒へ変換する。
    * liveModel.ts の LiveGesturePoint.t は秒なので混同しないこと)。 */
   | {
@@ -1151,30 +841,22 @@ export type LiveFromWebviewMessage =
   | { readonly type: "appSwitcher" }
   | { readonly type: "home" }
   /** 折りたたみ機の開閉。ボタンは折りたためる端末(MonitorDevice.foldable)にだけ出す */
-  | { readonly type: "fold"; readonly state: "fold" | "unfold" }
-  | { readonly type: "visibility"; readonly visible: boolean }
-  | { readonly type: "refreshAppProfiles" }
-  | { readonly type: "selectAppProfile"; readonly appProfile: string }
-  | { readonly type: "installApp"; readonly appProfile: string }
-  | { readonly type: "launchApp"; readonly appProfile: string }
-  | { readonly type: "startRecord"; readonly appProfile: string; readonly autoInstall: boolean }
-  | { readonly type: "stopRecord" };
+  | { readonly type: "fold"; readonly state: "fold" | "unfold" };
 
-export function isLiveFromWebviewMessage(value: unknown): value is LiveFromWebviewMessage {
-  if (!isRecord(value) || typeof value.type !== "string") {
+const GRID_LIVE_ACTION_TYPES: ReadonlySet<string> = new Set([
+  "home", "appSwitcher", "pinch", "fold", "tapPoint", "doubleTapPoint", "tracePoints",
+  "dragPoints", "pressPoint", "typeText", "refreshSnapshot",
+] satisfies GridLiveAction["type"][]);
+
+export function isGridLiveAction(value: unknown): value is GridLiveAction {
+  if (!isRecord(value) || typeof value.type !== "string" || !GRID_LIVE_ACTION_TYPES.has(value.type)) {
     return false;
   }
   switch (value.type) {
-    case "refreshDevices":
     case "refreshSnapshot":
     case "appSwitcher":
     case "home":
-    case "refreshAppProfiles":
-    case "stopRecord":
       return true;
-    case "selectDevice":
-    case "openDevice":
-      return typeof value.id === "string";
     case "tapPoint":
       return (
         typeof value.clickX === "number" &&
@@ -1228,55 +910,53 @@ export function isLiveFromWebviewMessage(value: unknown): value is LiveFromWebvi
       return value.state === "fold" || value.state === "unfold";
     case "typeText":
       return typeof value.text === "string";
-    case "visibility":
-      return typeof value.visible === "boolean";
-    case "selectAppProfile":
-    case "installApp":
-    case "launchApp":
-      return typeof value.appProfile === "string";
-    case "startRecord":
-      return typeof value.appProfile === "string" && typeof value.autoInstall === "boolean";
     default:
       return false;
   }
 }
 
-/** グリッドビュー(1台だけ選択したときの拡大表示)から撃てる操作。ライブ操作と同じ命令へ流す
- * (MonitorLiveController.handleGridAction。送り手: src/webview/monitor/gridLiveControls.js・gridLivePanel.js)。
- * ライブ操作の画面操作とツールバーに相当するものだけ。入れないのは install / launch / 録画系 / selectDevice 等。 */
-export type GridLiveAction = Extract<
-  LiveFromWebviewMessage,
-  {
-    readonly type: "home" | "appSwitcher" | "pinch" | "fold" | "tapPoint" | "doubleTapPoint" | "tracePoints"
-      | "dragPoints" | "pressPoint" | "typeText" | "refreshSnapshot";
-  }
->;
-
-const GRID_LIVE_ACTION_TYPES: ReadonlySet<string> = new Set([
-  "home", "appSwitcher", "pinch", "fold", "tapPoint", "doubleTapPoint", "tracePoints",
-  "dragPoints", "pressPoint", "typeText", "refreshSnapshot",
-] satisfies GridLiveAction["type"][]);
-
-export function isGridLiveAction(value: unknown): value is GridLiveAction {
-  return isLiveFromWebviewMessage(value) && GRID_LIVE_ACTION_TYPES.has(value.type);
-}
-
 // ---- host⇔webview封筒 -------------------------------------------------------------------
-// 「ライブ操作」タブはデバイスモニターの webview に同居するため、type:"live" の封筒で他タブの
-// メッセージと多重化する(対向: src/webview/monitor/liveTab.js、host 側: src/liveTabHost.ts)。
-
-/** webview → host。 */
-export interface LiveWebviewEnvelope {
-  readonly type: "live";
-  readonly message: LiveFromWebviewMessage;
-}
-
-export function isLiveWebviewEnvelope(value: unknown): value is LiveWebviewEnvelope {
-  return isRecord(value) && value.type === "live" && isLiveFromWebviewMessage(value.message);
-}
+// グリッドビューのライブ操作はデバイスモニターの webview に同居するため、type:"live" の封筒で他のメッセージと
+// 多重化する(対向: src/webview/monitor/main.js → gridLiveControls.js の applyGridLiveMessage)。
 
 /** host → webview。 */
 export interface LiveToWebviewEnvelope {
   readonly type: "live";
   readonly message: LiveToWebviewMessage;
+}
+
+/** 軌跡の点列の要約(表示座標 = webview の絵の上の px)。点の数・時間・押してから動き出すまで(始点と違う最初の点の t。
+ * 始めに止まっていると iOS のマップ等は長押しとして受け取りパンしない)・範囲・隣り合う点の最大の跳び */
+export function traceSummary(
+  points: ReadonlyArray<{ readonly x: number; readonly y: number; readonly t: number }>,
+  display: { readonly width: number; readonly height: number },
+): string {
+  const first = points[0];
+  const last = points[points.length - 1];
+  if (!first || !last) {
+    return "0 points";
+  }
+  let minX = first.x, maxX = first.x, minY = first.y, maxY = first.y;
+  let maxJump = 0;
+  let jumpTo = first;
+  let prev = first;
+  let movedAt: number | undefined;
+  for (const p of points) {
+    if (movedAt === undefined && (p.x !== first.x || p.y !== first.y)) {
+      movedAt = p.t;
+    }
+    minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x);
+    minY = Math.min(minY, p.y); maxY = Math.max(maxY, p.y);
+    const jump = Math.hypot(p.x - prev.x, p.y - prev.y);
+    if (jump > maxJump) {
+      maxJump = jump;
+      jumpTo = p;
+    }
+    prev = p;
+  }
+  const r = (v: number) => Math.round(v);
+  return `${points.length} points over ${r(last.t)}ms on ${r(display.width)}x${r(display.height)}`
+    + ` / first move at ${movedAt === undefined ? "-" : `${r(movedAt)}ms`}`
+    + ` / x ${r(minX)}..${r(maxX)} y ${r(minY)}..${r(maxY)}`
+    + ` / largest jump ${r(maxJump)}px to (${r(jumpTo.x)},${r(jumpTo.y)}) at ${r(jumpTo.t)}ms`;
 }

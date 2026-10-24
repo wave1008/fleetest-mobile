@@ -425,7 +425,6 @@ test("タイルの外(空きエリア)の右クリックでも出る(デバイ�
   rightClick(window, document.getElementById("grid"), 500, 250);
   assert.ok(menu(document).classList.contains("visible"));
   assert.equal(document.getElementById("device-op-menu-item").style.display, "none");
-  assert.equal(document.getElementById("device-op-menu-live").style.display, "none");
   assert.equal(document.getElementById("device-op-menu-gpu").style.display, "none");
   assert.equal(document.getElementById("device-op-menu-sep").style.display, "none");
   clickMenuItem(window, selectAllBtn(document));

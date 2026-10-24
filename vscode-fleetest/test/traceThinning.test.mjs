@@ -56,3 +56,25 @@ test("thinTracePoints: ①の間引きだけで600点以下に収まれば②は
   assert.equal(thinned[0], points[0]);
   assert.equal(thinned[thinned.length - 1], points[points.length - 1]);
 });
+
+test("tracePrefix: 経過時間までの点と、次の点との間を補間した現在位置を返す", async () => {
+  const { tracePrefix } = await import("../src/webview/monitor/traceThinning.js");
+  const points = [{ x: 0, y: 0, t: 0 }, { x: 100, y: 0, t: 100 }, { x: 100, y: 200, t: 300 }];
+  assert.deepEqual(tracePrefix(points, -1), [], "始まる前は空");
+  assert.deepEqual(tracePrefix(points, 0), [points[0], { x: 0, y: 0, t: 0 }], "始点だけ");
+  assert.deepEqual(tracePrefix(points, 50), [points[0], { x: 50, y: 0, t: 50 }]);
+  assert.deepEqual(tracePrefix(points, 100), [points[0], points[1], { x: 100, y: 0, t: 100 }]);
+  assert.deepEqual(tracePrefix(points, 200), [points[0], points[1], { x: 100, y: 100, t: 200 }]);
+  assert.deepEqual(tracePrefix(points, 300), points, "末尾の t で全体");
+  assert.deepEqual(tracePrefix(points, 999), points, "末尾を過ぎても全体");
+  assert.deepEqual(tracePrefix([], 10), []);
+});
+
+test("firstMoveT: 始点から minPx 以上離れた最初の点の t。離れなければ末尾の t", async () => {
+  const { firstMoveT } = await import("../src/webview/monitor/traceThinning.js");
+  const points = [{ x: 0, y: 0, t: 0 }, { x: 3, y: 0, t: 100 }, { x: 5, y: 0, t: 200 }, { x: 50, y: 0, t: 300 }];
+  assert.equal(firstMoveT(points, 5), 200, "ちょうど minPx は動いたうちに入る");
+  assert.equal(firstMoveT(points, 10), 300);
+  assert.equal(firstMoveT(points.slice(0, 2), 5), 100, "離れなければ末尾");
+  assert.equal(firstMoveT([], 5), 0);
+});

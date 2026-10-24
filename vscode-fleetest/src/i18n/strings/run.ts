@@ -62,14 +62,6 @@ export const runStrings = {
     en: "No previously failed scenarios (all passed or not yet run).",
   },
 
-  "run.live.preparing": {
-    ja: "ライブ操作パネルのデバイス準備(未起動なら起動)と画面同期を待機しています…",
-    en: "Preparing the device in the Live Control panel (launching if needed) and waiting for screen sync…",
-  },
-  "run.live.prepareFailed": {
-    ja: "[fleetest] ライブ操作パネルの準備に失敗しました: {message}",
-    en: "[fleetest] Failed to prepare the Live Control panel: {message}",
-  },
 
   "run.cancelled": { ja: "実行がキャンセルされました。", en: "The run was cancelled." },
   "run.cancel.stillRunningMessage": {

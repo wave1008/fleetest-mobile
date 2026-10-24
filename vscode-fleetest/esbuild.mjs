@@ -50,7 +50,6 @@ async function buildWebview() {
     // src/webview/dashboard/ は単独 entryPoint を持たない(「ダッシュボード」はモニターパネルの
     // タブへ統合済み。main.js は monitor/dashboardTab.js が import し、style.css は
     // monitor/style.css が @import で束ねる。dashboard/ 配下のモジュール自体は変更しない)。
-    // 「ライブ操作」タブも同じ形で統合済み(main.js は monitor/main.js が liveTab.js を import する)。
     entryPoints: [
       path.join(rootDir, "src/webview/monitor/main.js"),
       path.join(rootDir, "src/webview/monitor/style.css"),
@@ -138,7 +137,7 @@ async function buildTests() {
     // esbuild の CJS→ESM 変換シムが Node 組み込みモジュールの動的 require に対応できず
     // 実行時エラーになる。node_modules から素の bare import として解決させる(dap.test.mjs は
     // out-test/ 配下からでも Node の ESM 解決が親ディレクトリの node_modules を辿るため解決できる)。
-    // jsdom/esbuild も同様(webviewLiveDrag.test.mjs が実行時に使う。どちらも CJS/動的 require 持ち)。
+    // jsdom/esbuild も同様(webviewGridLiveControls.test.mjs が実行時に使う。どちらも CJS/動的 require 持ち)。
     // typescript は i18n.test.mjs が AST 走査に使う。巨大 CJS(動的 require 持ち)なので
     // バンドルせず node_modules から素の require で解決させる(jsdom/esbuild と同じ理由)。
     external: ["@vscode/debugadapter", "@vscode/debugprotocol", "jsdom", "esbuild", "typescript"],

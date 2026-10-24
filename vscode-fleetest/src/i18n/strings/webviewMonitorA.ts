@@ -1,5 +1,5 @@
 // バッチI 辞書(webview 側)。namespace: wvMonitor.
-// 対象ソース: webview/monitor/{deviceTiles,modals,liveTab,projectsTab}.js
+// 対象ソース: webview/monitor/{deviceTiles,modals,gridLiveControls,projectsTab}.js
 // webview バンドル(src/webview/i18n.js)から import される。**vscode 非依存**を保つこと。
 // キーは "wvMonitor." 始まり。ja は元の日本語と byte-identical(既存テスト互換)。
 import type { MessageDict } from "../core";
@@ -37,8 +37,8 @@ export const webviewMonitorAStrings = {
 
   // 選択の当たりは画像だけ(画像の外側のクリックは全解除。deviceTiles.js の click 委譲)
   "wvMonitor.tile.title": {
-    ja: "画像をクリックで選択 / 右クリックで起動・停止・ライブ操作",
-    en: "Click the screen to select / right-click to Start, Stop, or open Live Control",
+    ja: "画像をクリックで選択 / 右クリックで起動・停止",
+    en: "Click the screen to select / right-click to Start or Stop",
   },
   "wvMonitor.tile.running": { ja: "実行中", en: "Running" },
   "wvMonitor.tile.shuttingDown": { ja: "シャットダウン中", en: "Shutting down" },
@@ -108,8 +108,8 @@ export const webviewMonitorAStrings = {
   },
   "wvMonitor.tile.unregistered": { ja: "未登録", en: "Unregistered" },
   "wvMonitor.tile.unregisteredTitle": {
-    ja: "どの実行プロファイルにも記載の無い起動中デバイスです。起動は行えません(停止・ライブ操作は可能です)",
-    en: "A running device not listed in any run profile. Starting is unavailable (stopping and Live Control are available).",
+    ja: "どの実行プロファイルにも記載の無い起動中デバイスです。起動は行えません(停止は可能です)",
+    en: "A running device not listed in any run profile. Starting is unavailable (stopping is available).",
   },
   // ツールバー右端の全選択トグル(deviceTiles.js が押すたびに title/aria-label を入れ替える)。
   "wvMonitor.toolbar.selectAll": { ja: "デバイスをすべて選択", en: "Select All Devices" },
@@ -325,17 +325,13 @@ export const webviewMonitorAStrings = {
     ja: "軌跡が {max} 秒を超えたため中止しました（再生できるのは {max} 秒まで）。",
     en: "The trace was cancelled because it exceeded {max}s (up to {max}s can be replayed).",
   },
-  "wvMonitor.live.stateConnected": { ja: "接続済み", en: "Connected" },
-  "wvMonitor.live.stateUnknown": { ja: "状態不明(未確認)", en: "Unknown (unconfirmed)" },
+  "wvMonitor.live.blockedWhileBusy": {
+    ja: "前の操作を実行中のため、このクリックは送りませんでした。終わってからもう一度操作してください",
+    en: "This click was not sent because the previous operation is still running. Try again once it finishes",
+  },
+  "wvMonitor.live.longPressMark": { ja: "長押し", en: "Long press" },
   "wvMonitor.live.oplogMcpCopy": { ja: "クリックでコピー", en: "Click to copy" },
   "wvMonitor.live.oplogColOperation": { ja: "操作", en: "Operation" },
   "wvMonitor.live.oplogColMcp": { ja: "MCP コマンド", en: "MCP command" },
   "wvMonitor.live.oplogColResize": { ja: "ドラッグで操作列の幅を変更", en: "Drag to resize the operation column" },
-  "wvMonitor.live.processing": { ja: "処理中...", en: "Processing..." },
-  "wvMonitor.live.notConnectedWarning": { ja: "⚠ 接続されていません", en: "⚠ Not connected" },
-  "wvMonitor.live.noAppProfile": { ja: "(アプリプロファイルなし)", en: "(No app profile)" },
-  "wvMonitor.live.recordStop": { ja: "レコーディング終了", en: "Stop Recording" },
-  "wvMonitor.live.recordStart": { ja: "レコーディング開始", en: "Start Recording" },
-  "wvMonitor.live.appProfileRequired": { ja: "アプリプロファイルが必要です", en: "An app profile is required" },
-  "wvMonitor.live.detailUnset": { ja: "—", en: "—" },
 } satisfies MessageDict;

@@ -42,7 +42,7 @@ function makePanel() {
 
 test("recordingFinalizing で出し、録画タブへの自動表示を送ってから消す", async () => {
   const { panel, posts, reveals, finalizingStates, finishReveal } = makePanel();
-  panel.handleBusMessage({ type: "runStarted", runId: 1, isDryRun: false, liveFollow: false });
+  panel.handleBusMessage({ type: "runStarted", runId: 1, isDryRun: false });
   panel.handleBusMessage({ type: "event", runId: 1, event: { kind: "recordingFinalizing" } });
   assert.deepEqual(finalizingStates(), [false, true]);
 
@@ -60,7 +60,7 @@ test("recordingFinalizing で出し、録画タブへの自動表示を送って
 
 test("結果の run が無い終わり方(キャンセル・異常終了・dry-run)でもその場で消す", () => {
   const { panel, finalizingStates } = makePanel();
-  panel.handleBusMessage({ type: "runStarted", runId: 1, isDryRun: false, liveFollow: false });
+  panel.handleBusMessage({ type: "runStarted", runId: 1, isDryRun: false });
   panel.handleBusMessage({ type: "event", runId: 1, event: { kind: "recordingFinalizing" } });
   panel.handleBusMessage({ type: "runEnded", runId: 1 });
   assert.deepEqual(finalizingStates(), [false, true, false]);
@@ -68,7 +68,7 @@ test("結果の run が無い終わり方(キャンセル・異常終了・dry-r
 
 test("recordingFinalizing が来ない run(録画しない)では一度も出さない", () => {
   const { panel, finalizingStates } = makePanel();
-  panel.handleBusMessage({ type: "runStarted", runId: 1, isDryRun: false, liveFollow: false });
+  panel.handleBusMessage({ type: "runStarted", runId: 1, isDryRun: false });
   panel.handleBusMessage({ type: "event", runId: 1, event: { kind: "runFinished", passed: 1, failed: 0, skipped: 0 } });
   panel.handleBusMessage({ type: "runEnded", runId: 1 });
   assert.equal(finalizingStates().includes(true), false);

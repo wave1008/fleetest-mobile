@@ -41,7 +41,7 @@ fleetest 固有の用語を五十音順に並べました。英字で始まる�
 - **マシン設定** — この Mac の `~/.config/fleetest/config.json` に書く設定です。サンドボックスの許可・サービスのランタイム・保持容量のように、その Mac を使う人が決めるものを置きます。プロジェクトや実行プロファイルからは緩められません。 詳しくは [マシン設定(config.json)](../reference/project/machine_settings_ja.md)。
 - **マシン名** — ランナー機に手元で付ける名前(例: `M1Max`)です。プロファイルにはホスト名や IP アドレスではなくこの名前を書きます。手元の Mac は `local` です。`fleetest remote machines add` で登録します。 詳しくは [Mac を追加する](../fleet/adding_mac_ja.md)。
 - **容器** — 要素を囲むスクロール領域(リスト・スクロールビューなど)です。fleetest は画面の木から容器を推測し、見切れの判定やタップする座標の補正に使います(容器の推測)。補正が裏目に出る画面では `containerInference: false` などで切れます。 詳しくは [スクロール](../reference/commands/scroll_ja.md)。
-- **ライブ操作** — デバイスモニターのタブの1つで、デバイスの画面をマウスで直接操作します(クリックでタップ・ドラッグでスワイプ)。AIアシスタントを使わずにシナリオを作る入口にもなります。 詳しくは [VSCode で見る](../tutorial/watching_in_vscode_ja.md)。
+- **ライブ操作** — デバイスモニターで1台だけ選択したときのグリッドビューで、デバイスの画面をマウスで直接操作します(クリックでタップ・ドラッグでスワイプ)。 詳しくは [VSCode で見る](../tutorial/watching_in_vscode_ja.md)。
 - **run** — `fleetest run` などで行う、シナリオをまとめて実行する1回の実行です。runID が付き、結果が `results/` に記録されます。 詳しくは [シナリオの実行](../reference/running/running_scenarios_ja.md)。
 - **ランナー機** — テストを実行させる別の Mac です。手元の Mac から SSH でログインできれば、同じ LAN になくても構いません。ログインしたままにしておきます。 詳しくは [フリートの考え方](../fleet/concepts_ja.md)。
 - **レスポンス計測** — 実機で既存のシナリオを回しながら、画面を動かす操作ごとに「最初のフレームまで」(入力を注入してからアプリが最初のフレームを出すまで)と「操作可能まで」(注入から、次に操作する要素が見つかる・有効・覆われていない・止まっている状態になるまで)を測る機能です。実行プロファイルの `responseMeasurement: true` で有効になります。 詳しくは [レスポンス計測](../reference/running/response_measurement_ja.md)。

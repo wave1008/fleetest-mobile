@@ -40,11 +40,10 @@ test("配信の fps の既定が package.json / config.ts / 設定タブで一�
 
 // 走っている配信は起動時の fps のまま(張り直しの判定はコーデックしか見ない)。監視が無いと、設定を
 // 変えても画面は何も変わらない(2026-09-29 に実際に踏んだ)
-test("fleetest.liveFps の変更でタイルとライブ操作の配信を張り直す", () => {
+test("fleetest.liveFps の変更でタイルの配信を張り直す", () => {
   const panel = readFileSync(path.join(ROOT, "src/monitorPanel.ts"), "utf8");
   const start = panel.indexOf('event.affectsConfiguration("fleetest.liveFps")');
   assert.ok(start >= 0, "fleetest.liveFps の変更を監視していない");
   const block = panel.slice(start, start + 300);
   assert.ok(block.includes("this.deviceStream.restartAllStreams()"), "タイルの配信を張り直していない");
-  assert.ok(block.includes("this.live.restartStream()"), "ライブ操作の配信を張り直していない");
 });

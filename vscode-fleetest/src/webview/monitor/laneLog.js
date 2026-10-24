@@ -71,7 +71,7 @@ function reorderLanes() {
 // worker id(またはタイルが存在しない全体レーン)ごとの「実行中」状態。
 export const runningWorkers = new Set();
 
-/** そのデバイス(タイルの id = `platform:name`)がシナリオを回しているか。ライブ操作タブが実行中の自動の撮り直しを止めるのに使う */
+/** そのデバイス(タイルの id = `platform:name`)がシナリオを回しているか。グリッドビューの操作パネルが実行中の自動の撮り直しを止めるのに使う */
 export function isDeviceRunning(id) {
   return runningWorkers.has(id);
 }
@@ -142,9 +142,9 @@ function ensureLane(id, name, platform, updateLabel, machine) {
   // グリッドビューのダブルクリック: そのデバイスだけの選択にする(1台なら左に絵・右にログの複製)。
   // 「このデバイスのみ選択」の直後にもう一度押すと、その前の選択へ戻す(deviceTiles.js)
   // **1台表示の絵の上は除く** —— そこのクリックはタップ(gridLiveControls.js)なので、ダブルクリックは2回のタップ。
-  // 修飾キー付きも除く(Option+クリックを続けて押すと dblclick も来る)
+  // 修飾キー付きも除く(Command+クリック = ダブルタップを続けて押すと dblclick も来る)
   preview.addEventListener('dblclick', (event) => {
-    if (event.altKey || event.shiftKey || isGridLiveScreenTarget(event.target)) { return; }
+    if (event.altKey || event.shiftKey || event.metaKey || isGridLiveScreenTarget(event.target)) { return; }
     toggleSelectOnlyDevice(id);
   });
   preview.addEventListener('contextmenu', (event) => {

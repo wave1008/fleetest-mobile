@@ -1,5 +1,5 @@
 // グリッドビュー(1台だけ選択したときの拡大表示)の操作パネル: 要素一覧・バウンディングボックス・
-// 入力するテキスト・操作記録(ライブ操作タブと同等。インストール・レコーディング・アプリを起動は持たない)。
+// 入力するテキスト・操作記録。
 // gridLiveControls.js(ツールバー・画面の操作)から initGridLivePanel で postAction を受け、
 // syncGridLiveControls から syncGridLivePanel、applyGridLiveMessage から applyGridLivePanelMessage が呼ばれる。
 // DOM は monitorHtml.ts の #grid-live-panel。1台表示の間は .lane-pair の中の操作カラム(#grid-live-controls)の右隣に置く。
@@ -11,7 +11,7 @@
 // 絵はモニター自身の配信なので、host の snapshot の image は使わず screen と elements だけ採る。
 
 import { vscode, persistedState } from './vscodeApi.js';
-import { BOXES_SETTLE_CAP_MS, SETTLE_REFRESH_MS } from './liveTab.js';
+import { BOXES_SETTLE_CAP_MS, SETTLE_REFRESH_MS } from './liveConstants.js';
 import {
   clockText, createOplogView, frameToDisplayRect, hitTestRef, renderElementRows,
 } from './liveListViews.js';
@@ -19,6 +19,7 @@ import {
 const OPLOG_MAX_ROWS = 200; // デバイスごとの控えの上限(liveListViews.js の一覧の上限と同じ)
 
 const panel = document.getElementById('grid-live-panel');
+const panelSplitter = document.getElementById('grid-live-panel-splitter');
 const parking = document.getElementById('grid-live-parking');
 const refreshBtn = document.getElementById('grid-live-btn-refresh-snapshot');
 const boxesToggle = document.getElementById('grid-live-show-boxes');
@@ -43,6 +44,53 @@ hotBox.setAttribute('class', 'hot');
 const hoverBox = document.createElement('div');
 hoverBox.className = 'grid-live-hover-box';
 
+// ---- 操作パネルと実行ログの複製の幅(区切りのドラッグ)------------------------------------------
+// 覚えるのは**割合**(操作パネル ÷ 2つの和)。px で覚えるとパネルの幅が変わったときに片方が潰れる。
+// 実行ログの複製(laneLog.js が組を作り直すたびに新しい要素)は flex: 1 1 0 のままにし、操作パネルの
+// flex-grow だけを r/(1-r) にする = 作り直しで比が消えない
+const PANEL_MIN_WIDTH_PX = 120; // 片側の下限。見出し(題名+ボタン1つ)が1行に収まる目安
+let panelRatio = typeof persistedState.gridLivePanelRatio === 'number'
+  && persistedState.gridLivePanelRatio > 0 && persistedState.gridLivePanelRatio < 1
+  ? persistedState.gridLivePanelRatio : 0.5;
+
+function applyPanelRatio() {
+  panel.style.flexGrow = String(panelRatio / (1 - panelRatio));
+}
+applyPanelRatio();
+
+let splitDrag = null; // { pointerId, startX, startPanelWidth, total }
+panelSplitter.addEventListener('pointerdown', (event) => {
+  const mirror = panelSplitter.nextElementSibling;
+  if (event.button !== 0 || !mirror) { return; }
+  const startPanelWidth = panel.getBoundingClientRect().width;
+  const total = startPanelWidth + mirror.getBoundingClientRect().width;
+  if (!(total > 0)) { return; }
+  splitDrag = { pointerId: event.pointerId, startX: event.clientX, startPanelWidth, total };
+  panelSplitter.setPointerCapture(event.pointerId);
+  panelSplitter.classList.add('dragging');
+  event.preventDefault();
+});
+panelSplitter.addEventListener('pointermove', (event) => {
+  if (!splitDrag || splitDrag.pointerId !== event.pointerId) { return; }
+  const { startX, startPanelWidth, total } = splitDrag;
+  // 両側の下限が取れない狭さでは半々に固定する
+  const min = total > PANEL_MIN_WIDTH_PX * 2 ? PANEL_MIN_WIDTH_PX / total : 0.5;
+  const ratio = (startPanelWidth + (event.clientX - startX)) / total;
+  panelRatio = Math.min(1 - min, Math.max(min, ratio));
+  applyPanelRatio();
+});
+const endSplitDrag = (event) => {
+  if (!splitDrag || splitDrag.pointerId !== event.pointerId) { return; }
+  splitDrag = null;
+  panelSplitter.classList.remove('dragging');
+  panelSplitter.releasePointerCapture(event.pointerId);
+  vscode.setState(Object.assign({}, vscode.getState(), { gridLivePanelRatio: panelRatio }));
+};
+panelSplitter.addEventListener('pointerup', endSplitDrag);
+panelSplitter.addEventListener('pointercancel', endSplitDrag);
+// 区切りのダブルクリック・右クリックを拡大表示の組(選択の切り替え・デバイスのメニュー)へ伝えない
+panelSplitter.addEventListener('dblclick', (event) => event.stopPropagation());
+
 const oplogView = createOplogView(oplogList, { persistKey: 'gridLiveOplogLabelWidth', defaultLabelWidth: 220 });
 const oplogByDevice = new Map(); // id → [{ time, label, ok, mcp }]
 
@@ -55,22 +103,24 @@ let isRunning = () => false;
 
 // 1台表示のデバイス。1台表示でない間は null
 let target = null;
-// ライブ操作の serve が今つないでいるデバイス(host の devices.selectedId)。snapshot はこれが target と
+// host の serve が今つないでいるデバイス(host の devices.selectedId)。snapshot はこれが target と
 // 一致するときだけ採る
 let liveSelectedId = null;
 let busy = false;
 let busyObserving = false; // busy の原因が観測か(入力欄は観測の最中も送る = gridLiveControls.js の operationBlocked)
 let screen = null;
 let elements = [];
-let showBoxes = persistedState.gridLiveShowBoxes === true;
+// **既定 OFF・覚えない**(パネルを開くたびに OFF から始める。ユーザー決定)
+let showBoxes = false;
 
 // 枠の鮮度。**画面を変える操作を送った時点で枠を消し、その操作の直接の結果の snapshot では描かない**
 // (まだ遷移・慣性の途中の木で、描くと中間の座標で一度出て止まってからもう一度出る)。
-// 根拠: liveTab.js は applySnapshot のたびに SETTLE_REFRESH_MS 後の撮り直しを1回撃つ(scheduleSettleRefresh)
-// ので、操作の結果の次には整定後の木が必ず続く —— この依存があるので「次の snapshot」を待てる。
+// 直接の結果を受けたら、ここ自身が SETTLE_REFRESH_MS 後に撮り直しを1回撃つ(opSettleTimer。その間に拡大表示の絵が
+// 描き替わったら先送りする = 絵が止まってから撮る)ので、操作の結果の次には整定後の木が続く —— この撮り直しがあるので
+// 「次の snapshot」を待てる。
 // 尽きたとき: 直接の結果から BOXES_SETTLE_CAP_MS 以内に次が来なければ、手元の最新の木で描く。
-// 対象が実行中の間はライブ操作タブが自動の撮り直しを撃たない(liveTab.js の isSelectedDeviceRunning)ので
-// 「次の snapshot」は来ず、常にこの打ち切りで描く。
+// 対象が実行中の間は撮り直しを撃たない(XCUITest ブリッジをシナリオと取り合わない)ので「次の snapshot」は来ず、
+// 常にこの打ち切りで描く。
 // **「直接の結果」は host の合図(gridActionStarted)の後に届いた最初の snapshot だけ** —— host は撃つ前に
 // デバイスの切り替え(開いたときの観測)や直前の処理の終わりを待つので、送った直後に届く snapshot は操作前の画面
 // (取り違えると、本物の結果を「整定後」と読んで遷移の途中の位置に枠を一度描く)。
@@ -79,7 +129,7 @@ let boxesStale = true;        // true の間は枠を描かない(木を信用�
 // 'started' = 合図を受けた(次の snapshot が直接の結果)
 let opPhase = null;
 
-// **枠は、その木と同じ瞬間の絵の上に描く**。木はライブ操作の観測で届くが、拡大表示の絵はモニター自身の配信・
+// **枠は、その木と同じ瞬間の絵の上に描く**。木は host の観測(serve の snapshot)で届くが、拡大表示の絵はモニター自身の配信・
 // ポーリングで別経路 —— ブリッジの無いシミュレータのポーリングは1サイクル1台の順繰りで、台数ぶん遅い(実地: M1Max の
 // iOS 6台で1台あたり約12秒に1枚。待つ方式では上限が先に切れ、古い絵の上に枠が出た)。そこで観測の一枚絵(snapshot の
 // image)を拡大表示に出し(deviceTiles.js の showMirrorStill。以後の配信・ポーリングのフレームが届けば入れ替わる)、
@@ -118,15 +168,15 @@ export function noteMirrorFrame(id) {
   notePictureChanged();
 }
 
-// **操作と無関係に絵が変わったら、止まってから木を撮り直す**(ライブ操作タブの scheduleSettleRefresh と同じ考え方)。
+// **操作と無関係に絵が変わったら、止まってから木を撮り直す**(操作の結果の整定の撮り直しと同じ考え方)。
 // OS のダイアログ(位置情報の許可等)・遅れて出る画面は操作の結果と撮り直しより後に出るので、撮り直さないと前の画面の
 // 木の枠が新しい絵の上に残る(実地: マップの位置情報の許可で、マップの画面の枠がダイアログの上に出た)。
 // SETTLE_REFRESH_MS 新しいフレームが来なければ撮り直し、届いた木で描き直す。**絵が変わった時点では枠を消さない**
-// (ライブ操作タブと同じ)—— 文字カーソルの点滅のように中身の変わらない描き替わりにも反応し、消す → 撮り直して描く →
+// —— 文字カーソルの点滅のように中身の変わらない描き替わりにも反応し、消す → 撮り直して描く →
 // 消す、で枠が点滅した(実地)。止まらない絵(アニメーション)は BOXES_SETTLE_CAP_MS で打ち切って撮るが、**打ち切りで
 // 撮った木が前と同じなら、その動きは中身を変えないとみなして以後の打ち切りをやめる**(capBackoff。点滅のたびに
 // 2.8 秒ごとの撮り直しを続けない)。止まったときの撮り直し・木の変化・操作で打ち切りを戻す。
-// 何もしないとき: 操作の途中(その流れが撮る)・ライブ操作が別のデバイスにつないでいる(接続しない規律)。
+// 何もしないとき: 操作の途中(その流れが撮る)・host の serve が別のデバイスにつないでいる(接続しない規律)。
 // **実行中は枠を消すが撮り直さない**(整定のための自動の撮り直しは撃たない = XCUITest ブリッジをシナリオと取り合わない。
 // 実行中は絵がどんどん変わるので、古い木の枠を残すとずれたまま)
 let pictureSettleTimer = null;
@@ -149,7 +199,12 @@ function cancelPictureSettle() {
 }
 
 function notePictureChanged() {
-  if (liveSelectedId !== target.id || opPhase !== null || awaitSettled) { return; }
+  if (liveSelectedId !== target.id || opPhase !== null) { return; }
+  if (awaitSettled) {
+    // 操作の結果の整定待ち: 絵が動いている間は撮り直しを先送りする(止まってから撮る)
+    if (opSettleTimer !== null) { scheduleOpSettleRefresh(); }
+    return;
+  }
   if (isRunning(target.id)) {
     // 撮り直さないので、古い木の枠は残さない(実行中は絵がどんどん変わる)
     if (!boxesStale) {
@@ -172,7 +227,7 @@ function refreshAfterPictureSettled(byCap) {
     return;
   }
   if (busy) {
-    // 処理中(ライブ操作タブの操作・撮り直し)。終わってから撃つ(その結果の木が先に来れば、ここで撮るのは重複だが害は無い)
+    // 処理中(host の操作・観測)。終わってから撃つ(その結果の木が先に来れば、ここで撮るのは重複だが害は無い)
     pictureSettleTimer = setTimeout(() => refreshAfterPictureSettled(byCap), SETTLE_REFRESH_MS);
     return;
   }
@@ -193,6 +248,30 @@ function showSnapshotImage(message) {
 }
 let awaitSettled = false;     // 直接の結果を受けた。次の snapshot(整定後)か上限を待っている
 let capTimer = null;
+let opSettleTimer = null;     // 直接の結果の後に撃つ整定の撮り直しの予約(awaitSettled の間だけ)
+
+/** 操作の直接の結果の後、絵が止まってから木を撮り直す予約を(掛け直して)置く。実行中は撮り直さない */
+function scheduleOpSettleRefresh() {
+  cancelOpSettle();
+  if (!target || isRunning(target.id)) { return; }
+  opSettleTimer = setTimeout(fireOpSettleRefresh, SETTLE_REFRESH_MS);
+}
+function cancelOpSettle() {
+  if (opSettleTimer !== null) {
+    clearTimeout(opSettleTimer);
+    opSettleTimer = null;
+  }
+}
+function fireOpSettleRefresh() {
+  opSettleTimer = null;
+  if (!target || !awaitSettled || liveSelectedId !== target.id || isRunning(target.id)) { return; }
+  if (busy) {
+    // 処理中(host が観測・操作を捌いている最中は撮り直しを受け付けない)。終わってから撃つ。待ちの上限は capTimer
+    opSettleTimer = setTimeout(fireOpSettleRefresh, SETTLE_REFRESH_MS);
+    return;
+  }
+  postAction({ type: 'refreshSnapshot' });
+}
 
 let hotRef = null;
 const boxByRef = new Map();
@@ -228,6 +307,7 @@ function discardSnapshot() {
   cancelImageWait();
   cancelPictureSettle();
   cancelCap();
+  cancelOpSettle();
   awaitSettled = false;
   boxesStale = true;
   clearBoxes();
@@ -255,6 +335,7 @@ export function syncGridLivePanel(id, previewEl, anchorEl = previewEl) {
   }
   if (id === null || !previewEl) {
     if (panel.parentElement !== parking) { parking.appendChild(panel); }
+    if (panelSplitter.parentElement !== parking) { parking.appendChild(panelSplitter); }
     if (typeRow.parentElement !== parking) { parking.appendChild(typeRow); }
     boxesToggleLabel.hidden = true;
     return;
@@ -284,6 +365,9 @@ export function syncGridLivePanel(id, previewEl, anchorEl = previewEl) {
   if (previewEl.parentElement && anchor.nextElementSibling !== panel) {
     anchor.after(panel);
   }
+  if (panel.parentElement === previewEl.parentElement && panel.nextElementSibling !== panelSplitter) {
+    panel.after(panelSplitter);
+  }
   // 拡大表示は作り直すときに中身を空にする(deviceTiles.js の attachDeviceMirror)ので毎回見る。
   // 入力欄は絵のすぐ下。**ずれているときだけ動かす**(入力中に動かすとフォーカスが外れる)。高さの固定費は
   // 呼び手の後の段組み(laneLog.js の relayoutPreviewGrid → layoutSinglePreview)が実測する
@@ -301,6 +385,7 @@ function detachPreview() {
   boxesOverlay.remove();
   hoverBox.remove();
   if (panel.parentElement !== parking) { parking.appendChild(panel); }
+  if (panelSplitter.parentElement !== parking) { parking.appendChild(panelSplitter); }
   if (typeRow.parentElement !== parking) { parking.appendChild(typeRow); }
 }
 
@@ -312,6 +397,7 @@ function refreshBusy() {
 export function noteScreenAction() {
   if (!target) { return; }
   cancelCap();
+  cancelOpSettle();
   cancelImageWait();
   cancelPictureSettle();
   capBackoff = false;
@@ -413,14 +499,16 @@ function adoptSnapshot(message) {
   // 絵は**どの観測でも**出す(操作の直接の結果も = 遅い経路でも絵が先に変わる)。枠を描くのはその絵が出てから
   showSnapshotImage(message);
   if (opPhase === 'started') {
-    // 操作の直接の結果: 描かず、次(整定後)の木か上限を待つ
+    // 操作の直接の結果: 描かず、次(整定後)の木か上限を待つ。整定後の木はここ自身が撮り直して取る
     opPhase = null;
     beginSettleWait();
+    scheduleOpSettleRefresh();
   } else if (opPhase === 'posted') {
     // 合図より前 = 操作前の画面(開いたときの観測・直前の撮り直し)。一覧は入れ替えるが枠は描かない
     boxesStale = true;
   } else {
     cancelCap();
+    cancelOpSettle();
     awaitSettled = false;
     boxesStale = false;
   }
@@ -440,9 +528,11 @@ function beginSettleWait() {
   awaitSettled = true;
   boxesStale = true;
   cancelCap();
+  cancelOpSettle();
   capTimer = setTimeout(() => {
     capTimer = null;
     if (!awaitSettled) { return; }
+    cancelOpSettle();
     awaitSettled = false;
     boxesStale = false;
     renderBoxes();
@@ -611,7 +701,6 @@ refreshBtn.addEventListener('click', () => { postAction({ type: 'refreshSnapshot
 
 boxesToggle.addEventListener('change', () => {
   showBoxes = boxesToggle.checked;
-  vscode.setState(Object.assign({}, vscode.getState(), { gridLiveShowBoxes: showBoxes }));
   // ホバー中に切り替えると行ホバーの出し先(単一枠 ⇄ hot)が入れ替わる。両方畳んでから引き直す
   setHot(null, false);
   hideHover();

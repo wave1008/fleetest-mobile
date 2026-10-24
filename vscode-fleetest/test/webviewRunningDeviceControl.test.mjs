@@ -1,4 +1,4 @@
-// テスト実行中のデバイスの操作(グリッドビュー・ライブ操作タブ)の DOM テスト。harness は webviewGridLivePanel.test.mjs と
+// テスト実行中のデバイスの操作(グリッドビュー)の DOM テスト。harness は webviewGridLivePanel.test.mjs と
 // 同じ(実 HTML + 実バンドルを jsdom で動かす)。
 //
 // 契約(ユーザー決定: 介入は利用者の自己責任): デバイスがシナリオを回している間(workerRunning)も、操作は**止めない**
@@ -123,22 +123,6 @@ function setupGrid(t) {
 }
 
 
-const LIVE_ID = "ios:Dev A";
-function setupLiveTab(t) {
-  const ctx = createWebview();
-  t.after(() => ctx.window.close());
-  const { window, document } = ctx;
-  document.getElementById("tab-live").dispatchEvent(new window.MouseEvent("click", { bubbles: true }));
-  const screenshot = document.getElementById("live-screenshot");
-  screenshot.getBoundingClientRect = () => ({ left: 0, top: 0, right: 400, bottom: 800, width: 400, height: 800, x: 0, y: 0 });
-  live(window, {
-    type: "devices", selectedId: LIVE_ID,
-    devices: [{ id: LIVE_ID, name: "Dev A", platform: "ios", state: "connected", detail: "", kind: "virtual", udid: "U" }],
-  });
-  live(window, { type: "snapshot", platform: "ios", screen: { width: 400, height: 800 }, image: "aW1n", elements: [] });
-  return { ...ctx, screenshot };
-}
-
 test("グリッド: 実行中のデバイスも、トグル無しでそのまま操作を送る(ボタン・入力欄・更新も止めない)", (t) => {
   const { window, document, media, gridActions } = setupGrid(t);
   workerRunning(window, "d0", true);
@@ -151,53 +135,6 @@ test("グリッド: 実行中のデバイスも、トグル無しでそのまま
   assert.equal(document.getElementById("grid-live-type-text").disabled, false);
   assert.equal(document.getElementById("grid-live-btn-refresh-snapshot").disabled, false);
   assert.equal(document.getElementById("grid-live-error").textContent, "", "止める文言は出さない");
-});
-
-test("ライブ操作タブ: 実行中のデバイスも、トグル無しで画面操作・ボタン・入力・録画/インストール/起動を止めない", (t) => {
-  const { window, document, screenshot, liveMessages } = setupLiveTab(t);
-  workerRunning(window, LIVE_ID, true);
-  assert.equal(document.getElementById("live-run-gate"), null, "介入の門の表示は無い");
-  screenshot.dispatchEvent(pointerEvent(window, "pointerdown", { x: 10, y: 10 }));
-  window.dispatchEvent(pointerEvent(window, "pointerup", { x: 10, y: 10 }));
-  document.getElementById("live-btn-home").click();
-  const sent = liveMessages().map((m) => m.type);
-  assert.ok(sent.includes("tapPoint"), "画面のタップを送る");
-  assert.ok(sent.includes("home"), "ツールバーの操作を送る");
-  assert.equal(document.getElementById("live-type-text").disabled, false);
-  assert.equal(document.getElementById("live-action-error-text").textContent, "");
-});
-
-test("ライブ操作タブ: 実行中は整定のための自動の撮り直しを撃たない(人の「更新」は撃つ)", async (t) => {
-  const { window, document, liveMessages } = setupLiveTab(t);
-  const refreshes = () => liveMessages().filter((m) => m.type === "refreshSnapshot").length;
-  workerRunning(window, LIVE_ID, true);
-  const before = refreshes();
-  live(window, { type: "snapshot", platform: "ios", screen: { width: 400, height: 800 }, image: "aW1n", elements: [] });
-  await new Promise((resolve) => setTimeout(resolve, 1100));
-  assert.equal(refreshes(), before, "整定後の撮り直しを撃たない");
-  document.getElementById("live-btn-refresh-snapshot").click();
-  assert.equal(refreshes(), before + 1, "人が押した「更新」は撃つ");
-});
-
-test("ライブ操作タブ: 実行中でなければ従来どおり整定後に撮り直す(陰性対照)", async (t) => {
-  const { window, liveMessages } = setupLiveTab(t);
-  const refreshes = () => liveMessages().filter((m) => m.type === "refreshSnapshot").length;
-  const before = refreshes();
-  live(window, { type: "snapshot", platform: "ios", screen: { width: 400, height: 800 }, image: "aW1n", elements: [] });
-  await new Promise((resolve) => setTimeout(resolve, 1100));
-  assert.equal(refreshes(), before + 1);
-});
-
-test("ライブ操作タブ: 実行中でも画面サイズが無ければ最初の1回は撮る(撮らないと画面の操作が黙って無視される)", (t) => {
-  const { window, liveMessages } = setupLiveTab(t);
-  const refreshes = () => liveMessages().filter((m) => m.type === "refreshSnapshot").length;
-  workerRunning(window, LIVE_ID, true);
-  live(window, { type: "clearSnapshot" }); // 画面サイズ(lastScreen)が無い状態
-  const before = refreshes();
-  live(window, { type: "frame", image: "aW1n" });
-  assert.equal(refreshes(), before + 1, "配信の絵が来たら1回撮る");
-  live(window, { type: "frame", image: "aW1n" });
-  assert.equal(refreshes(), before + 1, "1回だけ(届くまで重ねて撃たない)");
 });
 
 test("グリッド: 実行中は自動の撮り直しが無いので、操作の結果の枠は打ち切りで手元の木で描く", async (t) => {
@@ -245,38 +182,37 @@ test("グリッド: 観測の最中(busy.observing)はタップを送り、操�
   assert.equal(gridActions().length, 2);
 });
 
-test("ライブ操作タブ: 観測の最中(busy.observing)はタップを送り、操作の最中は送らない。「更新」は観測中も重ねない", (t) => {
-  const { window, document, screenshot, liveMessages } = setupLiveTab(t);
-  const taps = () => liveMessages().filter((m) => m.type === "tapPoint").length;
-  live(window, { type: "busy", busy: true, observing: true });
-  screenshot.dispatchEvent(pointerEvent(window, "pointerdown", { x: 10, y: 10 }));
-  window.dispatchEvent(pointerEvent(window, "pointerup", { x: 10, y: 10 }));
-  assert.equal(taps(), 1, "観測の最中のタップは送る");
-  assert.equal(document.getElementById("live-btn-home").disabled, false, "デバイスを操作するボタンも押せる");
-  assert.equal(document.getElementById("live-btn-refresh-snapshot").disabled, true, "観測そのもの(更新)は重ねない");
-  live(window, { type: "busy", busy: true, observing: false });
-  screenshot.dispatchEvent(pointerEvent(window, "pointerdown", { x: 10, y: 10 }));
-  window.dispatchEvent(pointerEvent(window, "pointerup", { x: 10, y: 10 }));
-  assert.equal(taps(), 1, "操作の最中のタップは送らない");
-  assert.equal(document.getElementById("live-btn-home").disabled, true);
+test("グリッド: 実行中は操作の直接の結果の後も整定の撮り直しを撃たない(人の「更新」は撃つ)", async (t) => {
+  const { window, document, media, gridActions } = setupGrid(t);
+  const snap = {
+    type: "snapshot", platform: "ios", screen: { width: 400, height: 800 }, image: "QUJD", notes: [],
+    elements: [{ ref: "e1", frame: { x: 0, y: 0, width: 100, height: 100 }, frameText: "0,0 100x100", line: "Button A" }],
+  };
+  const refreshes = () => gridActions().filter((m) => m.action.type === "refreshSnapshot").length;
+  live(window, snap);
+  workerRunning(window, "d0", true);
+  tap(window, media);
+  live(window, { type: "gridActionStarted", id: "d0" });
+  live(window, snap); // 直接の結果
+  const before = refreshes();
+  await new Promise((resolve) => setTimeout(resolve, 1100));
+  assert.equal(refreshes(), before, "XCUITest ブリッジをシナリオと取り合わないよう、整定の撮り直しは撃たない");
+  document.getElementById("grid-live-btn-refresh-snapshot").click();
+  assert.equal(refreshes(), before + 1, "人が押した「更新」は撃つ");
 });
 
-test("ライブ操作タブ: 軌跡は離した後も、デバイスがなぞり終えるまで線を残す", (t) => {
-  const { window, document, screenshot } = setupLiveTab(t);
-  window.Element.prototype.setPointerCapture = () => {};
-  window.Element.prototype.releasePointerCapture = () => {};
-  const overlay = document.getElementById("live-drag-overlay");
-  const shift = (type, x, y) => {
-    const event = new window.MouseEvent(type, { bubbles: true, cancelable: true, clientX: x, clientY: y, button: 0, shiftKey: true });
-    Object.defineProperty(event, "pointerId", { value: 1 });
-    return event;
+test("グリッド: 実行中でなければ操作の直接の結果の 700ms 後に整定の撮り直しを撃つ(陰性対照)", async (t) => {
+  const { window, media, gridActions } = setupGrid(t);
+  const snap = {
+    type: "snapshot", platform: "ios", screen: { width: 400, height: 800 }, image: "QUJD", notes: [],
+    elements: [{ ref: "e1", frame: { x: 0, y: 0, width: 100, height: 100 }, frameText: "0,0 100x100", line: "Button A" }],
   };
-  screenshot.dispatchEvent(shift("pointerdown", 10, 10));
-  window.dispatchEvent(shift("pointermove", 100, 100));
-  window.dispatchEvent(shift("pointerup", 100, 100));
-  assert.ok(overlay.classList.contains("visible"), "離した後も線を残す");
-  live(window, { type: "busy", busy: true, observing: false });
-  assert.ok(overlay.classList.contains("visible"), "なぞっている間は残す");
-  live(window, { type: "busy", busy: false, observing: false });
-  assert.equal(overlay.classList.contains("visible"), false, "なぞり終えたら消す");
+  const refreshes = () => gridActions().filter((m) => m.action.type === "refreshSnapshot").length;
+  live(window, snap);
+  tap(window, media);
+  live(window, { type: "gridActionStarted", id: "d0" });
+  live(window, snap);
+  const before = refreshes();
+  await new Promise((resolve) => setTimeout(resolve, 1100));
+  assert.equal(refreshes(), before + 1);
 });

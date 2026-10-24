@@ -11,49 +11,47 @@
 // 写さないため、`vscode.Uri`/`vscode.workspace` 等はどのファイルでも undefined になり、触れた
 // 時点で必ず例外になる(実測: TypeError: Cannot read properties of undefined)。
 // そのため実行時テストで検証できるのは「vscode に触れない経路」だけ:
-// - LiveTabHost(「ライブ操作」タブのサブコントローラ)は自分の WebviewPanel を持たず、
+// - LiveTabHost(グリッドビューのライブ操作のサブコントローラ)は自分の WebviewPanel を持たず、
 //   MonitorPanelController から狭い deps(LiveTabHostDeps)だけを注入されるので、vscode に
 //   触れずに単体で構成できる(Monitor 本体はコンストラクタ自体が
 //   vscode.workspace.createFileSystemWatcher を呼ぶため、コンストラクタすら実行できない。
 //   Monitor 本体は対象外)。
-// Monitor の relocalize()(html 再構築 → deviceStream.restartAllStreams() → live.restartStream() の
-// 順)は test/panelRelocalizeSourceContract.test.mjs がソース走査で検証する(同ファイル冒頭コメント参照)。
+// Monitor の relocalize()(html 再構築 → deviceStream.restartAllStreams() の順)は
+// test/panelRelocalizeSourceContract.test.mjs がソース走査で検証する(同ファイル冒頭コメント参照)。
 // 「結果ダッシュボード」は単独パネルを廃止しモニターパネルのタブへ統合済み(旧 dashboardPanel.ts)。
 // relocalize は Monitor 側の1本にまとまったため、ここに Dashboard 専用のテストは無い。
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { FleetestCli } from "../src/cli";
 import { LiveTabHost } from "../src/liveTabHost";
-import { RunEventBus } from "../src/runEventBus";
 
 const outputChannel = { appendLine() {} };
 const getConfig = () => ({ binaryPath: "/usr/local/bin/fleetest", project: "P", profile: "" });
 
 function newLiveTabHost() {
-  const cli = new FleetestCli(outputChannel);
-  // FleetestTestTree(../src/testTree)は生成時に vscode.tests.createTestController を呼ぶため、
-  // esbuild の vscodeStubPlugin 下では作れない。LiveTabHost は testTree.refresh() しか呼ばないので、
-  // その形だけを備えた fake で足りる。
-  const testTree = { refresh: async () => {} };
   const deps = {
     post: () => {},
     isPanelOpen: () => false,
-    showTab: () => {},
-    isPollingMode: () => false,
-    openGeneratedDocument: () => {},
-    onLiveStreamKeyChanged: () => {},
   };
-  return new LiveTabHost(deps, getConfig, cli, testTree, new RunEventBus(), "/tmp/proj", outputChannel);
+  return new LiveTabHost(deps, getConfig, "/tmp/proj", outputChannel);
 }
 
-test("LiveTabHost.restartStream(): MonitorLiveController.restartStream() へ委譲する(例外なし)", () => {
+test("LiveTabHost: 狭い deps だけで構成でき、止める・破棄するが例外なく終わる(serve を起こしていなくても)", () => {
   const host = newLiveTabHost();
-  let restarted = 0;
-  host.live.restartStream = () => {
-    restarted += 1;
+  assert.doesNotThrow(() => host.stopProcesses());
+  assert.doesNotThrow(() => host.dispose());
+});
+
+test("LiveTabHost.resumeServeAfterSweep(): 畳んでいなくても何も起こさない(refreshDevices を撃たない)", async () => {
+  const host = newLiveTabHost();
+  let refreshed = 0;
+  host.live.refreshDevices = () => {
+    refreshed += 1;
   };
-  assert.doesNotThrow(() => host.restartStream());
-  assert.equal(restarted, 1);
+  host.resumeServeAfterSweep();
+  await host.suspendServeForSweep();
+  host.resumeServeAfterSweep();
+  assert.equal(refreshed, 0);
+  host.dispose();
 });

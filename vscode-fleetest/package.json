@@ -2,7 +2,7 @@
   "name": "vscode-fleetest",
   "displayName": "fleetest mobile",
   "description": "%fleetest.extension.description%",
-  "version": "0.1.500",
+  "version": "0.1.515",
   "private": true,
   "publisher": "wave1008",
   "license": "MIT",
@@ -144,11 +144,6 @@
           ],
           "default": "h264",
           "description": "%fleetest.config.streamCodec.description%"
-        },
-        "fleetest.liveControlOnRun": {
-          "type": "boolean",
-          "default": true,
-          "description": "%fleetest.config.liveControlOnRun.description%"
         },
         "fleetest.autoRepairBridge": {
           "type": "boolean",
@@ -313,11 +308,6 @@
         "title": "%fleetest.command.showDeviceMonitor.title%",
         "category": "fleetest",
         "icon": "$(device-mobile)"
-      },
-      {
-        "command": "fleetest.showLiveControl",
-        "title": "%fleetest.command.showLiveControl.title%",
-        "category": "fleetest"
       },
       {
         "command": "fleetest.showResultsDashboard",

@@ -1,4 +1,4 @@
-// ライブ操作タブ(liveTab.js)とグリッドビューの操作パネル(gridLivePanel.js)が共有する、
+// グリッドビューの操作パネル(gridLivePanel.js)が使う、
 // 当たり判定・要素一覧の行・操作記録の描画。DOM の id は持たず、呼び出し側が渡す要素に描く。
 
 import { t } from '../i18n.js';

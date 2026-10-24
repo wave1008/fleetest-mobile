@@ -55,9 +55,7 @@ export interface FleetestConfig {
    * として効く(monitorProcessManager.ts)。ドロップダウンの「起動中のデバイス」= profile "" +
    * この値 "running"(monitorModel.ts の RUNNING_DEVICES_PROFILE_VALUE)。 */
   monitorDeviceFilter: MonitorDeviceFilter;
-  /** ライブ操作パネルの自動フレーム更新レート上限(fps、3〜30にクランプ)。**成功時 delayMs=0 の
-   * ホットループにしない** —— デバイスが返す限り最速で /screenshot を叩く負荷源になる。目標fpsで頭打ちにする
-   * (monitorLiveController.ts frameTick)。 */
+  /** デバイスタイルの配信フレームレート上限(fps、3〜30にクランプ)。 */
   liveFps: number;
   /** iOS シミュレータのライブ映像ストリーミング(fleetest-simstream)を使うか。true でも helper が
    * 未ビルド(resolveSimStream が undefined)なら自動でポーリングにフォールバックする。 */
@@ -68,7 +66,7 @@ export interface FleetestConfig {
   /** 画面ストリーミングのコーデック。"h264": WebCodecs によるハードウェアデコード(既定、
    * deviceStream.ts の v2 stdout 形式)。"mjpeg": v1 形式。webview からの
    * codecError(WebCodecs 未対応/デコード失敗)を受けた個別デバイスは設定に関わらず
-   * mjpeg へ自動フォールバックする(monitorDeviceStreamController.ts/monitorLiveController.ts)。 */
+   * mjpeg へ自動フォールバックする(monitorDeviceStreamController.ts)。 */
   streamCodec: "h264" | "mjpeg";
   /** true の場合、Test Explorer ツリーを失敗テストのみ表示(未実施・成功は除外。testTree.ts の
    * resolveFailedFilter。トグルボタンの context key 同期は extension.ts registerCommands)。 */
@@ -80,13 +78,10 @@ export interface FleetestConfig {
    * 順で自動修復を試みる(monitorHealthWatchdog.ts)。既定 false: autoRepairBridge と異なり、
    * Wi-Fi をわざと切ってテストするケースを勝手に上書きしないため。 */
   autoRepairDeviceHealth: boolean;
-  /** true の場合、テスト実行(Run Test、非dry-run)開始時にデバイスモニター(monitorPanel.ts)を
-   * 「ライブ操作」タブで自動表示する(liveTabHost.ts)。 */
-  liveControlOnRun: boolean;
   /** "auto": 起動時に upstream の更新有無を確認し、あれば通知する(updateCheck.ts)。"off": 確認しない。
    * 確認するだけで取り込みはしない(取り込みは /fleetest-update)。 */
   updateCheck: UpdateCheckMode;
-  /** true の場合、実行(dry-run・ライブ操作パネル連動を除く)開始前に `fleetest api remote-compat` で
+  /** true の場合、実行(dry-run を除く)開始前に `fleetest api remote-compat` で
    * リモート機の版ズレを照合し、ズレていれば確認ダイアログを出す(runHandler.ts executeRun)。 */
   remoteCompatCheck: boolean;
 }
@@ -128,7 +123,6 @@ export function readConfig(workspaceRoot: string): FleetestConfig {
     showOnlyFailedTests: configuration.get<boolean>("showOnlyFailedTests", false),
     autoRepairBridge: configuration.get<boolean>("autoRepairBridge", true),
     autoRepairDeviceHealth: configuration.get<boolean>("autoRepairDeviceHealth", false),
-    liveControlOnRun: configuration.get<boolean>("liveControlOnRun", true),
     updateCheck: configuration.get<string>("updateCheck", "auto") === "off" ? "off" : "auto",
     remoteCompatCheck: configuration.get<boolean>("remoteCompatCheck", true),
   };
@@ -305,90 +299,6 @@ export function listAppProfileNames(workspaceRoot: string, project: string): str
       .sort((a, b) => a.localeCompare(b));
   } catch {
     return [];
-  }
-}
-
-/**
- * TestProjects/<project>/profiles/apps/<name>.json から platform 向けの起動対象を読む。
- * app/appPath は platform セクションのみ参照する(RunProfile.swift AppProfile.section(for:))。
- * bundle が無ければ null。
- */
-export function readAppProfileTarget(
-  workspaceRoot: string,
-  project: string,
-  name: string,
-  platform: Platform,
-): { bundle: string; appPath: string | null } | null {
-  const profilePath = path.join(workspaceRoot, "TestProjects", project, "profiles", "apps", `${name}.json`);
-  try {
-    const raw = fs.readFileSync(profilePath, "utf8");
-    const parsed: unknown = JSON.parse(raw);
-    if (typeof parsed !== "object" || parsed === null) {
-      return null;
-    }
-    const section = (parsed as Record<string, unknown>)[platform];
-    if (typeof section !== "object" || section === null) {
-      return null;
-    }
-    const { app, appPath: rawAppPath } = section as Record<string, unknown>;
-    if (typeof app !== "string") {
-      return null;
-    }
-    let appPath: string | null = null;
-    if (typeof rawAppPath === "string") {
-      // ベースディレクトリ・~展開の契約: RunProfile.swift:492 resolvePath(_, base: project.rootURL)
-      // (rootURL = TestProjects/<project>/)。
-      const expanded = rawAppPath.startsWith("~") ? path.join(os.homedir(), rawAppPath.slice(1)) : rawAppPath;
-      appPath = path.isAbsolute(expanded)
-        ? expanded
-        : path.resolve(path.join(workspaceRoot, "TestProjects", project), expanded);
-    }
-    return { bundle: app, appPath };
-  } catch {
-    return null;
-  }
-}
-
-export interface AppProfileDetail {
-  readonly appName: string | null;
-  readonly bundle: string | null;
-  readonly appPath: string | null;
-}
-
-/** ライブ操作パネルの詳細表示用。readAppProfileTarget と違い bundle 欠落でも null にせず、
- * 表示名(platform セクションのみ)と
- * platform セクションの app / appPath を個別に返す。ファイル未読/解析失敗のみ null。 */
-export function readAppProfileDetail(
-  workspaceRoot: string,
-  project: string,
-  name: string,
-  platform: Platform,
-): AppProfileDetail | null {
-  const profilePath = path.join(workspaceRoot, "TestProjects", project, "profiles", "apps", `${name}.json`);
-  try {
-    const parsed: unknown = JSON.parse(fs.readFileSync(profilePath, "utf8"));
-    if (typeof parsed !== "object" || parsed === null) {
-      return null;
-    }
-    const record = parsed as Record<string, unknown>;
-    const section = typeof record[platform] === "object" && record[platform] !== null
-      ? (record[platform] as Record<string, unknown>) : undefined;
-    const str = (v: unknown): string | null => (typeof v === "string" && v.length > 0 ? v : null);
-    // 表示名は platform セクションのみ(Sources/FTCore/RunProfile.swift の AppProfile.section(for:) と同期)
-    const appName = str(section?.appName);
-    const bundle = str(section?.app);
-    const rawAppPath = str(section?.appPath);
-    let appPath: string | null = null;
-    if (rawAppPath) {
-      // ベースディレクトリ・~展開の契約は readAppProfileTarget と同一(RunProfile.swift:492 resolvePath, base=TestProjects/<project>/)。
-      const expanded = rawAppPath.startsWith("~") ? path.join(os.homedir(), rawAppPath.slice(1)) : rawAppPath;
-      appPath = path.isAbsolute(expanded)
-        ? expanded
-        : path.resolve(path.join(workspaceRoot, "TestProjects", project), expanded);
-    }
-    return { appName, bundle, appPath };
-  } catch {
-    return null;
   }
 }
 

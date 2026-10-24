@@ -37,7 +37,7 @@ CLAUDE.md から移した規則(本文は移設前と同一)。この領域の�
   「中身の鍵が前回と同じなら return」。**周期的に変わる説明は `setHoverTip` で書く**(`el.title =` は表示中の文言が古いまま・
   ネイティブと二重になる)。**テストは `data-hover-tip` を読む** —— 移した後に `.title` を読むと常に空で、否定の assert が素通りする
   → maintainer-notes §85
-- **状態の語**: タイルの「接続中」は**接続しようとしている途中**(Connecting)。繋がっている状態は「接続済み」(ライブ操作と同じ)。
+- **状態の語**: タイルの「接続中」は**接続しようとしている途中**(Connecting)。繋がっている状態は「接続済み」。
   同じ語を逆の意味で使うと「接続中のまま変わらない」に見える(ダッシュボードで実際に報告された)
 - エスケープ文脈が変わる逐語移動(テンプレートリテラル⇔実ファイル)では二重エスケープの残存を機械チェックする(`grep '\\\\[dswb]'` 等。過去に `\\d` が検証不能バグとして実害化)
 - 辞書は `src/i18n/strings/<namespace>.ts` に `{ "ns.key": { ja, en } } satisfies MessageDict`。**ja は表示文字列と byte 一致**(未初期化時の既定 locale が "ja"・既存テストが日本語をアサートするため)。プレースホルダは名前付き `{name}` で ja/en 同集合。namespace とファイルは1対1。
@@ -46,10 +46,10 @@ CLAUDE.md から移した規則(本文は移設前と同一)。この領域の�
 - **module-level の表示 const 禁止**(import 時=initI18n 前に "ja" で固定される)。関数化する。
 - package.json の contributes(コマンド名・設定説明)だけは別系統: `%key%` + `package.nls.json`(英)/`package.nls.ja.json`(日)で **VSCode 表示言語連動**(fleetest.language ではない)。両 nls はキー集合一致。
 - 検証は `test/i18n.test.mjs`(辞書パリティ・**残存日本語の AST 走査**[HTML コメントは除外]・webview/lane キー存在・nls 整合)。正当に日本語を残す文字列(非表示の内部 throw 等)は同ファイルの `RESIDUAL_ALLOWLIST` に登録。
-- `fleetest.language` 変更は各 webview パネル(Monitor。Dashboard・ライブ操作はモニターのタブ)の `relocalize()` が
+- `fleetest.language` 変更は webview パネル(Monitor。Dashboard はモニターのタブ)の `relocalize()` が
   `webview.html` を再代入して即時反映する(`extension.ts` が呼ぶ `languageChangeHandler.ts` の
   `handleLanguageChange` が束ねる。vscode 非依存に切り出してあるのはテストのため。パネル未生成時は
   no-op)。Monitor は html 再代入(webview 再読込)でブラウザ側デコーダが失われるため、直後に
-  `restartAllStreams()`(タイル)と `LiveTabHost.restartStream()`(ライブ操作タブ)でライブ配信を新キーフレームから張り直す。
+  `restartAllStreams()`(タイル)でライブ配信を新キーフレームから張り直す。
   Reload Window が必要なのは package.nls(コマンド名・設定説明。VSCode 表示言語連動で
   `fleetest.language` とは無関係)だけ。

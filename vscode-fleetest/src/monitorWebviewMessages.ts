@@ -8,8 +8,8 @@
 import type { MonitorDeviceFilter } from "./config";
 import type { DashboardFromWebviewMessage, DashboardToWebviewMessage } from "./dashboardModel";
 import { isDashboardFromWebviewMessage } from "./dashboardModel";
-import type { GridLiveAction, LiveFromWebviewMessage, LiveToWebviewMessage } from "./liveModel";
-import { isGridLiveAction, isLiveFromWebviewMessage } from "./liveModel";
+import type { GridLiveAction, LiveToWebviewMessage } from "./liveModel";
+import { isGridLiveAction } from "./liveModel";
 import type {
   RecordingErrorEntry,
   RecordingScenarioDevice,
@@ -106,16 +106,6 @@ export type MonitorToWebviewMessage =
   | {
       readonly type: "h264Chunk";
       readonly device: string;
-      readonly keyframe: boolean;
-      readonly width: number;
-      readonly height: number;
-      readonly data: Uint8Array;
-    }
-  // 「ライブ操作」タブの H.264 AU 1件(monitorLiveController.ts の onChunk が post する。既存の
-  // { type: "frame", image } と並置。h264Chunk と同じく "live" 封筒は経由しない — webview 側は
-  // src/webview/monitor/main.js の直下ディスパッチャから直接 liveTab.js の applyLiveH264Chunk へ渡す)。
-  | {
-      readonly type: "liveH264Chunk";
       readonly keyframe: boolean;
       readonly width: number;
       readonly height: number;
@@ -567,23 +557,10 @@ export type MonitorToWebviewMessage =
   // monitorPanel.ts → monitorDashboardController.ts、
   // webview 側は src/webview/monitor/dashboardTab.js の handleDashboardMessage)。
   | { readonly type: "dashboard"; readonly message: DashboardToWebviewMessage }
-  // ---- ライブ操作タブ -----------------------------------------------------------------------
-  // 「ライブ操作」タブ向けの封筒。liveModel.ts の LiveToWebviewMessage/LiveFromWebviewMessage 自体は
-  // webview→host の命名衝突を避けるため "live" 型の封筒に包む(host 側は src/liveTabHost.ts、
-  // webview 側は src/webview/monitor/liveTab.js の applyLiveMessage)。
-  | { readonly type: "live"; readonly message: LiveToWebviewMessage }
-  // ライブ操作タブの H.264 AU(既存の "h264Chunk" と並置。理由は該当コメント参照)は
-  // このすぐ上の "liveH264Chunk" 型がそのまま兼ねる("live" 封筒は経由しない)。
-  // デバイスタイル右クリック「ライブ操作」・fleetest.showLiveControl から、モニターを開いて
-  // 「ライブ操作」タブへ切り替えたうえで届ける(host push。webview→host の
-  // LiveFromWebviewMessage.openDevice と名前が紛らわしいため live* 接頭辞で区別する)。
-  | { readonly type: "liveOpenDevice"; readonly id: string }
-  // 既存パネルへの再バインド要求(選択中デバイスの一覧を取り直す)。対向: liveTab.js の refreshLiveDevices。
-  | { readonly type: "liveRefreshDevicesFromHost" }
-  // webview パネル自体の可視性(他エディタタブの裏に隠れているか)。monitorPanel.ts の
-  // onDidChangeViewState から送る。「ライブ操作」タブが表示中かは別軸で、
-  // webview 側 main.js が両方の AND で判定する(対向: src/webview/monitor/liveTab.js の setLiveVisible)。
-  | { readonly type: "panelVisible"; readonly visible: boolean };
+  // ---- グリッドビューのライブ操作 -----------------------------------------------------------
+  // グリッドビュー向けの封筒(host 側は src/liveTabHost.ts → monitorLiveController.ts、
+  // webview 側は src/webview/monitor/gridLiveControls.js の applyGridLiveMessage)。
+  | { readonly type: "live"; readonly message: LiveToWebviewMessage };
 
 /** デバイスの一覧は表示フィルタを**畳まずに**送る(`filter` を添えて webview に判断させる) ——
  * run ボードのツリーは「起動中のデバイス」で消してはいけないため。toWebviewMessage は
@@ -668,25 +645,10 @@ export type MonitorFromWebviewMessage =
       readonly serial?: string;
       readonly registered?: boolean;
     }
-  // デバイスタイル右クリック「ライブ操作」: 「ライブ操作」タブへ切り替えて id のデバイスを
-  // 選択させる(受け手: monitorPanel.ts → LiveTabHost の openForDevice)。
-  // remote: **他の機械のタイル**のときだけ付く(そのデバイスはこの Mac の list-devices に居ないので、
-  // 開くのに要る属性をタイルから運ぶ。LiveTabHost.openForDevice → registerRemoteDevice)
-  | {
-      readonly type: "openLiveForDevice";
-      readonly id: string;
-      readonly remote?: {
-        readonly machine: string;
-        readonly name: string;
-        readonly platform: MonitorPlatform;
-        readonly state: MonitorDevice["state"];
-        readonly kind: MonitorDevice["kind"];
-        readonly udid?: string;
-        readonly serial?: string;
-      };
-    }
   // グリッドビュー(1台だけ選択したときの拡大表示)のツールバー・修飾キー操作(送り手: gridLiveControls.js、
-  // 受け手: monitorPanel.ts → LiveTabHost の gridAction)。remote は openLiveForDevice と同じ
+  // 受け手: monitorPanel.ts → LiveTabHost の gridAction)。
+  // remote: **他の機械のタイル**のときだけ付く(そのデバイスはこの Mac の list-devices に居ないので、
+  // 開くのに要る属性をタイルから運ぶ。LiveTabHost.gridAction → registerRemoteDevice)
   | {
       readonly type: "gridLiveAction";
       readonly id: string;
@@ -878,9 +840,8 @@ export type MonitorFromWebviewMessage =
   | { readonly type: "nameInputConfirm"; readonly id: number; readonly name: string }
   | { readonly type: "nameInputCancel"; readonly id: number }
   // 設定タブの「ポーリングモードを使用する」チェックボックス変更(settingsTab.js)。true でストリーミングを
-  // 止めてポーリングへ強制する(iOS/Android・「ライブ操作」タブ/デバイスタイル共通)。monitorPanel.ts が
-  // workspaceState へ永続化し、対の "pollingMode" メッセージで即時反映する(LiveTabHost は
-  // isPollingMode() で毎回読み直すため、この即時反映の対象はデバイスタイルのみ)。
+  // 止めてポーリングへ強制する(iOS/Android 共通)。monitorPanel.ts が
+  // workspaceState へ永続化し、対の "pollingMode" メッセージで即時反映する。
   | { readonly type: "setPollingMode"; readonly value: boolean }
   // 設定タブの容量表示チェックボックス変更(settingsTab.js)。monitorPanel.ts が workspaceState へ永続化し、
   // 対の "showMachineCapacity" で即時反映する
@@ -961,19 +922,15 @@ export type MonitorFromWebviewMessage =
   // パネル再作成時に "showStreamDuringRun" メッセージで復元する。
   | { readonly type: "setShowStreamDuringRun"; readonly value: boolean }
   // webview 側 WebCodecs が未対応/デコード失敗したときに1回送られてくる(受け手: monitorPanel.ts の
-  // codecError ハンドラ→monitorDeviceStreamController.fallbackToMjpeg/monitorLiveController.fallbackToMjpeg)。
-  // scope="tile" は device 必須(対象タイルを1つ特定するため)、scope="live" は選択中デバイスに
-  // 一律適用するため device 不要。
-  | { readonly type: "codecError"; readonly scope: "tile" | "live"; readonly device?: string }
+  // codecError ハンドラ→monitorDeviceStreamController.fallbackToMjpeg)。device は対象タイルを1つ特定するため必須。
+  | { readonly type: "codecError"; readonly scope: "tile"; readonly device: string }
   // webview がストリーム由来フレーム(h264 デコード成功 or stream:true の mjpeg)を描画できた ack
   // (deviceTiles.js が2秒スロットリングで送る)。受け手: monitorPanel.ts →
   // monitorDeviceStreamController.noteStreamRendered。これが届くまでポーリングは間引かれない
   | { readonly type: "streamRendered"; readonly device: string }
   // キーフレーム未受信のままデルタチャンクが流れ続けている(初期キーフレームの取り逃し)。受け手:
-  // monitorPanel.ts。scope="tile"(既定・device 必須)→ monitorDeviceStreamController.restartDevice、
-  // scope="live"(選択中デバイス一律・device 不要)→ monitorLiveController.restartStream。
-  // どちらもヘルパー再起動で新キーフレームを得る。
-  | { readonly type: "streamStall"; readonly scope?: "tile" | "live"; readonly device?: string }
+  // monitorPanel.ts → monitorDeviceStreamController.restartDevice(ヘルパー再起動で新キーフレームを得る)。
+  | { readonly type: "streamStall"; readonly scope?: "tile"; readonly device: string }
   // ---- 録画タブ ---------------------------------------------------------------------------
   | { readonly type: "recordingsRefresh" }
   // project = 名前: 「(すべて)」を解除して設定 fleetest.project を書き換える。
@@ -987,11 +944,7 @@ export type MonitorFromWebviewMessage =
   // ---- ダッシュボードタブ -------------------------------------------------------------------
   // dashboardModel.ts の DashboardFromWebviewMessage をそのまま運ぶ封筒(上の
   // MonitorToWebviewMessage の "dashboard" 型と対)。
-  | { readonly type: "dashboard"; readonly message: DashboardFromWebviewMessage }
-  // ---- ライブ操作タブ -----------------------------------------------------------------------
-  // liveModel.ts の LiveFromWebviewMessage をそのまま運ぶ封筒(上の MonitorToWebviewMessage の
-  // "live" 型と対。host 側は src/liveTabHost.ts の handleWebviewMessage)。
-  | { readonly type: "live"; readonly message: LiveFromWebviewMessage };
+  | { readonly type: "dashboard"; readonly message: DashboardFromWebviewMessage };
 
 /**
  * runProfileDevicesSync の add[] 1件(RunProfileDeviceAddEntry)の検証。name の空文字は不正。
@@ -1120,8 +1073,6 @@ export function isMonitorFromWebviewMessage(value: unknown): value is MonitorFro
         (value.serial === undefined || typeof value.serial === "string") &&
         (value.registered === undefined || typeof value.registered === "boolean")
       );
-    case "openLiveForDevice":
-      return typeof value.id === "string" && value.id !== "" && (value.remote === undefined || isLiveRemoteTarget(value.remote));
     case "gridLiveAction":
       return (
         typeof value.id === "string" && value.id !== "" && isGridLiveAction(value.action) &&
@@ -1359,16 +1310,11 @@ export function isMonitorFromWebviewMessage(value: unknown): value is MonitorFro
     case "setShowStreamDuringRun":
       return typeof value.value === "boolean";
     case "codecError":
-      return (
-        (value.scope === "tile" || value.scope === "live") &&
-        (value.device === undefined || typeof value.device === "string") &&
-        (value.scope !== "tile" || typeof value.device === "string")
-      );
+      return value.scope === "tile" && typeof value.device === "string";
     case "streamRendered":
       return typeof value.device === "string" && value.device !== "";
     case "streamStall":
-      // scope="live" は device 不要(選択中デバイスに一律)。それ以外(tile/未指定)は device 必須
-      return value.scope === "live" || (typeof value.device === "string" && value.device !== "");
+      return (value.scope === undefined || value.scope === "tile") && typeof value.device === "string" && value.device !== "";
     case "recordingsRefresh":
       return true;
     case "recordingsSelectProject":
@@ -1378,8 +1324,6 @@ export function isMonitorFromWebviewMessage(value: unknown): value is MonitorFro
       return typeof value.project === "string" && value.project !== "" && typeof value.runID === "string" && value.runID !== "";
     case "dashboard":
       return isDashboardFromWebviewMessage(value.message);
-    case "live":
-      return isLiveFromWebviewMessage(value.message);
     default:
       return false;
   }

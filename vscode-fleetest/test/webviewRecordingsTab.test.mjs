@@ -2,7 +2,7 @@
 // デバイスモニターパネル「録画」タブの webview を実 HTML+実バンドルで動かす DOM E2E(jsdom)。
 // renderHtml(monitorHtml.ts)を vscode スタブ付きでオンザフライ bundle して HTML を生成し、
 // src/webview/monitor/main.js も esbuild(write:false)で bundle して window.eval で実行する
-// (test/webviewLiveDrag.test.mjs と同じ方式)。
+// (test/webviewGridLiveControls.test.mjs と同じ方式)。
 //
 // jsdom の HTMLMediaElement は再生を実装しない(load/play/pause は no-op スタブへ差し替える。
 // loadedmetadata は発火しないため、動画切替の検証は同期的に反映される video.src の変化で行う)。

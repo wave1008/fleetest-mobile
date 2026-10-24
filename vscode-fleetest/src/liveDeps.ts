@@ -5,22 +5,12 @@
 import type * as vscode from "vscode";
 import type { FleetestConfig } from "./config";
 import type { LiveToWebviewEnvelope } from "./liveModel";
-import type { MonitorToWebviewMessage } from "./monitorModel";
 
 export interface LiveDeps {
   readonly workspaceRoot: string;
   getConfig(): FleetestConfig;
   readonly outputChannel: vscode.OutputChannel;
-  post(
-    message: LiveToWebviewEnvelope | Extract<MonitorToWebviewMessage, { readonly type: "liveH264Chunk" }>,
-  ): void;
+  post(message: LiveToWebviewEnvelope): void;
   /** パネルが開いているか。scheduleServeRestart() の5秒後再起動タイマーが使う。 */
   isPanelActive(): boolean;
-  /** 設定タブの「ポーリングモードを使用する」現在値(デバイスモニターと workspaceState を共有)。 */
-  isPollingMode(): boolean;
-  /** 生成したソース(絶対パス)をパネルの隣の列に開く(レコーディング→gen-scenario 完了時に使う)。 */
-  openGeneratedDocument(filePath: string): void;
-  /** ライブ操作の配信先(手元の iOS udid / Android serial。止めたら undefined)が変わった。
-   * タイル側がその1台の配信を畳むために使う(同じデバイスに配信を2本重ねない) */
-  onStreamKeyChanged(key: string | undefined): void;
 }

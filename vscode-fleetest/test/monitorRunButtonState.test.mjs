@@ -50,7 +50,7 @@ test("コマンドが失敗しても実行中表示を戻す", async () => {
 
 test("run が走って終わったときも最後は実行中表示が戻っている(false の再送は冪等)", async () => {
   const { panel, runActiveStates } = makePanel(async (p) => {
-    p.handleBusMessage({ type: "runStarted", runId: 1, isDryRun: false, liveFollow: false });
+    p.handleBusMessage({ type: "runStarted", runId: 1, isDryRun: false });
     p.handleBusMessage({ type: "runEnded", runId: 1 });
   });
   await panel.startTestRunAfterDevicesUp();
@@ -60,7 +60,7 @@ test("run が走って終わったときも最後は実行中表示が戻って�
 
 test("コマンドが戻った時点で別の run(Test Explorer から)が走っていれば戻さない", async () => {
   const { panel } = makePanel(async (p) => {
-    p.handleBusMessage({ type: "runStarted", runId: 2, isDryRun: false, liveFollow: false });
+    p.handleBusMessage({ type: "runStarted", runId: 2, isDryRun: false });
   });
   await panel.startTestRunAfterDevicesUp();
   assert.equal(panel.testRunActive, true);
@@ -75,7 +75,7 @@ test("モニター再起動: 固まった実行中表示を実体(run も起動�
 
 test("モニター再起動: run が走っている間は実行中のまま", () => {
   const { panel, runActiveStates } = makePanel(async () => {});
-  panel.handleBusMessage({ type: "runStarted", runId: 1, isDryRun: false, liveFollow: false });
+  panel.handleBusMessage({ type: "runStarted", runId: 1, isDryRun: false });
   panel.handleWebviewMessage({ type: "restartMonitor" });
   assert.deepEqual(runActiveStates(), [true, true]);
 });

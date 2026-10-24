@@ -45,8 +45,6 @@ export function renderHtml(webview: vscode.Webview, extensionUri: vscode.Uri): s
 
   ${renderDevicesPanel()}
 
-  ${renderLivePanel()}
-
   ${renderProfilesPanel()}
 
   ${renderRecordingsPanel()}
@@ -77,11 +75,10 @@ function renderTabBar(): string {
   return `<div id="tabbar" role="tablist">
     <button id="tab-dashboard" class="tab-button" type="button" role="tab" aria-selected="false" aria-controls="panel-dashboard">${t("panels.tabs.dashboard")}</button>
     <button id="tab-devices" class="tab-button active" type="button" role="tab" aria-selected="true" aria-controls="panel-devices">${t("panels.tabs.testRun")}</button>
-    <button id="tab-live" class="tab-button" type="button" role="tab" aria-selected="false" aria-controls="panel-live" style="display: none;">${t("panels.tabs.live")}<span id="tab-live-close" class="tab-close" role="button" title="${t("panels.tabs.close")}" aria-label="${t("panels.tabs.close")}">×</span></button>
     <button id="tab-recordings" class="tab-button" type="button" role="tab" aria-selected="false" aria-controls="panel-recordings">${t("panels.tabs.recordings")}</button>
     <button id="tab-profiles" class="tab-button" type="button" role="tab" aria-selected="false" aria-controls="panel-profiles">${t("panels.tabs.profiles")}</button>
     <button id="tab-settings" class="tab-button" type="button" role="tab" aria-selected="false" aria-controls="panel-settings">${t("panels.tabs.settings")}</button>
-    <!-- tab-live / tab-processes は起動時は出さない(tabs.js の HIDDEN_AT_STARTUP。開くと現れる) -->
+    <!-- tab-processes は起動時は出さない(tabs.js の HIDDEN_AT_STARTUP。開くと現れる) -->
     <button id="tab-processes" class="tab-button" type="button" role="tab" aria-selected="false" aria-controls="panel-processes" style="display: none;">${t("panels.tabs.processes")}<span id="tab-processes-close" class="tab-close" role="button" title="${t("panels.tabs.close")}" aria-label="${t("panels.tabs.close")}">×</span></button>
     <!-- 更新があるときだけ現れるボタン(タブの並びの直後。タブに関係なく常に見える)。
          押すと設定タブへ切り替える。対向: settingsTab.js -->
@@ -449,7 +446,7 @@ function renderDevicesPanel(): string {
       <div id="preview-grid" class="lanes-grid"></div>
       <div id="preview-empty" class="pane-empty">${t("panels.devices.selectDevices")}</div>
       <!-- グリッドビューのライブ操作。**1台だけ選択したときだけ** gridLiveControls.js が拡大表示の下へ移し、
-           それ以外はこの置き場(非表示)へ戻す。ボタンの文言・説明はライブ操作タブと同じキー -->
+           それ以外はこの置き場(非表示)へ戻す。 -->
       <div id="grid-live-parking" hidden>
         <div id="grid-live-controls" class="grid-live-controls">
           <!-- 縦のカラム = 3段(上: 戻る / 中: デバイス操作のグループ = 上下中央 / 下: 失敗の文言)。style.css の .grid-live-controls -->
@@ -465,22 +462,24 @@ function renderDevicesPanel(): string {
             <button id="grid-live-btn-zoom-out" class="secondary" type="button" title="${t("panels.live.zoomOutTitle")}">${t("panels.live.zoomOutButton")}</button>
             <button id="grid-live-btn-fold" class="secondary" type="button" data-fold="fold" hidden title="${t("panels.live.foldTitle")}">${t("panels.live.foldButton")}</button>
             <button id="grid-live-btn-unfold" class="secondary" type="button" data-fold="unfold" hidden title="${t("panels.live.unfoldTitle")}">${t("panels.live.unfoldButton")}</button>
-            <!-- 押せない表示灯(Shift を押している間だけ点く)。ライブ操作タブの #live-trace-indicator と同じ -->
+            <!-- 押せない表示灯(ダブルタップ = Command、軌跡 = Option を押している間だけ点く)。-->
+            <span id="grid-live-doubletap-indicator" class="trace-indicator"
+              title="${t("panels.live.doubleTapModeTitle")}">${t("panels.live.doubleTapModeButton")}</span>
             <span id="grid-live-trace-indicator" class="trace-indicator"
               title="${t("panels.live.traceModeTitle")}">${t("panels.live.traceModeButton")}</span>
-            <span class="screenshot-hint" title="${t("panels.devices.gridGestureHintTitle")}">${t("panels.live.gestureHint")}</span>
           </div>
           <div class="grid-live-bottom">
             <div id="grid-live-error" class="grid-live-error"></div>
           </div>
         </div>
         <!-- 入力するテキスト。1台表示のとき gridLivePanel.js が拡大表示の絵のすぐ下(.lane-preview-frame の直後)へ移す
-             (ユーザー決定)。文言はライブ操作タブと同じキー -->
+             (ユーザー決定)。 -->
         <div id="grid-live-type-row" class="grid-live-type-row">
           <input id="grid-live-type-text" type="text" placeholder="${t("panels.live.typeTextPlaceholder")}">
         </div>
-        <!-- 1台表示のとき gridLivePanel.js が .lane-pair の中の操作カラムの右隣へ移す(要素一覧・入力するテキスト・操作記録)。
-             文言はライブ操作タブと同じキー。インストール・レコーディング・アプリを起動は置かない -->
+        <!-- 1台表示のとき gridLivePanel.js が .lane-pair の中の操作カラムの右隣へ移す(要素一覧・入力するテキスト・操作記録)。 -->
+        <!-- 操作パネルと実行ログの複製の間の区切り(gridLivePanel.js が操作パネルの直後へ移す。ドラッグで幅の割合を変える) -->
+        <div id="grid-live-panel-splitter" class="splitter splitter-vertical grid-live-panel-splitter" title="${t("panels.live.panelSplitterTitle")}"></div>
         <div id="grid-live-panel" class="grid-live-panel">
           <div class="grid-live-elements-section">
             <div class="elements-header">
@@ -516,121 +515,6 @@ function renderDevicesPanel(): string {
            書くと畳みの規則に勝ってしまう -->
       <div id="lanes-empty" class="pane-empty">${t("panels.devices.selectDevices")}</div>
     </div>
-  </div>`;
-}
-
-/** 「ライブ操作」タブ。id は liveTab.js が参照するため変更しないこと。挙動は
- * monitorLiveController.ts / src/liveTabHost.ts / src/webview/monitor/liveTab.js が持つ。 */
-function renderLivePanel(): string {
-  return `<div id="panel-live" class="tab-panel" role="tabpanel" aria-labelledby="tab-live" style="display: none;">
-    <div class="toolbar">
-      <label for="live-device-select">${t("panels.common.deviceLabelColon")}</label>
-      <select id="live-device-select"></select>
-      <button id="live-btn-refresh-devices" class="secondary">${t("panels.common.refreshDeviceList")}</button>
-      <span id="live-device-warning"></span>
-      <span id="live-busy-label"></span>
-    </div>
-    <div class="toolbar live-record-row">
-      <label for="live-app-profile-select">${t("panels.live.appProfileLabelColon")}</label>
-      <select id="live-app-profile-select" title="${t("panels.common.appProfile")}"></select>
-    </div>
-    <div class="toolbar live-app-profile-detail" id="live-app-profile-detail">
-      <span class="app-profile-detail-field"><span class="app-profile-detail-label">${t("panels.appProfile.displayNameLabel")}:</span> <span id="live-app-profile-name" class="app-profile-detail-value">—</span></span>
-      <span class="app-profile-detail-field"><span class="app-profile-detail-label">${t("panels.appProfile.appIdLabel")}:</span> <span id="live-app-profile-bundle" class="app-profile-detail-value">—</span></span>
-      <span class="app-profile-detail-field app-profile-detail-path"><span class="app-profile-detail-label">${t("panels.appProfile.packagePathLabel")}:</span> <span id="live-app-profile-path" class="app-profile-detail-value">—</span></span>
-      <button id="live-btn-install" class="secondary" title="${t("panels.live.installButtonTitle")}" disabled>${t("panels.live.installButton")}</button>
-    </div>
-    <div class="toolbar live-record-actions">
-      <button id="live-btn-record">${t("panels.live.startRecording")}</button>
-      <button id="live-btn-launch" class="secondary" title="${t("panels.live.launchButtonTitle")}" disabled>${t("panels.live.launchButton")}</button>
-      <label id="live-boxes-toggle" class="profile-label header-toggle elements-header-toggle"><input id="live-show-boxes" type="checkbox" class="toggle-switch" role="switch">${t("panels.live.showBoxes")}</label>
-      <span id="live-record-status" class="live-record-status"></span>
-    </div>
-    <div id="live-banner" class="banner"></div>
-    <div id="live-action-error" class="banner"><span id="live-action-error-text" class="banner-text"></span><button id="live-action-error-copy" class="banner-copy" type="button"></button></div>
-    <!-- CLI(ApiLiveCommand.swift)の snapshot.notes(鮮度警告等)。エラーと見分けが付くよう
-         action-error とは別要素・警告色にする。本文は CLI が英語で作るので訳さない(枠のラベルのみ訳す)。 -->
-    <div id="live-stale-notice"><span id="live-stale-notice-label">${t("panels.live.staleNoticeLabel")}</span> <span id="live-stale-notice-text"></span></div>
-
-    <div class="content">
-      <!-- awaiting-image: 絵が1枚も来ていない間(placeholder 表示中)のレイアウト。liveTab.js の hidePlaceholder が外す -->
-      <div class="screenshot-pane awaiting-image" id="live-screenshot-pane">
-        <!-- 画像スロット。内容フィットで画像実寸に縮み pane 上端に付く。liveTab.js の fitScreenshot が
-             pane 実測高から actions/gap を引いた残りを #live-screenshot の max-height に反映する。 -->
-        <div class="screenshot-frame" id="live-screenshot-frame">
-          <div class="screenshot-wrap" id="live-screenshot-wrap" title="${t("panels.live.gestureHintTitle")}">
-            <img id="live-screenshot" alt="${t("panels.live.screenshotAlt")}">
-            <svg id="live-boxes-overlay" aria-hidden="true"></svg>
-            <div id="live-hover-box"></div>
-            <svg id="live-drag-overlay" aria-hidden="true"><line id="live-drag-line"/><polyline id="live-drag-trace"/><circle id="live-drag-start" r="6"/></svg>
-            <div id="live-screenshot-placeholder">${t("panels.live.screenshotPlaceholder")}</div>
-            <div id="live-conn-overlay">
-              <div class="conn-title">${t("panels.live.connectionErrorTitle")}</div>
-              <div class="conn-note">${t("panels.live.connectionErrorNote")}</div>
-              <div id="live-conn-detail"></div>
-            </div>
-            <!-- ブリッジの自動起動が進行中(bridgeStarting)の間だけ出す中立表示。conn-overlay(エラー)
-                 とは別要素 —— starting はまだエラーではない(monitorLiveController.ts の
-                 applyBridgeStarting)。文言は固定(host 側 t() で描画済み)なので webview は
-                 .visible の付け外しだけ行う -->
-            <div id="live-connecting-overlay">
-              <div id="live-connecting-spinner"></div>
-              <div id="live-connecting-message">${t("panels.live.connectingMessage")}</div>
-            </div>
-            <div id="live-busy-overlay">
-              <div id="live-busy-spinner"></div>
-              <div id="live-busy-message"></div>
-            </div>
-          </div>
-        </div>
-        <div class="screenshot-actions" id="live-screenshot-actions">
-          <button id="live-btn-home" class="secondary" title="${t("panels.live.homeButtonTitle")}">${t("panels.live.homeButton")}</button>
-          <button id="live-btn-app-switcher" class="secondary" title="${t("panels.live.appSwitcherTitle")}">${t("panels.live.appSwitcherButton")}</button>
-          <button id="live-btn-zoom-in" class="secondary" title="${t("panels.live.zoomInTitle")}">${t("panels.live.zoomInButton")}</button>
-          <button id="live-btn-zoom-out" class="secondary" title="${t("panels.live.zoomOutTitle")}">${t("panels.live.zoomOutButton")}</button>
-          <!-- 折りたためる端末(モニターの devices[].foldable)のときだけ出す(foldButtons.js) -->
-          <button id="live-btn-fold" class="secondary" data-fold="fold" hidden title="${t("panels.live.foldTitle")}">${t("panels.live.foldButton")}</button>
-          <button id="live-btn-unfold" class="secondary" data-fold="unfold" hidden title="${t("panels.live.unfoldTitle")}">${t("panels.live.unfoldButton")}</button>
-          <!-- 押せない表示灯。Shift を押している間だけ点く(= 今ドラッグすると軌跡モード)。liveTab.js の setTraceIndicator -->
-          <span id="live-trace-indicator" class="trace-indicator"
-            title="${t("panels.live.traceModeTitle")}">${t("panels.live.traceModeButton")}</span>
-          <!-- 修飾キーの割り当ては UI に出さないと誰も気付かない(README だけでは届かない)。
-               全体の割り当ては画面領域の tooltip(gestureHintTitle)にも同じものを出す -->
-          <span id="live-gesture-hint" class="screenshot-hint" title="${t("panels.live.gestureHintTitle")}">${t("panels.live.gestureHint")}</span>
-        </div>
-      </div>
-
-      <div class="splitter splitter-vertical" id="live-screen-splitter" title="${t("panels.live.screenSplitterTitle")}"></div>
-
-      <div class="control-pane">
-        <div class="live-lists">
-          <div class="live-elements-section" id="live-elements-section">
-            <div class="elements-header">
-              <span>${t("panels.live.elementsHeader")}</span>
-              <button id="live-btn-refresh-snapshot" class="secondary" title="${t("panels.live.refreshSnapshotTitle")}">${t("panels.live.refreshSnapshot")}</button>
-            </div>
-            <div id="live-elements-list" class="elements-list"></div>
-            <div class="row live-type-row">
-              <input id="live-type-text" type="text" placeholder="${t("panels.live.typeTextPlaceholder")}">
-            </div>
-          </div>
-          <div class="splitter" id="live-lists-splitter" title="${t("panels.live.listsSplitterTitle")}"></div>
-          <div class="live-oplog-section">
-            <div class="oplog-header">
-              <span>${t("panels.live.oplogHeader")}</span>
-              <button id="live-btn-oplog-clear" class="secondary" type="button">${t("panels.live.oplogClear")}</button>
-            </div>
-            <div id="live-oplog-list" class="oplog-list"></div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- ライブ操作の画像上で右クリック。開始/終了の活性は liveTab.js が録画状態に応じて切替(#live-btn-record と同ロジック)。 -->
-  <div id="live-record-menu" class="device-op-menu" role="menu">
-    <button id="live-record-menu-start" class="device-op-menu-item" type="button" role="menuitem">${t("panels.live.startRecording")}</button>
-    <button id="live-record-menu-stop" class="device-op-menu-item" type="button" role="menuitem">${t("panels.live.stopRecording")}</button>
   </div>`;
 }
 
@@ -1181,15 +1065,14 @@ function renderDeviceOpMenu(): string {
   return `<!-- アイコンはcodicon "vm-running"/"play"/"debug-stop"のインラインSVG。
        #device-op-menu-itemはup/down両方のアイコンを持ち、data-op(deviceTiles.jsが設定)でCSS表示切替。 -->
   <div id="device-op-menu" class="device-op-menu" role="menu">
-    <button id="device-op-menu-live" class="device-op-menu-item" type="button" role="menuitem"><svg class="op-icon" width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" clip-rule="evenodd" d="M6.607 14C6.79 14.357 7.017 14.689 7.275 15H3.5C3.224 15 3 14.776 3 14.5C3 14.224 3.224 14 3.5 14H5V12H3C1.895 12 1 11.105 1 10V3C1 1.895 1.895 1 3 1H13C14.105 1 15 1.895 15 3V7.293C14.69 7.036 14.357 6.816 14 6.633V3C14 2.448 13.552 2 13 2H3C2.448 2 2 2.448 2 3V10C2 10.552 2.448 11 3 11H6.024C5.994 11.332 6.004 11.666 6.034 12H6V14H6.607ZM16 11.5C16 12.39 15.736 13.26 15.242 14C14.748 14.74 14.045 15.317 13.222 15.657C12.4 15.998 11.495 16.087 10.622 15.913C9.749 15.739 8.947 15.311 8.318 14.681C7.689 14.052 7.26 13.25 7.086 12.377C6.912 11.504 7.001 10.599 7.342 9.777C7.683 8.955 8.259 8.252 8.999 7.757C9.739 7.264 10.609 7 11.499 7C12.692 7 13.837 7.474 14.681 8.318C15.525 9.162 16 10.307 16 11.5ZM13.97 11.499C13.97 11.41 13.946 11.323 13.901 11.246C13.856 11.17 13.791 11.106 13.713 11.063L10.743 9.413C10.667 9.371 10.581 9.349 10.494 9.35C10.407 9.351 10.322 9.375 10.247 9.419C10.171 9.463 10.109 9.526 10.066 9.602C10.023 9.677 10 9.763 10 9.85V13.15C10 13.237 10.023 13.322 10.066 13.398C10.11 13.474 10.172 13.537 10.247 13.581C10.322 13.625 10.407 13.649 10.494 13.65C10.581 13.65 10.667 13.629 10.743 13.587L13.713 11.937C13.791 11.892 13.856 11.829 13.901 11.752C13.946 11.676 13.97 11.588 13.97 11.499Z"/></svg><span>${t("panels.deviceMenu.liveControl")}</span></button>
+    <!-- 右クリックしたタイルがあるときだけ deviceTiles.js が表示する -->
+    <button id="device-op-menu-select-only" class="device-op-menu-item" type="button" role="menuitem"><svg class="op-icon" width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M2 2h12v12H2V2zm1 1v10h10V3H3z"/><path d="M5 5h6v6H5V5z"/></svg><span>${t("panels.deviceMenu.selectOnlyThis")}</span></button>
     <button id="device-op-menu-item" class="device-op-menu-item" type="button" role="menuitem"><svg class="op-icon op-icon-up" width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M4.74514 3.06414C4.41183 2.87665 4 3.11751 4 3.49993V12.5002C4 12.8826 4.41182 13.1235 4.74512 12.936L12.7454 8.43601C13.0852 8.24486 13.0852 7.75559 12.7454 7.56443L4.74514 3.06414ZM3 3.49993C3 2.35268 4.2355 1.63011 5.23541 2.19257L13.2357 6.69286C14.2551 7.26633 14.2551 8.73415 13.2356 9.30759L5.23537 13.8076C4.23546 14.37 3 13.6474 3 12.5002V3.49993Z"/></svg><svg class="op-icon op-icon-down" width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M12.5 3.5V12.5H3.5V3.5H12.5ZM12.5 2H3.5C2.672 2 2 2.672 2 3.5V12.5C2 13.328 2.672 14 3.5 14H12.5C13.328 14 14 13.328 14 12.5V3.5C14 2.672 13.328 2 12.5 2Z"/></svg><span id="device-op-menu-item-label"></span></button>
     <!-- CPU 描画フォールバックを解除して host GPU で再起動。deviceTiles.js が CPU バッジのタイルでのみ表示。 -->
     <button id="device-op-menu-gpu" class="device-op-menu-item" type="button" role="menuitem"><svg class="op-icon" width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M4.681 3H2V2h3.5l.5.5V6H5V4a5 5 0 1 0 4.53-.635l.418-.909A6 6 0 1 1 4.681 3z"/></svg><span>${t("panels.deviceMenu.restartWithGpu")}</span></button>
     <!-- ここから下はデバイスに紐づかない項目(空きエリアの右クリックでも出る)。区切りは
          上のデバイス項目が1つでも出ているときだけ deviceTiles.js が表示する。 -->
     <div id="device-op-menu-sep" class="device-op-menu-sep"></div>
-    <!-- 右クリックしたタイルがあるときだけ deviceTiles.js が表示する -->
-    <button id="device-op-menu-select-only" class="device-op-menu-item" type="button" role="menuitem"><svg class="op-icon" width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M2 2h12v12H2V2zm1 1v10h10V3H3z"/><path d="M5 5h6v6H5V5z"/></svg><span>${t("panels.deviceMenu.selectOnlyThis")}</span></button>
     <button id="device-op-menu-select-all" class="device-op-menu-item" type="button" role="menuitem"><svg class="op-icon" width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M2 2h12v12H2V2zm1 1v10h10V3H3z"/><path d="M6.9 11.2 4 8.3l.7-.7 2.2 2.2 4.4-4.4.7.7-5.1 5.1z"/></svg><span>${t("panels.deviceMenu.selectAll")}</span></button>
     <button id="device-op-menu-deselect-all" class="device-op-menu-item" type="button" role="menuitem"><svg class="op-icon" width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M2 2h12v12H2V2zm1 1v10h10V3H3z"/></svg><span>${t("panels.deviceMenu.deselectAll")}</span></button>
   </div>`;

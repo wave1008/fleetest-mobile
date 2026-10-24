@@ -9,7 +9,6 @@
 // 委譲する(詳細は executeDebugRun 参照)。結果はカスタムイベント `fleetest.scenarioFinished`
 // (debugAdapter.ts が中継)を購読して run.passed/failed に反映する。
 
-import * as fs from "node:fs";
 import * as path from "node:path";
 import { spawn } from "node:child_process";
 import * as vscode from "vscode";
@@ -20,7 +19,6 @@ import { resolveEntryAtCursor, truncateForStatusBar, type TreeItemEntry } from "
 import { checkForDyldLaunchFailure } from "./dyldLaunchNotice";
 import { t } from "./i18n";
 import { lastResultsDir, lookupKey, readFailedScenarioIds } from "./lastResults";
-import type { LiveRunTarget } from "./liveRunTarget";
 import { runOneShot } from "./oneShotCli";
 import { decideRemoteCompat, hasXcodeSelectionError, type RemoteCompatMachine, type RemoteCompatReport } from "./remoteCompatGate";
 import { findLatestReport, listRecentReports, reportsDir } from "./scenarioReports";
@@ -114,9 +112,6 @@ export function registerRunHandler(
   // GUI 実行(実行/デバッグ)が終わるたびに実行対象シナリオIDを渡して呼ぶ(reportCodeLens.ts の
   // refresh と lastResultsSync.ts の absorb 用。last-results が変化し得るタイミング)。
   onRunFinished?: (executedScenarioIds: string[]) => void,
-  // fleetest.liveControlOnRun 用: 実行(dry-run 以外)の前に「ライブ操作」タブを対象 platform の
-  // デバイスへ合わせる(liveTabHost.ts の prepareForRun)。デバッグ実行には渡さない。
-  prepareLiveForRun?: (platform: "ios" | "android") => Promise<LiveRunTarget | undefined>,
 ): void {
   const controller = testTree.controller;
 
@@ -135,7 +130,6 @@ export function registerRunHandler(
         dryRun,
         failedOnly,
         onRunFinished,
-        prepareLiveForRun,
       );
 
   // fleetest.rerunFailedTests(testing/item/context)と「失敗のみ実行」プロファイルは同じ handler を
@@ -429,46 +423,6 @@ function isExcludedFromBulk(item: vscode.TestItem): boolean {
   return item.tags.some((tag) => tag.id === DELETED_TAG_ID || tag.id === DRAFT_TAG_ID);
 }
 
-/** targets の先頭1件のファイルから @TestClass(...) の platform を読み取る(fleetest.liveControlOnRun
- * 用。実行対象は単一 platform 前提のため先頭のみで足りる)。クラス名スコープの一致を優先し、
- * 無ければファイル内最初の platform 指定にフォールバックする。読めない/見つからなければ
- * undefined(呼び出し元が既存のフォールバックへ進む)。 */
-function resolveTargetPlatform(targets: Map<string, vscode.TestItem>): "ios" | "android" | undefined {
-  const first = [...targets.entries()][0];
-  if (!first) {
-    return undefined;
-  }
-  const [id, item] = first;
-  const filePath = item.uri?.fsPath;
-  if (!filePath) {
-    return undefined;
-  }
-  try {
-    const text = fs.readFileSync(filePath, "utf8");
-    const className = id.split(".")[0] ?? "";
-    // クラス名を正規表現へ埋め込まず、@TestClass(...) 直後の class 宣言を全て列挙してから比較する
-    // (埋め込み+固定長の先読みだと、対象クラスより手前にある無関係な @TestClass の属性を誤って
-    // スコープと誤認する早期一致バグになる。日本語クラス名を含むため \w ではなく \p{L}\p{N}_ で拾う)。
-    const classRe = /@TestClass\(([^)]*)\)[\s\S]{0,300}?\bclass\s+([\p{L}\p{N}_]+)/gu;
-    let match: RegExpExecArray | null;
-    let scopedAttrs: string | undefined;
-    while ((match = classRe.exec(text))) {
-      if (match[2] === className) {
-        scopedAttrs = match[1];
-        break;
-      }
-    }
-    const scoped = scopedAttrs ? /platform:\s*"(ios|android)"/.exec(scopedAttrs)?.[1] : undefined;
-    if (scoped === "ios" || scoped === "android") {
-      return scoped;
-    }
-    const fallback = /platform:\s*"(ios|android)"/.exec(text)?.[1];
-    return fallback === "ios" || fallback === "android" ? fallback : undefined;
-  } catch {
-    return undefined;
-  }
-}
-
 /** リモート版ズレダイアログの1マシン分の値(revision 先頭7桁 / エラー / toolchain 不一致)。
  * error・revision は CLI からの英語値をそのまま出す(枠だけ ja/en。CLAUDE.md の方針)。 */
 export function formatMachineDetailValue(machine: RemoteCompatMachine): string {
@@ -551,7 +505,6 @@ async function executeRun(
   dryRun: boolean,
   failedOnly: boolean,
   onRunFinished?: (executedScenarioIds: string[]) => void,
-  prepareLiveForRun?: (platform: "ios" | "android") => Promise<LiveRunTarget | undefined>,
 ): Promise<void> {
   const config = getConfig();
   let targets = resolveTargets(controller, request);
@@ -625,47 +578,16 @@ async function executeRun(
     return;
   }
 
-  // fleetest.liveControlOnRun 用: dry-run 以外はライブ操作パネルを対象 platform のデバイスへ合わせ、
-  // 成功すればそのデバイスを直接実行対象にする(liveTarget)。platform 不明・パネル側が対象なしを
-  // 返す・機能 OFF のいずれでも liveTarget は undefined のままで、既存の分岐(下)にフォールバックする。
-  // 単一クラス実行(=全 target が同一クラス。id は "クラス名.シナリオ名"、resolveTargetPlatform と同じ抽出)
-  // のときだけライブ連動する。複数クラス(Test Explorer の一括等)は --profile 並列を優先し連動しない:
-  // liveTarget は単一デバイスで --profile と排他(下の args 分岐)のため、連動させると並列が単一に潰れる。
-  // クラス内の複数シナリオは連動対象(ユーザー決定。シナリオ数ではなくクラス数で判定)。
-  //
-  // **実行プロファイルが設定されていたら連動しない**(受け手報告の回帰)。
-  // liveTarget は --profile と排他なので、連動すると**プロファイルが黙って捨てられる**:
-  // 対象アプリが解決できず app 省略シナリオが全滅し(「no app could be resolved」)、
-  // scenarioTimeout / record / defaultTimeout も効かず、複数デバイスの並列も1台に潰れる。
-  // 下の args 分岐のコメントは元からこの条件を前提に書かれていたが、**実装だけが抜けていた**。
   let profile = config.profile.trim();
-  const singleClass = new Set([...targets.keys()].map((id) => id.split(".")[0])).size === 1;
-  let liveTarget: LiveRunTarget | undefined;
-  if (!dryRun && singleClass && profile.length === 0 && prepareLiveForRun && targets.size > 0) {
-    const platform = resolveTargetPlatform(targets);
-    if (platform) {
-      run.appendOutput(`${t("run.live.preparing")}\r\n`);
-      try {
-        liveTarget = await prepareLiveForRun(platform);
-      } catch (error) {
-        outputChannel.appendLine(
-          t("run.live.prepareFailed", {
-            message: error instanceof Error ? error.message : String(error),
-          }),
-        );
-      }
-    }
-  }
 
   // プロファイル未指定は「ブリッジを自動供給しない直接ポート接続」モードに落ちる。事前に
   // `fleetest bridge up` を回していない限り全シナリオが接続拒否で即失敗するため、走らせずに止める
   // (実害: 19 シナリオが 2 秒で全滅し、原因が設定だと分からなかった)。
-  // 除外2件: dry-run はデバイスに触れない / liveTarget はライブ操作パネルが実デバイスを解決済み。
-  // 選択肢が1つしか無ければ止めずにそれを選ぶ(ライブ連動の判定より後 = 連動の挙動は変えない)。
-  if (!dryRun && !liveTarget && profile.length === 0) {
+  // 除外: dry-run はデバイスに触れない。選択肢が1つしか無ければ止めずにそれを選ぶ。
+  if (!dryRun && profile.length === 0) {
     profile = await adoptSoleRunProfile(workspaceRoot, resolution.project, (line) => outputChannel.appendLine(line));
   }
-  if (!dryRun && !liveTarget && profile.length === 0) {
+  if (!dryRun && profile.length === 0) {
     const message = t("run.profileRequired.message");
     run.appendOutput(`${message}\r\n`);
     outputChannel.appendLine(message);
@@ -677,9 +599,9 @@ async function executeRun(
     return;
   }
 
-  // リモート機の版ズレ確認(dry-run・liveTarget は対象外。上のプロファイル必須チェックと同じ除外)。
+  // リモート機の版ズレ確認(dry-run は対象外。上のプロファイル必須チェックと同じ除外)。
   // CLI 呼び出しが失敗してもチェックだけスキップし、実行は止めない(最終ゲートはディスパッチ側に残る)。
-  if (!dryRun && !liveTarget && profile.length > 0 && config.remoteCompatCheck) {
+  if (!dryRun && profile.length > 0 && config.remoteCompatCheck) {
     let report: RemoteCompatReport | undefined;
     try {
       const result = await runOneShot(
@@ -807,20 +729,11 @@ async function executeRun(
   for (const id of targets.keys()) {
     args.push("--scenario", id);
   }
-  // --profile と --platform/--port/--serial は fleetest api run 側で同時指定不可なので、liveTarget が
-  // あれば最優先で使う(上のライブパネル連携)。無ければ既存どおり: profile が非空のときはそちらだけ、
-  // 空なら platform/port/serial を渡す。**liveTarget は profile 空のときだけ立つ**(上の連動ガード。
-  // ここの前提が実装から抜けていて、プロファイルが黙って捨てられていた時期がある)。
+  // --profile と --platform/--port/--serial は fleetest api run 側で同時指定不可なので、profile が
+  // 非空のときはそちらだけ、空なら platform/port/serial を渡す。
   // リモートディスパッチの要否は CLI 側が実行プロファイルの devices[].machine から判定する
   // (拡張は --runner 等を組み立てない)。
-  if (liveTarget) {
-    args.push("--platform", liveTarget.platform);
-    if (liveTarget.platform === "android" && liveTarget.serial) {
-      args.push("--serial", liveTarget.serial);
-    } else if (liveTarget.platform === "ios" && liveTarget.port !== undefined) {
-      args.push("--port", String(liveTarget.port));
-    }
-  } else if (profile.length > 0) {
+  if (profile.length > 0) {
     args.push("--profile", profile);
   } else {
     args.push("--platform", config.platform);
@@ -837,7 +750,7 @@ async function executeRun(
   // リモートへ出る run だけに効く(純ローカルの run では CLI が黙って無視する…のではなく
   // **ValidationError で弾く**ので、プロファイル指定があるときだけ渡す)。共有フリートでは
   // ロックの取り合いが日常になるため、既定 0(待たない)で明示的に有効化させる
-  if (config.remoteWaitLock > 0 && !liveTarget && profile.length > 0) {
+  if (config.remoteWaitLock > 0 && profile.length > 0) {
     args.push("--wait-lock", String(config.remoteWaitLock));
   }
   // --set heal=true は dry-run には付与しない(dry-run はワーカー構築自体を省略するデバイス不要の
@@ -971,8 +884,7 @@ async function executeRun(
   };
   const cancelListener = token.onCancellationRequested(cancelInvocation);
 
-  // liveFollow: liveTabHost.ts が単一クラス実行のときだけ自動追従する判定(runHandler が liveTarget を用意したか)。
-  const runId = eventBus.beginRun(dryRun, liveTarget !== undefined);
+  const runId = eventBus.beginRun(dryRun);
 
   try {
     invocation = cli.enqueue(config.binaryPath, workspaceRoot, {
@@ -1105,7 +1017,7 @@ async function executeDebugRun(
   }
 
   // プロファイル未指定で走らせない理由・除外条件は executeRun の同ガード参照
-  // (デバッグ実行に dry-run / liveTarget は無いので無条件)。
+  // (デバッグ実行に dry-run は無いので無条件)。
   let profile = config.profile.trim();
   if (profile.length === 0) {
     profile = await adoptSoleRunProfile(workspaceRoot, resolution.project);

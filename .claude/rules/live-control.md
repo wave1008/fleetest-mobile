@@ -57,6 +57,7 @@ paths:
   - "vscode-fleetest/src/*Live*.ts"
   - "vscode-fleetest/src/*live*.ts"
   - "vscode-fleetest/src/webview/**/live*"
+  - "vscode-fleetest/src/webview/**/gridLive*"
 ---
 
 # ライブ操作 の規律
@@ -65,8 +66,8 @@ CLAUDE.md から移した規則(本文は移設前と同一)。この領域の�
 
 - **ライブ操作は他の機械のデバイスも開ける**(ユーザー決定 2026-09-24「その機械で動かす」): serve を
   `fleetest remote exec <machine> -- api live serve` で**向こうに**起こす(同じ実機が Wi-Fi 越しにこの Mac から
-  見えても、USB で握っている機械のランナーと2本にしない)。右クリックの `openLiveForDevice` が machine・udid を
-  運び、一覧は取り直しても足し戻す(`remoteOptions`)。配信は張らず serve の frame で取る。
+  見えても、USB で握っている機械のランナーと2本にしない)。グリッドビューの `gridLiveAction` の `remote` が machine・udid を
+  運び、一覧は取り直しても足し戻す(`remoteOptions`)。絵はモニター自身の配信(リモート機は `api device-stream`)で取る。
   **stdin で命令を受ける子を `remote exec` で起こすとき、到達確認の ssh は `-n`**(読むと最初の命令を捨てる)。
   **ブリッジ未起動(booted)のデバイスへ切り替えたら観測を1回撃つ**(`requestOpenObservation`。自動のフレーム取得は
   自動起動を撃たない)。**前面追従の候補はシミュレータ = `launchctl list` / 実機 = devicectl の
@@ -78,7 +79,7 @@ CLAUDE.md から移した規則(本文は移設前と同一)。この領域の�
   **内側の上限が command watchdog の基準値を超えるコマンド(`Timeout.session` 45秒で撃つ launch/activate/
   appSwitcher/home/terminate/refresh/frame・その2回ぶんの clearAppData・install = 実機 devicectl の 600秒)は
   `ApiLiveServeCommand.watchdogAllowanceSeconds` でその分を watchdog に足す**(拡張側は `serveCommandAllowanceMs` が
-  launch/install を ms で持つ。片方だけ変えない)。**窓は本人確認・操作・観測をまとめて数えるので、観測を撃つ命令は
+  gesture/press/drag/pinch/fold を ms で持つ。拡張は launch/install を撃たないが、片方だけ変えない)。**窓は本人確認・操作・観測をまとめて数えるので、観測を撃つ命令は
   `observationAllowanceSeconds`(session)も足す**(窓に渡すのは和の `watchdogWindowAllowanceSeconds`)——
   猶予が無いと、内側の期限より先に watchdog が serve ごと殺す → maintainer-notes §66。
   **観測の段(前面追従・screenshot・snapshot・springboard 退避・失敗の注記)は段の数を猶予へ足さず、手前で

@@ -9,7 +9,7 @@
 import type { RunEvent } from "./model";
 
 export type RunBusMessage =
-  | { readonly type: "runStarted"; readonly runId: number; readonly isDryRun: boolean; readonly liveFollow: boolean }
+  | { readonly type: "runStarted"; readonly runId: number; readonly isDryRun: boolean }
   | { readonly type: "event"; readonly runId: number; readonly event: RunEvent }
   | { readonly type: "runEnded"; readonly runId: number; readonly resultRun?: RunResultRef };
 
@@ -33,13 +33,11 @@ export class RunEventBus {
     };
   }
 
-  /** isDryRun は healNotice.ts の HealFixCollector が dry-run 実行を除外する判定に使う。
-   * liveFollow は liveTabHost.ts が単一クラス実行のときだけライブ自動追従する判定に使う
-   * (runHandler.ts が単一デバイスの liveTarget を用意したか)。 */
-  beginRun(isDryRun = false, liveFollow = false): number {
+  /** isDryRun は healNotice.ts の HealFixCollector が dry-run 実行を除外する判定に使う。 */
+  beginRun(isDryRun = false): number {
     const runId = this.nextRunId;
     this.nextRunId += 1;
-    this.emit({ type: "runStarted", runId, isDryRun, liveFollow });
+    this.emit({ type: "runStarted", runId, isDryRun });
     return runId;
   }
 

@@ -101,7 +101,7 @@ test("選択があるとき、ログの上の右クリックは既定メニュ�
   }
 });
 
-test("拡大表示の右クリックは、タイルと同じ「ライブ操作」「停止」のメニューを出す", (t) => {
+test("拡大表示の右クリックは、タイルと同じ「停止」のメニューを出す", (t) => {
   const { window, document, sent } = createWebview();
   t.after(() => window.close());
   sendDevice(window);
@@ -113,7 +113,7 @@ test("拡大表示の右クリックは、タイルと同じ「ライブ操作�
   assert.equal(event.defaultPrevented, true);
   const menu = document.getElementById("device-op-menu");
   assert.ok(menu.classList.contains("visible"), "document の contextmenu で閉じられずに開いたまま");
-  assert.notEqual(document.getElementById("device-op-menu-live").style.display, "none");
+  assert.equal(document.getElementById("device-op-menu-live"), null, "ライブ操作の項目は無い");
   const item = document.getElementById("device-op-menu-item");
   assert.equal(item.dataset.op, "down");
 
@@ -121,11 +121,6 @@ test("拡大表示の右クリックは、タイルと同じ「ライブ操作�
   const op = sent.find((m) => m.type === "deviceOp");
   assert.equal(op.name, "Sim 1");
   assert.equal(op.op, "down");
-
-  rightClick(window, preview);
-  document.getElementById("device-op-menu-live").dispatchEvent(
-    new window.MouseEvent("click", { bubbles: true, cancelable: true }));
-  assert.equal(sent.find((m) => m.type === "openLiveForDevice").id, "ios:Sim 1");
 
   // 開いたメニューはログペインの右クリックで閉じる(document へ伝播させている)
   rightClick(window, preview);
@@ -143,7 +138,7 @@ test("選択が1台も無いとき(すべて解除)、ログの右クリック�
   const event = rightClick(window, document.getElementById("lanes-title"));
   assert.equal(event.defaultPrevented, true, "既定メニューは出さない");
   assert.ok(menu.classList.contains("visible"), "document の contextmenu で閉じられずに開いたまま");
-  for (const id of ["device-op-menu-item", "device-op-menu-live", "device-op-menu-gpu", "device-op-menu-sep",
+  for (const id of ["device-op-menu-item", "device-op-menu-gpu", "device-op-menu-sep",
     "device-op-menu-select-only", "device-op-menu-deselect-all"]) {
     assert.equal(display(document, id), "none", `${id} は出さない`);
   }

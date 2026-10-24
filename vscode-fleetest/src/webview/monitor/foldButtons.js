@@ -1,5 +1,5 @@
-// 折りたたみ機の開閉ボタン(「折りたたむ」「開く」)の出し分け。ライブ操作タブ(liveTab.js)と
-// グリッドビュー(gridLiveControls.js)が共有する。**出すのはモニターが折りたためると答えたデバイスだけ**
+// 折りたたみ機の開閉ボタン(「折りたたむ」「開く」)の出し分け。グリッドビュー(gridLiveControls.js)の
+// ツールバーが使う。**出すのはモニターが折りたためると答えたデバイスだけ**
 // (devices[].foldable === true。契約: monitorDeviceModel.ts の MonitorDevice.foldable)。
 // ボタンの DOM は monitorHtml.ts(data-fold="fold" | "unfold"・既定は hidden)。
 

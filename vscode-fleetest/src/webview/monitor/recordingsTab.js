@@ -1154,7 +1154,7 @@ document.addEventListener('keydown', (event) => {
 // px でピン止めする。ツリーとエラー一覧はともに flex:1 のまま触らない = 残り幅を常に 1:1 で
 // 等分し、表示エリアの変化にも自動追従する(ユーザー指定)。ツリー|エラー一覧間のバーは
 // 静的な仕切り(CSS .splitter-static)でドラッグ不可。
-// 動画幅は setState で同一パネル生存中は復元される。liveTab.js と同じ pointer capture 方式。
+// 動画幅は setState で同一パネル生存中は復元される。pointer capture 方式。
 
 const VIDEO_MIN_WIDTH = 200;
 // ツリー+エラー一覧の等分に最低幅(140px×2相当)を残す。

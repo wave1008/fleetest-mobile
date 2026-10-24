@@ -52,7 +52,7 @@ function createWebview(initialState) {
   const dom = new JSDOM(panelHtml, { runScripts: "outside-only", pretendToBeVisual: true, url: "https://localhost/" });
   const { window } = dom;
   const posts = [];
-  window.acquireVsCodeApi = () => ({ postMessage: (m) => posts.push(m), setState: () => {}, getState: () => initialState });
+  window.acquireVsCodeApi = () => ({ postMessage: (m) => posts.push(m), setState: (s) => { window.__state = s; }, getState: () => initialState });
   window.HTMLElement.prototype.scrollIntoView = () => {};
   window.eval(webviewBundle);
   // jsdom レルムのオブジェクトは Object.prototype が異なり deepEqual が落ちるため JSON で正規化する
@@ -156,7 +156,8 @@ test("パネルは1台選択のとき .lane-pair の中の操作カラムの右�
   assert.ok(panel.parentElement.classList.contains("lane-pair"), "1台なら .lane-pair の中");
   assert.equal(panel.previousElementSibling.id, "grid-live-controls", "操作カラムの右隣");
   assert.ok(panel.previousElementSibling.previousElementSibling.classList.contains("lane-preview"), "並びは 拡大表示 | 操作 | パネル");
-  assert.ok(panel.nextElementSibling.classList.contains("lane-log-mirror"), "実行ログの複製の手前");
+  assert.equal(panel.nextElementSibling.id, "grid-live-panel-splitter", "区切りを挟んで");
+  assert.ok(panel.nextElementSibling.nextElementSibling.classList.contains("lane-log-mirror"), "実行ログの複製の手前");
   // インストール・レコーディング・アプリを起動は置かない
   assert.equal(panel.querySelector("#live-btn-install, #live-btn-record, #live-btn-launch"), null);
   assert.ok(panel.querySelector("#grid-live-elements-list.elements-list"));
@@ -349,6 +350,83 @@ test("枠: 次の snapshot が来なくても、直接の結果から BOXES_SETT
   assert.equal(boxRects(document).length, 2, "上限で最新の木を描く");
 });
 
+// 操作の直接の結果の次の「整定後の木」は、グリッド自身が SETTLE_REFRESH_MS(700ms)後の撮り直しで取る
+// (host はタブ時代のような自動の撮り直しを撃たない)。
+const tapOnce = (window, media) => {
+  media.dispatchEvent(pointerEvent(window, "pointerdown", { x: 150, y: 150 }));
+  window.dispatchEvent(pointerEvent(window, "pointerup", { x: 150, y: 150 }));
+};
+const refreshCount = (gridActions) => gridActions().filter((m) => m.action.type === "refreshSnapshot").length;
+
+test("枠: 操作の直接の結果を受けたら 700ms 後に自分で refreshSnapshot を撃ち、届いた整定後の木で描く", async (t) => {
+  const { window, document, media, gridActions } = setupConnected(t);
+  toggleBoxes(window, document, true);
+  live(window, snapshot());
+  const before = refreshCount(gridActions);
+  tapOnce(window, media);
+  live(window, { type: "gridActionStarted", id: "d0" });
+  live(window, snapshot([ELEMENTS[1]])); // 直接の結果(遷移の途中)
+  await imageRedrawn(window, document);
+  assert.equal(refreshCount(gridActions), before, "直接の結果の時点では撃たない");
+  await sleep(400);
+  assert.equal(refreshCount(gridActions), before, "700ms 経つまでは撃たない");
+  await sleep(450);
+  assert.equal(refreshCount(gridActions), before + 1, "700ms 後に撮り直しを撃つ");
+  assert.equal(boxRects(document).length, 0, "撮り直しの結果が届くまでは描かない");
+  live(window, snapshot());
+  assert.equal(boxRects(document).length, 2, "撮り直しの木は非操作の snapshot として採り、枠を描く");
+  await sleep(900);
+  assert.equal(refreshCount(gridActions), before + 1, "撮り直しは1回だけ(撮り直しが撮り直しを呼ばない)");
+});
+
+test("枠: 整定の撮り直しの予約は、拡大表示の絵が描き替わるたびに先送りする(絵が止まってから撮る)", async (t) => {
+  const { window, document, media, gridActions } = setupConnected(t);
+  toggleBoxes(window, document, true);
+  live(window, snapshot());
+  const before = refreshCount(gridActions);
+  tapOnce(window, media);
+  live(window, { type: "gridActionStarted", id: "d0" });
+  live(window, snapshot([ELEMENTS[1]]));
+  await imageRedrawn(window, document); // 自分が出した一枚絵の読み込み(先送りの対象ではない)
+  await sleep(450);
+  imageLoaded(window, document); // 遷移の途中の描き替わり
+  await sleep(450); // 直接の結果から 900ms・最後の描き替わりから 450ms
+  assert.equal(refreshCount(gridActions), before, "絵が動いた直後なので先送りされている");
+  await sleep(350);
+  assert.equal(refreshCount(gridActions), before + 1, "最後の描き替わりから 700ms 後に撃つ");
+});
+
+test("枠: 整定の撮り直しは処理中(busy)なら終わってから撃つ", async (t) => {
+  const { window, document, media, gridActions } = setupConnected(t);
+  toggleBoxes(window, document, true);
+  live(window, snapshot());
+  const before = refreshCount(gridActions);
+  tapOnce(window, media);
+  live(window, { type: "gridActionStarted", id: "d0" });
+  live(window, snapshot([ELEMENTS[1]]));
+  await imageRedrawn(window, document);
+  live(window, { type: "busy", busy: true, observing: false }); // 別の処理が走っている
+  await sleep(900);
+  assert.equal(refreshCount(gridActions), before, "busy の間は撃たない");
+  live(window, { type: "busy", busy: false, observing: false });
+  await sleep(800);
+  assert.equal(refreshCount(gridActions), before + 1, "終わってから撃つ");
+});
+
+test("枠: 次の操作を送ると、前の操作の整定の撮り直しの予約は捨てる", async (t) => {
+  const { window, document, media, gridActions } = setupConnected(t);
+  toggleBoxes(window, document, true);
+  live(window, snapshot());
+  const before = refreshCount(gridActions);
+  tapOnce(window, media);
+  live(window, { type: "gridActionStarted", id: "d0" });
+  live(window, snapshot([ELEMENTS[1]]));
+  await imageRedrawn(window, document);
+  tapOnce(window, media); // 次の操作(まだ合図は来ていない)
+  await sleep(900);
+  assert.equal(refreshCount(gridActions), before, "前の操作の予約で撮り直さない(次の操作の結果が撮る)");
+});
+
 test("枠: 木が無いまま ON にすると撮り直しを撃ち、届いた木で描く。OFF なら描かない", (t) => {
   const { window, document, gridActions } = setupConnected(t);
   toggleBoxes(window, document, true);
@@ -412,26 +490,37 @@ test("1台表示を外れると状態を全部捨てる(枠・一覧・案内)",
   assert.equal(document.querySelector(".grid-live-boxes-overlay"), null, "オーバーレイは拡大表示から外す");
 });
 
-test("i18n: 操作パネルの文言はライブ操作タブと同じキー(見出し・更新・トグル・入力欄・操作記録)", (t) => {
+test("i18n: 操作パネルの文言(見出し・更新・トグル・入力欄・操作記録)", (t) => {
   const { window, document } = createWebview();
   t.after(() => window.close());
   const text = (selector) => panelOf(document).querySelector(selector).textContent.trim();
-  assert.equal(text(".elements-header > span"), document.querySelector("#live-elements-section .elements-header > span").textContent);
-  assert.equal(text("#grid-live-btn-refresh-snapshot"), document.getElementById("live-btn-refresh-snapshot").textContent);
+  assert.equal(text(".elements-header > span"), "要素一覧");
+  assert.equal(text("#grid-live-btn-refresh-snapshot"), "更新");
   // トグルはグリッドビューの見出し行(台数の右)に居る
-  assert.equal(document.querySelector("#grid-view-header .grid-view-boxes-toggle").textContent.trim(),
-    document.getElementById("live-boxes-toggle").textContent.trim());
-  assert.equal(text(".oplog-header > span"), document.querySelector(".oplog-header > span").textContent);
-  assert.equal(text("#grid-live-btn-oplog-clear"), document.getElementById("live-btn-oplog-clear").textContent);
-  assert.equal(document.getElementById("grid-live-type-text").placeholder, document.getElementById("live-type-text").placeholder);
+  assert.equal(document.querySelector("#grid-view-header .grid-view-boxes-toggle").textContent.trim(), "バウンディングボックスを表示");
+  assert.equal(text(".oplog-header > span"), "操作記録");
+  assert.equal(text("#grid-live-btn-oplog-clear"), "クリア");
+  assert.equal(document.getElementById("grid-live-type-text").placeholder, "入力するテキスト(Enterで送信)");
   assert.match(document.getElementById("grid-live-elements-empty").textContent, /更新/);
 });
 
-test("枠のトグルが保存値で ON のまま1台表示を開くと、木を1回取りに行き、届いたら枠を描く(OFF なら取りに行かない)", async (t) => {
-  const { window, document, gridActions } = createWebview({ gridLiveShowBoxes: true });
+test("枠のトグルは既定 OFF で、前回の ON を覚えていても OFF から始める", (t) => {
+  const { window, document } = createWebview({ gridLiveShowBoxes: true });
+  t.after(() => window.close());
+  assert.equal(document.getElementById("grid-live-show-boxes").checked, false);
+  const toggle = document.getElementById("grid-live-show-boxes");
+  toggle.checked = true;
+  toggle.dispatchEvent(new window.Event("change", { bubbles: true }));
+  assert.equal(window.__state?.gridLiveShowBoxes, undefined, "切り替えても状態に書かない");
+});
+
+test("枠のトグルが ON のまま1台表示を開くと、木を1回取りに行き、届いたら枠を描く(OFF なら取りに行かない)", async (t) => {
+  const { window, document, gridActions } = createWebview();
   t.after(() => window.close());
   sendDevices(window, 2);
-  assert.equal(document.getElementById("grid-live-show-boxes").checked, true);
+  const toggle = document.getElementById("grid-live-show-boxes");
+  toggle.checked = true;
+  toggle.dispatchEvent(new window.Event("change", { bubbles: true }));
   // 2台選択 → 絵の外側のダブルクリックで「このデバイスのみ選択」(報告された経路)
   clickTile(document, 1);
   clickTile(document, 0);
@@ -451,7 +540,7 @@ test("枠のトグルが保存値で ON のまま1台表示を開くと、木を
 });
 
 test("枠のトグルが OFF なら1台表示を開いても木を取りに行かない", async (t) => {
-  const { window, document, gridActions } = createWebview({ gridLiveShowBoxes: false });
+  const { window, document, gridActions } = createWebview();
   t.after(() => window.close());
   sendDevices(window, 1);
   clickTile(document, 0);
@@ -513,7 +602,7 @@ test("入力するテキストは拡大表示の絵のすぐ下に置き、中�
 });
 
 test("枠: 合図(gridActionStarted)より前に届いた snapshot は操作前の画面 —— 直接の結果と取り違えず、本物の結果の次で描く", async (t) => {
-  // 実際の順序: 撃つ前に host が直前の処理(ライブ操作タブの撮り直し)を待つ / 開いたときの観測を挟む
+  // 実際の順序: 撃つ前に host が直前の処理(整定の撮り直し)を待つ / 開いたときの観測を挟む
   const { window, document, media } = setupConnected(t);
   toggleBoxes(window, document, true);
   live(window, snapshot());
@@ -735,4 +824,54 @@ test("文字カーソルの点滅のように描き替わり続けても枠は�
   }
   assert.equal(minBoxes, 2, "点滅の間、枠は一度も消えない");
   assert.equal(refreshes(gridActions), before + 1, "打ち切りで1回撮り、木が同じならその後は点滅が続いても撮らない");
+});
+
+/** PointerEvent は jsdom に無いため MouseEvent に pointerId を後付けして代用する(webviewGridLiveControls.test.mjs と同じ) */
+function pointerAt(window, type, x) {
+  const event = new window.MouseEvent(type, { bubbles: true, cancelable: true, clientX: x, clientY: 10, button: 0 });
+  Object.defineProperty(event, "pointerId", { value: 1 });
+  return event;
+}
+
+test("操作パネルと実行ログの間に区切りを置き、1台表示をやめたら片付ける", (t) => {
+  const { window, document } = createWebview();
+  t.after(() => window.close());
+  sendDevices(window, 2);
+  const splitter = document.getElementById("grid-live-panel-splitter");
+  assert.equal(splitter.parentElement.id, "grid-live-parking", "1台表示でなければ表に出さない");
+  clickTile(document, 0);
+  const panel = document.getElementById("grid-live-panel");
+  assert.equal(panel.nextElementSibling, splitter, "操作パネルの直後");
+  assert.ok(splitter.nextElementSibling.classList.contains("lane-log-mirror"), "実行ログの複製の直前");
+  clickTile(document, 1);
+  assert.equal(splitter.parentElement.id, "grid-live-parking", "2台表示に戻したら片付ける");
+});
+
+test("区切りのドラッグで操作パネルの幅の割合を変え、両側の下限で止め、離したら覚える(次に開いたら戻す)", (t) => {
+  const { window, document } = createWebview();
+  t.after(() => window.close());
+  window.HTMLElement.prototype.setPointerCapture = () => {};
+  window.HTMLElement.prototype.releasePointerCapture = () => {};
+  sendDevices(window, 1);
+  clickTile(document, 0);
+  const panel = document.getElementById("grid-live-panel");
+  const splitter = document.getElementById("grid-live-panel-splitter");
+  const mirror = splitter.nextElementSibling;
+  panel.getBoundingClientRect = () => ({ width: 300 });
+  mirror.getBoundingClientRect = () => ({ width: 300 });
+  assert.equal(panel.style.flexGrow, "1", "既定は半々");
+
+  splitter.dispatchEvent(pointerAt(window, "pointerdown", 500));
+  splitter.dispatchEvent(pointerAt(window, "pointermove", 620)); // 300+120 / 600 = 0.7
+  assert.equal(Number(panel.style.flexGrow).toFixed(4), (0.7 / 0.3).toFixed(4));
+  splitter.dispatchEvent(pointerAt(window, "pointermove", 10)); // 左へ振り切る → 下限 120/600 = 0.2
+  assert.equal(Number(panel.style.flexGrow).toFixed(4), (0.2 / 0.8).toFixed(4), "下限で止める");
+  assert.equal(window.__state?.gridLivePanelRatio, undefined, "ドラッグ中は書かない");
+  splitter.dispatchEvent(pointerAt(window, "pointerup", 10));
+  assert.equal(window.__state.gridLivePanelRatio.toFixed(4), "0.2000", "離したら割合を覚える");
+
+  const reopened = createWebview({ gridLivePanelRatio: 0.25 });
+  t.after(() => reopened.window.close());
+  assert.equal(Number(reopened.document.getElementById("grid-live-panel").style.flexGrow).toFixed(4),
+    (0.25 / 0.75).toFixed(4), "覚えた割合で始める");
 });

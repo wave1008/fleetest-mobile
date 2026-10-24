@@ -22,8 +22,8 @@
 //                                                       press/drag/pinch の秒数は既定 10 秒が上限。
 //                                                       maxGestureSeconds でこの1回だけ最大60秒まで上げられる
 //   {"cmd":"gesture","fingers":[{"points":[{"x":..,"y":..,"t":..}, ...]}, ...],
-//    "maxGestureSeconds":<秒省略可>}                    **軌跡モード(ライブ操作パネルの
-//                                                        Shift+ドラッグ)専用** —— マウスの軌跡を離さず
+//    "maxGestureSeconds":<秒省略可>}                    **軌跡モード(グリッドビューの
+//                                                        Option+ドラッグ)専用** —— マウスの軌跡を離さず
 //                                                        1本のタッチとして再生する(GestureRequest と
 //                                                        同じワイヤ形。検査は FTCore.TouchGesture.validate
 //                                                        の1箇所。MCP の ft_gesture と共有)

@@ -28,8 +28,7 @@ so connect and prepare it yourself) and the app is auto-installed by the run pro
 
 **Run and Debug need a run profile** (Run (dry-run) does not). If none is selected and the project has exactly one
 run profile, that one is saved to `fleetest.profile` and the run proceeds; with two or more, the run does not start
-and shows an error with a "Select run profile" button. However, when none is selected, a single class is run, and the
-Live Control panel can provide a device (`fleetest.liveControlOnRun`), the run uses that device without a run profile.
+and shows an error with a "Select run profile" button.
 
 ## Steps View
 
@@ -86,19 +85,17 @@ is unavailable.
   shown twice.
   A column to the right of the enlarged screen then stacks **Back**, **Home**, **App Switcher**, **Zoom in** and **Zoom out** buttons, so you
   can operate that device in place (**Back** leaves the single-device view: it restores the selection you had before
-  "Select only this device", or clears the selection if there was none). On the screen, **click taps**, **Option(⌥)+click double-taps**,
-  **holding 500ms or more long-presses**, **dragging swipes** and **Shift(⇧)+drag traces the exact finger
-  path** ("Trace" lights up while Shift is held). Between the enlarged screen and the run log you get the same
-  **element list** (Refresh re-reads it; "Show bounding boxes", next to the device count in the header, overlays frames on the screen) and
-  **operation log** as the Live Control tab, and **text to type** (Enter sends) sits right below the enlarged screen. Selecting a device does not connect to it, so the
-  element list appears after your first operation or Refresh (or right away when "Show bounding boxes" is on). The operation log is kept per device.
+  "Select only this device", or clears the selection if there was none). On the screen, **click taps**, **Command(⌘)+click double-taps**,
+  **holding 500ms or more long-presses**, **dragging swipes** and **Option(⌥)+drag traces the exact finger
+  path** ("Double tap" lights up while Command is held, "Trace" while Option is held; keep holding to see its explanation). Between the enlarged screen and the run log you get the same
+  **element list** (Refresh re-reads it; "Show bounding boxes", next to the device count in the header, overlays frames on the screen;
+  long rows scroll sideways) and **operation log** (drag the border with the run log to resize them), and **text to type** (Enter sends) sits right below the enlarged screen. Selecting a device does not connect to it, so the
+  element list appears after your first operation or Refresh (or right away when "Show bounding boxes" is on; that switch starts off each time the panel opens). The operation log is kept per device.
   A double-click on the screen is two taps, so to toggle the selection
   double-click outside the screen (the device name row or the margin). On a foldable device (the iPhone Duo
-  Simulator or a foldable Android Emulator) **Fold** and **Unfold** buttons appear as well (also in the
-  Live Control tab's button row; never for physical devices).
-  These go through the same path as the Live Control tab, so if the Live Control tab had another device
-  open it switches to this one (while another device is being recorded, the switch is refused).
-- You can operate a device even while it is running a test (the Live Control tab too). Your operations interfere
+  Simulator or a foldable Android Emulator) **Fold** and **Unfold** buttons appear as well (never for physical devices).
+  The operations go to the selected device's resident process; when you select another device it switches over to that device first.
+- You can operate a device even while it is running a test. Your operations interfere
   with the run, so use your own judgment. They are recorded in the result of the scenario running at that moment
   (shown under "Human operations" in the Dashboard and in the report); text you type is not recorded. Operations
   made between two scenarios belong to neither, so they do not appear in any result.
@@ -128,30 +125,29 @@ is unavailable.
 - The **Settings** tab holds display, update, log-and-recording cleanup, and remote machine
   settings, including the update-check and update actions described below. The **Tools** section
   at its top has a "Processes" button that brings up that tab.
-- The **Live Control** tab (below) and the **Processes** tab (list and stop fleetest's resident
-  processes) are hidden at startup. Opening one brings its tab up; close it with the tab's ×.
+- The **Processes** tab (list and stop fleetest's resident
+  processes) is hidden at startup. Opening it brings its tab up; close it with the tab's ×.
 - Right-clicking anywhere does not show the default Cut/Copy/Paste menu (except in text input fields).
 
 ## Live Control
 
-A tab for touching a device directly from its screenshot, shown to the right of the device monitor's
-**Device Monitor** tab. Open it with the command **"fleetest: Show Live Control"** or **Live Control**
-in a tile's right-click menu (opens with that device selected). It also opens automatically when a test run starts (setting `fleetest.liveControlOnRun`).
+Touching a device directly from its screenshot. It lives in the Grid View when **exactly one device is selected** (see above).
+Selecting a device does not connect to it; the first operation or Refresh does.
 
-If the device's bridge isn't running yet, Live Control starts it automatically and shows a brief
-"Connecting to the device…" indicator instead of an error — normally this is tens of seconds
-(reusing an existing build); only the very first build for that device takes longer.
+If the device's bridge isn't running yet, it is started automatically. An operation made while it starts shows a brief
+"The device is still getting ready — try again once the screen appears" notice instead of an error — normally this is tens of
+seconds (reusing an existing build); only the very first build for that device takes longer.
 
 | Gesture | Action |
 |---|---|
 | Click | Tap |
-| Hold ~500ms without moving | Long press |
+| Hold ~500ms without moving | Long press (after 500ms the start point turns orange and shows "Long press"; moving on from there is a long-press-then-drag. Not shown while Command (⌘) is held, since releasing double-taps) |
 | Drag | Swipe (direction inferred from the drag vector) |
-| Shift (⇧) + drag | Trace the exact finger path (the toolbar's **Trace** indicator lights up while Shift is held; one continuous touch that never lifts; stopping and then moving while held is a long-press-then-drag; it replays at the speed you traced; once a trace passes 60 seconds it is cancelled on the spot with an error, and nothing is sent when you release) |
-| Option (⌥) + click | Double tap |
+| Option (⌥) + drag | Trace the exact finger path (the toolbar's **Trace** indicator lights up while Option is held; one continuous touch that never lifts; stopping and then moving while held is a long-press-then-drag (after 500ms still, the "Long press" mark appears; Maps on iOS then drops a pin instead of panning); it replays at the speed you traced; once a trace passes 60 seconds it is cancelled on the spot with an error, and nothing is sent when you release. After you release, while the device replays it, the traced line turns faint and a thick line grows over the part already replayed) |
+| Command (⌘) + click | Double tap (the toolbar's **Double tap** indicator lights up while Command is held) |
 | Toolbar zoom in/out | Pinch (whole screen) |
 
-On iOS, double tap (Option (⌥) + click) does not register in a Compose app on a physical device or
+On iOS, double tap (Command (⌘) + click) does not register in a Compose app on a physical device or
 with an `xcuitest`-only setup. To zoom in, use the toolbar's zoom (a pinch) instead
 ([gestures](../commands/gestures.md)).
 
@@ -159,15 +155,13 @@ The element list next to the screenshot is for reading: clicking a row does not 
 Hovering over a row highlights that element's frame on the screenshot. The text field sends input to
 whatever the device has focused (tap the field on the screenshot first, then type).
 
+After an operation it waits for the screen to settle, then re-reads the element tree and redraws the frames
+(it does not re-read while the device is running a test).
+
 You can keep driving the device after the app under test leaves the foreground (iOS). When the home
 screen, the app switcher, another app or a system dialog comes to the front, live control follows
 whatever is on screen — gestures land on it and the element list shows it. It switches back on its
-own once the app returns to the front (if it does not, launch the app from the toolbar).
-
-**Recording**: start recording, perform the flow, then stop — the extension turns the recorded
-steps into a Swift scenario under `TestProjects/<project>/scenarios/Generated/` via
-`fleetest api gen-scenario`. The generated file is build-verified immediately; if it fails to
-compile it is parked under `scenarios/_disabled/` instead of being added to the tree.
+own once the app returns to the front (if it does not, launch the app again).
 
 ## Results Dashboard
 
@@ -298,7 +292,6 @@ categories above or the Settings tab.
 | `fleetest.buildBeforeRun` | `true` | Build the Swift project before each run |
 | `fleetest.lptScheduling` | `true` | Schedule longer-running scenarios first (LPT), using recent run history |
 | `fleetest.monitorInterval` | `2` | Device Monitor polling interval, in seconds |
-| `fleetest.liveControlOnRun` | `true` | Auto-open Live Control when a (non-dry-run) test starts |
 | `fleetest.language` | `"auto"` | Extension UI display language |
 | `fleetest.updateCheck` | `"auto"` | Automatic once-a-day update check on startup |
 

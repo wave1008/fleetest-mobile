@@ -1,5 +1,5 @@
 // H.264 Annex-B チャンク→WebCodecs VideoDecoder→canvas 描画。
-// 契約(呼び出し元: deviceTiles.js/liveTab.js): pushChunk は初回キーフレーム受信まで delta を破棄し、
+// 契約(呼び出し元: deviceTiles.js): pushChunk は初回キーフレーム受信まで delta を破棄し、
 // 初回キーフレームの SPS(NAL type 7)から codec 文字列を組み立てて configure する
 // (description は渡さない= Annex-B 入力として扱われる)。configure 完了までに届いたチャンクは
 // デコード順を保つためキューに溜め、resolve 後にまとめて decode する。
@@ -24,7 +24,7 @@ function findAvcCodecString(data) {
 }
 
 // onFrameRendered(省略可): canvas へ 1 フレーム描画するたびに呼ぶ(描画間引き後=最大 ~15fps)。
-// deviceTiles.js がポーリング抑止の streamRendered ack に使う(liveTab.js は未使用)。
+// deviceTiles.js がポーリング抑止の streamRendered ack に使う。
 // onDimensions(省略可): デコード実寸が変わるたびに { width, height } で呼ぶ(初回も含む)。
 // deviceTiles.js がタイル枠のアスペクト比に使う(初回だけだと解像度変更で枠が古い比率のまま残る)。
 export function createH264Renderer({ canvas, onError, onFirstFrame, onFrameRendered, onDimensions }) {

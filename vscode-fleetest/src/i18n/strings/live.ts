@@ -1,5 +1,5 @@
 // バッチD 辞書。namespace: live.
-// 対象ソース: monitorLiveController.ts, liveModel.ts, liveTabHost.ts, deviceStream.ts
+// 対象ソース: monitorLiveController.ts, liveModel.ts, deviceStream.ts
 // キーは "live." 始まり。ja は元の日本語と byte-identical(既存テスト互換)。
 import type { MessageDict } from "../core";
 
@@ -29,10 +29,6 @@ export const liveStrings = {
     ja: "{id} はこの Mac のライブ操作の一覧に無いため開けません(ライブ操作で扱えるのはこの Mac につながっているデバイスだけです)。",
     en: "{id} is not in this Mac's Live Control device list, so it cannot be opened (Live Control only drives devices connected to this Mac).",
   },
-  "live.projectUnresolvedShort": {
-    ja: "対象のテストプロジェクトを解決できませんでした。",
-    en: "Could not resolve the target test project.",
-  },
   "live.deviceListFailedDetail": {
     ja: "デバイス一覧の取得に失敗しました。実行プロファイルの devices 設定を確認してください({detail})",
     en: "Failed to fetch the device list. Check the run profile's devices setting ({detail})",
@@ -40,18 +36,6 @@ export const liveStrings = {
   "live.deviceListFailedError": {
     ja: "デバイス一覧の取得に失敗しました: {error}",
     en: "Failed to fetch the device list: {error}",
-  },
-  "live.deviceBooting": {
-    ja: "デバイス「{name}」を起動しています…(初回は数十秒かかることがあります)",
-    en: 'Starting device "{name}"… (the first boot can take tens of seconds)',
-  },
-  "live.deviceBootFailed": {
-    ja: "デバイス「{name}」の起動に失敗しました。",
-    en: 'Failed to start device "{name}".',
-  },
-  "live.deviceBootFailedError": {
-    ja: "デバイス「{name}」の起動に失敗しました: {error}",
-    en: 'Failed to start device "{name}": {error}',
   },
   "live.serveSpawnFailed": {
     ja: "[live serve] プロセスの起動に失敗しました: {error}",
@@ -81,17 +65,9 @@ export const liveStrings = {
     ja: "[live serve] 対応するリクエストが無いイベントを受信しました({kind})",
     en: "[live serve] Received an event with no matching pending request ({kind})",
   },
-  "live.serveMismatchedEvent": {
-    ja: "[live serve] 対応しないイベントを受信しました(期待: {expected}、実際: {actual})",
-    en: "[live serve] Received a mismatched event (expected: {expected}, actual: {actual})",
-  },
   "live.internalErrorSnapshotMissing": {
     ja: "内部エラー: snapshot が届きませんでした。",
     en: "Internal error: snapshot was not received.",
-  },
-  "live.internalErrorFrameMissing": {
-    ja: "内部エラー: frame が届きませんでした。",
-    en: "Internal error: frame was not received.",
   },
   "live.noDeviceSelected": {
     ja: "デバイスが選択されていません。",
@@ -100,19 +76,6 @@ export const liveStrings = {
   "live.snapshotFailed": {
     ja: "snapshot の実行に失敗しました: {error}",
     en: "Failed to run snapshot: {error}",
-  },
-  "live.installing": { ja: "インストール中...", en: "Installing..." },
-  "live.installNoPath": {
-    ja: "インストールするパッケージパスが設定されていません",
-    en: "No package path is configured to install",
-  },
-  "live.launchNoBundle": {
-    ja: "起動するアプリID が設定されていません",
-    en: "No app ID is configured to launch",
-  },
-  "live.streamGiveUpSwitchPolling": {
-    ja: "[live-stream] {message} ポーリングに切り替えます。",
-    en: "[live-stream] {message} Switching to polling.",
   },
   "live.actionFailed": {
     ja: "操作の実行に失敗しました: {error}",
@@ -124,37 +87,9 @@ export const liveStrings = {
     ja: "デバイスの準備中です。表示されたら操作してください",
     en: "The device is still getting ready — try again once the screen appears",
   },
-  "live.appProfileUnresolved": {
-    ja: "アプリプロファイルを解決できません",
-    en: "Could not resolve the app profile",
-  },
-  "live.recordStarting": {
-    ja: "レコーディングを開始しています…",
-    en: "Starting recording…",
-  },
-  "live.recordNoSteps": {
-    ja: "操作が記録されていません",
-    en: "No actions were recorded",
-  },
-  "live.tempFileWriteFailed": {
-    ja: "一時ファイルの書き込みに失敗しました: {error}",
-    en: "Failed to write the temporary file: {error}",
-  },
-  "live.generatingCode": {
-    ja: "テストコードを生成中…",
-    en: "Generating test code…",
-  },
-  "live.codeGenFailed": {
-    ja: "テストコードの生成に失敗しました。",
-    en: "Failed to generate test code.",
-  },
   "live.traceTooLong": {
     ja: "軌跡が長すぎるため再生しませんでした（{seconds} 秒。再生できるのは {max} 秒まで）。",
     en: "The trace was not replayed because it is too long ({seconds}s; up to {max}s can be replayed).",
-  },
-  "live.gridRecordingOtherDevice": {
-    ja: "ライブ操作で別のデバイスをレコーディング中のため、このデバイスは操作できません。",
-    en: "Live Control is recording another device, so this device cannot be operated.",
   },
   "live.refreshFirst": {
     ja: "先に要素一覧の「更新」で画面を取得してください。",
@@ -165,26 +100,19 @@ export const liveStrings = {
     en: "Enter the text to type.",
   },
 
-  // ---- 「操作記録」ラベル(monitorLiveController.ts の手動操作 / liveModel.ts の
-  // stepDescriptionToOperationLabel が両方使う。表示と比較を同一 t() に揃える契約) ----
+  // ---- 「操作記録」ラベル(monitorLiveController.ts の手動操作) ----
   "live.opLabel.tap": { ja: "タップ: {target}", en: "Tap: {target}" },
   "live.opLabel.press": { ja: "ロングプレス: {target}", en: "Long press: {target}" },
   "live.opLabel.doubleTap": { ja: "ダブルタップ: {target}", en: "Double tap: {target}" },
-  "live.opLabel.doubleTapPlain": { ja: "ダブルタップ", en: "Double tap" },
   "live.opLabel.pinchOut": { ja: "ピンチで拡大", en: "Pinch to zoom in" },
   "live.opLabel.pinchIn": { ja: "ピンチで縮小", en: "Pinch to zoom out" },
   "live.opLabel.type": { ja: "入力: {text}", en: "Input: {text}" },
-  "live.opLabel.scrollTo": { ja: "スクロール: {target}", en: "Scroll: {target}" },
   "live.opLabel.swipe": { ja: "スワイプ: {direction}", en: "Swipe: {direction}" },
   "live.opLabel.trace": { ja: "なぞる", en: "Trace" },
   "live.opLabel.home": { ja: "ホーム", en: "Home" },
   "live.opLabel.fold": { ja: "折りたたむ", en: "Fold" },
   "live.opLabel.unfold": { ja: "開く", en: "Unfold" },
   "live.opLabel.appSwitcher": { ja: "タスク切替", en: "App Switcher" },
-  "live.opLabel.launch": { ja: "起動: {bundle}", en: "Launch: {bundle}" },
-  "live.opLabel.install": { ja: "インストール: {name}", en: "Install: {name}" },
-  "live.opLabel.terminate": { ja: "終了", en: "Terminate" },
-  "live.opLabel.wait": { ja: "待機: {seconds}秒", en: "Wait: {seconds}s" },
   "live.direction.up": { ja: "上", en: "Up" },
   "live.direction.down": { ja: "下", en: "Down" },
   "live.direction.left": { ja: "左", en: "Left" },
@@ -202,16 +130,6 @@ export const liveStrings = {
   "live.elementLine.label": {
     ja: '"{label}"',
     en: '"{label}"',
-  },
-
-  // ---- liveTabHost.ts ----
-  "live.panel.streamStallRestart": {
-    ja: "[live-stream] キーフレーム未受信のままのためヘルパーを再起動します。",
-    en: "[live-stream] No keyframe received. Restarting helper.",
-  },
-  "live.panel.codecFallback": {
-    ja: "[live-stream] WebCodecs 未対応/デコード失敗のため mjpeg へフォールバックします。",
-    en: "[live-stream] WebCodecs unsupported or decode failed. Falling back to mjpeg.",
   },
 
   // ---- deviceStream.ts: helper プロセス管理ログ(helper 自身の stdout/stderr 内容ではなく、

@@ -2,7 +2,7 @@
 //
 // serve はデバイスの印(`.fleetest/mcp-<鍵>.lease`)を書くので、畳まずに全掃討(`devices down`)を撃つと
 // CLI の sweepRefusal がその印で丸ごと断り、「MCP session が駆動中(fleetest-mcp pid …)」という
-// 事実と違う名指しのトーストだけが出て1台も止まらない(実地 2026-09-24: ライブ操作タブで実機
+// 事実と違う名指しのトーストだけが出て1台も止まらない(実地 2026-09-24: グリッドビューで実機
 // iPhone を開いたまま「全て終了」)。
 //
 // MonitorLiveController は vscode 依存でスタブでは作れないため、liveServeRebindWait.test.mjs と
@@ -59,6 +59,7 @@ test("畳んでいる間は serve を起動しない(掃討の途中で印を書
     "close の待ち手を登録してから止める(先に止めると close を取り逃がす)");
   assert.match(suspend, /setTimeout\(done, SERVE_SWEEP_STOP_WAIT_MS\)/, "待ちに上限を置く");
   const resume = body(controller, "resumeServeAfterSweep(): void {");
-  assert.match(resume, /this\.serveSuspendedForSweep = false;[\s\S]*this\.refreshDevices\(\)/,
-    "抑止を解いてから refreshDevices の既存経路で立て直す");
+  assert.match(resume, /this\.serveSuspendedForSweep = false;/, "抑止を解く");
+  assert.ok(!resume.includes("refreshDevices"),
+    "serve は次のグリッド操作が立て直す(選択しただけで観測を撃たない規律。gridLivePanel.js 冒頭)");
 });

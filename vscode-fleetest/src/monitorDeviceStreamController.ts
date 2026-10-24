@@ -1,6 +1,6 @@
 // monitorDeviceStreamController.ts
 // デバイスモニタータイル(deviceTiles.js)向け画面ストリーミング制御(iOS: fleetest-simstream /
-// Android: fleetest-androidstream)。ライブ操作タブと同じ StreamPipeline(deviceStream.ts)を、
+// Android: fleetest-androidstream)。StreamPipeline(deviceStream.ts)を、
 // connected な対象タイルの数だけ束ねて使い回す(供給・再起動ロジックはそちらに一本化されているため
 // 複製しない)。
 //
@@ -202,14 +202,6 @@ export class MonitorDeviceStreamController {
         continue;
       }
       if (device.streamedByOther === true) {
-        continue;
-      }
-      // **ライブ操作が配信中の手元の1台は張らない**(タブを切り替えてもタイルの配信は続けるので、
-      // そのままだと同じデバイスに配信が2本重なる。Android は重なりで run が赤くなった実測がある)。
-      // 鍵はデバイスの udid / serial で照らす(タイルの iOS 実機はポートを鍵にするため target.key では外れる)
-      const liveKey = this.deps.liveStreamKey();
-      if (liveKey !== undefined && device.machine === undefined
-          && (device.udid === liveKey || device.serial === liveKey)) {
         continue;
       }
       if (device.machine) {

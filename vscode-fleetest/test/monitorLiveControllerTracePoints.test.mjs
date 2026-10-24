@@ -1,7 +1,7 @@
 // monitorLiveController.ts の tracePoints ハンドラ(軌跡モード)のソース走査。
 // MonitorLiveController は vscode.ExtensionContext 等が要りスタブでは作れないため、host 側の
 // 配線は liveSnapshotCacheRebind.test.mjs と同じ方針で走査して守る。webview 側の挙動
-// (トグル/Shift でどちらの型のメッセージを送るか)は webviewLiveDrag.test.mjs が実 DOM で見る。
+// (Shift でどちらの型のメッセージを送るか)は webviewGridLiveControls.test.mjs が実 DOM で見る。
 //
 // 守っているのは3つ:
 //   ①snapshot 未取得(lastScreen 無し)なら送らないこと(他のポインタ操作ハンドラと同じ規律)
@@ -57,15 +57,12 @@ test("tracePoints: 時間を縮めず、上限は gestureCapFor で決めて長�
   assert.match(body, /maxGestureSeconds: cap/, "既定上限を超えたらこの1回だけ上限を上げること");
 });
 
-test("serve への応答待ちは正当な占有時間(軌跡・press/drag/pinch・launch/install)ぶん延ばす", () => {
+test("serve への応答待ちは正当な占有時間(軌跡・press/drag/pinch・fold)ぶん延ばす", () => {
   const source = controllerSource();
   assert.match(source, /SERVE_REQUEST_TIMEOUT_MS \+ serveCommandAllowanceMs\(command\)/);
 });
 
-test("tracePoints: gesture コマンドを組み立て、RecordedStep(gesture)も同じ点列から作る", () => {
+test("tracePoints: gesture コマンドを組み立てて serve へ送る", () => {
   const body = tracePointsCaseBody();
   assert.match(body, /cmd: "gesture", fingers/, "serve へ gesture コマンドを送ること");
-  assert.match(body, /recordedGestureFingers\(fingers, screen\)/,
-    "レコーディング用の RecordedStep も同じ(変換・縮小済みの)fingers から作ること"
-    + "(mcp 表示と記録で別のロジックを持たない)");
 });

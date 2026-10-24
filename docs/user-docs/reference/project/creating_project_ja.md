@@ -14,7 +14,6 @@ TestProjects/SampleApp/
 │   └── runs/ios-run.json          # 実行プロファイル(`profile setup` が作る。アプリ+各自マシンを名乗るデバイス一覧+実行時設定)
 ├── scenarios/                     # Swift DSL
 │   ├── _Main.swift                # ランナーへの委譲(編集不要)
-│   ├── Generated/                 # ライブ操作の録画が生成したシナリオ
 │   └── _disabled/                 # コンパイル対象外の退避場所(生成失敗コードの隔離先など)
 ├── reports/                       # シナリオごとの Markdown レポート
 ├── results/                       # 実行結果の JSON データベース(results_analysis_ja.md 参照)

@@ -33,17 +33,13 @@ Expected result:
 
 ## 3. Touch it yourself (Live Control)
 
-Open the "Live Control" tab ("fleetest: Show Live Control" in the Command Palette) and operate the device screen with the mouse (click to tap, drag to swipe).
+Select just one device in the Line View, and operation buttons appear to the right of the enlarged screen in the Grid View. Operate the device screen with the mouse (click to tap, drag to swipe, Command(⌘)+click to double-tap, Option(⌥)+drag to trace the exact path).
 
 Expected result:
 
 - The place you click is tapped on the device.
 - The screen updates.
-
-"Start Recording" -> operate -> "Stop Recording" turns your operations into a scenario. A recording has no verifications in it, so ask the
-AI assistant to add them, for example "add checks for what's on screen to each test of the scenario created by recording".
-
-<img src="../images/tutorial/en/vscode_live_control.png" width="720" alt="Live Control">
+- The element list and the operation log appear to the right of the enlarged screen.
 
 ## 4. Run from the Test Explorer
 

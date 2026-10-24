@@ -25,7 +25,7 @@
 | インターフェース | 説明 |
 |---|---|
 | **CLI** | fleetest によるテストをコントロールする各種コマンド |
-| **VSCode 拡張** | GUIを提供。シナリオ実行・デバッグ実行・ライブ操作・デバイスモニター・結果ダッシュボード |
+| **VSCode 拡張** | GUIを提供。シナリオ実行・デバッグ実行・デバイスモニター(1台選択でライブ操作)・結果ダッシュボード |
 | **MCP サーバー** | AIがデバイスを操作して発見的にテストコードを作成したりデバッグする |
 | **Swift DSL** | テストコード記述用のSwiftの関数セット |
 
@@ -128,7 +128,7 @@ swift run fleetest doctor
 #    (fleetest profile setup --auto-device に任せてもよい)
 ```
 
-VSCode 拡張(デバイスモニター・ライブ操作・結果ダッシュボードなどの UI)を使う場合は、続けて拡張をビルド・インストールする(Node.js は Homebrew の `node@26` に固定。`brew install node@26` で入れ、`PATH="$(brew --prefix node@26)/bin:$PATH"` を通してから実行する):
+VSCode 拡張(デバイスモニター・結果ダッシュボードなどの UI)を使う場合は、続けて拡張をビルド・インストールする(Node.js は Homebrew の `node@26` に固定。`brew install node@26` で入れ、`PATH="$(brew --prefix node@26)/bin:$PATH"` を通してから実行する):
 
 ```bash
 cd vscode-fleetest
@@ -161,8 +161,6 @@ swift run fleetest doctor
 swift run fleetest bridge up --with-sample-app
 
 # 3. シナリオを用意する(下記いずれか)
-#    - VSCode 拡張のライブ操作パネルで操作を録画 → TestProjects/<name>/scenarios/Generated/*.swift を生成
-#      (生成直後にビルド検証され、失敗コードは scenarios/_disabled/ に隔離される)
 #    - TestProjects/<name>/scenarios/ に Swift DSL で手書きする(下記「Swift DSL」参照)
 #    - Claude Code(MCP 経由)に作らせる
 
@@ -211,7 +209,7 @@ TestProjects/SampleApp/
 ├── profiles/
 │   ├── apps/ios-app.json          # アプリ(`profile setup` が作る): autoInstall は最上位、appName/bundle ID(app)/appPath は ios/android
 │   └── runs/ios-run.json          # 実行プロファイル(`profile setup` が作る。アプリ+各自マシンを名乗るデバイス一覧+実行時設定)
-├── scenarios/                     # Swift DSL(_Main.swift / Generated/ / _disabled/)
+├── scenarios/                     # Swift DSL(_Main.swift / _disabled/)
 ├── reports/                       # 実行レポート(プロジェクト別)
 └── .fleetest/locator-fingerprints.json  # ロケータの指紋(プロジェクト別)
 ```
@@ -476,22 +474,22 @@ condition {
 
 ## UI(VSCode 拡張)
 
-シナリオ実行・デバッグ実行(ブレークポイント/ステップ実行)・ライブ操作・デバイスモニター・
-ライブ操作(録画→シナリオ生成)・結果ダッシュボード・自己修復の書き戻しの通知・プロファイル編集支援と
+シナリオ実行・デバッグ実行(ブレークポイント/ステップ実行)・デバイスモニター
+(1台選択のグリッドビューでライブ操作)・結果ダッシュボード・自己修復の書き戻しの通知・プロファイル編集支援と
 いった対話的な UI は、VSCode 拡張(`vscode-fleetest/`)に一本化している。CLI と同じ `fleetest api ...` サブコマンド経由で
 fleetest 本体を呼び出すため、挙動は CLI・MCP と共通のモジュールに基づく。
 
 **ライブ操作の割り当て**: 画面をクリック = タップ / 500ms 以上ホールド = 長押し /
-ドラッグ = スワイプ / **Shift(⇧)+ドラッグ =
+ドラッグ = スワイプ / **Option(⌥)+ドラッグ =
 指の軌跡どおりになぞる**(離さない1本のタッチとして再生。`ft_gesture` と同じ経路。ツールバーの
-「軌跡」は Shift を押している間だけ点く表示灯) /
-**Option(⌥)+クリック = ダブルタップ** / ツールバーの **拡大・縮小** =
-画面全体のピンチ。ダブルタップを「素早く2回クリック」にしていないのは、パネルの1クリックを
+「軌跡」は Option を押している間だけ点く表示灯) /
+**Command(⌘)+クリック = ダブルタップ**(「ダブルタップ」は Command を押している間だけ点く表示灯) / ツールバーの **拡大・縮小** =
+画面全体のピンチ。ダブルタップを「素早く2回クリック」にしていないのは、画面の1クリックを
 既にタップとして送っているため —— 2回目を待つ設計にすると通常のタップが毎回遅くなる。
 **iOS の Compose のダブルタップは XCUITest 経路では届かない**
 (docs/commands.md の表。ライブ操作は実行プロファイルのモードに従う)。
 
-**デバイス画面はヘッドレス映像ストリーミングで表示する**: デバイスモニター・ライブ操作の
+**デバイス画面はヘッドレス映像ストリーミングで表示する**: デバイスモニターの
 画面は、変化駆動でフレーム(JPEG)を配信する常駐ヘルパー(iOS: `fleetest-simstream` /
 Android: `fleetest-androidstream`)経由でほぼリアルタイムに更新する。ScreenCaptureKit を
 使わずシミュレータ/エミュレータの画面を低負荷で流すヘッドレス方式で、静止画面では
@@ -589,7 +587,6 @@ TestProjects/          テストプロジェクト(コミットして資産化�
     profiles/        アプリプロファイル・実行プロファイル(apps / runs。JSON)
     scenarios/       テストシナリオ(Swift DSL)
       _Main.swift      ランナーへの委譲(編集不要)
-      Generated/       ライブ操作の録画(gen-scenario)が生成したシナリオ
       _disabled/       コンパイル対象外の退避場所(並列デモ・生成失敗コードの隔離先)
     reports/         実行レポート(プロジェクト別)
     .fleetest/        ロケータの指紋等(プロジェクト別)
@@ -651,7 +648,7 @@ Jenkins の例と flaky の扱いは [docs/ci.md](docs/ci.md)。
 - **ドライバに接続できません** → iOS: `bridge up` を先に実行(ログは `.fleetest/bridge-<ポート>.log`)。
   Android: `adb devices` で接続確認
 - **シナリオのコンパイルエラーで実行できない** → `swift build --product fleetest-scenarios-<プロジェクト名>`
-  のエラーを修正する。ライブ操作録画(gen-scenario)の生成不良は scenarios/_disabled/ に自動隔離される
+  のエラーを修正する。draft-scenario の生成不良は scenarios/_disabled/ に自動隔離される
 - **プロジェクトが認識されない(手動コピーや git pull 後)** → `fleetest project sync` で
   Package.swift のマーカー区間を再生成する(`project list` が未登録を警告する)
 - **デバイスが見つからない** → 実行プロファイルの `devices[]` に対象のデバイスが登録されているか

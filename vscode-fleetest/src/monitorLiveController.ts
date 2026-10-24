@@ -1,5 +1,5 @@
 // monitorLiveController.ts
-// デバイスモニターの「ライブ操作」タブ(liveTabHost.ts)のロジック本体。
+// デバイスモニターのグリッドビュー(1台選択)のライブ操作(liveTabHost.ts)のロジック本体。
 //
 // - `fleetest api list-devices` は FleetestCli の直列キュー(`fleetest api run` と共有。シナリオ実行が
 //   `swift build` を伴い得るため同時2プロセスを防ぐ SPM ビルドロック対策)には乗せず、oneShotCli.ts の
@@ -13,32 +13,22 @@
 //   serve はデバイスごとの状態を持つプロセスなので、デバイス選択が変わったら明示的に再バインド
 //   (停止→新デバイスで起動)し諦め状態もリセットする(=デバイスを選び直す操作が host-metrics の
 //   「再起動ボタン」に相当する回復経路。専用ボタンは無い)。
-// - webview 資産は src/webview/monitor/liveTab.js(src/webview/monitor/main.js から applyLiveMessage を
-//   import)。frameToDisplayRect の計算だけを手書きで複製している(要素一覧の表示テキストは host 側で
-//   事前整形して送るため複製不要)。liveModel.ts の frameToDisplayRect を変更したら
+// - webview 資産は src/webview/monitor/gridLiveControls.js・gridLivePanel.js(main.js から
+//   applyGridLiveMessage を import)。frameToDisplayRect の計算だけを手書きで複製している(要素一覧の
+//   表示テキストは host 側で事前整形して送るため複製不要)。liveModel.ts の frameToDisplayRect を変更したら
 //   liveListViews.js 側も追随させること。
 
 import { type ChildProcessByStdio, spawn } from "node:child_process";
 import type { Readable, Writable } from "node:stream";
-import * as vscode from "vscode";
+import type * as vscode from "vscode";
 import { childEnv } from "./childEnv";
-import type { FleetestCli } from "./cli";
-import {
-  type FleetestConfig,
-  resolveAdb,
-  resolveAndroidStream,
-  resolveProjectName,
-  resolveSimStream,
-} from "./config";
-import { StreamPipeline, type LiveStreamPipeline } from "./deviceStream";
+import { type FleetestConfig, resolveProjectName } from "./config";
 import { checkForDyldLaunchFailure } from "./dyldLaunchNotice";
 import { t } from "./i18n";
-import { LiveAppActions } from "./liveAppActions";
 import {
   buildDeviceArgs,
   describeElementShort,
   devicesToOptions,
-  FALLBACK_DEVICE_ID,
   fallbackDeviceOption,
   mcpCommandForServeCommand,
   hitTestElement,
@@ -48,32 +38,25 @@ import {
   type LiveDeviceRef,
   type LiveElement,
   type LiveErrorResult,
-  type LiveFrameResult,
-  type LiveFromWebviewMessage,
   type LiveServeCommand,
   type LiveSize,
   type LiveSnapshot,
   type LiveToWebviewMessage,
-  locatorChainForElement,
   parseListDevicesResult,
   GESTURE_SECONDS_CEILING,
   type GridLiveAction,
   gestureCapFor,
   parseLiveServeEvent,
   pointFromClick,
-  type RecordedStep,
-  recordedGestureFingers,
   sameLiveDeviceRef,
   serializeLiveServeCommand,
   serveCommandAllowanceMs,
-  stepDescriptionToOperationLabel,
   swipeDirectionLabel,
   toSnapshotMessage,
+  traceSummary,
   truncateOperationLabelText,
 } from "./liveModel";
 import type { LiveDeps } from "./liveDeps";
-import type { LiveRunTarget } from "./liveRunTarget";
-import type { StepEvent } from "./model";
 import { NdjsonParser } from "./ndjson";
 import { type OneShotResult, type PipeProcess, runOneShot } from "./oneShotCli";
 
@@ -110,19 +93,6 @@ const SERVE_REBIND_CLOSE_TIMEOUT_MS = 8000;
  * (印が残っていても持ち主の pid は死んでいる = CLI は生きた印としては数えない)。 */
 const SERVE_SWEEP_STOP_WAIT_MS = 2500;
 
-/** 自動フレームを実行できなかった回(busy・パネル非表示・serve 不在)と失敗時の再試行間隔(ms)。
- * 成功時は待ちなしで次フレームを送る(ホットループ防止のため失敗系のみ間隔を空ける)。 */
-const FRAME_IDLE_RETRY_MS = 500;
-/** 「接続中」表示の間に観測を撃ち直す間隔[ms]。serve は自動起動の完了を自分から知らせない
- * (観測・操作の応答に載せるだけ)ので、配信中(frameTick が止まる)は誰かが聞き直さないと
- * 表示が残り続ける。2 秒 = 再利用の起動(十数秒)を待たせすぎず、serve を詰まらせない間隔 */
-const BRIDGE_STARTING_PROBE_MS = 2000;
-
-/** ライブ映像ストリーミング helper(iOS/Android共通)へ渡すフレーム長辺px。ネイティブのシミュレータ
- * フレームは ~1206x2622・JPEG ~300KB と重いため既定 900px 幅へ縮めて転送量を抑える(config に専用
- * ノブは無い)。アスペクト比は helper 側で保たれるため、serve snapshot 基準のタップ座標変換は崩れない。 */
-const LIVE_STREAM_MAX_WIDTH = 900;
-
 /** serve 常駐プロセスの不在・応答不能・終了を表す文言。これらは個々の操作失敗(タップ失敗・
  * 未入力など)とは違い「接続状態」の問題で、serve が復帰すれば自動で解消する。postActionError が
  * isConnectionClassMessage との一致で connectionBannerShown を立て、復帰時(handleConnectionOk)に
@@ -152,31 +122,28 @@ interface ServeRequestOutcome {
   readonly snapshot: LiveSnapshot | LiveErrorResult;
 }
 
-/** sendServeCommand/sendServeFrame の resolve に渡す払い出し。resolvesOn で使うフィールドが決まる
- * (snapshot: action?+snapshot、frame: frame のみ)。 */
+/** sendServeCommand の resolve に渡す払い出し。 */
 interface PendingServeOutcome {
   readonly action?: LiveActionResult;
   readonly snapshot?: LiveSnapshot | LiveErrorResult;
-  readonly frame?: LiveFrameResult;
 }
 
-/** 送信中(応答待ち)の serve リクエスト1件分。自動フレームとユーザー操作が enqueueServeSend で
+/** 送信中(応答待ち)の serve リクエスト1件分。ユーザー操作と観測が enqueueServeSend で
  * 直列化されるため同時に2件以上送らない(単一スロットで管理。activeChild と同じ「一度に1つだけ」の設計)。 */
 interface PendingServeRequest {
-  /** refresh/frame は actionResult を出さないため false。 */
+  /** refresh は actionResult を出さないため false。 */
   readonly expectsAction: boolean;
-  /** どちらの観測イベントで resolve するか。handleServeEvent が届いた kind と照合し、不一致なら
-   * 「対応しないイベント」として無視する(自動フレームとユーザー操作の取り違え防止)。 */
-  readonly resolvesOn: "snapshot" | "frame";
+  /** 送ったコマンドの cmd(gesture の応答だけ webview へ即座に知らせる = gestureActionDone) */
+  readonly cmd: LiveServeCommand["cmd"];
   /** actionResult イベントが先に届いたら保持し、snapshot イベント到着時にまとめて resolve する。 */
   action: LiveActionResult | undefined;
   readonly resolve: (outcome: PendingServeOutcome) => void;
   readonly timeout: ReturnType<typeof setTimeout>;
 }
 
-/** 観測(画面を変えない busy)の最中に届いたら、観測の終わりを待って撃つ操作(handleWebviewMessage)。
- * 画面の操作とツールバーだけ —— 一覧の取り直し・録画・インストール等は従来どおり busy で断る */
-const OBSERVATION_DEFERRABLE_ACTIONS: ReadonlySet<LiveFromWebviewMessage["type"]> = new Set<LiveFromWebviewMessage["type"]>([
+/** 観測(画面を変えない busy)の最中に届いたら、観測の終わりを待って撃つ操作(runGridAction)。
+ * 画面の操作とツールバーだけ —— 「更新」(refreshSnapshot)は従来どおり busy で何もしない */
+const OBSERVATION_DEFERRABLE_ACTIONS: ReadonlySet<GridLiveAction["type"]> = new Set<GridLiveAction["type"]>([
   "tapPoint", "doubleTapPoint", "pressPoint", "dragPoints", "tracePoints", "typeText",
   "home", "appSwitcher", "pinch", "fold",
 ]);
@@ -190,45 +157,25 @@ export class MonitorLiveController implements vscode.Disposable {
   private selectedDeviceId: string | undefined;
   /** openDevice 用: 次の applyDevices で優先選択する id(消費したら undefined に戻す)。
    * **busy が解けた時点でも消化する**(setBusy)—— busy の原因が refreshDevices でない(画面取得・
-   * 操作の最中)と applyDevices が来ず、右クリックの「ライブ操作」が黙って捨てられていた。 */
+   * 操作の最中)と applyDevices が来ず、切り替えが黙って捨てられる。 */
   private pendingSelectId: string | undefined;
   /** booted のデバイスへ切り替えたときの観測1回(requestOpenObservation)。busy の間は撃てない
    * (refreshSnapshot は busy なら何もしない)ので、ここに控えて setBusy(false) で撃つ。 */
   private openObservationPending = false;
-  /** preferPlatform 用: Run Test 自動オープン(liveTabHost.ts)が「実行中シナリオの platform」を渡す。
-   * 選択中デバイスの platform がこれと食い違う間、applyDevices/preferPlatform は一覧の先頭から
-   * この platform のデバイスを探して自動選択する。ユーザーが手動で選び直したら(selectDevice/
-   * openDevice)解除する(明示選択を尊重する)。 */
-  private preferredPlatform: string | undefined;
   /** 直近の snapshot の screen(ポイント座標のサイズ)。クリック→タップ座標変換に使う。 */
   private lastScreen: LiveSize | undefined;
-  /** 直近の snapshot の要素一覧。レコーディング中のヒットテスト・ref 解決に使う。 */
+  /** 直近の snapshot の要素一覧。タップ位置のヒットテスト・MCP コマンド表示の ref 解決に使う。 */
   private lastElements: readonly LiveElement[] = [];
   private busy = false;
   /** busy の原因が**画面を変えない観測**(画面の撮り直し・デバイス一覧の取り直し)か。webview はこの間の画面の操作を
-   * 捨てずに送り、handleWebviewMessage が観測の終わりを待って撃つ(OBSERVATION_DEFERRABLE_ACTIONS)。操作の busy
+   * 捨てずに送り、runGridAction が観測の終わりを待って撃つ(OBSERVATION_DEFERRABLE_ACTIONS)。操作の busy
    * (runAction)では false —— その間は画面が変わっている最中なので、これまでどおり受け付けない */
   private busyObserving = false;
   /** busy が解けるのを待つ手(waitForIdle)。setBusy(false) の後もなお busy でなければ全件起こす。 */
   private idleWaiters: Array<() => void> = [];
-  /** 自動フレームの連続失敗回数(スキップ回はカウントしない)。3で connectionLost に切り替える
-   * (単発の取りこぼしで誤検知しないためのデバウンス)。 */
-  private frameFailureStreak = 0;
-  /** webview へ connection:false を post 済みかどうか(復帰時の connection:true post 要否判定)。 */
-  private connectionLost = false;
-  /** 直近 post した connection:false の message。文言が変わったとき(例えば自動起動が諦めて
-   * failed になったとき)だけ再 post するための比較用。 */
-  private lastConnectionMessage: string | undefined;
   /** 直近 post した actionError バナーが接続系(isConnectionClassMessage)かどうか。true の間は
-   * serve 復帰(handleConnectionOk)で自動的に消す。個々の操作失敗バナーは false のままなので、
-   * 常時回っている自動フレームで誤って消えることはない。 */
+   * serve 復帰(handleConnectionOk)で自動的に消す。個々の操作失敗バナーは false のまま。 */
   private connectionBannerShown = false;
-  /** 直近 webview へ post した bridgeStarting の値(applyBridgeStarting の冪等化・差分検知用)。 */
-  private bridgeStartingShown = false;
-  /** prepareForRun() の waitForStreamSync() 待ち手。handleConnectionOk() 到達のたびに全件 resolve
-   * して空にする(次の接続成功を「同期完了」とみなす契約。tap 待ち等 handleConnectionOk を呼ぶ
-   * 全経路が対象なので、対象デバイス切り替え後の最初のフレーム/snapshot 成功で必ず起きる)。 */
-  private streamSyncWaiters: Array<() => void> = [];
   /** list-devices のワンショット spawn(専用。runOneShot 経由)。 */
   private activeChild: PipeProcess | undefined;
 
@@ -270,72 +217,19 @@ export class MonitorLiveController implements vscode.Disposable {
   private serveSuspendedForSweep = false;
   /** 送信中(応答待ち)の serve リクエスト。同時に1件のみ(enqueueServeSend で直列化されるため)。 */
   private pendingServeRequest: PendingServeRequest | undefined;
-  /** serve への送信を直列化するチェーン(自動フレームとユーザー操作の pending 競合を防ぐ)。 */
+  /** serve への送信を直列化するチェーン(観測とユーザー操作の pending 競合を防ぐ)。 */
   private serveSendChain: Promise<unknown> = Promise.resolve();
-  /** ライブタブ表示中かどうか(webview からの visibility メッセージで更新)。自動フレームの実行可否
-   * (パネル非表示時はスキップ)に使う。 */
-  private liveTabVisible = false;
-  /** 自動フレームの次回 tick タイマー。 */
-  private frameTimer: ReturnType<typeof setTimeout> | undefined;
-  private bridgeStartingProbeTimer: ReturnType<typeof setTimeout> | undefined;
 
-  // ---- 画面ストリーミング(iOS: fleetest-simstream / Android: fleetest-androidstream。
-  // ポーリング frameTick の低負荷な代替) ----
-  /** 稼働中のストリーミング helper(iOS/Android共通の StreamPipeline で1本化)。 */
-  private streamPipeline: LiveStreamPipeline | undefined;
-  /** streamPipeline がバインドされているデバイスキー(iOS: シミュレータ UDID、Android: adb serial)。
-   * デバイス切り替え時の張り替え要否判定に使う。 */
-  private streamKey: string | undefined;
-  /** webview から codecError(scope=live)を受けたら true(fallbackToMjpeg 参照)。以後このパネルは
-   * 設定値に関わらず mjpeg 固定。monitorDeviceStreamController.ts の mjpegFallbackIds と違いデバイス単位ではなく
-   * パネル単位(ライブ操作パネルは常に1デバイスのみ選択するため)。 */
-  private liveMjpegFallback = false;
+  constructor(private readonly deps: LiveDeps) {}
 
-  // ---- アプリ操作・レコーディング(liveAppActions.ts の LiveAppActions へ委譲) -----------------
-  private readonly appActions: LiveAppActions;
-
-  constructor(
-    private readonly deps: LiveDeps,
-    private readonly cli: FleetestCli,
-    refreshTestTree: () => void,
-  ) {
-    this.appActions = new LiveAppActions(
-      {
-        workspaceRoot: this.deps.workspaceRoot,
-        getConfig: () => this.deps.getConfig(),
-        outputChannel: this.deps.outputChannel,
-        post: (message) => this.post(message),
-        currentDeviceRef: () => this.currentDeviceRef(),
-        postActionError: (message) => this.postActionError(message),
-        runAction: (command, recordStep, options) => this.runAction(command, recordStep, options),
-        openGeneratedDocument: (filePath) => this.deps.openGeneratedDocument(filePath),
-      },
-      cli,
-      refreshTestTree,
-    );
-  }
-
-  /** パネル close 時・dispose 時の両方から呼ばれる。パネル再オープン後は webview からの
-   * refreshDevices→applyDevices→ensureServeProcessForSelection で serve が再起動される。 */
+  /** パネル close 時・dispose 時の両方から呼ばれる。パネル再オープン後は次のグリッド操作の
+   * handleGridAction→openDevice→applyDevices→ensureServeProcessForSelection で serve が再起動される。 */
   stopProcesses(): void {
     this.killActiveChild();
     this.stopServeProcess();
-    this.stopStreamPipeline();
-    this.clearFrameTimer();
-    // パネル close/dispose 経由でのみ呼ばれる(終端)。可視フラグを落とさないと、パネル不在後に
-    // preferPlatform 等が liveTabVisible=true を見て serve/stream を無表示で respawn し得る。
-    // 再オープン時は panelVisible メッセージが冪等に再設定するため安全。
-    this.liveTabVisible = false;
   }
 
   dispose(): void {
-    this.clearBridgeStartingProbe();
-    if (this.appActions.isGenerating()) {
-      // `api gen-scenario` は `api run` と違って dispatch.lock 解放や終了スクリプトを持たない
-      // 一回限りのコード生成なので、後始末を持たないヘルパー扱いで時限 SIGKILL してよい
-      // (cli.ts の cancelCurrent の既定はここでは使わない。既定にすると dispose が確定しない)。
-      this.cli.cancelCurrent({ escalateAfterMs: 2000 });
-    }
     this.stopProcesses();
   }
 
@@ -392,10 +286,9 @@ export class MonitorLiveController implements vscode.Disposable {
   }
 
   /** **booted(デバイスは起動済み・ブリッジ未接続)のデバイスへ切り替えたら観測を1回撃つ**。serve の自動起動
-   * (LiveBridgeAutoStarter)の引き金は観測・操作の接続拒否だけで、自動のフレーム取得(frame)は
-   * 受動的な観測として起動を撃たない(ApiLiveCommand.emitFrame)。撃たないと、ブリッジの無いデバイス
+   * (LiveBridgeAutoStarter)の引き金は観測・操作の接続拒否だけ。撃たないと、ブリッジの無いデバイス
    * (実機では普通)を開いても「接続できません」のまま何も始まらない(実地: iPhone wave)。
-   * 切り替えの全経路(openDevice / selectDevice / applyDevices / preferPlatform)が通る
+   * 切り替えの全経路(openDevice / applyDevices)が通る
    * ensureServeProcess から呼ぶ。offline は撃たない(デバイスそのものが起きていない = start-device の役目) */
   private requestOpenObservation(): void {
     if (this.selectedOption()?.state !== "booted") {
@@ -408,7 +301,7 @@ export class MonitorLiveController implements vscode.Disposable {
     void this.refreshSnapshot();
   }
 
-  /** 「操作記録」1行を webview へ送る(対向: liveTab.js の operationLog ハンドラ)。
+  /** 「操作記録」1行を webview へ送る(対向: gridLivePanel.js の operationLog ハンドラ)。
    * 全ユーザー操作(tap/swipe/type/press/home/appSwitcher)の成否をここへ流す。 */
   private postOperationLog(label: string, ok: boolean, mcp?: string, deviceId?: string): void {
     this.post({
@@ -418,19 +311,9 @@ export class MonitorLiveController implements vscode.Disposable {
     });
   }
 
-  /** テスト実行(RunEventBus の step)由来の操作を「操作記録」へ流す。section=action のみ・
-   * skipped は除外。ラベルは手動操作と同じ表示文言に揃える(stepDescriptionToOperationLabel)。 */
-  public injectTestStep(event: StepEvent): void {
-    if (event.section !== "action" || event.status === "skipped" || !event.description) {
-      return;
-    }
-    const label = stepDescriptionToOperationLabel(event.description);
-    this.postOperationLog(label, event.status !== "failed");
-  }
-
   /** actionError バナーを出す共通経路。接続系の文言(serve 不在・タイムアウト・終了)なら
    * connectionBannerShown を立て、serve 復帰時に自動で消せるようにする。個々の操作失敗は
-   * false のまま残す(常時回る自動フレームで消さない)。全 actionError post はここを通す。
+   * false のまま残す。全 actionError post はここを通す。
    * neutral: true は bridgeStarting 中の操作失敗(live.bridgeStartingActionNotice)専用 ——
    * 接続系と同じく自動で消える(connectionBannerShown を立てる)が、webview 側はエラー色にしない。 */
   private postActionError(message: string, neutral = false): void {
@@ -438,97 +321,15 @@ export class MonitorLiveController implements vscode.Disposable {
     this.post({ type: "actionError", message, ...(neutral ? { neutral: true } : {}) });
   }
 
-  /** LiveBridgeAutoStarter が自動起動を進行中(bridgeStarting)かどうかの表示を同期する
-   * (frameTick/applySnapshotResult/runAction のいずれかがイベントを受けるたびに呼ぶ)。
-   * 前回と同じ値なら post しない(冪等)。 */
-  private applyBridgeStarting(starting: boolean): void {
-    if (this.bridgeStartingShown === starting) {
-      return;
-    }
-    this.bridgeStartingShown = starting;
-    this.post({ type: "bridgeStarting", starting });
-    if (starting) {
-      this.scheduleBridgeStartingProbe();
-    } else {
-      this.clearBridgeStartingProbe();
-    }
-  }
-
-  /** 「接続中」の間だけ観測を撃ち直し、起動が済んだ回の応答(bridgeStarting:false)で表示を畳む。
-   * **掛け直しは観測の後で自分から行う** —— applyBridgeStarting は値が変わらないと何もしないので、
-   * 起動中のままの応答からは予約が掛からない */
-  private scheduleBridgeStartingProbe(): void {
-    this.clearBridgeStartingProbe();
-    this.bridgeStartingProbeTimer = setTimeout(() => {
-      this.bridgeStartingProbeTimer = undefined;
-      void (async () => {
-        if (this.liveTabVisible && this.serveProcess && this.currentDeviceRef() && !this.busy) {
-          await this.refreshSnapshot();
-        }
-        if (this.bridgeStartingShown && this.liveTabVisible && this.serveProcess) {
-          this.scheduleBridgeStartingProbe();
-        }
-      })();
-    }, BRIDGE_STARTING_PROBE_MS);
-  }
-
-  private clearBridgeStartingProbe(): void {
-    if (this.bridgeStartingProbeTimer) {
-      clearTimeout(this.bridgeStartingProbeTimer);
-      this.bridgeStartingProbeTimer = undefined;
-    }
-  }
-
-  // ---- 接続断の可視化(自動フレームは失敗を無表示で再試行するため、connectionLost の間は
-  // webview 側にオーバーレイを出し続けて「最後に取得した静止画」を生きた画面と誤認させない。
-  // 受け手: src/webview/monitor/liveTab.js) ----
-
-  /** 接続成功を反映する(streak リセット+connectionLost なら connection:true を post して解除)。
-   * 自動フレーム成功・snapshot 成功・デバイス切り替えの起点(古いデバイスのオーバーレイを
-   * 新デバイスへ持ち越さないため)から呼ぶ。 */
+  /** serve の応答が届いた(接続が生きている)ことを反映する。timeout kill の連続回数を戻し、残っている
+   * 接続系 actionError バナー(常駐プロセス不在・タイムアウト・終了)を消す。デバイス切り替えの再バインド中は
+   * serve が undefined→復帰するので、この経路でしかバナーを消せない(操作可能なのにエラーが残る問題の本丸)。 */
   private handleConnectionOk(): void {
-    this.frameFailureStreak = 0;
     this.serveTimeoutKillStreak = 0;
-    // prepareForRun() の waitForStreamSync() を起こす(streamSyncWaiters 冒頭コメントの契約)。
-    if (this.streamSyncWaiters.length > 0) {
-      const waiters = this.streamSyncWaiters;
-      this.streamSyncWaiters = [];
-      for (const wake of waiters) {
-        wake();
-      }
-    }
-    // serve が復帰したので接続系 actionError バナー(常駐プロセス不在・タイムアウト・終了)が
-    // 残っていれば消す。connectionLost の早期 return より前に行う: デバイス切り替えの再バインド中は
-    // 自動フレームが serve 不在でスキップして回るため connectionLost が立たず、serve が
-    // undefined→復帰してもこの経路でしかバナーを消せない(操作可能なのにエラーが残る問題の本丸)。
     if (this.connectionBannerShown) {
       this.connectionBannerShown = false;
       this.post({ type: "actionError", message: "" });
     }
-    if (!this.connectionLost) {
-      return;
-    }
-    this.connectionLost = false;
-    this.lastConnectionMessage = undefined;
-    this.post({ type: "connection", connected: true, message: null });
-  }
-
-  /** 自動フレーム失敗を反映する(streak が3に達したら connectionLost にして post。既に
-   * connectionLost でも message が前回と異なれば再 post する: 例えば自動起動が諦めて
-   * failed になったときの文言更新を画面に反映するため)。
-   * **呼び出し元が bridgeStarting:true の回をここへ回さないこと** —— 起動が進行中の失敗は
-   * エラーではない(applyBridgeStarting が中立表示に倒す。frameTick 参照)。 */
-  private handleFrameFailure(message: string): void {
-    this.frameFailureStreak += 1;
-    if (this.frameFailureStreak < 3) {
-      return;
-    }
-    if (this.connectionLost && this.lastConnectionMessage === message) {
-      return;
-    }
-    this.connectionLost = true;
-    this.lastConnectionMessage = message;
-    this.post({ type: "connection", connected: false, message });
   }
 
   /** 実行中の live CLI プロセスがあれば SIGTERM(2秒後 SIGKILL)で止める(cli.ts と同じ方針)。 */
@@ -601,7 +402,8 @@ export class MonitorLiveController implements vscode.Disposable {
   }
 
   /** pendingSelectId(openDevice 由来)があればそれを優先選択する。無ければ直前の選択が新しい
-   * 一覧にも存在するとき維持し、それ以外は先頭を選択する。 */
+   * 一覧にも存在するとき維持し、それ以外は未選択にする。**先頭や fallback へ倒さない** —— 呼び手は
+   * グリッドの操作だけで、頼まれていないデバイスに serve を立てるとブリッジの自動起動まで撃つ。 */
   private applyDevices(listed: LiveDeviceOption[], bannerMessage: string | undefined): void {
     this.handleConnectionOk();
     const options = [...listed.filter((o) => !this.remoteOptions.has(o.id)), ...this.remoteOptions.values()];
@@ -610,26 +412,12 @@ export class MonitorLiveController implements vscode.Disposable {
     this.pendingSelectId = undefined;
     const preferred = pending !== undefined && options.some((o) => o.id === pending) ? pending : undefined;
     const stillExists = this.selectedDeviceId !== undefined && options.some((o) => o.id === this.selectedDeviceId);
-    let selected = preferred ?? (stillExists ? this.selectedDeviceId : options[0]?.id);
-    // 明示選択(openDevice の pending)が無いときだけ platform 優先を適用する。選択中の platform が
-    // preferredPlatform と食い違う場合、一覧の先頭から一致する platform のデバイスを採る。
-    if (preferred === undefined && this.preferredPlatform) {
-      const current = options.find((o) => o.id === selected);
-      if (!current || current.platform !== this.preferredPlatform) {
-        const match = options.find((o) => o.platform === this.preferredPlatform);
-        if (match) {
-          selected = match.id;
-        }
-      }
-    }
-    this.selectedDeviceId = selected;
+    this.selectedDeviceId = preferred ?? (stillExists ? this.selectedDeviceId : undefined);
     this.post({ type: "devices", devices: options, selectedId: this.selectedDeviceId });
-    this.post({ type: "banner", message: bannerMessage ?? null });
+    if (bannerMessage !== undefined) {
+      this.deps.outputChannel.appendLine(`[live] ${bannerMessage}`);
+    }
     this.ensureServeProcessForSelection();
-    // アプリID/パッケージパスは選択デバイスの platform で解決する(android/ios でセクションが別)。
-    // デバイス確定(初期ロード・一覧更新・自動選択)のたびに送り直さないと、platform 未確定時に
-    // 計算した空の詳細が残る。
-    this.appActions.postAppProfileDetail();
   }
 
   private applyFallback(config: FleetestConfig, bannerMessage: string): void {
@@ -637,154 +425,11 @@ export class MonitorLiveController implements vscode.Disposable {
     this.applyDevices([option], bannerMessage);
   }
 
-  /** Run Test 自動オープン(liveTabHost.ts)が「実行中シナリオの platform」を渡す窓口。選択中デバイスの
-   * platform が食い違う場合のみ、現在の一覧の先頭から一致する platform のデバイスへ即座に切り替える
-   * (一致するデバイスが無ければ現状維持)。一覧未取得のときは preferredPlatform を覚えておき、次の
-   * applyDevices が適用する。 */
-  preferPlatform(platform: string): void {
-    this.preferredPlatform = platform;
-    if (this.devices.length === 0) {
-      return; // 一覧未取得。refreshDevices 完了時の applyDevices が適用する。
-    }
-    const current = this.devices.find((o) => o.id === this.selectedDeviceId);
-    if (current && current.platform === platform) {
-      return; // 既に一致(ミスマッチのときだけ選び直す)。
-    }
-    const match = this.devices.find((o) => o.platform === platform);
-    if (!match || match.id === this.selectedDeviceId) {
-      return;
-    }
-    this.selectedDeviceId = match.id;
-    this.post({ type: "devices", devices: this.devices, selectedId: this.selectedDeviceId });
-    this.ensureServeProcessForSelection();
-    this.appActions.postAppProfileDetail(); // platform 切替に合わせて詳細も更新する(applyDevices と同理由)。
-    if (match.state === "connected") {
-      void this.refreshSnapshot();
-    }
-  }
-
-  /** Run Test 実行前(runHandler.ts の executeRun)から呼ばれる。対象 platform のデバイスへ選び直し、
-   * 未接続なら start-device で起動して待ち、webview の表示状態に関わらずホスト側でストリーミングを起動して
-   * 最初の同期(接続成功)を最大 timeoutMs 待つ(同期のタイムアウトは処理続行。デバイスは確定済み)。
-   * webview の visibility メッセージは別途届くが liveTabVisible の再設定は冪等なので無害。
-   * 一致する platform のデバイスが無い / 起動に失敗した / 実体識別子が無いときは undefined を返し、
-   * 呼び出し元を既存のプロファイル実行へフォールバックさせる(--serial 空で「more than one device」に
-   * なる事故を防ぐ)。 */
-  async prepareForRun(platform: "ios" | "android", timeoutMs: number): Promise<LiveRunTarget | undefined> {
-    if (this.devices.length === 0) {
-      await this.refreshDevices();
-    }
-    this.preferPlatform(platform);
-    // preferPlatform は状態を問わず対象 platform の先頭を選ぶ。一覧に対象 platform が無ければ起動対象も
-    // 選べないためフォールバック(applyFallback の合成デバイスも platform 不一致なら弾かれる)。
-    let option = this.selectedOption();
-    if (!option || option.platform !== platform) {
-      return undefined;
-    }
-    // 未接続(offline/booted/unknown)なら start-device で起動して待つ(冷起動は数十秒かかり得る)。
-    // 起動後に一覧を取り直し、同じ platform の先頭を選び直してから接続状態を再確認する。
-    if (option.state !== "connected") {
-      const booted = await this.bootDevice(option.name, option.machine);
-      if (!booted) {
-        return undefined;
-      }
-      await this.refreshDevices();
-      this.preferPlatform(platform);
-      option = this.selectedOption();
-      if (!option || option.platform !== platform || option.state !== "connected") {
-        return undefined;
-      }
-    }
-    const ref = this.currentDeviceRef();
-    // 実体識別子(android: serial / ios: port)が無ければ単機実行の引数を組めないためフォールバック。
-    if (!ref || ref.platform !== platform || (platform === "android" ? !ref.serial : ref.port == null)) {
-      return undefined;
-    }
-    this.liveTabVisible = true;
-    this.updateLiveFrameSource();
-    await this.waitForStreamSync(timeoutMs);
-    return {
-      platform: ref.platform,
-      serial: ref.serial ?? undefined,
-      port: ref.port ?? undefined,
-      udid: ref.udid ?? undefined,
-    };
-  }
-
   private selectedOption(): LiveDeviceOption | undefined {
     return this.devices.find((o) => o.id === this.selectedDeviceId);
   }
 
-  /** 選択デバイスを `api start-device --name` で起動し完了(exit 0)まで待つ。冷起動で長時間ブロックし得る
-   * (start-device 自身がタイムアウト/リトライを持つ)。進捗は live バナーへ出す。list-devices と同じ
-   * 専用 spawn(runCli=runOneShot)で FleetestCli の直列キューには乗せない。
-   * **手元のデバイスだけ起こす**(`--device-machine local` で絞る。付けないと同名のデバイスが別の機械にも居るとき
-   * start-device が ambiguous で断る)。リモートのデバイス(machine あり)は false = 呼び手がプロファイル実行へ戻す
-   * (この経路の単機実行は手元の serial/port しか組めない)。 */
-  private async bootDevice(name: string, machine: string | undefined): Promise<boolean> {
-    if (machine !== undefined) {
-      return false;
-    }
-    const config = this.deps.getConfig();
-    const resolution = resolveProjectName(this.deps.workspaceRoot, config);
-    if (resolution.kind !== "resolved") {
-      return false;
-    }
-    this.post({ type: "banner", message: t("live.deviceBooting", { name }) });
-    const args = ["api", "start-device", "--name", name, "--project", resolution.project, "--device-machine", "local"];
-    if (config.profile) {
-      args.push("--profile", config.profile);
-    }
-    try {
-      const result = await this.runCli(args);
-      const ok = result.exitCode === 0;
-      this.post({ type: "banner", message: ok ? null : t("live.deviceBootFailed", { name }) });
-      return ok;
-    } catch (error) {
-      this.post({ type: "banner", message: t("live.deviceBootFailedError", { name, error: errorMessage(error) }) });
-      return false;
-    }
-  }
-
-  /** 次の handleConnectionOk() 到達(=最初のフレーム/snapshot 成功)で true、timeoutMs 経過で false。
-   * どちらが先でも二重 resolve しない(settled ガード)。 */
-  private waitForStreamSync(timeoutMs: number): Promise<boolean> {
-    return new Promise((resolve) => {
-      let settled = false;
-      const removeWaiter = () => {
-        const i = this.streamSyncWaiters.indexOf(waiter);
-        if (i >= 0) {
-          this.streamSyncWaiters.splice(i, 1);
-        }
-      };
-      // タイムアウトでも waiter を配列から除去する。残すと再接続が来ないまま prepareForRun が
-      // 繰り返しタイムアウトした際に streamSyncWaiters が次の handleConnectionOk まで無制限に伸びる。
-      const waiter = () => {
-        if (settled) {
-          return;
-        }
-        settled = true;
-        clearTimeout(timer);
-        removeWaiter();
-        resolve(true);
-      };
-      const timer = setTimeout(() => {
-        if (settled) {
-          return;
-        }
-        settled = true;
-        removeWaiter();
-        resolve(false);
-      }, timeoutMs);
-      this.streamSyncWaiters.push(waiter);
-    });
-  }
-
-  /** デバイスタイル右クリック「ライブ操作」から(monitorPanel.ts の deviceTiles.js → liveTabHost.ts の
-   * openForDevice → 「ライブ操作」タブの liveTab.js openLiveDevice)。
-   * id はモニターと共通の `platform:name`(Swift 側 MonitorTarget.id と devicesToOptions が同形式)。
-   * 一覧に無ければ取得し直してから選択し、接続済みなら snapshot まで自動取得する。 */
-  /** タイル右クリック(liveTabHost.ts の openForDevice)で開く**他の機械のデバイス**を選択肢に加える。
+  /** グリッドビューのタイル(liveTabHost.ts の gridAction)から来た**他の機械のデバイス**を選択肢に加える。
    * 続く openDevice が一覧を取り直さずにこの id で選べるよう、this.devices にもすぐ入れる */
   registerRemoteDevice(option: LiveDeviceOption): void {
     this.remoteOptions.set(option.id, option);
@@ -797,21 +442,16 @@ export class MonitorLiveController implements vscode.Disposable {
   }
 
   /** グリッドビュー(1台表示)のツールバー・修飾キー操作(liveTabHost.ts の gridAction)。
-   * **ライブ操作と同じ serve へ流す** —— 選択中のデバイスが id と違えば、ライブ操作タブの選択ごと
-   * id へ切り替えてから撃つ(serve は1本だけ = 同じデバイスへ2本の常駐を立てない)。
+   * serve は1本だけ(同じデバイスへ2本の常駐を立てない)—— 選択中のデバイスが id と違えば、
+   * id へ切り替えてから撃つ。
    * 座標の操作は画面サイズ(lastScreen)が要るので、切り替え直後の観測が済むのを待ってから撃つ。 */
   async handleGridAction(id: string, action: GridLiveAction): Promise<void> {
     const switching = this.selectedDeviceId !== id;
     if (switching) {
-      if (this.appActions.isRecordingInProgress()) {
-        this.post({ type: "gridActionError", id, message: t("live.gridRecordingOtherDevice") });
-        return;
-      }
       if (this.busy) {
         this.post({ type: "gridActionError", id, message: t("live.busyRetry") });
         return;
       }
-      this.preferredPlatform = undefined; // 手動の選択(openDevice の経路と同じ)
       await this.openDevice(id);
       if (this.selectedDeviceId !== id) {
         this.post({ type: "gridActionError", id, message: t("live.deviceNotOpenable", { id }) });
@@ -833,10 +473,10 @@ export class MonitorLiveController implements vscode.Disposable {
       await this.waitForIdle(SERVE_REQUEST_TIMEOUT_MS);
     }
     // **撃つ直前に合図する**(gridLivePanel.js の枠の鮮度)。切り替え・待ちの間に届いた観測(開いたときの観測・
-    // ライブ操作タブの撮り直し)を、webview が「この操作の直接の結果」と取り違えないため。handleWebviewMessage は
+    // 整定の撮り直し)を、webview が「この操作の直接の結果」と取り違えないため。runGridAction は
     // 同期で runAction へ入り、最初の await より前に busy を立てるので、合図と操作の結果の間に別の観測は割り込まない
     this.post({ type: "gridActionStarted", id });
-    this.handleWebviewMessage(action);
+    this.runGridAction(action);
   }
 
   private async openDevice(id: string): Promise<void> {
@@ -854,12 +494,7 @@ export class MonitorLiveController implements vscode.Disposable {
       await this.refreshDevices();
     }
     if (this.selectedDeviceId !== id) {
-      // 一覧取得失敗(フォールバック)は refreshDevices が banner を出し済み。取れた一覧に居ないのは
-      // **他の機械のデバイス**(モニターのタイル id が `ios:<machine>/<name>`)か消えたデバイス —— 黙ると前のデバイスの
-      // 画面が出続け、開いたつもりのデバイスと違う画面になる(実地: M1Ultra の iPhone wave)
-      if (this.devices.every((device) => device.id !== id) && this.devices[0]?.id !== FALLBACK_DEVICE_ID) {
-        this.post({ type: "banner", message: t("live.deviceNotOpenable", { id }) });
-      }
+      // 開けなかった旨は呼び手(handleGridAction)が gridActionError で言う
       return;
     }
     const selected = this.devices.find((device) => device.id === id);
@@ -885,9 +520,6 @@ export class MonitorLiveController implements vscode.Disposable {
     } else {
       this.ensureServeProcess(device);
     }
-    // serve(操作・snapshot 用)とは別に、ライブ映像の供給元(ストリーミング/ポーリング)も
-    // 選択デバイスに合わせて張り替える。デバイス選択が変わる経路は全てここを通る。
-    this.updateLiveFrameSource();
   }
 
   /** device 向けの serve プロセスが既に起動していれば何もしない。そうでなければ
@@ -1139,17 +771,13 @@ export class MonitorLiveController implements vscode.Disposable {
     });
   }
 
-  /** 「全て終了」が終わったら呼ぶ。起動の抑止を解き、パネル再オープンと同じ経路
-   * (refreshDevices → applyDevices → ensureServeProcessForSelection)で serve を立て直す
-   * (選んでいたデバイスが落ちた・ブリッジが消えた後の扱いをそちらに任せる)。 */
+  /** 「全て終了」が終わったら呼ぶ。起動の抑止を解く。serve は次のグリッド操作が立て直す
+   * (runAction → ensureServeProcess。選んでいたデバイスが落ちた・ブリッジが消えた後の扱いもそちらに任せる)。 */
   resumeServeAfterSweep(): void {
     if (!this.serveSuspendedForSweep) {
       return;
     }
     this.serveSuspendedForSweep = false;
-    if (this.liveTabVisible) {
-      void this.refreshDevices();
-    }
   }
 
   /** 実行中の serve プロセスがあれば止めて(this.serveProcess も即座に未設定に戻す)、参照を
@@ -1157,9 +785,6 @@ export class MonitorLiveController implements vscode.Disposable {
    * 個別に this.serveProcess を扱うため、こちらは呼ばない)。 */
   private stopServeProcess(): void {
     this.serveStopEpoch += 1;
-    // 表示ごと解く(予約だけ消すと「表示中」の記録が残り、次の serve も起動中だったとき
-    // 値が変わらず予約が掛からない = 同じデバイスの切り替えで「接続中」が残り続ける)
-    this.applyBridgeStarting(false);
     if (this.serveRestartTimer) {
       clearTimeout(this.serveRestartTimer);
       this.serveRestartTimer = undefined;
@@ -1216,8 +841,7 @@ export class MonitorLiveController implements vscode.Disposable {
   }
 
   /** serve の stdout から届いた NDJSON 1行を pendingServeRequest に配る。actionResult は
-   * 保持だけして、続く snapshot/frame イベントで resolve する(ファイル冒頭プロトコル参照)。
-   * pending.resolvesOn と一致しない kind(自動フレームとユーザー操作の取り違え)は無視する。 */
+   * 保持だけして、続く snapshot イベントで resolve する(ファイル冒頭プロトコル参照)。 */
   private handleServeEvent(value: unknown): void {
     const event = parseLiveServeEvent(value);
     if (!event) {
@@ -1231,19 +855,12 @@ export class MonitorLiveController implements vscode.Disposable {
     }
     if (event.kind === "actionResult") {
       pending.action = event.result;
+      if (pending.cmd === "gesture") {
+        this.post({ type: "gestureActionDone", ok: event.result.ok });
+      }
       return;
     }
-    if (event.kind !== pending.resolvesOn) {
-      this.deps.outputChannel.appendLine(
-        t("live.serveMismatchedEvent", { expected: pending.resolvesOn, actual: event.kind }),
-      );
-      return;
-    }
-    if (event.kind === "snapshot") {
-      this.settlePendingServeRequest({ action: pending.action, snapshot: event.result });
-    } else {
-      this.settlePendingServeRequest({ frame: event.result });
-    }
+    this.settlePendingServeRequest({ action: pending.action, snapshot: event.result });
   }
 
   private settlePendingServeRequest(outcome: PendingServeOutcome): void {
@@ -1257,8 +874,7 @@ export class MonitorLiveController implements vscode.Disposable {
   }
 
   /** 応答を受け取れなくなった(プロセス終了・タイムアウト)ときに、待たせている呼び出し元を
-   * エラー結果で解放する(busy 状態のまま固まらないようにする安全弁)。resolvesOn に応じて
-   * snapshot/frame のどちらか一方だけを埋める。 */
+   * エラー結果で解放する(busy 状態のまま固まらないようにする安全弁)。 */
   private failPendingServeRequest(message: string): void {
     const pending = this.pendingServeRequest;
     if (!pending) {
@@ -1266,17 +882,13 @@ export class MonitorLiveController implements vscode.Disposable {
     }
     // **bridgeStarting は常に false**(この経路は自動起動とは無関係の host 側の障害
     // [プロセス終了・応答タイムアウト]なので、デバイスが起動中かどうかは分からない・関係ない)
-    if (pending.resolvesOn === "frame") {
-      this.settlePendingServeRequest({ frame: { ok: false, error: message, bridgeStarting: false } });
-      return;
-    }
     this.settlePendingServeRequest({
       action: pending.expectsAction ? { ok: false, error: message, bridgeStarting: false } : undefined,
       snapshot: { ok: false, error: message, bridgeStarting: false },
     });
   }
 
-  /** serve への送信を直列化するチェーン内で run を実行する(自動フレームとユーザー操作の pending
+  /** serve への送信を直列化するチェーン内で run を実行する(観測とユーザー操作の pending
    * スロット競合を防ぐ)。チェーン自体は常に成功状態を維持する(run の失敗を次回以降へ持ち越さない)。 */
   private enqueueServeSend<T>(run: () => Promise<T>): Promise<T> {
     const result = this.serveSendChain.then(run, run);
@@ -1307,7 +919,7 @@ export class MonitorLiveController implements vscode.Disposable {
       });
     }
     return new Promise((resolve) => {
-      // 正当に長く占有しうる操作(軌跡・press/drag/pinch・launch/install)は応答待ちの上限に
+      // 正当に長く占有しうる操作(軌跡・press/drag/pinch・fold)は応答待ちの上限に
       // その分を足す(serve 側の command watchdog も同じだけ延びる)
       const timeout = setTimeout(() => {
         this.failPendingServeRequest(serveTimeoutMessage());
@@ -1315,7 +927,7 @@ export class MonitorLiveController implements vscode.Disposable {
       }, SERVE_REQUEST_TIMEOUT_MS + serveCommandAllowanceMs(command));
       this.pendingServeRequest = {
         expectsAction: command.cmd !== "refresh",
-        resolvesOn: "snapshot",
+        cmd: command.cmd,
         action: undefined,
         resolve: (outcome) =>
           resolve({
@@ -1330,49 +942,12 @@ export class MonitorLiveController implements vscode.Disposable {
     });
   }
 
-  /** 画像のみの frame コマンドを送る(自動リフレッシュ用)。再バインド中なら待ち、それでも serve が
-   * 起動していなければ CLI を呼ばずに即座にエラー結果を返す(sendServeCommandNow と同じ文言)。
-   * enqueueServeSend で直列化する。 */
-  private sendServeFrame(): Promise<LiveFrameResult> {
-    return this.enqueueServeSend(() => this.sendServeFrameNow());
-  }
-
-  private async sendServeFrameNow(): Promise<LiveFrameResult> {
-    await this.awaitServeRebind();
-    const proc = this.serveProcess;
-    if (!proc || proc.exitCode !== null || proc.signalCode !== null) {
-      return Promise.resolve({
-        ok: false,
-        error: serveUnavailableMessage(),
-        bridgeStarting: false,
-      });
-    }
-    return new Promise((resolve) => {
-      const timeout = setTimeout(() => {
-        this.failPendingServeRequest(serveTimeoutMessage());
-        this.restartWedgedServe(proc);
-      }, SERVE_REQUEST_TIMEOUT_MS);
-      this.pendingServeRequest = {
-        expectsAction: false,
-        resolvesOn: "frame",
-        action: undefined,
-        resolve: (outcome) =>
-          resolve(outcome.frame ?? {
-            ok: false, error: t("live.internalErrorFrameMissing"), bridgeStarting: false,
-          }),
-        timeout,
-      };
-      proc.stdin.write(serializeLiveServeCommand({ cmd: "frame" }));
-    });
-  }
-
   // ---- snapshot -------------------------------------------------------------------
 
   private applySnapshotResult(result: LiveSnapshot | LiveErrorResult): void {
-    this.applyBridgeStarting(result.bridgeStarting);
     if (!result.ok) {
-      // 自動起動が進行中の失敗はエラーとして出さない(applyBridgeStarting の中立表示に任せる。
-      // 起動が終わっていればこの回は自動で reachable になる=撃ち直しはしない)
+      // 自動起動が進行中の失敗はエラーとして出さない(起動が終わっていればこの回は自動で reachable になる
+      // = 撃ち直しはしない)
       if (result.bridgeStarting) {
         return;
       }
@@ -1410,249 +985,19 @@ export class MonitorLiveController implements vscode.Disposable {
     }
   }
 
-  // ---- ライブ映像の供給元切り替え(ストリーミング ⇄ ポーリング) --------------------------
-  // 設定タブ「ポーリングモードを使用する」のトグルはワークスペース単位で永続化される
-  // (workspaceState の "monitor.pollingMode")のみで、パネルを跨いだ即時反映のプッシュ通知は無い。
-  // このパネルへは次のデバイス選択/表示状態変化(updateLiveFrameSource 呼び出し契機)で追随する。
-
-  /**
-   * ライブフレームの供給元を「画面ストリーミング(iOS: fleetest-simstream / Android:
-   * fleetest-androidstream)」と「serve ポーリング(frameTick)」の間で切り替える唯一の分岐点。
-   * デバイス選択・表示状態が変わるたびに呼ぶ。ストリーミング条件を満たせば frameTick を止めて
-   * helper を起動し、満たさなければ helper を止めて(表示中なら)ポーリングへ戻す。ポーリングは
-   * ヘッドレスでも動くフォールバックなので、ストリーミング不可・helper 未ビルドでもライブ操作は成立する。
-   * isPollingMode() が true の間は両プラットフォームともストリーミング条件を無条件に不成立とする。
-   */
-  private updateLiveFrameSource(): void {
-    const config = this.deps.getConfig();
-    const device = this.currentDeviceRef();
-    const pollingForced = this.deps.isPollingMode();
-    // codecError(scope=live)を受けていれば設定値に関わらず mjpeg 固定(fallbackToMjpeg 参照)。
-    const codec: "mjpeg" | "h264" = this.liveMjpegFallback ? "mjpeg" : config.streamCodec;
-    const codecArgs = codec === "h264" ? ["--codec", "h264"] : [];
-
-    // **iOS 実機は simstream を使わない**(CoreSimulator の私有 API = シミュレータ専用。実機の UDID は
-    // 「invalid UDID」で即終了し、再起動を繰り返す間はポーリングも止まる = 前のデバイスの絵が残って見えた。
-    // モニターのタイルと同じ規則: monitorDeviceStreamController.ts)。ポーリング(serve の frame)へ直行する
-    const physical = this.selectedOption()?.kind === "physical";
-    // 他の機械のデバイスも配信は張らない(simstream/androidstream はこの Mac のデバイスしか映せない)。ポーリング
-    // (serve の frame)は serve ごと向こうで動くのでそのまま使える
-    const remote = device?.machine !== undefined;
-    if (!pollingForced && this.liveTabVisible && config.iosStreamEnabled && device?.platform === "ios" && device.udid
-        && !physical && !remote) {
-      const simStreamPath = resolveSimStream(config);
-      if (simStreamPath) {
-        this.clearFrameTimer();
-        this.startStreamPipeline(device.udid, {
-          command: simStreamPath,
-          args: [
-            "--udid", device.udid, "--fps", String(config.liveFps), "--max-width", String(LIVE_STREAM_MAX_WIDTH),
-            ...codecArgs,
-          ],
-          logPrefix: `ios-stream ${device.udid}`,
-          codec,
-        });
-        return;
-      }
-    } else if (
-      !pollingForced &&
-      this.liveTabVisible &&
-      config.androidStreamEnabled &&
-      device?.platform === "android" &&
-      device.serial &&
-      !remote
-    ) {
-      const androidStreamPath = resolveAndroidStream(config);
-      const adbPath = androidStreamPath ? resolveAdb() : undefined;
-      if (androidStreamPath && adbPath) {
-        this.clearFrameTimer();
-        this.startStreamPipeline(device.serial, {
-          command: androidStreamPath,
-          args: [
-            "--serial", device.serial, "--adb", adbPath,
-            "--fps", String(config.liveFps), "--max-width", String(LIVE_STREAM_MAX_WIDTH),
-            ...codecArgs,
-          ],
-          logPrefix: `android-stream ${device.serial}`,
-          codec,
-        });
-        return;
-      }
-    }
-
-    this.stopStreamPipeline();
-    if (this.liveTabVisible) {
-      this.scheduleFrameTick(0);
-    } else {
-      this.clearFrameTimer();
-    }
-  }
-
-  /** webview から codecError(scope=live)を受けたら monitorPanel.ts から呼ぶ。以後 mjpeg 固定にし、
-   * 稼働中のストリームがあれば同じ対象へ即座に mjpeg で再起動する(updateLiveFrameSource の
-   * startStreamPipeline は同一 key・稼働中なら早期returnするため、先に止めてから呼び直す)。 */
-  fallbackToMjpeg(): void {
-    this.liveMjpegFallback = true;
-    if (this.streamPipeline) {
-      this.stopStreamPipeline();
-      this.updateLiveFrameSource();
-    }
-  }
-
-  /** webview から streamStall(scope=live)を受けたら monitorPanel.ts から呼ぶ。初期キーフレームの
-   * 取り逃しで描画が始まらない状態を、helper を作り直して新キーフレームから始めさせて回復する
-   * (startStreamPipeline は同一 key・稼働中なら早期returnするため、先に止めてから張り直す)。
-   * fallbackToMjpeg と同型。 */
-  restartStream(): void {
-    if (this.streamPipeline) {
-      this.stopStreamPipeline();
-      this.updateLiveFrameSource();
-    }
-  }
-
-  /** key(iOS: UDID、Android: adb serial)向けの StreamPipeline を起動する。同じ key で既に稼働中
-   * なら何もしない(張り替えでフレームが途切れないように)。別 key なら旧 helper を止めて張り替える。 */
-  private startStreamPipeline(
-    key: string,
-    spec: {
-      readonly command: string;
-      readonly args: readonly string[];
-      readonly logPrefix: string;
-      readonly codec: "mjpeg" | "h264";
-    },
-  ): void {
-    if (this.streamPipeline && this.streamPipeline.isRunning() && this.streamKey === key) {
-      return;
-    }
-    this.stopStreamPipeline();
-    this.streamKey = key;
-    this.deps.onStreamKeyChanged(key);
-    const pipeline = new StreamPipeline({
-      command: spec.command,
-      args: spec.args,
-      logPrefix: spec.logPrefix,
-      outputChannel: this.deps.outputChannel,
-      codec: spec.codec,
-      onFrame: (image) => {
-        // ライブ操作パネルの frame メッセージは w/h を持たない(deviceStream.ts 冒頭コメント参照)ため無視する。
-        this.handleConnectionOk();
-        this.post({ type: "frame", image });
-      },
-      onChunk: (data, keyframe, width, height) => {
-        this.handleConnectionOk();
-        // liveH264Chunk は "live" 封筒を経由しない top-level メッセージ(webview 側
-        // src/webview/monitor/main.js の直下ディスパッチャが受ける契約。monitorModel.ts の
-        // MonitorToWebviewMessage 参照)。
-        this.deps.post({ type: "liveH264Chunk", keyframe, width, height, data: new Uint8Array(data) });
-      },
-      onConnectionOk: () => this.handleConnectionOk(),
-      // helper が「この機械では h264 が無理」と降りたら mjpeg で張り直す(タイル側と同じ扱い。
-      // 配線しないと同じ引数で再起動し続け、無フレームのまま諦めてポーリングへ落ちる)
-      onCodecUnavailable: () => this.fallbackToMjpeg(),
-      onFailure: (message) => this.handleStreamGiveUp(message),
-    });
-    this.streamPipeline = pipeline;
-    pipeline.start();
-  }
-
-  /** 稼働中のストリーミング helper を止めてバインド情報も消す(dispose/切り替え/非表示から呼ぶ)。 */
-  private stopStreamPipeline(): void {
-    if (this.streamPipeline) {
-      this.streamPipeline.dispose();
-      this.streamPipeline = undefined;
-    }
-    if (this.streamKey !== undefined) {
-      this.streamKey = undefined;
-      this.deps.onStreamKeyChanged(undefined);
-    }
-  }
-
-  /** ストリーミングが継続不能になったときのフォールバック。helper を止め、接続断は出さずに
-   * ポーリング(frameTick)へ戻す(ポーリングはヘッドレスでも動く既存経路)。 */
-  private handleStreamGiveUp(message: string): void {
-    this.deps.outputChannel.appendLine(t("live.streamGiveUpSwitchPolling", { message }));
-    this.stopStreamPipeline();
-    if (this.liveTabVisible) {
-      this.scheduleFrameTick(0);
-    }
-  }
-
-  // ---- 自動フレーム(ライブタブ表示中、画像のみの定期更新) ------------------------------
-
-  private clearFrameTimer(): void {
-    if (this.frameTimer) {
-      clearTimeout(this.frameTimer);
-      this.frameTimer = undefined;
-    }
-  }
-
-  private scheduleFrameTick(delayMs: number): void {
-    if (this.frameTimer) {
-      return;
-    }
-    this.frameTimer = setTimeout(() => {
-      this.frameTimer = undefined;
-      void this.frameTick();
-    }, delayMs);
-  }
-
-  /** 表示中のみ回る自動フレーム。busy(ユーザー操作中)・パネル非表示・serve 不在の回はスキップ
-   * (このスキップ回は handleFrameFailure の streak に数えない)。失敗3回連続で接続断オーバーレイに
-   * 切り替わる(handleFrameFailure)。serve 死は既存の自動再起動が回復する。
-   * **bridgeStarting 中の失敗は handleFrameFailure へ回さない** —— 自動起動の進行中は
-   * applyBridgeStarting が中立の「接続中」表示に倒す(接続断のエラー表示は本当に止まった
-   * ときだけ出す)。
-   * 成功時は config.liveFps を上限とする間隔(1フレームの実測所要を差し引く)で次フレームへ。
-   * **delayMs=0 のホットループにしない** —— デバイスが返す限り最速で /screenshot を叩く(iOS/Android 共通)。
-   * スキップ・失敗時のみ FRAME_IDLE_RETRY_MS 空ける。 */
-  private async frameTick(): Promise<void> {
-    if (!this.liveTabVisible) {
-      return;
-    }
-    // ストリーミング中はポーリングしない(二重取得を避ける)。ここで抜けると再スケジュールもしないため
-    // 供給元がストリーミングへ切り替わった直後に残っていた tick はこの1回で自然に止まる。
-    if (this.streamPipeline?.isRunning()) {
-      return;
-    }
-    let delayMs = FRAME_IDLE_RETRY_MS;
-    if (this.deps.isPanelActive() && !this.busy && this.serveProcess && this.currentDeviceRef()) {
-      const startedAt = Date.now();
-      const frame = await this.sendServeFrame();
-      this.applyBridgeStarting(frame.bridgeStarting);
-      if (frame.ok) {
-        this.handleConnectionOk();
-        this.post({ type: "frame", image: frame.image });
-        const targetPeriodMs = Math.round(1000 / this.deps.getConfig().liveFps);
-        delayMs = Math.max(0, targetPeriodMs - (Date.now() - startedAt));
-      } else if (!frame.bridgeStarting) {
-        this.handleFrameFailure(frame.error);
-      }
-    }
-    if (this.liveTabVisible && !this.streamPipeline?.isRunning()) {
-      this.scheduleFrameTick(delayMs);
-    }
-  }
-
-  // ---- tap/type/drag/press/terminate/appSwitcher/home ---------------------------
+  // ---- tap/type/drag/press/appSwitcher/home ---------------------------
 
   /** serve へ1コマンド送って結果を反映する。成功時は serve が続けて返す観測イベント(操作後の
    * 追加待ちなしで届く。ブリッジ応答=UI整定済みのため)をそのまま画面へ反映する。失敗時は
    * 画面を再取得しない(観測イベント自体は届くが反映せず、直近のエラーを表示する)。
-   * recordStep はレコーディング中(appActions.recordStep)かつ action 成功時に記録する(busy中スキップ・
-   * デバイス未選択・action失敗では記録しない)。snapshot 失敗では記録を止めない: home/appSwitcher/
-   * terminate は対象アプリを離れ直後の観測が失敗し得るが、操作自体は成立しているため。
-   * silentObservation: 直後に別コマンドが続くとき観測を反映・表示せず action 成否だけ返す。
-   * install(=simctl 再インストール)はアプリを終了させるため直後の snapshot は必ず失敗する(正常)。
-   * これを表示・中断に使わないための逃げ道(録画開始の install→launch で使う)。
-   * 戻り値は呼び出し元(startRecord)が install/launch の成否判定に使う。 */
+   * 戻り値は操作と直後の観測が成功したか。 */
   private async runAction(
     command: LiveServeCommand,
-    recordStep?: RecordedStep,
-    options?: { readonly silentObservation?: boolean; readonly logLabel?: string },
+    options?: { readonly logLabel?: string },
   ): Promise<boolean> {
     if (this.busy) {
-      // **黙って落とさない** —— 画面タップ・ツールバーは busy 中 webview 側で止まるが、
-      // レコーディング開始は止まらないので、ここに来ると overlay だけ光って何も起きない
+      // **黙って落とさない** —— 画面タップ・ツールバーは busy 中 webview 側で止まるので、
+      // ここに来るのは host 内部の呼び出しだけ
       this.postActionError(t("live.busyRetry"));
       return false;
     }
@@ -1669,9 +1014,6 @@ export class MonitorLiveController implements vscode.Disposable {
     try {
       this.ensureServeProcess(device);
       const { action, snapshot } = await this.sendServeCommand(command);
-      if (action) {
-        this.applyBridgeStarting(action.bridgeStarting);
-      }
       if (action && !action.ok) {
         // 自動起動が進行中の失敗はエラーとして出さない —— 撃ち直しはしない
         // (利用者が画面の復帰を見てから自分でやり直す。interruption-no-resend-policy と同じ理由)
@@ -1687,17 +1029,11 @@ export class MonitorLiveController implements vscode.Disposable {
       }
       // **利用者の操作が通ったら前のエラーは消す** —— 自動で消えるのは接続系の3文言だけ
       // (isConnectionClassMessage)なので、ブリッジ接続拒否のように serve が返した文言は
-      // 状況が直っても残り続けていた。ここは利用者が起こした操作の成功経路だけを通るので、
-      // 常時回っている自動フレーム(frameTick)が読む前に消してしまうことはない。
+      // 状況が直っても残り続ける。
       this.post({ type: "actionError", message: "" });
       this.connectionBannerShown = false;
-      // 記録するのは対象アプリの上での操作だけ(LiveAppActions.recordStep の operationBelongsToApp doc)
-      this.appActions.recordStep(recordStep, action?.app);
       if (options?.logLabel) {
         this.postOperationLog(options.logLabel, true, mcp, loggedDeviceId);
-      }
-      if (options?.silentObservation) {
-        return true;  // action は成功。観測は反映も表示もしない(直後の launch が画面を出す)
       }
       this.applySnapshotResult(snapshot);
       return snapshot.ok;
@@ -1711,51 +1047,29 @@ export class MonitorLiveController implements vscode.Disposable {
 
   /** 画像上の点タップ専用。タップ成功後、当たった要素がテキスト入力欄なら webview の
    * 「入力するテキスト」欄へフォーカスを移す(デバイス側の入力欄フォーカスに続けてすぐ入力できる)。
-   * hit は tapPoint 側で算出済みの当たり要素(recordStep と同じ hitTestElement 結果)。 */
+   * hit は tapPoint 側で算出済みの当たり要素。 */
   private async runTapAtPoint(
     command: LiveServeCommand,
-    step: RecordedStep | undefined,
     hit: LiveElement | undefined,
     logLabel: string,
   ): Promise<void> {
-    const ok = await this.runAction(command, step, { logLabel });
+    const ok = await this.runAction(command, { logLabel });
     if (ok && hit && isTextInputElement(hit)) {
       this.post({ type: "focusTypeInput" });
     }
   }
 
-  // ---- webview からのメッセージ -----------------------------------------------------
-  // isLiveFromWebviewMessage による型ガードは呼び出し元(monitorPanel.ts の
-  // isMonitorFromWebviewMessage の "live" ケース)側で済んでいるためここでは行わない。
+  // ---- グリッドビューからの操作 -----------------------------------------------------
 
-  handleWebviewMessage(message: LiveFromWebviewMessage): void {
+  private runGridAction(message: GridLiveAction): void {
     // **観測の最中に届いた画面の操作は、観測が終わってから撃つ**(断らない)。画面の撮り直しは操作の結果のたびに
     // 走る(webview の整定の撮り直し・グリッドビューの絵の変化)ので、その窓に押したタップが黙って消えていた
     // (実地: 画面が止まっているのにタップが空振りした)。まだ撃っていない操作を後で撃つだけ = 撃ち直しではない
     if (this.busy && this.busyObserving && OBSERVATION_DEFERRABLE_ACTIONS.has(message.type)) {
-      void this.waitForIdle(SERVE_REQUEST_TIMEOUT_MS).then(() => this.handleWebviewMessage(message));
+      void this.waitForIdle(SERVE_REQUEST_TIMEOUT_MS).then(() => this.runGridAction(message));
       return;
     }
     switch (message.type) {
-      case "refreshDevices":
-        void this.refreshDevices();
-        break;
-      case "selectDevice":
-        if (this.devices.some((device) => device.id === message.id)) {
-          this.handleConnectionOk();
-          this.preferredPlatform = undefined; // 手動選択は platform 優先より強い(明示選択を尊重)
-          this.selectedDeviceId = message.id;
-          this.ensureServeProcessForSelection();
-          this.appActions.postAppProfileDetail();
-        }
-        break;
-      case "openDevice":
-        this.preferredPlatform = undefined; // 手動(タイル右クリック)選択は platform 優先を解除する
-        void this.openDevice(message.id);
-        // デバイスタイル右クリック起動(liveTab.js の openLiveDevice)は refreshAppProfiles を
-        // 送らない(初回自動 refresh を抑止する経路)ため、ここでアプリプロファイル一覧を補充する。
-        this.appActions.refreshAppProfiles();
-        break;
       case "refreshSnapshot":
         void this.refreshSnapshot();
         break;
@@ -1770,12 +1084,10 @@ export class MonitorLiveController implements vscode.Disposable {
           this.lastScreen,
         );
         const tapHit = hitTestElement(point, this.lastElements);
-        const tapChain = tapHit ? locatorChainForElement(tapHit, this.lastElements) : undefined;
-        const tapStep: RecordedStep | undefined = tapChain ? { action: "tap", ...tapChain } : undefined;
         const tapLabel = tapHit
           ? t("live.opLabel.tap", { target: describeElementShort(tapHit) })
           : t("live.opLabel.tap", { target: `(${Math.round(point.x)}, ${Math.round(point.y)})` });
-        void this.runTapAtPoint({ cmd: "tap", x: point.x, y: point.y }, tapStep, tapHit, tapLabel);
+        void this.runTapAtPoint({ cmd: "tap", x: point.x, y: point.y }, tapHit, tapLabel);
         break;
       }
       case "dragPoints": {
@@ -1800,7 +1112,6 @@ export class MonitorLiveController implements vscode.Disposable {
             fromX: from.x, fromY: from.y, toX: to.x, toY: to.y,
             press: pressSeconds, duration: durationSeconds,
           },
-          { action: "swipe", direction },
           { logLabel: swipeLabel },
         );
         break;
@@ -1829,14 +1140,12 @@ export class MonitorLiveController implements vscode.Disposable {
           break;
         }
         const fingers = [{ points: devicePoints }];
-        const traceLabel = t("live.opLabel.trace");
+        // 送った軌跡の要約を残す(出力パネル)。点が飛んだ報告(軌跡が絵の左上を経由した)を、拡張の側で混ざったのか
+        // デバイスの側で起きたのかに分けるため —— 範囲の最小が 0 で跳びが大きければ、送った点列に混ざっていた
+        this.deps.outputChannel.appendLine(`[live] trace: ${traceSummary(message.points, display)}`);
         void this.runAction(
           cap === undefined ? { cmd: "gesture", fingers } : { cmd: "gesture", fingers, maxGestureSeconds: cap },
-          {
-            action: "gesture", gesture: recordedGestureFingers(fingers, screen),
-            ...(cap === undefined ? {} : { maxGestureSeconds: cap }),
-          },
-          { logLabel: traceLabel },
+          { logLabel: t("live.opLabel.trace") },
         );
         break;
       }
@@ -1853,13 +1162,10 @@ export class MonitorLiveController implements vscode.Disposable {
         // 実測ホールド時間をそのまま流す(serve タイムアウト対策で 0.5〜5 秒にクランプ)
         const duration = Math.min(Math.max(message.holdMs / 1000, 0.5), 5);
         const pressHit = hitTestElement(point, this.lastElements);
-        const pressStep: RecordedStep | undefined = pressHit
-          ? { action: "press", ...locatorChainForElement(pressHit, this.lastElements), duration }
-          : undefined;
         const pressLabel = pressHit
           ? t("live.opLabel.press", { target: describeElementShort(pressHit) })
           : t("live.opLabel.press", { target: `(${Math.round(point.x)}, ${Math.round(point.y)})` });
-        void this.runAction({ cmd: "press", x: point.x, y: point.y, duration }, pressStep, { logLabel: pressLabel });
+        void this.runAction({ cmd: "press", x: point.x, y: point.y, duration }, { logLabel: pressLabel });
         break;
       }
       case "doubleTapPoint": {
@@ -1872,16 +1178,12 @@ export class MonitorLiveController implements vscode.Disposable {
           { width: message.displayWidth, height: message.displayHeight },
           this.lastScreen,
         );
-        // 記録は tap と同じくロケータ付きにする(生成コードは doubleTap("#id"))。
         // **座標へ畳んでから送る**のは ref の名前空間がブリッジごとに違うため(AppDriver の注記)
         const hit = hitTestElement(point, this.lastElements);
-        const step: RecordedStep | undefined = hit
-          ? { action: "doubleTap", ...locatorChainForElement(hit, this.lastElements) }
-          : undefined;
         const label = hit
           ? t("live.opLabel.doubleTap", { target: describeElementShort(hit) })
           : t("live.opLabel.doubleTap", { target: `(${Math.round(point.x)}, ${Math.round(point.y)})` });
-        void this.runAction({ cmd: "doubleTap", x: point.x, y: point.y }, step, { logLabel: label });
+        void this.runAction({ cmd: "doubleTap", x: point.x, y: point.y }, { logLabel: label });
         break;
       }
       case "pinch": {
@@ -1890,7 +1192,6 @@ export class MonitorLiveController implements vscode.Disposable {
         const zoomIn = message.zoomIn;
         void this.runAction(
           { cmd: "pinch", scale: zoomIn ? 2 : 0.5, duration: 0.5 },
-          { action: zoomIn ? "pinchOut" : "pinchIn" },
           { logLabel: t(zoomIn ? "live.opLabel.pinchOut" : "live.opLabel.pinchIn") },
         );
         break;
@@ -1900,58 +1201,24 @@ export class MonitorLiveController implements vscode.Disposable {
           this.postActionError(t("live.typeTextEmpty"));
           break;
         }
-        // 直前の tap でフォーカスした要素へ送る前提でロケータを付けずに記録する(ScenarioCodeGen が
-        // type("text") を出す)。**入力先も同じ**で、ref は付けずフォーカス中の要素へ送る
-        // (理由は LiveFromWebviewMessage の typeText の doc)。
-        const typeStep: RecordedStep = { action: "type", text: message.text };
-        const typedLabel = t("live.opLabel.type", { text: truncateOperationLabelText(message.text) });
+        // **入力先はデバイス側でフォーカスしている要素**(ref は付けない。理由は GridLiveAction の typeText の doc)
         void this.runAction(
           { cmd: "type", text: message.text },
-          typeStep,
-          { logLabel: typedLabel },
+          { logLabel: t("live.opLabel.type", { text: truncateOperationLabelText(message.text) }) },
         );
         break;
       }
       case "home":
-        void this.runAction({ cmd: "home" }, { action: "home" }, { logLabel: t("live.opLabel.home") });
+        void this.runAction({ cmd: "home" }, { logLabel: t("live.opLabel.home") });
         break;
       case "fold":
-        // 記録しない(gen-scenario のコード生成に fold / unfold が無い = ScenarioCodeGen)
         void this.runAction(
           { cmd: "fold", state: message.state },
-          undefined,
           { logLabel: t(message.state === "fold" ? "live.opLabel.fold" : "live.opLabel.unfold") },
         );
         break;
       case "appSwitcher":
-        void this.runAction(
-          { cmd: "appSwitcher" },
-          { action: "appSwitcher" },
-          { logLabel: t("live.opLabel.appSwitcher") },
-        );
-        break;
-      case "visibility":
-        this.liveTabVisible = message.visible;
-        // 表示なら供給元を確定(ストリーミング開始 or ポーリング再開)、非表示なら両方止める。
-        this.updateLiveFrameSource();
-        break;
-      case "refreshAppProfiles":
-        this.appActions.refreshAppProfiles();
-        break;
-      case "selectAppProfile":
-        this.appActions.selectAppProfile(message.appProfile);
-        break;
-      case "installApp":
-        void this.appActions.installApp(message.appProfile);
-        break;
-      case "launchApp":
-        void this.appActions.launchApp(message.appProfile);
-        break;
-      case "startRecord":
-        void this.appActions.startRecord(message.appProfile, message.autoInstall);
-        break;
-      case "stopRecord":
-        this.appActions.stopRecord();
+        void this.runAction({ cmd: "appSwitcher" }, { logLabel: t("live.opLabel.appSwitcher") });
         break;
     }
   }

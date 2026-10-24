@@ -4,10 +4,9 @@
 // 握ったままだと2つとも黙って壊れる:
 //   - タップ座標が**前のデバイスの画面サイズ**で換算される(px の Android → pt の iOS では
 //     まるごと別の場所を叩く)
-//   - タップの当たり判定(hitTestElement)が**前のデバイスの要素一覧**を引き、記録するロケータと
-//     操作ログの名指しが別のアプリの要素になる(撃つのは座標なので、誰も気付けない)
-// webview 側の挙動(捨てたあとは無反応 + 次のフレームで撮り直しを自動要求)は
-// webviewLiveDrag.test.mjs が実 DOM で見る。ここは host 側の配線
+//   - タップの当たり判定(hitTestElement)が**前のデバイスの要素一覧**を引き、操作ログの名指しが
+//     別のアプリの要素になる(撃つのは座標なので、誰も気付けない)
+// webview 側の挙動は webviewGridLivePanel.test.mjs が実 DOM で見る。ここは host 側の配線
 // (MonitorLiveController は vscode.ExtensionContext 等が要りスタブでは作れない)を走査で守る。
 
 import assert from "node:assert/strict";
@@ -65,15 +64,13 @@ test("控えを捨てる経路は webview にも捨てさせる", () => {
 
 // エラーバナーは利用者が消せなければならない。自動で消えるのは接続系の3文言だけ
 // (isConnectionClassMessage)で、ブリッジ接続拒否のように serve が返す文言は次の失敗で
-// 上書きされるまで残る = 「消す手段がない」状態だった(2026-09-21)。
-// 口は2つ: webview の × ボタン(webviewLiveActionErrorDismiss.test.mjs)と、
-// 利用者の操作が通ったときの自動クリア(ここ)。
+// 上書きされるまで残る。利用者の操作が通ったときの自動クリアがその消し口(ここで守る)。
 test("利用者の操作が成功したらエラーバナーを消す", () => {
   const source = controllerSource();
   const run = body(source, "private async runAction(");
   assert.match(
     run,
     /type: "actionError", message: ""/,
-    "成功経路でバナーを空にすること(自動フレームは runAction を通らない)",
+    "成功経路でバナーを空にすること",
   );
 });

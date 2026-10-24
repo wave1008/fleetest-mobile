@@ -25,23 +25,18 @@ import {
   frameToDisplayRect,
   gestureCapFor,
   gestureStepsFromPoints,
-  isLiveFromWebviewMessage,
-  isLiveWebviewEnvelope,
+  isGridLiveAction,
   isListDevicesResult,
-  locatorChainForElement,
-  operationBelongsToApp,
   parseLiveActionResult,
   parseLiveServeEvent,
   parseLiveSnapshotResult,
   parseListDevicesResult,
   pointFromClick,
   mcpCommandForServeCommand,
-  recordedGestureFingers,
   remoteDeviceOption,
   sameLiveDeviceRef,
   serializeLiveServeCommand,
   serveCommandAllowanceMs,
-  stepDescriptionToOperationLabel,
   toSnapshotMessage,
 } from "../src/liveModel";
 
@@ -273,7 +268,7 @@ test("serializeLiveServeCommand: JSON化して末尾に改行を付ける", () =
     '{"cmd":"type","text":"hello"}\n',
   );
   assert.equal(serializeLiveServeCommand({ cmd: "home" }), '{"cmd":"home"}\n');
-  assert.equal(serializeLiveServeCommand({ cmd: "terminate" }), '{"cmd":"terminate"}\n');
+  assert.equal(serializeLiveServeCommand({ cmd: "fold", state: "fold" }), '{"cmd":"fold","state":"fold"}\n');
 });
 
 // ---- parseLiveServeEvent ----
@@ -316,22 +311,11 @@ test("parseLiveServeEvent: actionResult の app(操作を撃った先)を落と�
       result: { ok: false, error: "x", bridgeStarting: false, app: "com.apple.springboard" },
     },
   );
-  // app が文字列でない/無い旧形式では欄自体を作らない(undefined の欄で deepEqual を割らない)
+  // app が文字列でない/無い形では欄自体を作らない(undefined の欄で deepEqual を割らない)
   assert.deepEqual(parseLiveServeEvent({ kind: "actionResult", ok: true, app: 12, bridgeStarting: false }), {
     kind: "actionResult",
     result: { ok: true, bridgeStarting: false },
   });
-});
-
-// ---- operationBelongsToApp(レコーディングの採否) ----
-
-test("operationBelongsToApp: 対象アプリ以外(ホーム画面・別アプリ)で行った操作は記録しない", () => {
-  assert.equal(operationBelongsToApp("com.example.app", "com.example.app"), true);
-  assert.equal(operationBelongsToApp("com.apple.springboard", "com.example.app"), false);
-  assert.equal(operationBelongsToApp("com.other.app", "com.example.app"), false);
-  // 判定材料が無いとき(Android・旧 CLI・記録していない)は落とさない
-  assert.equal(operationBelongsToApp(undefined, "com.example.app"), true);
-  assert.equal(operationBelongsToApp("com.apple.springboard", undefined), true);
 });
 
 test("parseLiveServeEvent: kind=snapshot の成功/失敗を判別する", () => {
@@ -436,27 +420,6 @@ test("parseLiveServeEvent: kind=snapshot は bridgeStarting 欠落なら undefin
       notes: [],
     }),
     undefined,
-  );
-});
-
-test("parseLiveServeEvent: kind=frame の成功/失敗/欠落を判別する", () => {
-  assert.deepEqual(parseLiveServeEvent({ kind: "frame", ok: true, image: "abc", bridgeStarting: false }), {
-    kind: "frame",
-    result: { ok: true, image: "abc", bridgeStarting: false },
-  });
-  assert.deepEqual(parseLiveServeEvent({ kind: "frame", ok: false, error: "x", bridgeStarting: true }), {
-    kind: "frame",
-    result: { ok: false, error: "x", bridgeStarting: true },
-  });
-  assert.equal(
-    parseLiveServeEvent({ kind: "frame", ok: true, bridgeStarting: false }),
-    undefined,
-    "image 欠落は frame として不正",
-  );
-  assert.equal(
-    parseLiveServeEvent({ kind: "frame", ok: true, image: "abc" }),
-    undefined,
-    "bridgeStarting 欠落は frame として不正(後方互換の読み替えを置かない)",
   );
 });
 
@@ -632,94 +595,6 @@ test("formatElementFrame: 非有限値は 0 に倒す", () => {
   assert.equal(formatElementFrame({ x: Number.NaN, y: 0, width: Number.POSITIVE_INFINITY, height: 10 }), "(0,0 0x10)");
 });
 
-// ---- stepDescriptionToOperationLabel ----
-
-test("stepDescriptionToOperationLabel: tap はセレクタの label 節を使う", () => {
-  assert.equal(stepDescriptionToOperationLabel('tap "#login_btn||ログイン"'), "タップ: ログイン");
-});
-
-test("stepDescriptionToOperationLabel: tap は label 節が無ければセレクタ全体", () => {
-  assert.equal(stepDescriptionToOperationLabel('tap "#login_btn"'), "タップ: #login_btn");
-});
-
-test("stepDescriptionToOperationLabel: tap は生ラベル節をそのまま使う", () => {
-  assert.equal(stepDescriptionToOperationLabel('tap "ログイン"'), "タップ: ログイン");
-});
-
-test("stepDescriptionToOperationLabel: tap は末尾の (optional) を無視する", () => {
-  assert.equal(stepDescriptionToOperationLabel('tap "#a||ラベル" (optional)'), "タップ: ラベル");
-});
-
-test("stepDescriptionToOperationLabel: press はロングプレス表記", () => {
-  assert.equal(stepDescriptionToOperationLabel('press "#row||セル"'), "ロングプレス: セル");
-});
-
-test("stepDescriptionToOperationLabel: type(欄指定なし)は最後のクォート文字列を使う", () => {
-  assert.equal(stepDescriptionToOperationLabel('type "a@b.c"'), "入力: a@b.c");
-});
-
-test("stepDescriptionToOperationLabel: type(欄指定あり)も最後のクォート文字列を使う", () => {
-  assert.equal(stepDescriptionToOperationLabel('type "#email" "a@b.c"'), "入力: a@b.c");
-});
-
-test("stepDescriptionToOperationLabel: type は21文字以上を20文字+…に切り詰める", () => {
-  const text = "123456789012345678901"; // 21文字
-  assert.equal(stepDescriptionToOperationLabel(`type "${text}"`), "入力: 12345678901234567890…");
-});
-
-test("stepDescriptionToOperationLabel: swipe は方向を和文へ", () => {
-  assert.equal(stepDescriptionToOperationLabel("swipe up"), "スワイプ: 上");
-  assert.equal(stepDescriptionToOperationLabel("swipe down"), "スワイプ: 下");
-  assert.equal(stepDescriptionToOperationLabel("swipe left"), "スワイプ: 左");
-  assert.equal(stepDescriptionToOperationLabel("swipe right"), "スワイプ: 右");
-});
-
-test("stepDescriptionToOperationLabel: home/appSwitcher は固定文言", () => {
-  assert.equal(stepDescriptionToOperationLabel("home"), "ホーム");
-  assert.equal(stepDescriptionToOperationLabel("appSwitcher"), "タスク切替");
-});
-
-test("stepDescriptionToOperationLabel: tap は .Type=ラベル 節からラベルを抽出", () => {
-  assert.equal(stepDescriptionToOperationLabel('tap ".Switch=写真アップロード"'), "タップ: 写真アップロード");
-});
-
-test("stepDescriptionToOperationLabel: tap は .Type のみ(label 無し)ならセレクタ全体", () => {
-  assert.equal(stepDescriptionToOperationLabel('tap ".Button"'), "タップ: .Button");
-});
-
-// ---- locatorChainForElement ----
-
-const rect0 = { x: 0, y: 0, width: 0, height: 0 };
-
-test("locatorChainForElement: id があれば type+index フォールバックは付けない(#id のみ)", () => {
-  const email = { ref: 1, type: "TextField", label: null, identifier: "email", value: null, frame: rect0 };
-  const other = { ref: 2, type: "TextField", label: null, identifier: null, value: null, frame: rect0 };
-  const chain = locatorChainForElement(email, [email, other]);
-  assert.deepEqual(chain, { locator: { id: "email" }, fallbacks: [] });
-});
-
-test("locatorChainForElement: id+label があれば label は残すが type+index は付けない", () => {
-  const el = { ref: 1, type: "TextField", label: "メール", identifier: "email", value: null, frame: rect0 };
-  const chain = locatorChainForElement(el, [el]);
-  assert.deepEqual(chain, { locator: { id: "email" }, fallbacks: [{ label: "メール" }] });
-});
-
-test("locatorChainForElement: id が無ければ label→type+index のフォールバックを付ける", () => {
-  const el = { ref: 2, type: "TextField", label: "メール", identifier: null, value: null, frame: rect0 };
-  const first = { ref: 1, type: "TextField", label: null, identifier: null, value: null, frame: rect0 };
-  const chain = locatorChainForElement(el, [first, el]);
-  assert.deepEqual(chain, {
-    locator: { label: "メール" },
-    fallbacks: [{ type: "TextField", index: 1 }],
-  });
-});
-
-test("locatorChainForElement: id/label 共に無ければ type+index のみ", () => {
-  const el = { ref: 1, type: "Button", label: null, identifier: null, value: null, frame: rect0 };
-  const chain = locatorChainForElement(el, [el]);
-  assert.deepEqual(chain, { locator: { type: "Button", index: 0 }, fallbacks: [] });
-});
-
 // ---- buildDeviceArgs ----
 
 test("buildDeviceArgs: iOS + port あり", () => {
@@ -858,19 +733,16 @@ test("toSnapshotMessage: notes(鮮度警告)をそのまま webview メッセー
   ]);
 });
 
-// ---- isLiveFromWebviewMessage ----
+// ---- isGridLiveAction ----
 
-test("isLiveFromWebviewMessage: 各メッセージ種別の正常な値を true と判定する", () => {
-  assert.equal(isLiveFromWebviewMessage({ type: "refreshDevices" }), true);
-  assert.equal(isLiveFromWebviewMessage({ type: "refreshSnapshot" }), true);
-  assert.equal(isLiveFromWebviewMessage({ type: "selectDevice", id: "ios:シミュ1" }), true);
-  assert.equal(isLiveFromWebviewMessage({ type: "openDevice", id: "ios:iPhone 17 Pro" }), true);
+test("isGridLiveAction: 各メッセージ種別の正常な値を true と判定する", () => {
+  assert.equal(isGridLiveAction({ type: "refreshSnapshot" }), true);
   assert.equal(
-    isLiveFromWebviewMessage({ type: "tapPoint", clickX: 1, clickY: 2, displayWidth: 3, displayHeight: 4 }),
+    isGridLiveAction({ type: "tapPoint", clickX: 1, clickY: 2, displayWidth: 3, displayHeight: 4 }),
     true,
   );
   assert.equal(
-    isLiveFromWebviewMessage({
+    isGridLiveAction({
       type: "pressPoint",
       clickX: 1,
       clickY: 2,
@@ -881,7 +753,7 @@ test("isLiveFromWebviewMessage: 各メッセージ種別の正常な値を true 
     true,
   );
   assert.equal(
-    isLiveFromWebviewMessage({
+    isGridLiveAction({
       type: "dragPoints",
       fromX: 1,
       fromY: 2,
@@ -894,10 +766,10 @@ test("isLiveFromWebviewMessage: 各メッセージ種別の正常な値を true 
     }),
     true,
   );
-  assert.equal(isLiveFromWebviewMessage({ type: "typeText", text: "hello", ref: null }), true);
-  assert.equal(isLiveFromWebviewMessage({ type: "typeText", text: "hello", ref: 2 }), true);
+  assert.equal(isGridLiveAction({ type: "typeText", text: "hello", ref: null }), true);
+  assert.equal(isGridLiveAction({ type: "typeText", text: "hello", ref: 2 }), true);
   assert.equal(
-    isLiveFromWebviewMessage({
+    isGridLiveAction({
       type: "doubleTapPoint",
       clickX: 1,
       clickY: 2,
@@ -906,26 +778,25 @@ test("isLiveFromWebviewMessage: 各メッセージ種別の正常な値を true 
     }),
     true,
   );
-  assert.equal(isLiveFromWebviewMessage({ type: "pinch", zoomIn: true }), true);
-  assert.equal(isLiveFromWebviewMessage({ type: "appSwitcher" }), true);
-  assert.equal(isLiveFromWebviewMessage({ type: "home" }), true);
-  assert.equal(isLiveFromWebviewMessage({ type: "visibility", visible: true }), true);
+  assert.equal(isGridLiveAction({ type: "pinch", zoomIn: true }), true);
+  assert.equal(isGridLiveAction({ type: "appSwitcher" }), true);
+  assert.equal(isGridLiveAction({ type: "home" }), true);
 });
 
-test("isLiveFromWebviewMessage: 未知の type・型不一致・フィールド欠落は false", () => {
-  assert.equal(isLiveFromWebviewMessage(null), false);
-  assert.equal(isLiveFromWebviewMessage("refreshDevices"), false);
-  assert.equal(isLiveFromWebviewMessage({}), false);
-  assert.equal(isLiveFromWebviewMessage({ type: "unknown" }), false);
-  assert.equal(isLiveFromWebviewMessage({ type: "selectDevice" }), false);
-  assert.equal(isLiveFromWebviewMessage({ type: "openDevice" }), false);
+test("isGridLiveAction: 未知の type・型不一致・フィールド欠落は false", () => {
+  assert.equal(isGridLiveAction(null), false);
+  assert.equal(isGridLiveAction("refreshDevices"), false);
+  assert.equal(isGridLiveAction({}), false);
+  assert.equal(isGridLiveAction({ type: "unknown" }), false);
+  assert.equal(isGridLiveAction({ type: "selectDevice" }), false);
+  assert.equal(isGridLiveAction({ type: "openDevice" }), false);
   assert.equal(
-    isLiveFromWebviewMessage({ type: "dragPoints", fromX: 1, fromY: 2, toX: 3, displayWidth: 5, displayHeight: 6 }),
+    isGridLiveAction({ type: "dragPoints", fromX: 1, fromY: 2, toX: 3, displayWidth: 5, displayHeight: 6 }),
     false,
     "toY 欠落は不正",
   );
   assert.equal(
-    isLiveFromWebviewMessage({
+    isGridLiveAction({
       type: "dragPoints",
       fromX: 1,
       fromY: 2,
@@ -939,37 +810,19 @@ test("isLiveFromWebviewMessage: 未知の type・型不一致・フィールド�
     "dragMs 欠落は不正",
   );
   assert.equal(
-    isLiveFromWebviewMessage({ type: "pressPoint", clickX: 1, clickY: 2, displayWidth: 3, displayHeight: 4 }),
+    isGridLiveAction({ type: "pressPoint", clickX: 1, clickY: 2, displayWidth: 3, displayHeight: 4 }),
     false,
     "holdMs 欠落は不正",
   );
   assert.equal(
-    isLiveFromWebviewMessage({ type: "doubleTapPoint", clickX: 1, clickY: 2, displayWidth: 3 }),
+    isGridLiveAction({ type: "doubleTapPoint", clickX: 1, clickY: 2, displayWidth: 3 }),
     false,
     "displayHeight 欠落は不正",
   );
-  assert.equal(isLiveFromWebviewMessage({ type: "pinch" }), false, "zoomIn 欠落は不正");
-  assert.equal(isLiveFromWebviewMessage({ type: "pinch", zoomIn: "yes" }), false);
-  assert.equal(isLiveFromWebviewMessage({ type: "typeText", text: 1, ref: null }), false);
-  assert.equal(isLiveFromWebviewMessage({ type: "visibility" }), false);
-});
-
-// ---- isLiveWebviewEnvelope ----
-
-test("isLiveWebviewEnvelope: type:'live' + 正常な LiveFromWebviewMessage を true と判定する", () => {
-  assert.equal(isLiveWebviewEnvelope({ type: "live", message: { type: "refreshDevices" } }), true);
-  assert.equal(
-    isLiveWebviewEnvelope({ type: "live", message: { type: "pinch", zoomIn: true } }),
-    true,
-  );
-});
-
-test("isLiveWebviewEnvelope: type が 'live' 以外、または message が不正なら false", () => {
-  assert.equal(isLiveWebviewEnvelope({ type: "monitor", message: { type: "refreshDevices" } }), false);
-  assert.equal(isLiveWebviewEnvelope({ type: "live", message: { type: "unknown" } }), false);
-  assert.equal(isLiveWebviewEnvelope({ type: "live" }), false);
-  assert.equal(isLiveWebviewEnvelope(null), false);
-  assert.equal(isLiveWebviewEnvelope({}), false);
+  assert.equal(isGridLiveAction({ type: "pinch" }), false, "zoomIn 欠落は不正");
+  assert.equal(isGridLiveAction({ type: "pinch", zoomIn: "yes" }), false);
+  assert.equal(isGridLiveAction({ type: "typeText", text: 1, ref: null }), false);
+  assert.equal(isGridLiveAction({ type: "visibility" }), false);
 });
 
 // ---- 統合: mock-live.mjs を実際に spawn して liveModel の解析関数に通す ----
@@ -1184,9 +1037,6 @@ test("mcpCommandForServeCommand: 操作ごとに ft_* とその引数へ写す",
   assert.equal(f({ cmd: "home" }), 'ft_navigate {"target":"home"}');
   assert.equal(f({ cmd: "appSwitcher" }), 'ft_navigate {"target":"appSwitcher"}');
   assert.equal(f({ cmd: "fold", state: "unfold" }), 'ft_fold {"state":"unfold"}');
-  assert.equal(f({ cmd: "terminate" }), "ft_terminate {}");
-  assert.equal(f({ cmd: "launch", bundle: "com.example.app" }), 'ft_launch {"bundleId":"com.example.app"}');
-  assert.equal(f({ cmd: "install", path: "/tmp/App.app" }), 'ft_install {"packagePath":"/tmp/App.app"}');
 });
 
 // ref はスナップショットごとの採番で MCP の ft_snapshot と一致しないので、要素の枠の中心(座標)に畳む
@@ -1195,14 +1045,13 @@ test("mcpCommandForServeCommand: 要素番号のタップは枠の中心の座�
   assert.equal(mcpCommandForServeCommand({ cmd: "tap", ref: 99 }, ELEMENTS), 'ft_tap {"ref":99}');
 });
 
-test("mcpCommandForServeCommand: 観測だけ(refresh / frame)は操作ではないので出さない", () => {
+test("mcpCommandForServeCommand: 観測だけ(refresh)は操作ではないので出さない", () => {
   assert.equal(mcpCommandForServeCommand({ cmd: "refresh" }, ELEMENTS), undefined);
-  assert.equal(mcpCommandForServeCommand({ cmd: "frame" }, ELEMENTS), undefined);
 });
 
 // ---- 軌跡モード(gesture) ----
-// ワイヤ形(GestureRequest)は t が秒。mcpCommandForServeCommand/recordedGestureFingers はどちらも
-// gestureStepsFromPoints(点列→move/hold の列)を土台にする(ロジックを2箇所に持たない)。
+// ワイヤ形(GestureRequest)は t が秒。mcpCommandForServeCommand は
+// gestureStepsFromPoints(点列→move/hold の列)を土台にする。
 
 test("gestureStepsFromPoints: 同座標が続く区間は hold、動けば move", () => {
   // t は2進で誤差なく表現できる値を選ぶ(0.3-0.9 のような値は浮動小数点誤差(0.6000...1)が
@@ -1255,35 +1104,11 @@ test("mcpCommandForServeCommand: gesture の秒は0.01刻みに丸め、0を超�
   );
 });
 
-test("recordedGestureFingers: device座標をscreenの比率へ畳み、FTFinger(Codable)と同じキー名で返す", () => {
-  const fingers = [{ points: [
-    { x: 100, y: 200, t: 0 },
-    { x: 100, y: 200, t: 0.25 },
-    { x: 300, y: 400, t: 1 },
-  ] }];
-  assert.deepEqual(recordedGestureFingers(fingers, { width: 400, height: 800 }), [
-    {
-      x: 0.25, y: 0.25, startSeconds: 0,
-      steps: [
-        { hold: { seconds: 0.25 } },
-        { move: { x: 0.75, y: 0.5, durationSeconds: 0.75 } },
-      ],
-    },
-  ]);
-});
+// ---- isGridLiveAction: tracePoints ----
 
-test("recordedGestureFingers: screen が不明(0以下)なら空配列(比率が計算できない)", () => {
-  assert.deepEqual(
-    recordedGestureFingers([{ points: [{ x: 1, y: 1, t: 0 }] }], { width: 0, height: 0 }),
-    [],
-  );
-});
-
-// ---- isLiveFromWebviewMessage: tracePoints ----
-
-test("isLiveFromWebviewMessage: tracePoints は points(有限数のx/y/t)+displayWidth/Height を要求する", () => {
+test("isGridLiveAction: tracePoints は points(有限数のx/y/t)+displayWidth/Height を要求する", () => {
   assert.equal(
-    isLiveFromWebviewMessage({
+    isGridLiveAction({
       type: "tracePoints",
       points: [{ x: 1, y: 2, t: 0 }, { x: 3, y: 4, t: 10 }],
       displayWidth: 400, displayHeight: 800,
@@ -1292,31 +1117,31 @@ test("isLiveFromWebviewMessage: tracePoints は points(有限数のx/y/t)+displa
   );
 });
 
-test("isLiveFromWebviewMessage: tracePoints は空配列を拒否する", () => {
+test("isGridLiveAction: tracePoints は空配列を拒否する", () => {
   assert.equal(
-    isLiveFromWebviewMessage({ type: "tracePoints", points: [], displayWidth: 400, displayHeight: 800 }),
+    isGridLiveAction({ type: "tracePoints", points: [], displayWidth: 400, displayHeight: 800 }),
     false,
   );
 });
 
-test("isLiveFromWebviewMessage: tracePoints は非有限の点(NaN/Infinity)を拒否する", () => {
+test("isGridLiveAction: tracePoints は非有限の点(NaN/Infinity)を拒否する", () => {
   assert.equal(
-    isLiveFromWebviewMessage({
+    isGridLiveAction({
       type: "tracePoints", points: [{ x: NaN, y: 1, t: 0 }], displayWidth: 400, displayHeight: 800,
     }),
     false,
   );
   assert.equal(
-    isLiveFromWebviewMessage({
+    isGridLiveAction({
       type: "tracePoints", points: [{ x: 1, y: Infinity, t: 0 }], displayWidth: 400, displayHeight: 800,
     }),
     false,
   );
 });
 
-test("isLiveFromWebviewMessage: tracePoints は displayWidth/Height 欠落を拒否する", () => {
+test("isGridLiveAction: tracePoints は displayWidth/Height 欠落を拒否する", () => {
   assert.equal(
-    isLiveFromWebviewMessage({ type: "tracePoints", points: [{ x: 1, y: 2, t: 0 }], displayWidth: 400 }),
+    isGridLiveAction({ type: "tracePoints", points: [{ x: 1, y: 2, t: 0 }], displayWidth: 400 }),
     false,
   );
 });
@@ -1349,15 +1174,19 @@ test("serveCommandAllowanceMs: press/drag/pinch は指定秒数そのもの(秒�
   assert.equal(serveCommandAllowanceMs({ cmd: "pinch", scale: 2, duration: 0.5 }), 500);
 });
 
-// launch/install は Sources/FTBridgeClient/BridgeClient.swift の Timeout.session(45秒)/
-// Timeout.physicalInstall(600秒)と同値(片方だけ変えない)
-test("serveCommandAllowanceMs: launch/install は Swift 側の内側上限と同じ ms", () => {
-  assert.equal(serveCommandAllowanceMs({ cmd: "launch", bundle: "com.example" }), 45_000);
-  assert.equal(serveCommandAllowanceMs({ cmd: "install", path: "/tmp/App.app" }), 600_000);
-});
-
 test("mcpCommandForServeCommand: 上限を上げた軌跡は ft_gesture に maxGestureSeconds を出す", () => {
   const fingers = [{ points: [{ x: 0, y: 0, t: 0 }, { x: 10, y: 10, t: 12 }] }];
   assert.match(mcpCommandForServeCommand({ cmd: "gesture", fingers, maxGestureSeconds: 12 }, []), /"maxGestureSeconds":12/);
   assert.doesNotMatch(mcpCommandForServeCommand({ cmd: "gesture", fingers }, []), /maxGestureSeconds/);
+});
+
+test("traceSummary: 点の数・時間・範囲・隣り合う点の最大の跳び(左上の角を経由した点列は最小 0 と大きな跳びで分かる)", async () => {
+  const { traceSummary } = await import("../src/liveModel");
+  const display = { width: 300, height: 600 };
+  assert.equal(traceSummary([], display), "0 points");
+  assert.equal(
+    traceSummary([{ x: 100, y: 200, t: 0 }, { x: 110, y: 210, t: 16 }, { x: 0, y: 0, t: 32 }, { x: 120, y: 220, t: 48 }], display),
+    "4 points over 48ms on 300x600 / first move at 16ms / x 0..120 y 0..220 / largest jump 251px to (120,220) at 48ms");
+  assert.match(traceSummary([{ x: 5, y: 5, t: 0 }, { x: 5, y: 5, t: 600 }, { x: 9, y: 5, t: 630 }], display),
+    / first move at 630ms /, "始めに止まっていた時間が分かる");
 });

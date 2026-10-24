@@ -8,7 +8,7 @@
 import { t, withCliTranslation } from '../i18n.js';
 import { setDevicesWaiting } from './waitingNote.js';
 import { vscode } from './vscodeApi.js';
-import { grid, banner, btnUp, btnDown, deviceOpMenu, deviceOpMenuItemBtn, deviceOpMenuItemLabel, deviceOpMenuLiveBtn, deviceOpMenuGpuBtn, deviceOpMenuSep, deviceOpMenuSelectAllBtn, deviceOpMenuSelectOnlyBtn, deviceOpMenuDeselectAllBtn, btnSelectAll, btnRestart, btnRunTests, projectSelect, profileSelect, tilePane, tileMarquee, lineViewSelection, platformFilterBadges } from './domRefs.js';
+import { grid, banner, btnUp, btnDown, deviceOpMenu, deviceOpMenuItemBtn, deviceOpMenuItemLabel, deviceOpMenuGpuBtn, deviceOpMenuSep, deviceOpMenuSelectAllBtn, deviceOpMenuSelectOnlyBtn, deviceOpMenuDeselectAllBtn, btnSelectAll, btnRestart, btnRunTests, projectSelect, profileSelect, tilePane, tileMarquee, lineViewSelection, platformFilterBadges } from './domRefs.js';
 import { updateLaneVisibility, syncLanesToDevices, runningWorkers, relayoutPreviewsForResize } from './laneLog.js';
 import { createH264Renderer } from './h264Decoder.js';
 import { clampMenuPosition } from './menu.js';
@@ -239,7 +239,7 @@ function measureTileImageHeight() {
 }
 
 // どの実行プロファイルにも記載の無い合成デバイス。起動(up)と GPU 再起動が成立しないことを
-// タイル上でも明示する(停止・ライブ操作は可)。
+// タイル上でも明示する(停止は可)。
 // **バッジは「他と違う」ことを示すもの**なので、区別しないときは出さない:
 //   - 「(起動中のデバイス)」を選んでいる間(ユーザー決定)—— このフィルタは登録に依らず
 //     動いているデバイスを見るためのもので、そこでは未登録は例外ではなく普通の状態。
@@ -951,7 +951,6 @@ function openDeviceOpMenu(entry, clientX, clientY, { selectAllOnly = false } = {
   deviceOpMenuSelectOnlyBtn.style.display = entry ? '' : 'none';
   if (!entry) {
     deviceOpMenuItemBtn.style.display = 'none';
-    deviceOpMenuLiveBtn.style.display = 'none';
     deviceOpMenuGpuBtn.style.display = 'none';
     deviceOpMenuSep.style.display = 'none';
     deviceOpMenu.classList.add('visible');
@@ -962,15 +961,8 @@ function openDeviceOpMenu(entry, clientX, clientY, { selectAllOnly = false } = {
   deviceOpMenuSep.style.display = '';
   renderDeviceOpMenuItem();
   // GPU再起動は実行プロファイルへの記載前提(name 解決)のため未登録では出さない
-  // (起動/停止項目は renderDeviceOpMenuItem 側、ライブ操作は下で個別に扱う)。
+  // (起動/停止項目は renderDeviceOpMenuItem 側)。
   const unregistered = entry.device.registered === false;
-  // state は connected に加えて **iOS の booted**(デバイスは起動済み・ブリッジ未接続)も出す —— 開けば
-  // ライブ操作が観測を撃ち、serve がブリッジを自動起動する(monitorLiveController.requestOpenObservation。
-  // 自動起動は iOS の --udid 経路だけ)。未登録でも udid/serial 直指定で動くので registered は見ない。
-  // **他の機械のデバイスも出す**(serve をその機械で起こす。openLiveForDevice の remote)
-  const liveOpenable = entry.device.state === 'connected'
-    || (entry.device.state === 'booted' && entry.device.platform === 'ios');
-  deviceOpMenuLiveBtn.style.display = liveOpenable ? '' : 'none';
   // 「GPUで再起動」は CPU 描画フォールバック中(CPU バッジ)の Android タイルでのみ意味を持つ。
   // 起動/停止のライフサイクル操作中(opBusy)は再起動を積んでも enqueueRestart が無視するため出さない。
   deviceOpMenuGpuBtn.style.display =
@@ -1362,9 +1354,9 @@ deviceOpMenuGpuBtn.addEventListener('click', (event) => {
   closeDeviceOpMenu();
 });
 
-// ライブ操作で開くときに運ぶ他の機械のデバイスの属性(手元のデバイスは undefined)。この Mac の
+// グリッドビューの操作で運ぶ他の機械のデバイスの属性(手元のデバイスは undefined)。この Mac の
 // list-devices に居ないので、開くのに要る属性をタイルから運ぶ
-// (契約: monitorWebviewMessages.ts の openLiveForDevice / gridLiveAction の remote)
+// (契約: monitorWebviewMessages.ts の gridLiveAction の remote)
 function liveRemoteTarget(device) {
   return device.machine
     ? {
@@ -1381,18 +1373,6 @@ export function liveRemoteTargetFor(deviceId) {
   const entry = tiles.get(deviceId);
   return entry ? liveRemoteTarget(entry.device) : undefined;
 }
-
-// 受け手: monitorPanel.ts → liveTabHost.ts の openForDevice(「ライブ操作」タブへ切り替えて表示)。
-deviceOpMenuLiveBtn.addEventListener('click', (event) => {
-  event.stopPropagation();
-  if (!deviceOpMenuEntry) {
-    return;
-  }
-  const device = deviceOpMenuEntry.device;
-  const remote = liveRemoteTarget(device);
-  vscode.postMessage({ type: 'openLiveForDevice', id: device.id, ...(remote ? { remote } : {}) });
-  closeDeviceOpMenu();
-});
 
 // メニューの外を押したら閉じる。**開いているかは deviceOpMenuOpen で見る** —— 空きエリアの右クリック・
 // 実行ログビューの「すべて選択」は entry 無しで開く(entry で見ると閉じる手段が項目の選択だけになる)。

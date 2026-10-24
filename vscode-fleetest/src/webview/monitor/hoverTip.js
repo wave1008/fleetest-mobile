@@ -112,6 +112,28 @@ export function flashTip(el, text) {
   }, FLASH_MS);
 }
 
+// 修飾キーを押している間だけ出すツールチップ(gridLiveControls.js の表示灯)。文言は el の setHoverTip のもの。
+// ホバー用の tipEl は mousedown(capture)で消えるので**要素ごとに別に持つ** —— Command を押したままクリック
+// (= ダブルタップ)しても消さない
+const heldTips = new Map(); // el → div
+export function setHeldTip(el, on) {
+  const existing = heldTips.get(el);
+  const text = on && el ? el.getAttribute(ATTR) : null;
+  if (!text) {
+    if (existing) { existing.style.display = 'none'; }
+    return;
+  }
+  let tip = existing;
+  if (!tip) {
+    tip = document.createElement('div');
+    tip.className = 'hover-tip held-tip';
+    tip.setAttribute('role', 'tooltip');
+    document.body.appendChild(tip);
+    heldTips.set(el, tip);
+  }
+  placeTip(tip, el, text);
+}
+
 /// マウスが載った要素(祖先を含む)のネイティブ title を自前へ移す。**最寄りの title だけを見る** ——
 /// title="" はネイティブでも祖先の説明を打ち切る印なので、その先は探さない。title を後から書き換えた
 /// 要素も、次に載ったときに移し直す(setHoverTip が title を空にするので二重にはならない)

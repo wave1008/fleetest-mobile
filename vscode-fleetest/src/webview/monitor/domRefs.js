@@ -57,7 +57,6 @@ export const previewGrid = document.getElementById('preview-grid');
 export const deviceOpMenu = document.getElementById('device-op-menu');
 export const deviceOpMenuItemBtn = document.getElementById('device-op-menu-item');
 export const deviceOpMenuItemLabel = document.getElementById('device-op-menu-item-label');
-export const deviceOpMenuLiveBtn = document.getElementById('device-op-menu-live');
 export const deviceOpMenuGpuBtn = document.getElementById('device-op-menu-gpu');
 export const deviceOpMenuSep = document.getElementById('device-op-menu-sep');
 export const deviceOpMenuSelectAllBtn = document.getElementById('device-op-menu-select-all');

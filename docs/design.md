@@ -188,7 +188,7 @@ FoundationModels はモデル型を2つ持ち、**`PrivateCloudComputeLanguageMo
 │  MCP サーバは FTCore/FTBridgeClient を直接リンクし fleetest api を経由しない) │
 │  ├─ FTFoundationModels        : FoundationModels エージェント層               │
 │  │   ├─ ReplayAssist      (画面検証。ロケータ修復は撤去済み §10) │
-│  │   └─ OcclusionVerifier / FMDoctor / ScenarioNamer / TestbaseDrafter │
+│  │   └─ OcclusionVerifier / FMDoctor / TestbaseDrafter               │
 │  ├─ FTDSL          : Swift DSL(§10)/ セレクタ式 / ロケータの指紋 │
 │  ├─ FTCore          : AppDriver プロトコル / StepExecutor(実行機) / 判定の型 │
 │  ├─ FTBridgeClient  : iOS ブリッジへの HTTP クライアント・起動管理  │
@@ -1154,15 +1154,14 @@ Android `VERSION_CODE` 100。XCUITest ランナーと Android ブリッジが持
 | `FMServeServer.swift` | FM の常駐プロセス(`fleetest api fm-serve`)の本体。画像を伴う実呼び出し・載せたままにする暖機・無操作での終了。通信と起動は `FTCore/FMServe.swift` |
 | `PreloadSlot.swift` | 常駐プロセスの予備のセッション 1 つ分の規則(同じ instructions なら作り直さない・使ったら捨てる) |
 | `FMDoctor.swift` | FM 可用性判定。`check()` は同期・可否を保証しない / `checkLive()` は実際に1回推論する(§1.1 の罠) |
-| `ScenarioNamer.swift` | 記録操作(ライブ操作タブ)からのシナリオ名生成 |
 | `TestbaseDrafter.swift` | テスト設計資料 → シナリオ下書き(§17)。FM 不可用時は決定的パーサへ落ちる |
 | `FMLivenessProbe.swift` | FM の死活プローブ(§リモート「FM の「死活」は回数とは別の軸」)。実呼び出しは常駐プロセスへ頼む。**FMCallAdmission を通さない** |
 | `FMLoadGenerator.swift` | `fleetest doctor --fm-load` の負荷測定。**FMCallAdmission を通さない**(測っている対象が門になるため) |
 
-- 生成を伴う FM 呼び出し(`ReplayAssist` / `OcclusionVerifier` / `ScenarioNamer` / `TestbaseDrafter`)は
+- 生成を伴う FM 呼び出し(`ReplayAssist` / `OcclusionVerifier` / `TestbaseDrafter`)は
   `FMCallAdmission.enter()` を通す(§1.1。常駐プロセスへ頼む2つも、頼む側で通す = 枠の待ちはシナリオの締め切りから
   差し引かれる)。死活プローブ・負荷生成・常駐プロセスの暖機は意図してこの門を通らない。
-- **`LanguageModelSession` を作ってよいのは `FMServeServer` / `ScenarioNamer` / `TestbaseDrafter` / `FMLoadGenerator` だけ**
+- **`LanguageModelSession` を作ってよいのは `FMServeServer` / `TestbaseDrafter` / `FMLoadGenerator` だけ**
   (`FMServeTests.testOnlyTheFMProcessAndAuthoringToolsCreateSessions` が集合を等号で固定)。
   出力の実例・運用知見は §8.6。
 
@@ -4489,8 +4488,8 @@ DeviceBooter.defaultLocale(実行プロファイルの locale が届くのは wi
 4. **自動インストール**: `appPath` あり+`autoInstall`(**未指定の既定は appPath/appPathPhysical の有無**。
    `false` 明示で opt-out)→ オーケストレータ投入前に各ワーカーへ並行 install
    (差分判定=installedIsCurrent も並列。失敗ワーカーは離脱、残ワーカーがキューを引き継ぐ)。
-   **ライブ操作(記録開始)の install も同じ差分判定**を通す(`ApiLiveServe`。無条件に入れ直すと
-   記録のたびにアプリが終了し、状態が消える)
+   **ライブ操作(`api live serve` の install)も同じ差分判定**を通す(`ApiLiveServe`。無条件に入れ直すと
+   そのたびにアプリが終了し、状態が消える)
 5. RunOrchestrator で並列実行。ワーカーラベル=デバイスの論理名。レポートは
    `TestProjects/<P>/reports/`、ロケータの指紋は `--project-dir` 経由で `TestProjects/<P>/.fleetest/` に分離
    - **シナリオの振り分けは platform 別の静的分配**(ワークスティールではない)。
@@ -4517,7 +4516,7 @@ DeviceBooter.defaultLocale(実行プロファイルの locale が届くのは wi
   **実行/デバッグ実行は `fleetest.profile` 未指定なら実行せず、「デバイスモニター」タブでの指定を促す通知
   (ボタン「デバイスモニター」タブを開く = `fleetest.showDeviceMonitor`)を出す**(未指定だとブリッジ自動供給の無い
   直接ポート接続に落ち、全シナリオが接続拒否で即失敗するため。ユーザー決定 2026-07-26。
-  dry-run とライブ操作タブ連動は実デバイスを要さない/解決済みのため除外)
+  dry-run は実デバイスを要さないため除外)
   内部的には CLI と同じ `fleetest api ...` サブコマンドを呼ぶため、解決ロジック(ProfileResolver 等)
   は CLI と共通(詳細は [vscode-fleetest/README.md](../vscode-fleetest/README.md))
 - MCP: `ft_list_scenarios` / `ft_run_scenario` に `project` / `profile` 引数、`ft_list_projects` 追加。
@@ -5097,9 +5096,6 @@ adb 接続は生きているがゲスト側が不健全(Wi-Fi 無効・ゲスト
   bulk down を NDJSON 化**(`deviceStopping`/`deviceFinished`。停止ロジックは `shutdownProfile` と同一で回帰なし)、
   拡張は `deviceFinished` ごとにそのタイルだけ offline を先行反映(`deviceDownFinished` → resume 後に本物の
   state で上書き)。profile 無しの down は従来の全掃討 `devices down` のまま。詳細は performance-tuning.md §3.4
-- **「ライブ操作」タブ**: 「デバイスモニター」タブの右隣。**起動時は出さない**(プロセスタブと同じ
-  `HIDDEN_AT_STARTUP`・× で隠す)。開く口はコマンド `fleetest.showLiveControl`・タイルの
-  右クリック・Run Test の自動表示(`liveControlOnRun`)。ロジックは `liveTabHost.ts`(モニターに同居)
 - **右クリックの既定メニュー(Cut/Copy/Paste)は拡張の全画面で出さない**(モニターの `main.js` が
   この規則を持つ。文字を打つ入力欄だけ残す)
 - **「プロセス」タブ(常駐プロセス一覧・停止)**(2026-07-19): **起動時は出さない** —— 設定タブ「ツール」の
@@ -5275,8 +5271,7 @@ backboardd のこのエラーは、モニターが画面を配信しているデ
   `deviceTiles.js` の `relayoutTiles`)→ タイル幅(`--tile-image-h × --tile-aspect`)。
   padding/border/gap の定数は持たず全て実測する(style.css を変えたとき片方だけ古くなるのを防ぐ)
 - **罠(実害 2026-07-31。auto-fit があった頃に踏んだが、規律は今も効く)**: `devices` のポーリングは「デバイスモニター」タブが**非表示の間も届き続ける**
-  (タブ非表示の間もフレーム配信は続く = 他タブから戻ったとき張り直しで映らない時間を作らない。ユーザー決定。
-  タイルが畳むのはライブ操作が配信中の1台だけ = `MonitorPanelDeps.liveStreamKey`)。`applyDevices` は毎回
+  (タブ非表示の間もフレーム配信は続く = 他タブから戻ったとき張り直しで映らない時間を作らない。ユーザー決定)。`applyDevices` は毎回
   `relayoutTiles` を呼ぶため、`display:none` 中は `clientHeight=0` → `--tile-image-h` が下限 60px に
   潰れて書き込まれ、ペイン高さと `--tile-image-h` の対応が壊れていた。**タブへ戻ると実際の画像高さぶん過大**になりタイルが
   はみ出す(初回表示だけ正しく、他タブを経由すると必ず崩れる)。対策は
@@ -5298,12 +5293,12 @@ backboardd のこのエラーは、モニターが画面を配信しているデ
 - **テスト実行中のデバイスも操作を止めない**(ヒューマンインザループ。ユーザー決定 2026-10-25「常に介入可能・
   利用者の自己責任」)。トグルも確認も置かない(再提案しない)。人の操作の事実は CLI が
   結果 JSON の `humanOperations` に残し、ダッシュボードのシナリオ詳細と Markdown レポートに出す(§13.3 (0b))。
-  止めるのは**整定のための自動の撮り直し**だけ(ライブ操作タブの `scheduleSettleRefresh` / `armBoxesSettleCap`。
-  判定は `laneLog.js` の `isDeviceRunning(id)` = `workerRunning` / hydrate の `runningWorkers`。id はタイルの
-  `platform:name`)—— XCUITest ブリッジは1件ずつしか処理せず、シナリオの操作と口を取り合う。**最初の1回の撮影
-  (`requestSnapshotIfNeeded` = 画面サイズを得る)は実行中でも撃つ**(無いと画面の操作が黙って無視される)。
-  そのためグリッドの枠の整定(`gridLivePanel.js`)は実行中は「次の snapshot」が来ず、`BOXES_SETTLE_CAP_MS` の打ち切りで
-  手元の木で描く。
+  止めるのは**整定のための自動の撮り直し**だけ(`gridLivePanel.js` の `scheduleOpSettleRefresh` /
+  `refreshAfterPictureSettled`。判定は `laneLog.js` の `isDeviceRunning(id)` = `workerRunning` / hydrate の
+  `runningWorkers`。id はタイルの `platform:name`)—— XCUITest ブリッジは1件ずつしか処理せず、シナリオの操作と口を取り合う。
+  **画面サイズが無いときの最初の1回の撮影は実行中でも撃つ**(host の `handleGridAction` が座標の操作の前に撮る。無いと
+  画面の操作が黙って無視される)。そのためグリッドの枠の整定は実行中は「次の snapshot」が来ず、`BOXES_SETTLE_CAP_MS` の
+  打ち切りで手元の木で描く。
 - **「実行中」と「デバイス」の間にもセパレーター**(`#devices-separator`。ユーザー決定 2026-09-22)。
   **見た目も挙動も `#splitter-log` と同じ**(`.splitter`)で、下げると run ボードが伸びる。
   見出し行どうしの区切りを地色だけで付ける規律(2026-09-21)の**唯一の例外**。守る規律4つ:
@@ -5336,49 +5331,67 @@ backboardd のこのエラーは、モニターが画面を配信しているデ
   旗 ∧ グリッドビューが開いている)—— グリッドビューを畳んだときに旗のほうを捨てると、開き直した
   瞬間に同じログが上下へ出たまま次の選択変更まで戻らない。**見出しクリックは「見えている状態」を
   反転する**(旗が効いているかで分岐を変えると、押しても何も起きない空振りができる)
-- **1台表示のときだけ、ライブ操作と同等の操作**ができる(`gridLiveControls.js` = ツールバーと画面の操作、
-  `gridLivePanel.js` = 操作パネル。インストール・レコーディング開始・アプリを起動は持たない)。
-  - **ツールバー**(拡大表示の右隣の縦のカラム。並びは「拡大表示 | 操作 | 操作パネル | 実行ログ」): 戻る・ホーム・タスク切替・
-    拡大・縮小・軌跡の表示灯・修飾キーの案内を縦に積む。カラムは3段(上 = 戻る / 中 = ホーム〜修飾キーの案内を枠で
+- **1台表示のときだけ、デバイスのライブ操作**ができる(`gridLiveControls.js` = ツールバーと画面の操作、
+  `gridLivePanel.js` = 操作パネル)。
+  - **ツールバー**(拡大表示の右隣の縦のカラム。並びは「拡大表示 | 操作 | 操作パネル | 区切り | 実行ログ」): 戻る・ホーム・タスク切替・
+    拡大・縮小・修飾キーの表示灯(ダブルタップ = Command・軌跡 = Option を押している間だけ点き、押し続けると `HELD_TIP_DELAY_MS`(0.8 秒)後に説明のツールチップも出す = `hoverTip.js` の `setHeldTip`。入力欄で押したとき・他のキーと一緒に押したとき(ショートカット)は出さない)を縦に積む。
+    カラムは3段(上 = 戻る / 中 = ホーム〜表示灯を枠で
     囲んだデバイス操作のグループ / 下 = 失敗の文言)で、**上と下の段を同じ 1fr にしてグループを上下中央に置く**。DOM は `monitorHtml.ts` の `#grid-live-controls` を置き場から
     `.lane-pair` の中へ移し、操作パネルはその右隣へ置く(**ずれているときだけ動かす** —— devices の周期ごとに並べ直すと
     載せたボタンのツールチップが点滅する)。**「戻る」は1台表示を抜ける**(`deviceTiles.js` の
     `exitSingleSelection`): 「このデバイスのみ選択」の直後なら直前の選択へ戻し(絵の外側のダブルクリックと同じ戻し)、
     控えが無ければ選択を解除する。デバイスを触らないので busy でも押せる。
-  - **画面の操作**(絵の上。ライブ操作タブと同じ割り当て): クリック=タップ / Option+クリック=ダブルタップ /
-    `LONG_PRESS_MS`(500ms、`liveTab.js` と共有)以上のホールド=長押し(`pressPoint`)/ 素のドラッグ=スワイプ
-    (`dragPoints`。ドラッグ中は始点からの直線を描く)/ Shift+ドラッグ=軌跡(`tracePoints`)。**軌跡の線は離した後も、
-    デバイスがなぞり終えるまで残す**(ライブ操作タブも同じ。デバイスは描いた時間ぶんかけて再生する)—— その操作の busy
+  - **画面の操作**(絵の上): クリック=タップ / Command+クリック=ダブルタップ /
+    `LONG_PRESS_MS`(500ms、`liveConstants.js`)以上のホールド=長押し(`pressPoint`)/ 素のドラッグ=スワイプ
+    (`dragPoints`。ドラッグ中は始点からの直線を描く)/ Option+ドラッグ=軌跡(`tracePoints`)。**軌跡の線は離した後も、
+    デバイスがなぞり終えるまで残す**(デバイスは描いた時間ぶんかけて再生する)—— その操作の busy
     (observing なし)が立って解けたら消す。撃つ前に断られた(`gridActionError`・busy の外の `actionError`)・次のドラッグ・
     対象の変更でも消す。保険の上限は軌跡の長さ + 40 秒(host の待ち 20 秒 + serve の応答待ち 20 秒)。
+    **離した後は、なぞった線を薄くし、再生が済んだ部分を太く重ねる**(`.playing` と `polyline.done`)。済んだ部分は**推定**で、
+    経過時間をなぞった点の t に当てて伸ばす(`traceThinning.js` の `tracePrefix`。デバイスは指の位置を返さない)。
+    **起点は見えている絵に合わせる**: その操作の busy の後に拡大表示の絵が初めて描き替わった時刻を「指が動き始めた点
+    (`firstMoveT`)が映った時刻」とみなす(busy 起点だとブリッジの合成と配信の遅れの分だけ絵より先走った)。起点は busy の
+    時刻より前へ戻さない。絵が変わらない操作では、再生が終わるまで太い線を出さない。
+    **速さは実際の再生に合わせる**: iOS の XCTest の合成タッチはなぞった時間どおりに再生しない(§50.6 の実測)。host は
+    軌跡の操作の応答(serve の actionResult = 再生の終わり)を受けた時点で `gestureActionDone` を送り、webview はそこで線を
+    描き切って「起点から終わりまでの実際の時間 ÷ なぞった時間」をデバイスごとに覚え、次の軌跡の線の速さにする(直近の1回)。
+    失敗の応答なら線を消し、比は覚えない。
+    **押したまま動かさずに `LONG_PRESS_MS` を過ぎたら始点に「長押し」の印(`.long-press`)を出す**(デバイスは止まっていた
+    時間ごと再生するので長押しになる = iOS のマップはピンを立ててパンしない。仕様は変えず、意図しない長押しに離す前に気付かせる)。
+    軌跡・素のドラッグ・素の長押しのどれでも出し、**ダブルタップのモード(Command)では出さない**(押していた時間に関係なく
+    ダブルタップを送る = 印と送るものが食い違う)。host は軌跡を送るたびに要約を出力パネルへ1行残す
+    (`[live] trace:` = 点の数・時間・押してから動き出すまで・範囲・最大の跳び。`liveModel.ts` の `traceSummary`)。
+    **座標がウィンドウの原点 (0,0) のポインターイベントは採らない**(`isOriginPointer`。なぞっている最中に1つだけ混ざり、
+    軌跡が絵の左上の角を経由してデバイスにもその形で送られた。離した位置が (0,0) なら最後に採った位置)。
     **絵の上のダブルクリックは2回のタップで、選択の切り替えにしない**(`laneLog.js` が
     `isGridLiveScreenTarget` と修飾キーで除く。切り替えは絵の外側のダブルクリック)。
   - **操作パネル**(`#grid-live-panel`): `.lane-pair` の中、操作カラムの右隣に置く(`syncLogMirror` が組を作り直すので
     `syncGridLivePanel` が毎回位置を確かめる)。1台表示は「拡大表示 | 操作 | 操作パネル | 実行ログの複製」の4列。
     中身は要素一覧(見出し・「更新」。「バウンディングボックスを表示」はグリッドビューの見出し行の台数の右に置き、
-    1台表示のときだけ出す・クリックは見出しの開閉へ伝えない)・操作記録(列幅は `gridLiveOplogLabelWidth` に保存)。**入力するテキスト**(Enter 送信・IME 変換中と
+    1台表示のときだけ出す・既定 OFF で ON/OFF は覚えない・クリックは見出しの開閉へ伝えない)・操作記録(列幅は `gridLiveOplogLabelWidth` に保存)。操作パネルと実行ログの複製の間の区切り(`#grid-live-panel-splitter`)はドラッグで幅の割合を変え、`gridLivePanelRatio` に保存する。要素一覧は本文を切らずに横スクロールする。**入力するテキスト**(Enter 送信・IME 変換中と
     処理中は送らない)だけは拡大表示の絵のすぐ下(`.lane-preview-frame` の直後。`#grid-live-type-row`)に置き、中の
     ダブルクリック・右クリックは拡大表示(選択の切り替え・デバイスのメニュー)へ伝えない。当たり判定・行の描画・操作記録の描画は
-    ライブ操作タブと共有(`liveListViews.js`)。
+    `liveListViews.js`。
   - **選択しただけでは serve へ接続しない(観測を自動で撃たない)** —— ブリッジの自動起動や実行中のテストへの
     相乗りを避けるため。接続は最初の操作・「更新」・枠トグル ON のときに起こる。**枠トグルが既に ON のまま
     1台表示を開いたときも1回取りに行く**(ON は利用者の明示の意思。撮らないと描く木が無く、ON なのに枠が出なかった)。一覧は host の `devices.selectedId`
-    (ライブ操作が今つないでいるデバイス)が対象と一致するときの `snapshot`(screen と elements だけ。絵は
+    (host の serve が今つないでいるデバイス)が対象と一致するときの `snapshot`(screen と elements だけ。絵は
     モニター自身の配信)でだけ描き、`clearSnapshot` や別デバイスへのつなぎ替わりで捨てる。未取得の間は案内を出す。
   - **操作記録はデバイスごと**: host の `operationLog` が手動操作の行にだけ `deviceId`(操作を撃った時点の選択)を付け、
-    パネルはデバイスごとに最大200行を控えて対象の行だけ出す。`deviceId` の無い行(テスト実行由来 = `injectTestStep`)は
-    出さない。「クリア」は対象のぶんだけ。
+    パネルはデバイスごとに最大200行を控えて対象の行だけ出す。`deviceId` の無い行は出さない。「クリア」は対象のぶんだけ。
   - **枠の整定**: 画面を変える操作(「更新」以外)を送った時点で枠を消し(一覧は消さない)、**その操作の直接の結果の
-    `snapshot` では描かず**、次の `snapshot` で描く。**この依存**: `liveTab.js` は `applySnapshot` のたびに
-    `SETTLE_REFRESH_MS`(700ms)後の撮り直しを1回撃つ(`scheduleSettleRefresh`)ので、操作の結果の次には整定後の木が
-    必ず続く。続かない場合のため、直接の結果から `BOXES_SETTLE_CAP_MS`(= 700ms×4)で手元の最新の木で描く。
+    `snapshot` では描かず**、次の `snapshot` で描く。**この依存**: 直接の結果を受けたらグリッド自身が
+    `SETTLE_REFRESH_MS`(700ms)後に「更新」(`refreshSnapshot`)を1回撃つ(`opSettleTimer`)ので、操作の結果の次には整定後の木が
+    続く。その間に拡大表示の絵が描き替わったら予約を先送りする(絵が止まってから撮る)。処理中(busy)なら終わってから撃ち、
+    実行中は撃たない。撮り直しの結果は非操作の `snapshot` として採って枠を描く。続かない場合のため、直接の結果から
+    `BOXES_SETTLE_CAP_MS`(= 700ms×4)で手元の最新の木で描く。
     **「直接の結果」は host の合図 `gridActionStarted` の後に届いた最初の `snapshot` だけ**(`handleGridAction` が撃つ直前に
     送る。`runAction` は最初の await より前に busy を立てるので、合図と結果の間に別の観測は割り込まない)。host は撃つ前に
     デバイスの切り替え(開いたときの観測)や直前の処理の終わりを待つので、送った直後に届く `snapshot` は操作前の画面 ——
     取り違えると本物の結果を「整定後」と読み、遷移の途中の位置に枠を一度描いていた。操作の段(`opPhase`)は
     `clearSnapshot` で消さない(切り替えの途中で消すと同じ取り違えに戻る)。撃つ前に断られたら(`gridActionError`・
     busy を立てずに返る `actionError`)手元の木で描き直す。
-    **枠はその木と同じ瞬間の絵の上に描く**: 木はライブ操作の観測で届くが、拡大表示の絵はモニター自身の配信・ポーリングで
+    **枠はその木と同じ瞬間の絵の上に描く**: 木は host の観測(serve の `snapshot`)で届くが、拡大表示の絵はモニター自身の配信・ポーリングで
     別経路。ブリッジの無いシミュレータのポーリングは1サイクル1台の順繰りで台数ぶん遅く(実地: M1Max の iOS 6台で1台あたり
     約12秒に1枚。他の利用者が配信中 = `streamedByOther` だと配信も張れない)、絵の更新を待つ方式では上限が先に切れて古い絵の上に
     枠が出た。そこで**観測の一枚絵(snapshot の `image`)を拡大表示とタイルに出し**(`deviceTiles.js` の `showMirrorStill`。
@@ -5392,26 +5405,24 @@ backboardd のこのエラーは、モニターが画面を配信しているデ
     入れない。**比べるのはどちらもデバイスの居る機械で撮った時刻**(リモートでもモニターとライブ操作の serve はその機械で動く =
     機械間の時計のずれが入らない)。時刻は撮り始める前に採る(後に採ると古い絵が「後」に見える。`CaptureTimestampWiringTests`)。
     配信のフレームは時刻を持たない(届いた順 = 撮った順)。
-    **操作と無関係に絵が変わったら、止まってから木を撮り直す**(ライブ操作タブの `scheduleSettleRefresh` と同じ考え方):
+    **操作と無関係に絵が変わったら、止まってから木を撮り直す**(操作の結果の整定の撮り直しと同じ考え方):
     OS のダイアログ(位置情報の許可等)・遅れて出る画面は操作の結果と撮り直しより後に出るので、撮り直さないと前の画面の木の枠が
     新しい絵の上に残った(実地: マップの位置情報の許可)。自分が出した一枚絵の読み込み以外で `onMirrorFrame` が鳴ったら、
-    `SETTLE_REFRESH_MS` 新しいフレームが来なければ「更新」を撃ち、届いた木で描き直す。**鳴った時点では枠を消さない**(ライブ操作
-    タブと同じ)—— 文字カーソルの点滅のように中身の変わらない描き替わりにも鳴り、消す → 撮り直して描く → 消す、で枠が点滅した(実地)。
+    `SETTLE_REFRESH_MS` 新しいフレームが来なければ「更新」を撃ち、届いた木で描き直す。**鳴った時点では枠を消さない** —— 文字カーソルの点滅のように中身の変わらない描き替わりにも鳴り、消す → 撮り直して描く → 消す、で枠が点滅した(実地)。
     止まらない絵は `BOXES_SETTLE_CAP_MS` で打ち切って撃つが、**打ち切りで撮った木が前と同じなら以後の打ち切りをやめる**
     (`capBackoff`。点滅のたびに 2.8 秒ごとの撮り直しを続けない)。止まったときの撮り直し・木の変化・操作で戻す。操作の途中・
-    ライブ操作が別のデバイスにつないでいる間は何もしない。**実行中は枠を消すが撮り直さない**。
-    トグル ON で木が無い/古いときは「更新」を撃ち、届いた木で描く。ホバーはライブ操作タブと同じ(絵の上の点の
-    最小の要素を一覧の行と枠で対に光らせる。一覧送りは枠 ON のときだけ)。
-  - 送り先は `gridLiveAction` → `MonitorLiveController.handleGridAction` で、**ライブ操作タブと同じ serve を使う**
-    (同じデバイスへ常駐を2本立てない)。選択中が別のデバイスなら `openDevice` で切り替えてから撃ち、
-    **別のデバイスをレコーディング中は切り替えずに断る**(`gridActionError`)。座標の操作(tap/doubleTap/press/drag/
+    host の serve が別のデバイスにつないでいる間は何もしない。**実行中は枠を消すが撮り直さない**。
+    トグル ON で木が無い/古いときは「更新」を撃ち、届いた木で描く。ホバーは絵の上の点の
+    最小の要素を一覧の行と枠で対に光らせる(一覧送りは枠 ON のときだけ)。
+  - 送り先は `gridLiveAction` → `MonitorLiveController.handleGridAction` で、**serve は1本だけ**
+    (対象のデバイスへ切り替えて使う。同じデバイスへ常駐を2本立てない)。選択中が別のデバイスなら `openDevice` で切り替えてから撃つ(処理中は
+    切り替えずに `gridActionError` で断る)。座標の操作(tap/doubleTap/press/drag/
     trace)は切り替え直後の観測で `lastScreen` が揃うのを待つ。切り替えの中で観測が済んでいれば「更新」は二重に撃たない。
-    失敗は**ライブ操作が今つないでいるデバイスが対象と一致するときだけ**グリッド側にも出す
-- **折りたたみ機の開閉ボタン**(「折りたたむ」「開く」。グリッドビューとライブ操作タブ)は**モニターの `devices[].foldable` が
+    失敗は**serve が今つないでいるデバイスが対象と一致するときだけ**グリッド側にも出す
+- **折りたたみ機の開閉ボタン**(「折りたたむ」「開く」。グリッドビュー)は**モニターの `devices[].foldable` が
   true のデバイスだけ**に出す(`webview/monitor/foldButtons.js`。判定は `api monitor` の `DeviceFoldabilitySampler` が裏で1台1回 =
   iOS Simulator は devicectl の内蔵画面の枚数・Android Emulator は device_state の CLOSED。実機は測らず false・未確定は欄ごと省く)。
   押すと serve の `{"cmd":"fold","state":"fold"|"unfold"}`(`FoldControl.apply`。DSL の `fold()` / MCP の `ft_fold` と同じ判定)。
-  記録はしない(`ScenarioCodeGen` に fold / unfold が無い)
 - **選択0台は両ペインに「デバイスを選択して下さい」**。実行ログビュー側は**全体レーンに行があるときは
   出さない**(供給の進行と重なる)。**出し入れはクラス(CSS)で行い inline の `display` を書かない**
   —— inline は畳みの規則に勝つので、畳んでも消えない形が静かにできる(例外は `waitingNote.js` が
@@ -5471,18 +5482,18 @@ run → monitor 方向の `RunLease`(§12 の「監視と実行の協調」)は�
 
 ### 13.3 ライブ操作(`api live serve`)の宛先決定と門(2026-09-22)
 
-ライブ操作パネルは常駐 CLI(`ApiLiveServe`。プロトコルは `Sources/fleetest/ApiLiveCommand.swift`
+グリッドビューのライブ操作は常駐 CLI(`ApiLiveServe`。プロトコルは `Sources/fleetest/ApiLiveCommand.swift`
 冒頭)で、run / MCP とは別に自分でブリッジへ繋ぎに行く。§13.1/13.2 と同じ「相乗り・未導入 launch」の
 危険がここにも及ぶことが実地で分かったので、判定は既存の1箇所へ寄せた。
 
 **(0a) 観測の最中の操作は捨てずに後で撃つ**: 画面の撮り直し(整定の撮り直し・グリッドビューの絵の変化・「更新」)と一覧の
 取り直しは画面を変えない観測で、host は `busy` に `observing: true` を載せる(`MonitorLiveController.busyObserving`)。webview
-(ライブ操作タブ・グリッドビュー)はこの間の画面の操作とデバイスを操作するボタンを捨てずに送り、host の `handleWebviewMessage` が
-観測の終わりを待って撃つ(`OBSERVATION_DEFERRABLE_ACTIONS`。グリッドビューの経路は `handleGridAction` が元から待つ)。撮り直しは
+(グリッドビュー)はこの間の画面の操作とデバイスを操作するボタンを捨てずに送り、host の `runGridAction` が
+観測の終わりを待って撃つ(`OBSERVATION_DEFERRABLE_ACTIONS`。`handleGridAction` は切り替えや座標の操作の前にも待つ)。撮り直しは
 操作の結果のたびに走る(1回 約 0.4 秒)ので、捨てていた頃は止まった画面へのタップが黙って空振りした(実地)。操作の最中(`runAction` =
 observing なし)は従来どおり受け付けない(画面が変わる最中)。まだ撃っていない操作を後で撃つだけ = 撃ち直しではない。
 
-**(0) 実行中も操作を止めない**: ライブ操作タブも §12.6 と同じく、選択中のデバイスがシナリオを回している間も
+**(0) 実行中も操作を止めない**: グリッドビューは §12.6 のとおり、選択中のデバイスがシナリオを回している間も
 操作を受け付ける(利用者の自己責任。止めるのは整定のための自動の撮り直しだけ)。
 
 **(0b) run 中の人の操作の台帳**(`FTCore.HumanOperationLedger`): run の実行中に人がライブ操作で触った事実を、
@@ -6049,7 +6060,7 @@ pid 引きとソケット一覧は**1往復に畳む**(adb は1回ごとに数�
 ## 17. テストベースからのシナリオ下書き生成(2026-07-26)
 
 `TestProjects/<name>/docs/testbases/*.md`(テスト設計の元資料)を Swift DSL シナリオの**下書き**に
-落とす。`fleetest draft-scenario`。ライブ操作の記録生成(§10 の gen-scenario)は実セレクタを持つが、
+落とす。`fleetest draft-scenario`。探索の操作列からの下書き(MCP の `ft_draft_scenario`)は実セレクタを持つが、
 こちらは設計資料しか無いのでセレクタは全て TODO プレースホルダになる。
 
 ### 17.1 二段構え(FM → 決定的パーサ)

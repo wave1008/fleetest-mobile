@@ -84,7 +84,7 @@ test("文字を打つ入力欄では既定メニューを残す(checkbox は止�
 test("他のタブ・タブバーでも既定メニューを出さない", (t) => {
   const { window, document } = createWebview();
   t.after(() => window.close());
-  for (const id of ["tabbar", "panel-settings", "panel-profiles", "panel-recordings", "panel-dashboard", "panel-live", "panel-processes"]) {
+  for (const id of ["tabbar", "panel-settings", "panel-profiles", "panel-recordings", "panel-dashboard", "panel-processes"]) {
     const el = document.getElementById(id);
     assert.ok(el, `${id} がある`);
     assert.equal(rightClick(window, el), true, `${id} の右クリックは既定メニューを止める`);

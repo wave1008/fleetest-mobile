@@ -31,16 +31,12 @@ fleetest(Swift 製の iOS/Android UI テストツール。リポジトリルー�
   一覧・作成・編集・削除ができ、ブリッジ無応答・Android ゲスト OS 異常を自動検出して修復を試みる
   ウォッチドッグ(`src/monitorBridgeWatchdog.ts` / `src/monitorHealthWatchdog.ts`。設定
   `fleetest.autoRepairBridge`/`fleetest.autoRepairDeviceHealth`)も動く
-- ライブ操作(`src/monitorLiveController.ts` / `src/liveModel.ts`)。デバイスモニターの
-  「ライブ操作」タブ(`src/liveTabHost.ts`。コマンド **「fleetest: ライブ操作を表示」**
-  (`fleetest.showLiveControl`)でモニターを開いてこのタブへ切り替える)で、画像上のタップ/
-  ドラッグ(スワイプ)/長押し・テキスト入力・ホーム/タスク切替の操作と、操作を
-  記録して Swift シナリオを生成するレコーディング(`fleetest api gen-scenario`)を、
+- ライブ操作(`src/monitorLiveController.ts` / `src/liveModel.ts`)。デバイスモニターで
+  **1台だけ選択したときのグリッドビュー**(`src/liveTabHost.ts` が窓口)で、画像上のタップ/
+  ドラッグ(スワイプ)/長押し・テキスト入力・ホーム/タスク切替の操作を、
   `fleetest api list-devices`(デバイス一覧のみワンショット)と `fleetest api live serve`
   (常駐プロセス。選択デバイスごとに1つ spawn し、NDJSON でコマンド送信・観測イベント受信を行う)
-  経由で行う。設定 `fleetest.liveControlOnRun`(既定 `true`)が有効な間はテスト実行開始時にも
-  このタブが自動的に開くほか、コマンドやデバイスモニターのタイル右クリック
-  「ライブ操作」からも開ける(詳細は下記「ライブ操作」)
+  経由で行う(詳細は下記「ライブ操作」)
 - 結果ダッシュボード(`src/monitorDashboardController.ts` / `src/dashboardModel.ts`)。コマンド
   **「fleetest: 結果ダッシュボードを開く」**(`fleetest.showResultsDashboard`)で開くデバイスモニターの
   「ダッシュボード」タブで、`fleetest api results --project <名> ...` の集計結果(シナリオ別成功率・不安定
@@ -192,11 +188,10 @@ code --install-extension vscode-fleetest-<version>.vsix
 | `fleetest.monitorInterval` | number | `2` | デバイスモニターの更新間隔(秒)。`0.5` 未満は `0.5` として扱われる |
 | `fleetest.monitorMaxWidth` | number | `960` | デバイスモニターのフレーム画像の長辺px(240〜1600)。大きいほど鮮明だが転送量が増える |
 | `fleetest.monitorDeviceFilter` | `"all"` \| `"running"` | `"all"` | デバイスモニターがタイル表示するデバイスの範囲。`running` は監視スコープのうち起動中(未起動以外)のみを表示する。通常はモニターのプロファイルドロップダウンで「(起動中のデバイス)」を選ぶと `fleetest.profile=""` とセットで設定される(監視スコープ自体は変えない表示フィルタ) |
-| `fleetest.liveFps` | number | `12` | ライブ操作の自動フレーム更新レート上限(fps、3〜30)。大きいほど滑らかだがホスト負荷が増える |
+| `fleetest.liveFps` | number | `12` | デバイス画面の配信フレームレート上限(fps、3〜30)。大きいほど滑らかだがホスト負荷が増える |
 | `fleetest.iosStreamEnabled` | boolean | `true` | iOS の画面更新に映像ストリーミング(`fleetest-simstream`)を使う。無効・ヘルパー未ビルド時はポーリングにフォールバック |
 | `fleetest.androidStreamEnabled` | boolean | `true` | Android の画面更新に映像ストリーミング(`fleetest-androidstream`)を使う。無効・ヘルパー未ビルド・adb 未検出時はポーリングにフォールバック |
 | `fleetest.streamCodec` | `"h264"` \| `"mjpeg"` | `"h264"` | デバイス画面ストリーミングのコーデック。`h264`(既定)は WebCodecs によるハードウェアデコードを使う。問題が出る環境では `mjpeg`(従来方式)に切り替える |
-| `fleetest.liveControlOnRun` | boolean | `true` | テスト実行(Run Test)開始時に、デバイスモニターの「ライブ操作」タブを自動表示する |
 | `fleetest.autoRepairBridge` | boolean | `true` | ブリッジ無応答(接続済みだったデバイスが起動中のまま復帰しない状態が続く)を検出したら、実行中のレーンが無い間に限り start-device で自動修復を試みる |
 | `fleetest.autoRepairDeviceHealth` | boolean | `false` | Android エミュレータのゲスト OS 異常(Wi-Fi 無効・時計のずれ)を検出したとき、Wi-Fi 再有効化→再起動の順で自動修復を試みる |
 | `fleetest.showOnlyFailedTests` | boolean | `false` | Test Explorer のツリーを失敗したテストだけに絞り込む(未実施・成功のテストは非表示)。Test Explorer タイトルバーのフィルターボタンでも切り替えられる |
@@ -359,8 +354,9 @@ JSON→Diagnostic への変換ロジック自体は vscode 非依存の `src/pro
   - **起動中**(黄): デバイス自体は起動しているがブリッジがまだ接続されていない状態
   - **未起動**(灰): デバイスが起動していない状態(画面は表示されずプレースホルダー枠になります)
 - **タイルの右クリックメニューによる個別起動/停止**: 各タイルを右クリックすると、その場に
-  1項目だけのコンテキストメニュー(webview 内の自作メニュー。VS Code の Webview は OS の
-  ネイティブメニューを表示できないため)が開きます。「未起動」のタイルには**「起動」**
+  コンテキストメニュー(webview 内の自作メニュー。VS Code の Webview は OS の
+  ネイティブメニューを表示できないため)が開きます。並びは上から**「このデバイスのみ選択」**・起動/停止・
+  「GPUで再起動」(CPU 描画の Android だけ)・区切り・「すべて選択」・「すべて解除」です。「未起動」のタイルには**「起動」**
   (`fleetest api start-device --name <論理名>`。iOS はブリッジ供給も行います)、「接続済み」
   「起動中」のタイルには**「停止」**(`fleetest api stop-device --name <論理名>`)
   が表示されます。メニュー外クリック・Esc・スクロールで閉じます。右クリックしてもタイル自体の
@@ -409,8 +405,7 @@ JSON→Diagnostic への変換ロジック自体は vscode 非依存の `src/pro
   - **「画面更新」**(右端のチェックボックス): OFF にすると全デバイスの画面の配信と取り込みを止めて
     Mac の負荷を下げます。タイルと拡大表示は最後の画面のまま暗く表示されます(状態の表示・警告バッジ・
     実行ログのバッジは暗くしません)。
-- **「ライブ操作」タブと「プロセス」タブは起動時には出ません**。設定タブ一番上の「ツール」のボタン
-  (ライブ操作はコマンド・タイルの右クリック・テスト実行開始時の自動表示からも)で現れ、タブの × で閉じます。
+- **「プロセス」タブは起動時には出ません**。設定タブ一番上の「ツール」のボタンで現れ、タブの × で閉じます。
 - 右クリックの既定メニュー(切り取り/コピー/貼り付け)は拡張のどの画面でも出ません(文字を打つ入力欄を除く)。
   - 起動/終了の実行中(タイル個別操作を含む直列キューが空でない間)は多重起動を防ぐため両ボタンが
     無効化されます(キューが空になると自動的に再度有効になります)。
@@ -501,96 +496,51 @@ dry-run ではない run の終了時に、修復候補(同じ file・line・変
 
 ## ライブ操作
 
-デバイスモニターパネル(`src/monitorPanel.ts`)の「ライブ操作」タブ。ロジック本体は
-`src/liveTabHost.ts`(サブコントローラとして monitorPanel.ts に同居)と、デバイスモニターと共通の
-`src/monitorLiveController.ts`、webview 資産はデバイスモニターと共通の `src/webview/monitor/main.js`
-から呼び出す `src/webview/monitor/liveTab.js` です。アプリ操作・レコーディング・シナリオ生成は
-`src/liveAppActions.ts` に分けてあります。デバイスモニターの他タブとはポーリングモード設定(`workspaceState` の
-`monitor.pollingMode`)を含め、webview・設定とも完全に同居しています。
+デバイスモニターで **1台だけ選択したとき**のグリッドビュー(拡大表示の右隣の操作カラムと操作パネル)にあります。
+ロジック本体は `src/liveTabHost.ts`(サブコントローラとして monitorPanel.ts に同居する窓口)と
+`src/monitorLiveController.ts`、webview 資産は `src/webview/monitor/main.js` から呼ぶ
+`gridLiveControls.js`(ツールバーと画面の操作)・`gridLivePanel.js`(要素一覧・枠・入力するテキスト・操作記録)です。
+送り先は webview の `gridLiveAction` → `MonitorLiveController.handleGridAction` です。
 
-タブを開く経路は2通りあります。
-
-- コマンドパレットから **「fleetest: ライブ操作を表示」** を実行する(デバイスモニターを開いて
-  「ライブ操作」タブへ切り替える。既に開いている場合は前面に出るだけ)
-- デバイスモニターパネルでタイルを右クリックして**「ライブ操作」**を選ぶ(「ライブ操作」タブへ
-  切り替わり、対象デバイスを選択したうえで接続済みなら画面も取得します)
-
-さらに設定 `fleetest.liveControlOnRun`(既定 `true`)が有効な間は、Test Explorer の「実行」
-(dry-run を除く)開始時にもこのタブが自動的に開きます。
-
-- **上部のデバイスセレクタ**: タブを初めて表示すると `fleetest api list-devices --project <project>`
-  を実行し、全デバイスと現在状態(接続済み/起動中/未起動)を取得してプルダウンに
-  表示します。**「デバイス一覧を更新」**ボタンで再取得できます。`connected` 以外のデバイスも選択
-  自体はできますが、選択中に「⚠ 接続されていません」という注意表示が出ます。`list-devices` が
-  失敗した場合(実行プロファイルにデバイスが無い、対象プロジェクト未解決等)は、`fleetest.platform`/
-  `fleetest.port`/`fleetest.serial` 設定から作った「設定のデバイス」1件にフォールバックし、上部に
-  エラーバナーで理由を表示します。デバイスを選択すると、そのデバイス向けの `fleetest api live serve`
-  常駐プロセスが起動し、画面の供給元(ストリーミング/自動フレーム)も切り替わります(詳細は下記
-  「常駐プロセス」「画面の自動更新」)。
-- **画面の自動更新(ストリーミング/自動フレーム)**: 選択デバイスの画面は既定でヘッドレス映像
-  ストリーミング(iOS: `fleetest-simstream` / Android: `fleetest-androidstream`。デバイスモニターと
-  共通の仕組み。詳細は上記「デバイスモニター」)により自動更新されます。ストリーミング条件(ライブ
-  タブ表示中・`fleetest.iosStreamEnabled`/`fleetest.androidStreamEnabled` が有効・helper が解決できる・
-  設定タブの「ポーリングモードを使用する」が OFF)を満たさない場合、または helper が継続不能になった
-  場合は、`api live serve` へ `{"cmd":"frame"}` を `fleetest.liveFps`(既定12)fps を上限に送り続ける
-  自動フレーム(画像のみ)にフォールバックします。いずれの経路でも要素一覧・タップ座標変換に必要な
-  `screen`/`elements` は含まれないため、**「更新」ボタン**でフルの snapshot(`{"cmd":"refresh"}`)を
-  取り直す必要があります(タブを初めて表示したときは自動的に1回だけ実行されます)。
-- **左: スクリーンショット**: 画像をクリックするとその位置をタップし(`{"cmd":"tap","x":..,"y":..}`)、
-  ドラッグするとその軌跡でスワイプし(`{"cmd":"drag",...}`。方向は始点終点の差分から自動判定)、
-  ほぼ動かさず500ms以上長押ししてから離すと長押しを送ります(`{"cmd":"press","x":..,"y":..,
-  "duration":..}`)。**Option(⌥)を押しながらクリックするとダブルタップ**を送ります
-  (`{"cmd":"doubleTap","x":..,"y":..}`)。**「素早く2回クリック」に割り当てていない**のは、
-  1クリックを既にタップとして送っているためで、2回目を待つ設計にすると通常のタップが毎回遅くなります。
-  クリック位置→デバイス座標の変換は下記「座標変換について」参照。画像直下に
+- **デバイスの選び方**: ラインビューで1台だけ選びます。選んだだけでは serve へ接続せず、最初の操作・「更新」・
+  枠のトグル ON のときに、`fleetest api list-devices --project <project>` で取った一覧からそのデバイスを選び、
+  `fleetest api live serve` 常駐プロセスを起動します(詳細は下記「常駐プロセス」)。他の機械のデバイスは
+  タイルが運ぶ属性(`remote`)から選択肢に加え、serve を向こうで起こします。そのデバイスが一覧に無い・
+  `list-devices` が失敗した(実行プロファイルにデバイスが無い、対象プロジェクト未解決等)ときは、**別のデバイスへ
+  倒さず**グリッドビューに「開けません」と出して操作を送りません(頼まれていないデバイスに serve を立てると
+  ブリッジの自動起動まで撃つため)。一覧が取れなかった理由は出力パネルに出ます。
+- **画面**: 拡大表示の絵はデバイスモニター自身の配信(ストリーミング/ポーリング。上記「デバイスモニター」)です。
+  host の観測(`{"cmd":"refresh"}`)の snapshot は `screen`/`elements` と、枠と同じ瞬間の一枚絵(`image`)を運びます。
+- **画面の操作**: クリックでその位置をタップし(`{"cmd":"tap","x":..,"y":..}`)、ドラッグでスワイプし
+  (`{"cmd":"drag",...}`。方向は始点終点の差分から自動判定)、ほぼ動かさず500ms以上長押ししてから離すと長押し
+  (`{"cmd":"press",...}`。500ms を過ぎると始点が橙になり「長押し」と出る。その後に動かすと長押しからのドラッグ。
+  Command を押しているときは出さない)、**Command(⌘)を押しながらクリックするとダブルタップ**(`{"cmd":"doubleTap",...}`)、
+  **Option(⌥)+ドラッグで指の軌跡どおりになぞります**(`{"cmd":"gesture",...}`。離した後は、なぞった線を薄くし、
+  再生が済んだ部分を太く重ねる = 実行が始まって画面の絵が描き替わり始めた時刻からの経過時間で推定。
+  再生が終わった応答で描き切り、実際にかかった時間との比を覚えて次の軌跡の線の速さにする)。送った軌跡は出力パネル「fleetest」に
+  `[live] trace:` の1行で要約される(点の数・時間・押してから動き出すまで・範囲・最大の跳び。軌跡の形を確かめるときに使う)。**「素早く2回クリック」に
+  割り当てていない**のは、1クリックを既にタップとして送っているためで、2回目を待つ設計にすると通常のタップが
+  毎回遅くなります。ツールバーの**「ダブルタップ」「軌跡」は押せない表示灯**で、Command / Option を押している間
+  だけ点き、押し続けると 0.8 秒後に説明のツールチップが出ます(入力欄で押したとき・ショートカットで他のキーと
+  一緒に押したときは出さない)。クリック位置→デバイス座標の変換は下記「座標変換について」。ツールバーに
   **「ホーム」**(`{"cmd":"home"}`)・**「タスク切替」**(`{"cmd":"appSwitcher"}`)・
-  **「拡大」「縮小」**(`{"cmd":"pinch","scale":2|0.5,...}`。画面全体のピンチ)ボタンがあります。
-  未取得時はプレースホルダーが表示されます。
+  **「拡大」「縮小」**(`{"cmd":"pinch","scale":2|0.5,...}`。画面全体のピンチ)・折りたためる端末の
+  **「折りたたむ」「開く」**(`{"cmd":"fold",...}`)があります。
   **iOS はモードによって届かないジェスチャがあります**: Compose のダブルタップは
   XCUITest 経路では効きません(実行プロファイルが inapp モードなら効く。docs/commands.md の表)。
-- **右: 操作パネル**: **「更新」**ボタン(snapshot 再取得)・**テキスト入力欄 + 「入力」**
-  (`{"cmd":"type","text":..}`。`ref` は付けず、デバイス側でフォーカス中の要素に入力されます)・
-  **要素一覧**(`[ref] type「label」id=identifier =value` 形式。空フィールドは省く。**行のクリックでは
-  何も送らない**(読むための一覧)。行にマウスを乗せると画像上に該当要素の `frame` を枠オーバーレイ表示)。要素一覧の下には後述の**「操作記録」**欄が並び、間のスプリッタをドラッグして
-  両者の高さ配分を調整できます(配分は `vscode.setState` に保存されます)。
-- **操作記録**: ライブ操作で実行した操作(タップ/ダブルタップ/スワイプ/長押し/ピンチ/入力/ホーム/タスク切替)を時刻付きで
-  1 行ずつ追記する表示専用のログです(**下記「レコーディングとシナリオ生成」とは別機能**で、シナリオ
-  生成には一切関与しません)。各行は「時刻 + 短いラベル」(タップ対象は label > `#id` > type の順、
-  要素外のタップ/長押しは座標、入力は先頭20字)で、失敗した操作は `✗` を付けて強調します。最大 200 行
-  (超えたら古い行から破棄)で最新行が見えるよう自動スクロールし、**「クリア」**ボタンで消去できます。
-- **アプリプロファイル・レコーディング**: 上部の「アプリプロファイル」セレクタ・
-  **「レコーディング開始」/「レコーディング終了」**ボタン(画像を右クリックした同じ操作のメニューからも
-  実行可)で操作を録画できます。録画開始時は対象アプリを常に再インストールしてから起動します
-  (アプリプロファイルに appPath がある場合。以前の「自動インストール」チェックボックスは廃止)。
-  詳細は下記「レコーディングとシナリオ生成」。
-- **エラー表示欄**: 直近の失敗(`actionResult` の `ok:false`、または snapshot 取得失敗)のエラー
-  メッセージを表示します。
-- **操作後の反映**: タップ/ドラッグ/長押し/入力/ホーム/タスク切替が成功すると、serve が操作直後に
-  返す観測イベント(snapshot)をそのまま画面へ反映します(ブリッジの操作応答時点で UI が整定済みの
-  ため追加待ちは不要)。失敗時は画面を再取得せず、エラー表示欄にエラーを出すだけです。操作中は全ての
-  操作ボタン・デバイスセレクタが無効化され、「処理中...」と表示されます。
-
-### レコーディングとシナリオ生成
-
-操作を記録して Swift シナリオを自動生成する機能です(`src/monitorLiveController.ts` の
-startRecord/stopRecord/generateScenario、`src/liveModel.ts` の `RecordedStep`/`locatorChainForElement`、
-Swift 側 `fleetest api gen-scenario`(`Sources/fleetest/ApiGenScenarioCommand.swift`))。
-
-- **開始**: アプリプロファイルを選び「レコーディング開始」を押すと、「自動インストール」が ON かつ
-  プロファイルにアプリパスがあれば `{"cmd":"install"}` → `{"cmd":"launch"}` を実行し(install 直後の
-  観測失敗は無視する)、OFF なら `launch` のみ実行します。起動に失敗すると録画は開始されません。
-- **記録中**: 以降のタップ/長押し/ドラッグ(スワイプ)/テキスト入力/ホーム/タスク切替の操作が成功
-  するたびに `RecordedStep` として記録されます。ロケータは identifier > label > (同 type 内の)
-  index の優先度で組み立て(`locatorChainForElement`)、タップ/長押しは当たった要素が無ければ記録
-  しません(操作自体は実行されます)。ドラッグ・入力・ホーム・タスク切替はロケータ不要のため常に
-  記録されます。
-- **終了**: 「レコーディング終了」を押すと記録済みステップを一時 JSON(`os.tmpdir()`)に書き出し、
-  `fleetest api gen-scenario --project <project> --steps <path>`(FleetestCli の直列キュー経由。生成
-  コードのビルド検証(`swift build`)を伴うため `api run` と同じキューに乗せる)を
-  実行してテストコードを生成します。成功すると生成ファイルを自動的に開きシナリオツリーを更新します。
-  失敗時(ビルド検証失敗を含む)はエラーメッセージがレコーディング状態欄に表示されるだけで、ファイル
-  は開きません。一時 JSON は完了後にベストエフォートで削除されます。操作を1件も記録しないまま終了
-  すると、CLI を呼ばずに「操作が記録されていません」と表示します。
+- **操作パネル**: **「更新」**ボタン(snapshot 再取得)・**要素一覧**(`[ref] type「label」id=identifier =value` 形式。
+  **行のクリックでは何も送らない**(読むための一覧)。行にマウスを乗せると画像上に該当要素の `frame` を枠オーバーレイ表示。
+  長い行は切らずに横スクロール)・
+  見出し行の**「バウンディングボックスを表示」**(全要素の枠。操作のあと画面が止まるのを待って木を撮り直し、描き直す。
+  **既定 OFF で ON/OFF は覚えない** = パネルを開くたびに OFF から始まる)・
+  拡大表示の絵の直下の**テキスト入力欄**(Enter で `{"cmd":"type","text":..}`。`ref` は付けず、デバイス側で
+  フォーカス中の要素に入力されます)・**操作記録**(実行した操作を時刻つきでデバイスごとに追記する表示専用のログ。最大 200 行、
+  失敗は `✗`、右列に同じ操作を MCP で撃つコマンド)。操作パネルと実行ログの間の区切りはドラッグで幅を変えられ、
+  幅の割合は webview の状態に覚える。
+- **操作後の反映**: 操作が成功すると、serve が操作直後に返す観測イベント(snapshot)を反映します。失敗時は
+  画面を再取得せず、エラー表示欄にエラーを出すだけです。操作の最中は操作ボタンが無効化され、観測(画面の
+  撮り直し)の最中の操作は捨てずに host が観測の終わりを待って撃ちます。前の操作の実行中に押したクリックは
+  送らず(溜めて後で撃つと、画面が変わった後に届いて別の物に当たる)、その旨を操作カラムの下に出します。
 
 ### 常駐プロセス(`api live serve`)について
 
@@ -600,15 +550,13 @@ Swift 側 `fleetest api gen-scenario`(`Sources/fleetest/ApiGenScenarioCommand.sw
 - コマンドは stdin へ NDJSON で1行ずつ送ります: `{"cmd":"tap","ref":<Int>}` /
   `{"cmd":"tap","x":..,"y":..}` / `{"cmd":"type","text":..,"ref":..|null}` /
   `{"cmd":"drag","fromX":..,"fromY":..,"toX":..,"toY":..,"press":..,"duration":..}` /
-  `{"cmd":"press","x":..,"y":..,"duration":..}` / `{"cmd":"launch","bundle":..}` /
-  `{"cmd":"install","path":..}` / `{"cmd":"home"}` / `{"cmd":"appSwitcher"}` / `{"cmd":"refresh"}`
-  (観測のみ。screen+要素一覧付きの snapshot) / `{"cmd":"frame"}`(観測のみ。画像のみ)。
-  `{"cmd":"terminate"}` もプロトコル上定義されていますが、この UI からは現状呼ばれていません。
-- 応答は stdout から NDJSON で届きます。`refresh`/`frame` 以外はまず
+  `{"cmd":"press","x":..,"y":..,"duration":..}` / `{"cmd":"home"}` / `{"cmd":"appSwitcher"}` /
+  `{"cmd":"refresh"}`(観測のみ。screen+要素一覧付きの snapshot)。`launch` / `install` / `terminate` /
+  `frame` もプロトコル上定義されていますが、この UI からは呼ばれていません。
+- 応答は stdout から NDJSON で届きます。`refresh` 以外はまず
   `{"kind":"actionResult","ok":true|false,"error":..|null}` を出し、続けて(操作の成否を問わず)
   観測イベントを出します: `refresh` を含む操作系は `{"kind":"snapshot","ok":true,"platform":..,
-  "screen":..,"image":..,"elements":..}`(失敗時は `{"kind":"snapshot","ok":false,"error":..}`)、
-  `frame` は `{"kind":"frame","ok":true,"image":..}` です。拡張側は `actionResult` が `ok:false` の
+  "screen":..,"image":..,"elements":..}`(失敗時は `{"kind":"snapshot","ok":false,"error":..}`)です。拡張側は `actionResult` が `ok:false` の
   とき、続く観測イベントは画面へ反映しません(直前の表示を保持したままエラーを表示する)。
 - プロセス管理は `src/monitorPanel.ts` の host-metrics プロセス管理パターンを踏襲しています: stdin
   パイプ保持(EOF が終了指示)・SIGTERM 送信後2秒で SIGKILL・予期しない終了は5秒後に自動再起動・
@@ -616,7 +564,7 @@ Swift 側 `fleetest api gen-scenario`(`Sources/fleetest/ApiGenScenarioCommand.sw
   kill→respawn し、これが3連続したら諦めて「常駐プロセスが起動していません」を表示します。
   host-metrics と違い serve はデバイスごとの状態を持つプロセスなので、デバイス選択が変わるたびに
   明示的に再バインド(停止→新デバイスで起動)し、その際は諦め状態もリセットします。専用の「再起動」
-  ボタンは無く、デバイスを選び直す(または一覧を再取得する)操作そのものが復帰の手段になります。
+  ボタンは無く、デバイスを選び直す操作そのものが復帰の手段になります。
 
 ### 座標変換について
 
@@ -630,7 +578,7 @@ Swift 側 `fleetest api gen-scenario`(`Sources/fleetest/ApiGenScenarioCommand.sw
 クリック位置→タップ座標への変換自体は拡張ホスト側(`src/monitorLiveController.ts`)で行い、webview は
 クリック位置(画像内の表示px)と表示サイズだけを postMessage で送ります。ホバー時の枠オーバーレイは
 即応性のため webview 内で完結させる必要があり、CSP により `liveModel.ts` を import できないため、
-`frameToDisplayRect` と同じ小さな計算式だけを webview 内の素の JS(`src/webview/monitor/liveTab.js`)に
+`frameToDisplayRect` と同じ小さな計算式だけを webview 内の素の JS(`src/webview/monitor/liveListViews.js`)に
 複製しています。
 
 ### CLI 呼び出しについて(FleetestCli のキューを使わない理由)
@@ -640,14 +588,12 @@ Swift 側 `fleetest api gen-scenario`(`Sources/fleetest/ApiGenScenarioCommand.sw
 spawn します(`list-devices` は `src/oneShotCli.ts` の `runOneShot`、`live serve` は個別の常駐
 spawn)。`FleetestCli` のキューは `fleetest api run`(シナリオ実行。内部で `swift build` を伴い得るため、
 SPM のビルドロック対策として同時に2プロセス走らせない設計)と共有されているため、もしライブ操作も
-同じキューに乗せると、実行中(数分かかることもある)はライブ操作タブの全ての操作がその実行完了まで
+同じキューに乗せると、実行中(数分かかることもある)はグリッドビューの全ての操作がその実行完了まで
 待たされて固まってしまいます。ライブ操作は「今の画面を見ながらすぐ触る」ためのものなのでこれは
 受け入れられません。一方 `api live serve`/`api list-devices` はいずれもドライバ直叩きの操作で
 `swift build` を一切行わないため、専用 spawn にしても実行中の `swift build` と競合する心配は
 ありません(`src/monitorPanel.ts` が `devicesUp`/`devicesDown`/host-metrics を専用 spawn している
-のと同じ方針)。例外として `fleetest api gen-scenario`(レコーディング終了時の生成)は生成コードの
-ビルド検証(`swift build`)を伴うため、あえて `FleetestCli` の直列キュー経由で実行します
-(詳細は上記「レコーディングとシナリオ生成」)。
+のと同じ方針)。
 
 ## 結果ダッシュボード
 
@@ -864,47 +810,28 @@ F5 で Extension Development Host を起動した状態(またはパッケージ
 
 ### ライブ操作
 
-35. デバイス(シミュレータ/エミュレータ)を `fleetest devices up` 等で起動した状態で、
-    コマンドパレットから **「fleetest: ライブ操作を表示」** を実行する。デバイスモニターパネルが
-    開いて「ライブ操作」タブへ切り替わり、上部のデバイスセレクタに起動済みのデバイスが一覧表示
-    されることを確認する(ブリッジ接続済みのデバイスは「接続済み」と表示される)。もう一度実行
-    しても新しいパネルが増えず、既存のパネルが前面に出て「ライブ操作」タブのままであることを
-    確認する。デバイスモニターパネルでタイルを右クリックし **「ライブ操作」** を選ぶと、同様に
-    「ライブ操作」タブへ切り替わり(または前面に出て)そのデバイスが選択されることも確認する。
-36. デバイスが1台も解決できない状態(`fleetest.project` を存在しないプロジェクト名にする等)
-    でタブを開くと、上部にエラーバナーが表示され、デバイスセレクタに
-    `fleetest.platform`/`fleetest.port`/`fleetest.serial` 設定から作られた「設定のデバイス」が
-    1件だけ表示されることを確認する。
-37. 接続済みのデバイスを選択すると、「更新」を押さなくても画面がほぼリアルタイムに自動更新
-    される(既定のヘッドレス映像ストリーミング)ことを確認する(設定タブの「ポーリングモードを
-    使用する」をチェックすると `fleetest.liveFps` 間隔のポーリングに切り替わることも確認する)。
-    「更新」ボタンを押すと、右側に要素一覧(`[ref] type「label」...` 形式)が表示されることを
-    確認する。
-38. 表示された画面をクリックすると、その位置がタップされ、直後に画面が自動的に更新される
-    ことを確認する(クリック位置と実際にタップされた位置が対応していることを、ボタン等の
-    UI要素を狙ってクリックして反応することで確認する)。
-39. 要素一覧の行にマウスを乗せると、画面上にその要素の枠がオーバーレイ表示されることを
-    確認する。行をクリックするとその要素がタップされ(枠がハイライトされる)、画面が自動的に
-    更新されることを確認する。
-40. 画面を押したままドラッグして離すとその軌跡でスワイプされ、ほぼ同じ位置で500ms以上長押し
-    してから離すと長押し操作になり、それぞれ画面が自動的に更新されることを確認する。画面直下の
-    「ホーム」「タスク切替」ボタンを押すと、それぞれホーム画面/アプリスイッチャーに切り替わり、
-    画面が自動的に更新されることを確認する。
-41. テキスト入力欄にテキストを入力して「入力」を押すと、直前にタップした要素(テキスト
+35. デバイス(シミュレータ/エミュレータ)を `fleetest devices up` 等で起動した状態で、デバイスモニターを開き、
+    ラインビューで1台だけ選択する。グリッドビューに拡大表示とその右隣の操作カラム・操作パネルが出ることを確認する
+    (選択しただけでは要素一覧が空で、デバイスへ接続しないこと)。
+36. 「更新」を押すと、要素一覧(`[ref] type「label」...` 形式)が表示されることを確認する。
+    デバイスが1台も解決できない状態(`fleetest.project` を存在しないプロジェクト名にする等)では
+    操作が「開けません」のエラーになり、出力パネルに理由が出ることを確認する。
+37. 拡大表示の画面をクリックすると、その位置がタップされ、直後に要素一覧が更新されることを確認する
+    (クリック位置と実際にタップされた位置が対応していることを、ボタン等のUI要素を狙って確認する)。
+    「バウンディングボックスを表示」を ON にしたまま画面遷移するタップをすると、遷移中は枠が消え、
+    約 0.7 秒後に整定した画面の枠が描かれることを確認する。
+38. 要素一覧の行にマウスを乗せると、画面上にその要素の枠が表示されることを確認する。行をクリックしても
+    デバイスは操作されないことを確認する。
+39. 画面を押したままドラッグして離すとその軌跡でスワイプされ、ほぼ同じ位置で500ms以上長押し
+    してから離すと長押し操作になることを確認する。「ホーム」「タスク切替」ボタンで、それぞれホーム画面/
+    アプリスイッチャーに切り替わることを確認する。
+40. 画面の下のテキスト入力欄にテキストを入力して Enter を押すと、直前にタップした要素(テキスト
     フィールド等)にテキストが入力されることを確認する。
-42. 操作(タップ/ドラッグ/長押し/入力/ホーム/タスク切替)の実行中は、デバイスセレクタと全ての
-    操作ボタンが無効化され、「処理中...」と表示されることを確認する。存在しない要素を狙う等、
-    意図的に失敗する操作を行うと、エラー表示欄にエラーメッセージが表示され、画面の自動更新は
-    行われない(直前の画面のまま)ことを確認する。
-43. アプリプロファイルを選択し「レコーディング開始」(画像を右クリックしたメニューの同項目
-    でも可)を押すと、必要に応じて対象アプリがインストール・起動され、レコーディング中の表示に
-    変わることを確認する。いくつか操作(タップ・入力・スワイプ等)を行った後「レコーディング
-    終了」を押すと、テストコードが生成されて自動的にエディタで開かれ、シナリオツリーにも
-    反映されることを確認する。操作を1件も行わずに終了すると、「操作が記録されていません」と
-    表示されCLIが呼ばれないことを確認する。
-44. シナリオを「実行」している最中(実行に数秒以上かかるもの)に、ライブ操作タブで「更新」や
-    タップ等の操作を行うと、実行の完了を待たずに応答が返る(FleetestCli のキューに乗らず
-    専用 spawn している)ことを確認する。
+41. 存在しない要素を狙う等、意図的に失敗する操作を行うと、操作カラムの下にエラーメッセージが表示され、
+    操作記録に `✗` の行が付くことを確認する。
+42. シナリオを「実行」している最中(実行に数秒以上かかるもの)に、同じデバイスを選んで「更新」やタップ等の操作を
+    行うと、実行の完了を待たずに応答が返る(FleetestCli のキューに乗らず専用 spawn している)ことと、
+    実行中は操作のあとの自動の撮り直しが走らないことを確認する。
 
 ### デバイスモニター(タイルの個別起動/停止)
 
@@ -1047,18 +974,16 @@ vscode-fleetest/
 │   ├── runHookScaffold.ts        # プロファイルタブ「リモート制御」の run 前後スクリプトの雛形を作成する
 │   ├── machineLockModel.ts       # どの機械で誰の run が走っているかの控え(`api monitor` の monitorLock イベントが供給元。vscode 非依存)
 │   ├── runBoardModel.ts          # デバイスモニターの「run ボード」(フリート横断の実行状況)の純粋ロジック(拡張・webview 両バンドルに入る。vscode 非依存)
-│   ├── deviceStream.ts           # 映像ストリーミング常駐 helper のプロセス管理(iOS/Android 共通。ライブ操作・モニタータイル両方が使う)
+│   ├── deviceStream.ts           # 映像ストリーミング常駐 helper のプロセス管理(iOS/Android 共通。モニタータイルが使う)
 │   ├── remoteStreamAdmission.ts  # リモート機への画面配信(`api device-stream`)を一斉に張らないための入場制限(sshd MaxStartups 対策)
 │   ├── healModel.ts              # HealFixCollector・候補の件数(vscode 非依存)
 │   ├── healNotice.ts             # RunEventBus 購読。run 終了時に自己修復の件数を通知
 │   ├── profileModel.ts           # `fleetest api validate-profile` の出力の検証・変換、プロファイルファイルパスの種別判定(vscode 非依存)
 │   ├── profileDiagnostics.ts     # DiagnosticCollection("fleetest-profile")。保存時自動検証・fleetest.validateProfiles コマンド
-│   ├── liveModel.ts              # `fleetest api list-devices`/`fleetest api live serve`/`fleetest api gen-scenario` の検証・NDJSONコマンド組み立て・座標変換・要素行フォーマット・CLI引数組み立て・レコーディング→FlowStep変換・webviewメッセージプロトコル(vscode 非依存)
+│   ├── liveModel.ts              # `fleetest api list-devices`/`fleetest api live serve` の検証・NDJSONコマンド組み立て・座標変換・要素行フォーマット・CLI引数組み立て・webviewメッセージプロトコル(vscode 非依存)
 │   ├── liveDeps.ts               # MonitorLiveController への窓口インターフェース(liveTabHost.ts が実装)
-│   ├── liveRunTarget.ts          # prepareForRun が返す契約(runHandler.ts の --platform/--port/--serial 組み立て用)
-│   ├── monitorLiveController.ts  # ライブ操作の中核サブコントローラ。list-devices の専用spawn+live serve の常駐spawn(いずれもFleetestCliのキューを使わない)・座標変換の適用・serveの観測イベント反映・画面ストリーミング/自動フレームの供給元切替・レコーディング→gen-scenario
-│   ├── liveAppActions.ts         # ライブ操作のアプリ操作(インストール・起動)・レコーディング・シナリオ生成。MonitorLiveController から委譲
-│   ├── liveTabHost.ts            # デバイスモニターの「ライブ操作」タブのサブコントローラ。コマンド fleetest.showLiveControl・実行開始時の自動オープン(fleetest.liveControlOnRun)・デバイスタイル右クリック連携
+│   ├── monitorLiveController.ts  # ライブ操作の中核サブコントローラ。list-devices の専用spawn+live serve の常駐spawn(いずれもFleetestCliのキューを使わない)・座標変換の適用・serveの観測イベント反映
+│   ├── liveTabHost.ts            # デバイスモニターのグリッドビュー(1台選択)のライブ操作の窓口。gridLiveAction の受け口・「全て終了」前後の serve の畳み/復帰
 │   ├── monitorRecordingsController.ts # 「録画」タブ: セッション一覧の供給と選択セッションの再生データの組み立て
 │   ├── recordingsModel.ts        # 録画再生 UI の型ガード・純粋関数(recordings/index.json の解釈。vscode 非依存)
 │   ├── recordingsSessionsCache.ts # テストセッション一覧の前回結果を workspaceState に控える
@@ -1075,7 +1000,7 @@ vscode-fleetest/
 │   │   └── strings/*.ts          # namespace 別辞書(`{ "ns.key": { ja, en } }`。lane.ts は vscode 非依存の共有ランタイム)
 │   └── webview/
 │       ├── i18n.js                # webview 側 i18n ランタイム(locale は <html lang> 経由)
-│       ├── monitor/               # デバイスモニターの webview 資産(main.js/tabs.js/deviceTiles.js/liveTab.js/各プロファイルタブ/h264Decoder.js 等。liveTab.js が「ライブ操作」タブの UI 本体)
+│       ├── monitor/               # デバイスモニターの webview 資産(main.js/tabs.js/deviceTiles.js/gridLiveControls.js/gridLivePanel.js/各プロファイルタブ/h264Decoder.js 等。gridLive*.js がグリッドビューのライブ操作の UI 本体)
 │       └── dashboard/             # 結果ダッシュボードの webview モジュール(render.js/format.js/summaryTable.js/deviceHealth.js/machineHealth.js/insights.js/headlineDiff.js/headlineDiffLogic.js/style.css 等。monitor/dashboardTab.js が読む)
 └── test/
     ├── ndjson.test.mjs           # NdjsonParser のユニットテスト(node:test)
@@ -1099,7 +1024,7 @@ vscode-fleetest/
     ├── binaryPathResolve.test.mjs # binaryPathResolve のユニットテスト
     ├── protocolVersion.test.mjs  # protocolVersion のユニットテスト
     ├── deviceStream.test.mjs     # deviceStream(StreamPipeline)のユニットテスト
-    ├── webviewLiveDrag.test.mjs  # webview 側ドラッグ処理のユニットテスト(jsdom)
+    ├── webviewGridLiveControls.test.mjs # グリッドビューのライブ操作(ツールバー・画面のドラッグ等)の DOM テスト(jsdom)
     ├── healModel.test.mjs        # healModel のユニットテスト + mock-runner(--pattern heal)を使った統合テスト
     ├── cli.test.mjs              # FleetestCli のキャンセル方針のテスト
     ├── profileModel.test.mjs     # profileModel のユニットテスト + mock-validate-profile を使った統合テスト + 実バイナリ(存在すれば)確認

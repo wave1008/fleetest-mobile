@@ -84,13 +84,14 @@ function selectedNames(document) {
   return [...document.querySelectorAll("#grid .tile.selected .tile-name")].map((el) => el.textContent);
 }
 
-test("タイルの右クリックの「このデバイスのみ選択」は「すべて選択」の直前に並び、その台だけの選択に置き換える", (t) => {
+test("タイルの右クリックの「このデバイスのみ選択」は先頭(起動/停止の上)に並び、その台だけの選択に置き換える", (t) => {
   const { window, document, sent } = createWebview();
   t.after(() => window.close());
   sendDevices(window);
   const [first, second] = document.querySelectorAll("#grid .tile");
   const only = document.getElementById("device-op-menu-select-only");
-  assert.equal(only.nextElementSibling, document.getElementById("device-op-menu-select-all"));
+  assert.equal(only.parentElement.firstElementChild, only);
+  assert.equal(only.nextElementSibling, document.getElementById("device-op-menu-item"));
   assert.equal(only.textContent, "このデバイスのみ選択");
 
   rightClick(window, first);

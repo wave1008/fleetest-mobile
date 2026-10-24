@@ -14,7 +14,6 @@ TestProjects/SampleApp/
 │   └── runs/ios-run.json          # run profiles (created by `profile setup`; app + device list, each naming its machine + run-time settings)
 ├── scenarios/                     # Swift DSL
 │   ├── _Main.swift                # delegates to the runner (do not edit)
-│   ├── Generated/                 # scenarios generated from Live Control recordings
 │   └── _disabled/                 # excluded from compilation (parking spot for generation
 │                                   # failures and anything you want to keep out of the build)
 ├── reports/                       # per-scenario Markdown reports
