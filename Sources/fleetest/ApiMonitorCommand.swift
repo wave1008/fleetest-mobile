@@ -526,6 +526,7 @@ struct ApiMonitorCommand: AsyncParsableCommand {
                 .filter { plannedIDs.contains($0.target.id) }
             // **撮るのは並列**(1台ずつだと Android 8 台で約 2 秒 = 0.2〜0.3 秒 × 台数を毎周払っていた)。
             // 判定・配信は下で従来どおり1台ずつ・同じ順で回す
+            let captureStartedAt = Date()
             let fetched = await Self.fetchScreenshots(captureStates, repoRoot: monitorRepoRoot)
             for state in captureStates {
                 guard !stop.isSet else { break }
@@ -581,7 +582,8 @@ struct ApiMonitorCommand: AsyncParsableCommand {
                     emitLine(ApiMonitorFrameEvent(
                         device: state.target.id,
                         jpegBase64: jpeg.data.base64EncodedString(),
-                        width: jpeg.width, height: jpeg.height))
+                        width: jpeg.width, height: jpeg.height,
+                        capturedAtMs: Int64(captureStartedAt.timeIntervalSince1970 * 1000)))
                     lastErrorMessage[state.target.id] = nil
                 } catch {
                     // JPEG 変換失敗(壊れた PNG 等)はタイルへ警告を出さない(ユーザー決定:

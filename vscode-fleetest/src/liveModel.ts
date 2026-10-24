@@ -126,6 +126,9 @@ export interface LiveSnapshot {
   /** LiveBridgeAutoStarter.isStarting(契約: ApiLiveCommand.swift 冒頭)。ok/エラーを問わず全イベント
    * 共通の必須フィールド。monitorLiveController.ts の applyBridgeStarting が読む。 */
   readonly bridgeStarting: boolean;
+  /** 画面を撮り始めた時刻(デバイスの居る機械の epoch ms。契約: ApiLiveCommand.swift 冒頭)。グリッドビューが
+   * この絵を出したあと、これより前に撮られたモニターのポーリングの絵を捨てる(deviceTiles.js の showMirrorStill) */
+  readonly capturedAtMs: number;
 }
 
 export interface LiveOkResult {
@@ -189,7 +192,8 @@ export function isLiveSnapshot(value: unknown): value is LiveSnapshot {
     value.elements.every(isLiveElement) &&
     Array.isArray(value.notes) &&
     value.notes.every((note) => typeof note === "string") &&
-    typeof value.bridgeStarting === "boolean"
+    typeof value.bridgeStarting === "boolean" &&
+    typeof value.capturedAtMs === "number"
   );
 }
 
@@ -499,6 +503,7 @@ export function parseLiveServeEvent(value: unknown): LiveServeEvent | undefined 
             elements: result.elements,
             notes: result.notes,
             bridgeStarting: result.bridgeStarting,
+            capturedAtMs: result.capturedAtMs,
           }
         : { ok: false, error: result.error, bridgeStarting: result.bridgeStarting },
     };
@@ -1019,6 +1024,8 @@ export type LiveToWebviewMessage =
       readonly image: string;
       readonly elements: readonly LiveElementView[];
       readonly notes: readonly string[];
+      /** LiveSnapshot.capturedAtMs(グリッドビューの古い絵の除外に使う) */
+      readonly capturedAtMs: number;
     }
   | { readonly type: "frame"; readonly image: string }
   /** 直前のデバイスのスナップショット(画面サイズ・要素一覧)を捨てさせる。デバイスを
@@ -1082,6 +1089,7 @@ export function toSnapshotMessage(snapshot: LiveSnapshot): LiveToWebviewMessage 
       frameText: formatElementFrame(element.frame),
     })),
     notes: snapshot.notes,
+    capturedAtMs: snapshot.capturedAtMs,
   };
 }
 

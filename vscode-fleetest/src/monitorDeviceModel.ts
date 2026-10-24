@@ -19,7 +19,7 @@
 //     どちらか使用中なら true)
 //     ("registered":bool は ApiMonitorCommand.determineStates(includeUnregistered:) が合成した
 //     どの実行プロファイルにも記載が無い起動中デバイスなら false)
-//   {"kind":"monitorFrame","device":"..","jpegBase64":"..","width":480,"height":1040}
+//   {"kind":"monitorFrame","device":"..","jpegBase64":"..","width":480,"height":1040,"capturedAtMs":1761300000000}
 //     … connected デバイスのみ、約interval秒毎
 //
 // webview 向けメッセージ契約は monitorWebviewMessages.ts、デバイスライフサイクルのキューは
@@ -227,6 +227,9 @@ export type MonitorEvent =
       readonly jpegBase64: string;
       readonly width: number;
       readonly height: number;
+      /** その周の撮影を始めた時刻(デバイスの居る機械の epoch ms)。webview はライブ操作の観測の絵
+       * (snapshot の capturedAtMs)より前に撮られたこの絵を捨てる。契約: ApiMonitorEvents.swift の ApiMonitorFrameEvent */
+      readonly capturedAtMs: number;
     }
   // `fleetest monitor pause` の保持状態の変化(ApiMonitorHoldEvent)。webview へは送らず
   // OUTPUT ログだけ(配信の停止自体は、hold 中の全タイル state:"unknown" 化で
@@ -485,7 +488,8 @@ export function isMonitorEvent(value: unknown): value is MonitorEvent {
         typeof value.device === "string" &&
         typeof value.jpegBase64 === "string" &&
         typeof value.width === "number" &&
-        typeof value.height === "number"
+        typeof value.height === "number" &&
+        typeof value.capturedAtMs === "number"
       );
     case "monitorHold":
       return typeof value.active === "boolean";

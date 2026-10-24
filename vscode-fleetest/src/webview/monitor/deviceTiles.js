@@ -493,10 +493,10 @@ function renderFrame(entry) {
     entry.imgEl.alt = entry.device.name;
     // usingH264 中は img を DOM に残したまま非表示にする(mjpeg フォールバック復帰時に renderFrame
     // だけで即再表示できるようにするため。canvas は h264 停止後も再利用せず null 化する)。
-    entry.imgEl.classList.toggle('h264-hidden', entry.usingH264);
+    entry.imgEl.classList.toggle('h264-hidden', entry.usingH264 && !entry.stillOverH264);
     entry.frameWrapEl.appendChild(entry.imgEl);
     if (entry.canvasEl) {
-      entry.canvasEl.classList.toggle('visible', entry.usingH264);
+      entry.canvasEl.classList.toggle('visible', entry.usingH264 && !entry.stillOverH264);
       entry.frameWrapEl.appendChild(entry.canvasEl);
     }
   } else {
@@ -598,13 +598,17 @@ function renderMirror(entry) {
   mirror.placeholderHtml = null;
   mirror.placeholderClone = null;
   mirror.frameEl.textContent = '';
-  if (entry.usingH264 && entry.canvasEl) {
+  if (entry.usingH264 && entry.canvasEl && !entry.stillOverH264) {
     mirror.frameEl.appendChild(mirror.canvasEl);
     copyMirrorFrame(entry);
     return;
   }
   if (entry.frameSrc) {
-    mirror.imgEl.src = entry.frameSrc;
+    // **変わったときだけ入れる** —— 同じ src を入れ直すとブラウザは読み込みをやり直して load を鳴らすので、
+    // 「絵が描き替わった」(onMirrorFrame)を古い絵のまま知らせてしまう(devices サイクルごとにここを通る)
+    if (mirror.imgEl.getAttribute('src') !== entry.frameSrc) {
+      mirror.imgEl.src = entry.frameSrc;
+    }
     mirror.imgEl.alt = entry.device.name;
     mirror.frameEl.appendChild(mirror.imgEl);
   }
@@ -630,6 +634,46 @@ function renderMirrorHeader(entry, mirror) {
   mirror.headerEl.appendChild(entry.headerEl.cloneNode(true));
 }
 
+/** ライブ操作の観測の一枚絵(snapshot の image = 要素の木と同じ瞬間の画面)をタイルと拡大表示に出す。受け手:
+ * gridLivePanel.js(枠を描く木の絵を出してから描く = 絵の経路がどれだけ遅くても枠と絵が揃う。ブリッジの無い
+ * シミュレータのポーリングは1サイクル1台の順繰りで、台数ぶん遅い)。以後の配信・ポーリングのフレームが届けば
+ * そちらに入れ替わる。配信(h264)を描いている台は、次のフレームが描けるまで一枚絵を前面に出す(stillOverH264)。
+ * capturedAtMs: その絵を撮り始めた時刻(snapshot の capturedAtMs)。**これより前に撮られたポーリングの絵は捨てる**
+ * (applyFrame)—— 撮るのに時間がかかるポーリングの絵が一枚絵の後に届くと、古い絵に戻る。
+ * 戻り値: 'shown' = その絵が既に出ている(load は鳴らない)/ 'loading' = 入れた(拡大表示の load で onMirrorFrame が鳴る)/
+ * 'none' = タイルが無い */
+export function showMirrorStill(deviceId, imageBase64, capturedAtMs) {
+  const entry = tiles.get(deviceId);
+  if (!entry) {
+    return 'none';
+  }
+  if (typeof capturedAtMs === 'number') {
+    entry.stillCapturedAtMs = Math.max(entry.stillCapturedAtMs ?? 0, capturedAtMs);
+  }
+  const src = 'data:image/jpeg;base64,' + imageBase64;
+  const canvasInFront = entry.usingH264 && !entry.stillOverH264;
+  if (entry.frameSrc === src && !canvasInFront) {
+    return 'shown';
+  }
+  entry.frameSrc = src;
+  if (entry.usingH264) {
+    entry.stillOverH264 = true;
+  }
+  renderFrame(entry);
+  return 'loading';
+}
+
+// 拡大表示の絵が実際に描き替わった(一枚絵の読み込み完了・配信のフレームの複製)ことを知らせる。
+// 受け手: gridLivePanel.js(操作の結果の枠を、絵が描き替わってから描く)。listener(deviceId)
+const mirrorFrameListeners = new Set();
+export function onMirrorFrame(listener) {
+  mirrorFrameListeners.add(listener);
+  return () => mirrorFrameListeners.delete(listener);
+}
+function notifyMirrorFrame(deviceId) {
+  for (const listener of [...mirrorFrameListeners]) { listener(deviceId); }
+}
+
 // h264 は1フレーム描画するたびに呼ぶ(タイルの canvas → 拡大表示の canvas への転写)。
 // 転写元はデコード実寸の canvas なので、拡大表示でも解像度は落ちない。
 function copyMirrorFrame(entry) {
@@ -651,6 +695,7 @@ function copyMirrorFrame(entry) {
     return;
   }
   ctx.drawImage(source, 0, 0);
+  notifyMirrorFrame(entry.device.id);
 }
 
 // laneLog.js から: 選択デバイスのレーンに拡大表示を付ける/外す。同じ wrapEl への再 attach は
@@ -667,6 +712,11 @@ export function attachDeviceMirror(deviceId, wrapEl) {
     const imgEl = document.createElement('img');
     imgEl.className = 'lane-preview-media';
     imgEl.draggable = false;  // タイルの img と同じ(ネイティブの画像ドラッグを止める)
+    // **読み込みが終わった時点**で知らせる(src を入れた時点ではまだ前の絵が出ている = デコードは非同期)。
+    // src は変わったときだけ入れる(renderMirror)ので、devices サイクルでは鳴らない
+    imgEl.addEventListener('load', () => notifyMirrorFrame(deviceId));
+    // 読めなかった絵でも待ちを解く(待つ側が永久に描かなくならない)
+    imgEl.addEventListener('error', () => notifyMirrorFrame(deviceId));
     const canvasEl = document.createElement('canvas');
     canvasEl.className = 'lane-preview-media';
     const headerEl = document.createElement('div');
@@ -1627,6 +1677,13 @@ export function applyFrame(message) {
   if (!entry) {
     return; // devices サイクルより先に届いた場合は無視する(次の devices で改めて反映される)
   }
+  // **ライブ操作の観測の一枚絵より前に撮られたポーリングの絵は捨てる**(showMirrorStill の doc)。比べる時刻はどちらも
+  // デバイスの居る機械で撮った時刻(monitorFrame と snapshot の capturedAtMs)。配信(stream)のフレームは時刻を持たない
+  // (届いた順 = 撮った順)
+  if (!message.stream && typeof message.capturedAtMs === 'number'
+      && typeof entry.stillCapturedAtMs === 'number' && message.capturedAtMs < entry.stillCapturedAtMs) {
+    return;
+  }
   entry.frameSrc = 'data:image/jpeg;base64,' + message.jpegBase64;
   // mjpeg フォールバック復帰(codecError 後は host が mjpeg に切替え以後 frame のみ届く)は
   // message.stream(mjpeg ストリーミングヘルパー由来)で見分ける。stream の無い定期ポーリングは
@@ -1651,6 +1708,7 @@ export function applyFrame(message) {
 
 function disposeH264(entry) {
   entry.usingH264 = false;
+  entry.stillOverH264 = false;
   if (entry.h264Renderer) {
     entry.h264Renderer.dispose();
     entry.h264Renderer = null;
@@ -1728,6 +1786,11 @@ export function applyH264Chunk(message) {
         setTileAspect(entry, dims.width / dims.height);
       },
       onFrameRendered: () => {
+        // 操作の結果の一枚絵(showMirrorStill)を出している間に配信が次のフレームを描けたら、配信へ戻す
+        if (entry.stillOverH264) {
+          entry.stillOverH264 = false;
+          renderFrame(entry);
+        }
         copyMirrorFrame(entry);
         ackStreamRendered(entry);
       },

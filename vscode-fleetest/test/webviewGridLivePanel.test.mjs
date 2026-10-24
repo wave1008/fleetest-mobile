@@ -115,6 +115,11 @@ const live = (window, message) => send(window, { type: "live", message });
 const panelOf = (document) => document.getElementById("grid-live-panel");
 const rowsOf = (document) => [...document.querySelectorAll("#grid-live-elements-list .element-row")];
 const boxRects = (document) => [...document.querySelectorAll(".grid-live-boxes-overlay rect:not(.hot)")];
+/** 拡大表示の絵が描き替わった(一枚絵の読み込み完了。jsdom は画像を読まないので load を起こす) */
+const imageLoaded = (window, document) =>
+  document.querySelector("#preview-grid .lane-preview img.lane-preview-media").dispatchEvent(new window.Event("load"));
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+const imageRedrawn = async (window, document) => { imageLoaded(window, document); };
 
 const ELEMENTS = [
   { ref: "e1", frame: { x: 0, y: 0, width: 400, height: 800 }, frameText: "0,0 400x800", line: "Window" },
@@ -298,7 +303,7 @@ test("操作記録は1デバイスあたり200行までで、古い行から捨�
   assert.equal(rows()[0], "op1");
 });
 
-test("枠: 操作を送った直後の snapshot では描かず、次の snapshot で描く(一覧は消さない)", (t) => {
+test("枠: 操作を送った直後の snapshot では描かず、次の snapshot で描く(一覧は消さない)", async (t) => {
   const { window, document, media } = setupConnected(t);
   toggleBoxes(window, document, true);
   live(window, snapshot());
@@ -313,6 +318,7 @@ test("枠: 操作を送った直後の snapshot では描かず、次の snapsho
   live(window, snapshot([ELEMENTS[1]]));
   assert.equal(boxRects(document).length, 0, "操作の直接の結果では描かない");
   assert.equal(rowsOf(document).length, 1, "一覧は入れ替わる");
+  await imageRedrawn(window, document);
 
   live(window, snapshot());
   assert.equal(boxRects(document).length, 2, "次(整定後)の木で描く");
@@ -321,7 +327,7 @@ test("枠: 操作を送った直後の snapshot では描かず、次の snapsho
   assert.deepEqual(["x", "y", "width", "height"].map((a) => rect.getAttribute(a)), ["0", "0", "50", "50"]);
 });
 
-test("枠: 次の snapshot が来なくても、直接の結果から BOXES_SETTLE_CAP_MS(2800ms)で最新の木を描く", (t) => {
+test("枠: 次の snapshot が来なくても、直接の結果から BOXES_SETTLE_CAP_MS(2800ms)で最新の木を描く", async (t) => {
   const { window, document, media } = setupConnected(t);
   const timers = [];
   const realSetTimeout = window.setTimeout.bind(window);
@@ -338,6 +344,7 @@ test("枠: 次の snapshot が来なくても、直接の結果から BOXES_SETT
   live(window, snapshot());
   assert.equal(boxRects(document).length, 0);
   assert.equal(timers.length, 1, "直接の結果を受けた時点で上限のタイマーを張る");
+  await imageRedrawn(window, document);
   timers[0]();
   assert.equal(boxRects(document).length, 2, "上限で最新の木を描く");
 });
@@ -505,7 +512,7 @@ test("入力するテキストは拡大表示の絵のすぐ下に置き、中�
   assert.equal(row.parentElement.id, "grid-live-parking", "2台では置き場へ戻す");
 });
 
-test("枠: 合図(gridActionStarted)より前に届いた snapshot は操作前の画面 —— 直接の結果と取り違えず、本物の結果の次で描く", (t) => {
+test("枠: 合図(gridActionStarted)より前に届いた snapshot は操作前の画面 —— 直接の結果と取り違えず、本物の結果の次で描く", async (t) => {
   // 実際の順序: 撃つ前に host が直前の処理(ライブ操作タブの撮り直し)を待つ / 開いたときの観測を挟む
   const { window, document, media } = setupConnected(t);
   toggleBoxes(window, document, true);
@@ -518,11 +525,12 @@ test("枠: 合図(gridActionStarted)より前に届いた snapshot は操作前�
   live(window, { type: "gridActionStarted", id: "d0" });
   live(window, snapshot([ELEMENTS[1]])); // 本物の直接の結果(遷移の途中)
   assert.equal(boxRects(document).length, 0, "直接の結果では描かない(取り違えると、ここで途中の位置に描いていた)");
+  await imageRedrawn(window, document);
   live(window, snapshot());
   assert.equal(boxRects(document).length, 2, "整定後の木で描く");
 });
 
-test("枠: 操作の途中でデバイスを切り替えても(clearSnapshot → 開いたときの観測)、合図の後の結果まで描かない", (t) => {
+test("枠: 操作の途中でデバイスを切り替えても(clearSnapshot → 開いたときの観測)、合図の後の結果まで描かない", async (t) => {
   const { window, document, media } = setupConnected(t);
   toggleBoxes(window, document, true);
   live(window, { type: "devices", devices: [], selectedId: "other" }); // ライブ操作は別のデバイスにつないでいる
@@ -537,6 +545,7 @@ test("枠: 操作の途中でデバイスを切り替えても(clearSnapshot →
   live(window, { type: "gridActionStarted", id: "d0" });
   live(window, snapshot([ELEMENTS[1]]));
   assert.equal(boxRects(document).length, 0, "直接の結果では描かない");
+  await imageRedrawn(window, document);
   live(window, snapshot());
   assert.equal(boxRects(document).length, 2);
 });
@@ -550,4 +559,158 @@ test("枠: 撃つ前に断られた操作(gridActionError)は画面を変えて�
   assert.equal(boxRects(document).length, 0);
   live(window, { type: "gridActionError", id: "d0", message: "busy" });
   assert.equal(boxRects(document).length, 2, "断られたら元の木で描く");
+});
+
+test("枠: 操作を挟まない観測(「更新」・トグル ON)は絵の描き替わりを待たない(画面は変わっていない)", (t) => {
+  const { window, document } = setupConnected(t);
+  toggleBoxes(window, document, true);
+  live(window, snapshot());
+  assert.equal(boxRects(document).length, 2, "その場で描く");
+  document.getElementById("grid-live-btn-refresh-snapshot").click();
+  live(window, snapshot([ELEMENTS[1]]));
+  assert.equal(boxRects(document).length, 1, "「更新」の結果もその場で描く");
+});
+
+test("拡大表示の絵は devices の周期で同じ src を入れ直さない(入れ直すと load が鳴り、古い絵で「描き替わった」と読む)", async (t) => {
+  const { window, document } = setupConnected(t);
+  const img = document.querySelector("#preview-grid .lane-preview img.lane-preview-media");
+  let sets = 0;
+  const observer = new window.MutationObserver((records) => { sets += records.filter((r) => r.attributeName === "src").length; });
+  observer.observe(img, { attributes: true });
+  sendDevices(window, 1);
+  sendDevices(window, 1);
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  observer.disconnect();
+  assert.equal(sets, 0, "同じ絵なら src に触らない");
+  send(window, { type: "frame", device: "d0", jpegBase64: "WFla", stream: true });
+  assert.match(img.getAttribute("src"), /WFla$/, "新しい絵は入れる");
+});
+
+test("枠: 観測の一枚絵を拡大表示に出し、その絵の読み込みが終わってから描く(ポーリングが遅い経路でも枠と絵が揃う)", (t) => {
+  const { window, document } = setupConnected(t);
+  toggleBoxes(window, document, true);
+  const img = () => document.querySelector("#preview-grid .lane-preview img.lane-preview-media");
+  live(window, { ...snapshot(), image: "TkVX" }); // 拡大表示に出ている絵(QUJD)とは違う瞬間の絵
+  assert.match(img().getAttribute("src"), /TkVX$/, "観測の絵を拡大表示に出す");
+  assert.equal(boxRects(document).length, 0, "その絵が出る(読み込みが終わる)までは描かない");
+  rowsOf(document)[1].dispatchEvent(new window.MouseEvent("mouseenter", { bubbles: true }));
+  assert.equal(document.querySelector(".grid-live-hover-box").style.display, "none", "ホバー枠も待つ");
+  imageLoaded(window, document);
+  assert.equal(boxRects(document).length, 2, "絵が出たら描く");
+});
+
+test("枠: 観測の絵が既に拡大表示に出ているなら待たずに描く", (t) => {
+  const { window, document } = setupConnected(t);
+  toggleBoxes(window, document, true);
+  live(window, snapshot()); // 拡大表示の絵(QUJD)と同じ
+  assert.equal(boxRects(document).length, 2);
+});
+
+test("枠: 一枚絵の load / error が鳴らなくても保険の上限(1000ms)で描く", (t) => {
+  const { window, document } = setupConnected(t);
+  const caps = [];
+  const realSetTimeout = window.setTimeout.bind(window);
+  window.setTimeout = (fn, delay, ...rest) => {
+    if (delay === 1000) { caps.push(fn); return 0; }
+    return realSetTimeout(fn, delay, ...rest);
+  };
+  toggleBoxes(window, document, true);
+  live(window, { ...snapshot(), image: "TkVX" });
+  assert.equal(boxRects(document).length, 0);
+  assert.equal(caps.length, 1, "一枚絵を入れた時点で上限を張る");
+  caps[0]();
+  assert.equal(boxRects(document).length, 2);
+});
+
+test("枠: 操作の結果の流れでも、整定後の木の絵が出てから描く(直接の結果の絵も先に出す)", (t) => {
+  const { window, document, media } = setupConnected(t);
+  toggleBoxes(window, document, true);
+  live(window, snapshot());
+  media.dispatchEvent(pointerEvent(window, "pointerdown", { x: 150, y: 150 }));
+  window.dispatchEvent(pointerEvent(window, "pointerup", { x: 150, y: 150 }));
+  const img = () => document.querySelector("#preview-grid .lane-preview img.lane-preview-media");
+  live(window, { type: "gridActionStarted", id: "d0" });
+  live(window, { ...snapshot([ELEMENTS[1]]), image: "TUlE" }); // 直接の結果(遷移の途中の絵)
+  assert.match(img().getAttribute("src"), /TUlE$/, "直接の結果の絵も出す(遅い経路でも絵が先に変わる)");
+  imageLoaded(window, document);
+  live(window, { ...snapshot(), image: "RU5E" }); // 整定後の木と絵
+  assert.equal(boxRects(document).length, 0, "整定後の絵が出るまで描かない");
+  imageLoaded(window, document);
+  assert.equal(boxRects(document).length, 2, "整定後の絵が出たら描く");
+});
+
+test("一枚絵を出した後は、それより前に撮られたポーリングの絵を捨てる(古い絵に戻らない)。後に撮られた絵と配信のフレームは入れる", (t) => {
+  const { window, document } = setupConnected(t);
+  toggleBoxes(window, document, true);
+  const img = () => document.querySelector("#preview-grid .lane-preview img.lane-preview-media");
+  live(window, { ...snapshot(), image: "TkVX", capturedAtMs: 2000 });
+  assert.match(img().getAttribute("src"), /TkVX$/);
+  send(window, { type: "frame", device: "d0", jpegBase64: "T0xE", width: 1, height: 1, capturedAtMs: 1500 });
+  assert.match(img().getAttribute("src"), /TkVX$/, "一枚絵より前に撮られたポーリングの絵は捨てる");
+  send(window, { type: "frame", device: "d0", jpegBase64: "TkVXRVI=", width: 1, height: 1, capturedAtMs: 2500 });
+  assert.match(img().getAttribute("src"), /TkVXRVI=$/, "後に撮られた絵は入れる");
+  live(window, { ...snapshot(), image: "U0VDT05E", capturedAtMs: 3000 });
+  send(window, { type: "frame", device: "d0", jpegBase64: "U1RSRUFN", stream: true });
+  assert.match(img().getAttribute("src"), /U1RSRUFN$/, "配信のフレーム(時刻を持たない = 届いた順が撮った順)は入れる");
+});
+
+// ---- 操作と無関係に絵が変わったとき(OS のダイアログ等) ----------------------------------------------
+
+const ALERT_ELEMENTS = [
+  { ref: "a1", frame: { x: 40, y: 260, width: 320, height: 360 }, frameText: "40,260 320x360", line: "Alert" },
+];
+const refreshes = (gridActions) => gridActions().filter((m) => m.action.type === "refreshSnapshot").length;
+
+test("操作と無関係に絵が変わったら枠を消し、700ms 止まったら撮り直して新しい木(ダイアログ)の枠を描く", async (t) => {
+  const { window, document, gridActions } = setupConnected(t);
+  toggleBoxes(window, document, true);
+  live(window, snapshot());
+  assert.equal(boxRects(document).length, 2);
+  const before = refreshes(gridActions);
+  imageLoaded(window, document); // 配信・ポーリングで絵が変わった(遅れて出たダイアログ)
+  assert.equal(boxRects(document).length, 0, "絵が変わった時点で古い木の枠を消す");
+  assert.equal(rowsOf(document).length, 2, "要素一覧は消さない");
+  await sleep(400);
+  assert.equal(refreshes(gridActions), before, "まだ止まっていない");
+  await sleep(400);
+  assert.equal(refreshes(gridActions), before + 1, "止まったら撮り直す");
+  live(window, snapshot(ALERT_ELEMENTS));
+  assert.equal(boxRects(document).length, 1, "撮り直した木(ダイアログ)で描く");
+});
+
+test("絵が動き続けても、上限(BOXES_SETTLE_CAP_MS = 2800ms)で撮り直す", async (t) => {
+  const { window, document, gridActions } = setupConnected(t);
+  toggleBoxes(window, document, true);
+  live(window, snapshot());
+  const before = refreshes(gridActions);
+  const started = Date.now();
+  while (Date.now() - started < 3200 && refreshes(gridActions) === before) {
+    imageLoaded(window, document); // 300ms ごとに描き替わる(止まらない)
+    await sleep(300);
+  }
+  assert.equal(refreshes(gridActions), before + 1, "止まらなくても上限で撮る");
+  assert.ok(Date.now() - started >= 2700, "上限より前には撮らない");
+});
+
+test("自分が出した一枚絵の読み込みでは撮り直さない(撮り直しが撮り直しを呼ばない)", async (t) => {
+  const { window, document, gridActions } = setupConnected(t);
+  toggleBoxes(window, document, true);
+  live(window, { ...snapshot(), image: "TkVX" }); // 一枚絵を出す(読み込み待ち)
+  const before = refreshes(gridActions);
+  imageLoaded(window, document); // その一枚絵の読み込み
+  assert.equal(boxRects(document).length, 2);
+  await sleep(800);
+  assert.equal(refreshes(gridActions), before, "撮り直さない");
+});
+
+test("実行中は絵が変わると枠を消すが、撮り直さない", async (t) => {
+  const { window, document, gridActions } = setupConnected(t);
+  toggleBoxes(window, document, true);
+  live(window, snapshot());
+  send(window, { type: "runEvent", action: { type: "workerRunning", workerId: "d0", running: true } });
+  const before = refreshes(gridActions);
+  imageLoaded(window, document);
+  assert.equal(boxRects(document).length, 0, "古い木の枠は残さない");
+  await sleep(800);
+  assert.equal(refreshes(gridActions), before, "実行中は撮り直さない");
 });

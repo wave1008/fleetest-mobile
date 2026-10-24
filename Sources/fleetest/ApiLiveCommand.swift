@@ -58,10 +58,12 @@
 //      "screen":{"width":..,"height":..},"image":"<base64 JPEG>",
 //      "elements":[{"ref":..,"type":"..","label":..|null,"identifier":..|null,"value":..|null,
 //                    "frame":{"x":..,"y":..,"width":..,"height":..}}, ...],
-//      "notes":[<String>, ...],"bridgeStarting":<Bool>}   観測そのものへの注記(鮮度警告等。
-//                                 FTCore.StaleFrameDetector。無ければ空配列。elements と違い null にしない)
+//      "notes":[<String>, ...],"bridgeStarting":<Bool>,"capturedAtMs":<Int>}   notes = 観測そのものへの注記(鮮度警告等。
+//                                 FTCore.StaleFrameDetector。無ければ空配列。elements と違い null にしない)。
+//                                 capturedAtMs = 画面を撮り始めた時刻(この機械の epoch ミリ秒)。拡張はこの絵より前に撮られた
+//                                 モニターのポーリングの絵(monitorFrame の capturedAtMs)を捨てる —— どちらもデバイスの居る機械で撮るので同じ時計
 //     {"kind":"snapshot","ok":false,"error":"<説明>","platform":null,"screen":null,"image":null,
-//      "elements":null,"notes":[],"bridgeStarting":<Bool>}
+//      "elements":null,"notes":[],"bridgeStarting":<Bool>,"capturedAtMs":null}
 //   を出す(操作後の追加waitは無し。ブリッジの操作応答=UI整定済みのため)。
 //   refresh はこの観測イベント1行だけを出す(actionResult は出さない)。
 //   frame は {"kind":"frame","ok":..,"error":..,"image":"<base64 JPEG>"|null,"bridgeStarting":<Bool>}
@@ -1287,6 +1289,7 @@ struct ApiLiveServe: AsyncParsableCommand {
                                  runnerHealth: LiveRunnerHealthMemo) async {
         do {
             ResidentProcessGuard.noteCommandProgress()
+            let capturedAt = Date()
             let png = try await driver.screenshot()
             let jpeg = try MonitorImage.downscaledJPEG(pngData: png, maxWidth: maxWidth)
             let snap = try await snapshotWithSessionFallback(driver: driver, follower: follower)
@@ -1303,7 +1306,8 @@ struct ApiLiveServe: AsyncParsableCommand {
                 platform: driverOptions.resolvedPlatform,
                 screen: ApiLiveScreenSize(width: snap.screen.width, height: snap.screen.height),
                 image: jpeg.data.base64EncodedString(), elements: elements, notes: notes,
-                bridgeStarting: await bridgeStartingFlag(starter)))
+                bridgeStarting: await bridgeStartingFlag(starter),
+                capturedAtMs: Int64(capturedAt.timeIntervalSince1970 * 1000)))
         } catch {
             ResidentProcessGuard.noteCommandProgress()
             let message = await annotated(error, starter: starter, triggering: true, port: port)
@@ -1311,7 +1315,7 @@ struct ApiLiveServe: AsyncParsableCommand {
             emitLine(ApiLiveSnapshotEvent(
                 ok: false, error: message,
                 platform: nil, screen: nil, image: nil, elements: nil, notes: [],
-                bridgeStarting: await bridgeStartingFlag(starter)))
+                bridgeStarting: await bridgeStartingFlag(starter), capturedAtMs: nil))
         }
     }
 
@@ -1775,9 +1779,11 @@ private struct ApiLiveSnapshotEvent: Encodable {
     let notes: [String]
     /// LiveBridgeAutoStarter.isStarting(ファイル冒頭プロトコル・bridgeStartingFlag 参照)
     let bridgeStarting: Bool
+    /// 画面を撮り始めた時刻(epoch ミリ秒)。失敗は nil(ファイル冒頭プロトコル)
+    let capturedAtMs: Int64?
 
     private enum CodingKeys: String, CodingKey {
-        case kind, ok, error, platform, screen, image, elements, notes, bridgeStarting
+        case kind, ok, error, platform, screen, image, elements, notes, bridgeStarting, capturedAtMs
     }
 
     func encode(to encoder: Encoder) throws {
@@ -1791,6 +1797,7 @@ private struct ApiLiveSnapshotEvent: Encodable {
         try container.encode(elements, forKey: .elements)
         try container.encode(notes, forKey: .notes)
         try container.encode(bridgeStarting, forKey: .bridgeStarting)
+        try container.encode(capturedAtMs, forKey: .capturedAtMs)
     }
 }
 

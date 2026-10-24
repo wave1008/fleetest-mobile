@@ -62,6 +62,7 @@ function runSuccess() {
       jpegBase64: `frame-${i}`,
       width: 480,
       height: 1040,
+      capturedAtMs: 1761300000000 + i,
     });
   }
 }

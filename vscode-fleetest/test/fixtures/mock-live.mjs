@@ -75,6 +75,7 @@ if (command === "list-devices") {
         error: "mock-live: --fail-all 指定によりスナップショット取得に失敗しました",
         notes: [],
         bridgeStarting: false,
+        capturedAtMs: null,
       });
       return;
     }
@@ -105,6 +106,7 @@ if (command === "list-devices") {
       ],
       notes: [],
       bridgeStarting: false,
+      capturedAtMs: Date.now(),
     });
   }
 

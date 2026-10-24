@@ -17,11 +17,11 @@ import { t } from '../i18n.js';
 import { vscode } from './vscodeApi.js';
 import { thinTracePoints } from './traceThinning.js';
 import { setHoverTip } from './hoverTip.js';
-import { exitSingleSelection, liveRemoteTargetFor } from './deviceTiles.js';
+import { exitSingleSelection, liveRemoteTargetFor, onMirrorFrame, showMirrorStill } from './deviceTiles.js';
 import { DRAG_MIN_PX, LONG_PRESS_MS, TRACE_MAX_MS } from './liveTab.js';
-import { relayoutPreviewsForResize } from './laneLog.js';
+import { isDeviceRunning, relayoutPreviewsForResize } from './laneLog.js';
 import { bindFoldButtons } from './foldButtons.js';
-import { applyGridLivePanelMessage, initGridLivePanel, noteScreenAction, syncGridLivePanel } from './gridLivePanel.js';
+import { applyGridLivePanelMessage, initGridLivePanel, noteMirrorFrame, noteScreenAction, syncGridLivePanel } from './gridLivePanel.js';
 
 const parking = document.getElementById('grid-live-parking');
 const controls = document.getElementById('grid-live-controls');
@@ -51,8 +51,17 @@ function applyButtonState() {
   for (const button of buttons) { button.disabled = busy; }
 }
 
+// 拡大表示の絵の描き替わりをパネルへ渡す購読(gridLivePanel.js の waitingForImage)。**読み込み時に購読しない** ——
+// このモジュールは deviceTiles.js の読み込みの途中で評価される(deviceTiles → laneLog → ここ)ので、その時点では
+// 購読者の集合がまだ無い。最初の1台表示(実行時)で張る
+let mirrorFrameSubscribed = false;
+
 /** id: 1台表示のデバイス(1台表示でなければ null)。previewEl: その拡大表示の .lane-preview */
 export function syncGridLiveControls(id, previewEl) {
+  if (!mirrorFrameSubscribed && id !== null) {
+    mirrorFrameSubscribed = true;
+    onMirrorFrame(noteMirrorFrame);
+  }
   if (target && (target.id !== id || target.previewEl !== previewEl)) {
     cancelDrag();
     target.previewEl.removeEventListener('pointerdown', handlePointerDown);
@@ -136,7 +145,7 @@ function postAction(action) {
   if (action.type !== 'refreshSnapshot') { noteScreenAction(); }
   return true;
 }
-initGridLivePanel({ postAction });
+initGridLivePanel({ postAction, showStill: showMirrorStill, isRunning: isDeviceRunning });
 
 document.getElementById('grid-live-btn-back').addEventListener('click', () => exitSingleSelection());
 document.getElementById('grid-live-btn-home').addEventListener('click', () => postAction({ type: 'home' }));

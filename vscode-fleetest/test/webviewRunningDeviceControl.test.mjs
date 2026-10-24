@@ -200,7 +200,7 @@ test("ライブ操作タブ: 実行中でも画面サイズが無ければ最初
   assert.equal(refreshes(), before + 1, "1回だけ(届くまで重ねて撃たない)");
 });
 
-test("グリッド: 実行中は自動の撮り直しが無いので、操作の結果の枠は打ち切りで手元の木で描く", (t) => {
+test("グリッド: 実行中は自動の撮り直しが無いので、操作の結果の枠は打ち切りで手元の木で描く", async (t) => {
   const { window, document, media } = setupGrid(t);
   const timers = [];
   const realSetTimeout = window.setTimeout.bind(window);
@@ -220,6 +220,7 @@ test("グリッド: 実行中は自動の撮り直しが無いので、操作の
   tap(window, media);
   live(window, { type: "gridActionStarted", id: "d0" });
   live(window, snap); // 直接の結果(次の整定後の木は来ない)
+  document.querySelector("#preview-grid .lane-preview img.lane-preview-media").dispatchEvent(new window.Event("load")); // 絵が描き替わった
   const rects = () => document.querySelectorAll(".grid-live-boxes-overlay rect:not(.hot)").length;
   assert.equal(rects(), 0);
   assert.equal(timers.length, 1);

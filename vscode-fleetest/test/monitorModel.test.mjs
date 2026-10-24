@@ -61,8 +61,13 @@ test("isMonitorEvent: monitorFrame の正常な値を true と判定する", () 
     jpegBase64: "AAAA",
     width: 480,
     height: 1040,
+    capturedAtMs: 1761300000000,
   };
   assert.equal(isMonitorEvent(value), true);
+});
+
+test("isMonitorEvent: monitorFrame は capturedAtMs(撮影の時刻)欠落なら false(後方互換の読み替えを置かない)", () => {
+  assert.equal(isMonitorEvent({ kind: "monitorFrame", device: "d", jpegBase64: "A", width: 1, height: 1 }), false);
 });
 
 test("isMonitorEvent: monitorError は CLI が出さない行種なので受理しない", () => {
@@ -373,6 +378,7 @@ test("toWebviewMessage: monitorFrame → { type: 'frame', ... }", () => {
     jpegBase64: "AAAA",
     width: 480,
     height: 1040,
+    capturedAtMs: 1761300000000,
   };
   assert.deepEqual(toWebviewMessage(event), {
     type: "frame",
@@ -380,6 +386,7 @@ test("toWebviewMessage: monitorFrame → { type: 'frame', ... }", () => {
     jpegBase64: "AAAA",
     width: 480,
     height: 1040,
+    capturedAtMs: 1761300000000,
   });
 });
 

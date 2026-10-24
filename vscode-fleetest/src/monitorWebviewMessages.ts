@@ -87,6 +87,9 @@ export type MonitorToWebviewMessage =
        * webview は描画後に streamRendered を ack する(ポーリング由来のフレームには付かない。
        * ack でポーリング抑止を発動する契約は monitorDeviceStreamController.ts 冒頭参照) */
       readonly stream?: boolean;
+      /** ポーリング由来のフレームだけが持つ撮影の時刻(monitorFrame の capturedAtMs)。webview(deviceTiles.js の
+       * applyFrame)はライブ操作の観測の一枚絵より前に撮られた絵を捨てる。配信由来(stream)は持たない */
+      readonly capturedAtMs?: number;
     }
   // そのデバイスの配信ヘルパーを落とした(畳み・破棄・パネル非表示)。**黙って落とさない** —— webview は
   // h264 を描いている間ポーリングのフレームを隠れた img にしか入れないので、知らせないとタイルは
@@ -618,6 +621,7 @@ export function toWebviewMessage(
         jpegBase64: event.jpegBase64,
         width: event.width,
         height: event.height,
+        capturedAtMs: event.capturedAtMs,
       };
     case "monitorRuns":
       return { type: "monitorRuns", machine: event.machine, observed: event.observed, runs: event.runs };

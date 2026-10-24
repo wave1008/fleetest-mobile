@@ -158,6 +158,7 @@ test("parseLiveSnapshotResult: 成功形(ok:true)をそのまま返す", () => {
     ],
     notes: [],
     bridgeStarting: false,
+    capturedAtMs: 1761300000000,
   };
   assert.deepEqual(parseLiveSnapshotResult(value), value);
 });
@@ -201,6 +202,7 @@ test("parseLiveSnapshotResult: notes に鮮度警告の本文が入っていれ�
     elements: [],
     notes: ["this screenshot may be stale: the element tree changed since the previous observation"],
     bridgeStarting: false,
+    capturedAtMs: 1761300000000,
   };
   assert.deepEqual(parseLiveSnapshotResult(value), value);
 });
@@ -342,12 +344,13 @@ test("parseLiveServeEvent: kind=snapshot の成功/失敗を判別する", () =>
     elements: [],
     notes: [],
     bridgeStarting: false,
+    capturedAtMs: 1761300000000,
   };
   assert.deepEqual(parseLiveServeEvent(success), {
     kind: "snapshot",
     result: {
       ok: true, platform: "ios", screen: { width: 402, height: 874 }, image: "AAAA", elements: [], notes: [],
-      bridgeStarting: false,
+      bridgeStarting: false, capturedAtMs: 1761300000000,
     },
   });
   assert.deepEqual(
@@ -379,6 +382,7 @@ test("parseLiveServeEvent: kind=snapshot は notes(鮮度警告)を落とさな�
     elements: [],
     notes: ["this screenshot may be stale: the element tree changed since the previous observation"],
     bridgeStarting: false,
+    capturedAtMs: 1761300000000,
   };
   assert.deepEqual(parseLiveServeEvent(withNote), {
     kind: "snapshot",
@@ -390,6 +394,7 @@ test("parseLiveServeEvent: kind=snapshot は notes(鮮度警告)を落とさな�
       elements: [],
       notes: ["this screenshot may be stale: the element tree changed since the previous observation"],
       bridgeStarting: false,
+      capturedAtMs: 1761300000000,
     },
   });
 });
@@ -404,6 +409,16 @@ test("parseLiveServeEvent: kind=snapshot は notes 欠落なら undefined(後方
       image: "AAAA",
       elements: [],
       bridgeStarting: false,
+    }),
+    undefined,
+  );
+});
+
+test("parseLiveServeEvent: kind=snapshot は capturedAtMs(撮影の時刻)欠落なら undefined(後方互換の読み替えを置かない)", () => {
+  assert.equal(
+    parseLiveServeEvent({
+      kind: "snapshot", ok: true, platform: "ios", screen: { width: 402, height: 874 }, image: "AAAA",
+      elements: [], notes: [], bridgeStarting: false,
     }),
     undefined,
   );

@@ -259,6 +259,10 @@ struct ApiMonitorFrameEvent: Encodable {
     let jpegBase64: String
     let width: Int
     let height: Int
+    /// その周の撮影を始めた時刻(この機械の epoch ミリ秒。並列に撮るので周の始まり = 実際の撮影はこれ以後)。
+    /// 拡張はライブ操作の観測の絵(snapshot の capturedAtMs)より前に撮られたこの絵を捨てる(古い絵に戻らない)。
+    /// 同期相手: vscode-fleetest/src/monitorDeviceModel.ts の monitorFrame
+    let capturedAtMs: Int64
 }
 
 /// xcresult(XCUITest ランナーの結果の束)の保持容量が guarded(生きているブリッジ)だけで

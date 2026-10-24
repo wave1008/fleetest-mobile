@@ -11,7 +11,7 @@
 // 絵はモニター自身の配信なので、host の snapshot の image は使わず screen と elements だけ採る。
 
 import { vscode, persistedState } from './vscodeApi.js';
-import { BOXES_SETTLE_CAP_MS } from './liveTab.js';
+import { BOXES_SETTLE_CAP_MS, SETTLE_REFRESH_MS } from './liveTab.js';
 import {
   clockText, createOplogView, frameToDisplayRect, hitTestRef, renderElementRows,
 } from './liveListViews.js';
@@ -46,8 +46,12 @@ hoverBox.className = 'grid-live-hover-box';
 const oplogView = createOplogView(oplogList, { persistKey: 'gridLiveOplogLabelWidth', defaultLabelWidth: 220 });
 const oplogByDevice = new Map(); // id → [{ time, label, ok, mcp }]
 
-// gridLiveControls.js の postAction(送れたら true)。initGridLivePanel で受ける
+// gridLiveControls.js の postAction(送れたら true)と deviceTiles.js の showMirrorStill。initGridLivePanel で受ける
+// (ここから deviceTiles.js を import しない = noteMirrorFrame の doc)
 let postAction = () => false;
+let showStill = () => 'none';
+// laneLog.js の isDeviceRunning(同じ理由で gridLiveControls.js から受ける)
+let isRunning = () => false;
 
 // 1台表示のデバイス。1台表示でない間は null
 let target = null;
@@ -73,6 +77,103 @@ let boxesStale = true;        // true の間は枠を描かない(木を信用�
 // 画面を変える操作の段: null = 無し / 'posted' = 送った(合図待ち。届く snapshot は操作前の画面)/
 // 'started' = 合図を受けた(次の snapshot が直接の結果)
 let opPhase = null;
+
+// **枠は、その木と同じ瞬間の絵の上に描く**。木はライブ操作の観測で届くが、拡大表示の絵はモニター自身の配信・
+// ポーリングで別経路 —— ブリッジの無いシミュレータのポーリングは1サイクル1台の順繰りで、台数ぶん遅い(実地: M1Max の
+// iOS 6台で1台あたり約12秒に1枚。待つ方式では上限が先に切れ、古い絵の上に枠が出た)。そこで観測の一枚絵(snapshot の
+// image)を拡大表示に出し(deviceTiles.js の showMirrorStill。以後の配信・ポーリングのフレームが届けば入れ替わる)、
+// **その絵の読み込みが終わるまで**(onMirrorFrame → gridLiveControls.js → noteMirrorFrame)枠とホバー枠を描かない。
+// 上限[ms]: 一枚絵のデコードは数十 ms なので、load / error が鳴らない異常の保険。尽きたら今の絵の上に描く
+const IMAGE_WAIT_CAP_MS = 1000;
+let imageWaitTimer = null; // null = 待っていない
+
+function startImageWait() {
+  cancelImageWait();
+  imageWaitTimer = setTimeout(finishImageWait, IMAGE_WAIT_CAP_MS);
+}
+function cancelImageWait() {
+  if (imageWaitTimer !== null) {
+    clearTimeout(imageWaitTimer);
+    imageWaitTimer = null;
+  }
+}
+function finishImageWait() {
+  if (imageWaitTimer === null) { return; }
+  cancelImageWait();
+  renderBoxes();
+}
+function waitingForImage() {
+  return imageWaitTimer !== null;
+}
+/** 拡大表示の絵が描き替わった(gridLiveControls.js が deviceTiles.js の onMirrorFrame から渡す)。
+ * **ここから deviceTiles.js を import しない** —— 循環 import の評価順が変わり、別のモジュールの初期化前の値を踏む */
+export function noteMirrorFrame(id) {
+  if (!target || id !== target.id) { return; }
+  // 自分が出した一枚絵の読み込み(待ちの完了)は「絵が変わった」に数えない —— 数えると撮り直しが撮り直しを呼ぶ
+  if (waitingForImage()) {
+    finishImageWait();
+    return;
+  }
+  notePictureChanged();
+}
+
+// **操作と無関係に絵が変わったら、止まってから木を撮り直す**(ライブ操作タブの scheduleSettleRefresh と同じ考え方)。
+// OS のダイアログ(位置情報の許可等)・遅れて出る画面は操作の結果と撮り直しより後に出るので、撮り直さないと前の画面の
+// 木の枠が新しい絵の上に残る(実地: マップの位置情報の許可で、マップの画面の枠がダイアログの上に出た)。絵が変わった
+// 時点で枠は消し(要素一覧は消さない)、SETTLE_REFRESH_MS 新しいフレームが来なければ撮り直す。止まらない絵
+// (アニメーション)はライブ操作タブと同じ BOXES_SETTLE_CAP_MS で打ち切って撮る。
+// 何もしないとき: 操作の途中(その流れが撮る)・ライブ操作が別のデバイスにつないでいる(接続しない規律)。
+// **実行中は枠を消すが撮り直さない**(整定のための自動の撮り直しは撃たない = XCUITest ブリッジをシナリオと取り合わない。
+// 実行中は絵がどんどん変わるので、古い木の枠を残すとずれたまま)
+let pictureSettleTimer = null;
+let pictureMotionSince = null; // 絵が動き始めた時刻(打ち切りの起点)。止まっていれば null
+
+function cancelPictureSettle() {
+  if (pictureSettleTimer !== null) {
+    clearTimeout(pictureSettleTimer);
+    pictureSettleTimer = null;
+  }
+  pictureMotionSince = null;
+}
+
+function notePictureChanged() {
+  if (liveSelectedId !== target.id || opPhase !== null || awaitSettled) { return; }
+  if (!boxesStale) {
+    boxesStale = true;
+    clearBoxes();
+  }
+  if (isRunning(target.id)) { return; }
+  if (pictureSettleTimer !== null) { clearTimeout(pictureSettleTimer); }
+  const now = performance.now();
+  if (pictureMotionSince === null) { pictureMotionSince = now; }
+  const delay = now - pictureMotionSince >= BOXES_SETTLE_CAP_MS ? 0 : SETTLE_REFRESH_MS;
+  pictureSettleTimer = setTimeout(refreshAfterPictureSettled, delay);
+}
+
+function refreshAfterPictureSettled() {
+  pictureSettleTimer = null;
+  if (!target || liveSelectedId !== target.id || opPhase !== null || isRunning(target.id)) {
+    pictureMotionSince = null;
+    return;
+  }
+  if (busy) {
+    // 処理中(ライブ操作タブの操作・撮り直し)。終わってから撃つ(その結果の木が先に来れば、ここで撮るのは重複だが害は無い)
+    pictureSettleTimer = setTimeout(refreshAfterPictureSettled, SETTLE_REFRESH_MS);
+    return;
+  }
+  pictureMotionSince = null;
+  postAction({ type: 'refreshSnapshot' });
+}
+
+/** 観測の一枚絵を拡大表示に出す。読み込みを待つなら待ちを始め、既に出ている・出せないなら待たない */
+function showSnapshotImage(message) {
+  const shown = message.image ? showStill(target.id, message.image, message.capturedAtMs) : 'none';
+  if (shown === 'loading') {
+    startImageWait();
+  } else {
+    finishImageWait();
+  }
+}
 let awaitSettled = false;     // 直接の結果を受けた。次の snapshot(整定後)か上限を待っている
 let capTimer = null;
 
@@ -90,6 +191,8 @@ boxesToggleLabel.addEventListener('click', (event) => event.stopPropagation());
 /** gridLiveControls.js が postAction を渡す(循環 import を避けて関数で受ける) */
 export function initGridLivePanel(deps) {
   postAction = deps.postAction;
+  showStill = deps.showStill;
+  isRunning = deps.isRunning;
 }
 
 function cancelCap() {
@@ -105,6 +208,8 @@ function cancelCap() {
 function discardSnapshot() {
   screen = null;
   elements = [];
+  cancelImageWait();
+  cancelPictureSettle();
   cancelCap();
   awaitSettled = false;
   boxesStale = true;
@@ -187,6 +292,8 @@ function refreshBusy() {
 export function noteScreenAction() {
   if (!target) { return; }
   cancelCap();
+  cancelImageWait();
+  cancelPictureSettle();
   awaitSettled = false;
   opPhase = 'posted';
   boxesStale = true;
@@ -281,6 +388,8 @@ oplogClearBtn.addEventListener('click', () => {
 function adoptSnapshot(message) {
   screen = message.screen;
   elements = message.elements;
+  // 絵は**どの観測でも**出す(操作の直接の結果も = 遅い経路でも絵が先に変わる)。枠を描くのはその絵が出てから
+  showSnapshotImage(message);
   if (opPhase === 'started') {
     // 操作の直接の結果: 描かず、次(整定後)の木か上限を待つ
     opPhase = null;
@@ -329,7 +438,7 @@ function renderElements() {
 }
 
 function boxesShown() {
-  return showBoxes && !boxesStale;
+  return showBoxes && !boxesStale && !waitingForImage();
 }
 
 function mediaEl() {
@@ -368,6 +477,7 @@ function renderBoxes() {
   // 行の見た目(赤枠を出すか)は CSS(.boxes-on)。枠が実際に出ているかと一致させる
   elementsList.classList.toggle('boxes-on', boxesShown());
   if (boxesStale) { return; } // 消した後は次の木を待つ(サイズ変化からの引き直しで古い枠を蘇らせない)
+  if (waitingForImage()) { return; } // 絵がまだ前の画面(枠は操作の時点で消してある)
   boxByRef.clear();
   hotBox.remove();
   if (!showBoxes || !screen || elements.length === 0 || !target) {
@@ -417,6 +527,7 @@ function setHot(ref, scrollList) {
 }
 
 function showHover(element) {
+  if (waitingForImage()) { return; } // 新しい木の位置を古い絵の上に出さない
   const display = placeOverlay();
   if (!screen || !display) { return; }
   const box = frameToDisplayRect(element.frame, screen, display);
