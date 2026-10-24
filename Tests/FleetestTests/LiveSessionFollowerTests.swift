@@ -194,10 +194,33 @@ final class LiveSessionFollowerTests: XCTestCase {
         let guardRange = try XCTUnwrap(source.range(of: "guard let target = LiveSessionTarget.retarget"))
         XCTAssertTrue(ask.lowerBound < guardRange.lowerBound,
                       "判定より前に聞くこと")
-        // 前面と答えた回だけ聞く(常時の監視にしない)
-        let foregroundGate = try XCTUnwrap(source.range(of: "if foreground {"))
-        XCTAssertTrue(foregroundGate.lowerBound < ask.lowerBound,
-                      "前面と答えた回だけ聞くこと(前面でなければどのみち springboard を向く)")
+        // アプリへ向けることになる回だけ聞く(常時の監視にしない)。**前面の別のアプリを探した後**に判定する ——
+        // 探す前に聞く形だと、駆動対象でないアプリ(マップ等)がアラートに覆われていても、そのアプリを向く
+        let search = try XCTUnwrap(source.range(of: "frontmost = await frontmostApp(driver: driver)"))
+        let gate = try XCTUnwrap(source.range(
+            of: "if LiveSessionTarget.shouldAskSystemAlert(preferredIsForeground: foreground, frontmost: frontmost) {"))
+        XCTAssertTrue(search.lowerBound < gate.lowerBound, "前面の別のアプリを探してから、聞くかを決める")
+        XCTAssertTrue(gate.lowerBound < ask.lowerBound, "聞くのは判定が真のときだけ")
+    }
+
+    /// アラートの有無を聞くのは「アプリへ向けることになる回」だけ —— **前面の別のアプリが見つかった回も含む**
+    /// (実地: パネルがアプリを選ばずにマップを触り、位置情報の許可のアラートが出ても、セッションはマップを向いたまま =
+    /// 木にアラートが載らず、タップはブリッジに断られた)
+    func testAsksAboutASystemAlertWheneverTheSessionWouldPointAtAnApp() {
+        XCTAssertTrue(LiveSessionTarget.shouldAskSystemAlert(preferredIsForeground: true, frontmost: nil),
+                      "駆動対象が前面")
+        XCTAssertTrue(LiveSessionTarget.shouldAskSystemAlert(preferredIsForeground: false, frontmost: "com.apple.Maps"),
+                      "前面の別のアプリ(駆動対象を選んでいないグリッドビューの典型)")
+        XCTAssertFalse(LiveSessionTarget.shouldAskSystemAlert(preferredIsForeground: false, frontmost: nil),
+                       "springboard を向く回は聞かない(アラートは SpringBoard の木に載る)")
+    }
+
+    /// アラートが出ていれば、前面の別のアプリより springboard を選ぶ(判定は既存の retarget)
+    func testPointsAtSpringboardWhenAnAlertCoversTheFrontmostApp() {
+        XCTAssertEqual(LiveSessionTarget.retarget(sessionTarget: "com.apple.Maps", preferred: nil,
+                                                  preferredIsForeground: false, systemAlertPresent: true,
+                                                  frontmost: "com.apple.Maps"),
+                       LiveSessionTarget.springboard)
     }
 
     private func caseBody(_ source: String, cmd: String, until next: String) throws -> String {
@@ -266,9 +289,10 @@ final class LiveSessionFollowerTests: XCTestCase {
 extension LiveSessionFollowerTests {
     func testLooksForTheFrontmostAppOnlyWhenTheDrivenAppIsNotInFront() throws {
         let source = try followerSource()
-        XCTAssertTrue(source.contains("if !foreground && !systemAlertPresent && !covered {"),
-                      "探索の門(前面でない・アラート無し・覆われていない)が無い")
-        let gate = try XCTUnwrap(source.range(of: "if !foreground && !systemAlertPresent && !covered {"))
+        // アラートの有無は探索の後に聞く(探索の門には入らない = shouldAskSystemAlert の doc)
+        XCTAssertTrue(source.contains("if !foreground && !covered {"),
+                      "探索の門(前面でない・覆われていない)が無い")
+        let gate = try XCTUnwrap(source.range(of: "if !foreground && !covered {"))
         let call = try XCTUnwrap(source.range(of: "await frontmostApp(driver: driver)"))
         XCTAssertTrue(gate.lowerBound < call.lowerBound, "門の中で呼ぶこと")
     }
@@ -331,7 +355,7 @@ extension LiveSessionFollowerTests {
     /// 強制終了 = 拡張から見ると serve が固まり、要素一覧も枠も更新されない)。
     func testDoesNotSearchForTheFrontmostAppWhileCovered() throws {
         let source = try followerSource()
-        XCTAssertTrue(source.contains("!foreground && !systemAlertPresent && !covered"),
+        XCTAssertTrue(source.contains("if !foreground && !covered {"),
                       "覆われているときは探索の門を通さないこと")
     }
 

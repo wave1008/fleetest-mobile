@@ -40,6 +40,16 @@ enum LiveSessionTarget {
         let desired = (onTheApp ? preferred : nil) ?? other ?? springboard
         return desired == sessionTarget ? nil : desired
     }
+
+    /// システムアラートの有無を聞くか。**アプリへ向けることになる回だけ**(駆動対象が前面・または前面の別のアプリが
+    /// 見つかった)—— どちらも `retarget` はアラート中なら springboard へ倒すが、聞かなければアプリを向いたままになる。
+    /// 向き先が初めから springboard なら、アラートは SpringBoard の木に載るので聞かなくてよい(常時の監視にしない)。
+    /// **前面の別のアプリでも聞く**: アラートは別プロセスの窓なので、覆われたアプリも前面と答え続ける —— 聞かないと
+    /// そのアプリを向き、木にアラートが1要素も載らず、タップはブリッジに断られた(実地: マップの位置情報の許可。
+    /// パネルがアプリを選ばずに使う = preferred が nil のグリッドビューでは必ずこの経路)
+    static func shouldAskSystemAlert(preferredIsForeground: Bool, frontmost: String?) -> Bool {
+        preferredIsForeground || frontmost != nil
+    }
 }
 
 /// devicectl(実機の apps/processes 列挙)の back-off 判定だけを持つ純粋ロジック。「詰まった
@@ -124,21 +134,20 @@ final class LiveSessionFollower {
             foreground = false
             lastFrontmost = nil // 面の向こうのアプリを「前面」として覚えない
         }
-        // **聞くのは前面と答えた回だけ** —— 前面でなければどのみち springboard を向くので、
-        // アラートの有無は答えを変えない(常時の監視にしない)。
-        var systemAlertPresent = false
-        if foreground {
-            systemAlertPresent = ((try? await driver.systemAlert()) ?? nil)?.present ?? false
-        }
-        // preferred が前面でなく、アラートも面も出ていないなら「別のアプリを見ている」可能性がある。
+        // preferred が前面でなく、面も出ていないなら「別のアプリを見ている」可能性がある。
         // **そのときだけ探す**(毎回 simctl と IPC を払わない)。
         // **覆われているときは探さない** —— 見えているのは SpringBoard の面なので springboard へ
         // 倒すのが正しく、探すだけ無駄。しかも面が出ている間は state の問い合わせが極端に遅く、
         // 探索が応答を止める(実測: アプリスイッチャー表示中に 120 秒を超えて
         // 強制終了 = 拡張から見ると serve が固まる)
         var frontmost: String?
-        if !foreground && !systemAlertPresent && !covered {
+        if !foreground && !covered {
             frontmost = await frontmostApp(driver: driver)
+        }
+        // アラートの有無は**アプリへ向けることになる回だけ**聞く(LiveSessionTarget.shouldAskSystemAlert の doc)
+        var systemAlertPresent = false
+        if LiveSessionTarget.shouldAskSystemAlert(preferredIsForeground: foreground, frontmost: frontmost) {
+            systemAlertPresent = ((try? await driver.systemAlert()) ?? nil)?.present ?? false
         }
         guard let target = LiveSessionTarget.retarget(
             sessionTarget: sessionTarget, preferred: preferred, preferredIsForeground: foreground,
