@@ -759,3 +759,50 @@ test("押したまま動かさずに LONG_PRESS_MS(500ms)を過ぎたら始点�
   assert.ok(!overlay().classList.contains("long-press"), "Command(ダブルタップ)は押していた時間に関係なくダブルタップなので出さない");
   window.dispatchEvent(pointerEvent(window, "pointerup", { x: 110, y: 60, metaKey: true }));
 });
+
+/** ドラッグの途中で拡大表示の絵の要素を入れ替える(配信の canvas ⇔ 操作の結果の一枚絵の img = deviceTiles.js の renderMirror)。
+ * **外れた要素の矩形は実際のブラウザと同じく 0×0** を返す(固定値の差し替えのままだと外れても測れてしまい、再現しない) */
+function swapMedia(document, oldMedia) {
+  const rect = { left: 100, top: 50, width: 200, height: 400, right: 300, bottom: 450, x: 100, y: 50 };
+  const zero = { left: 0, top: 0, width: 0, height: 0, right: 0, bottom: 0, x: 0, y: 0 };
+  oldMedia.getBoundingClientRect = () => (oldMedia.isConnected ? rect : zero);
+  const next = document.createElement("canvas");
+  next.className = "lane-preview-media";
+  next.getBoundingClientRect = () => (next.isConnected ? rect : zero);
+  oldMedia.replaceWith(next);
+  return next;
+}
+
+test("ドラッグの途中で絵の要素が入れ替わっても、軌跡を絵の左上 (0,0) に吸わせない(なぞり・スワイプとも)", (t) => {
+  const { window, document, gridActions } = createWebview();
+  t.after(() => window.close());
+  sendDevices(window, 1);
+  let media = selectOneWithPicture(window, document, 0);
+  const advance = fakeClock(window);
+
+  // なぞり(Option)
+  media.dispatchEvent(pointerEvent(window, "pointerdown", { x: 110, y: 60, altKey: true }));
+  advance(50);
+  window.dispatchEvent(pointerEvent(window, "pointermove", { x: 200, y: 200, altKey: true }));
+  media = swapMedia(document, media);
+  advance(50);
+  window.dispatchEvent(pointerEvent(window, "pointermove", { x: 250, y: 300, altKey: true }));
+  advance(50);
+  window.dispatchEvent(pointerEvent(window, "pointerup", { x: 250, y: 300, altKey: true }));
+  const traced = gridActions().at(-1).action;
+  assert.equal(traced.type, "tracePoints");
+  assert.deepEqual(traced.points.map((p) => [p.x, p.y]), [[10, 10], [100, 150], [150, 250], [150, 250]]);
+  assert.equal(traced.displayWidth, 200);
+
+  // 素のドラッグ(スワイプ)
+  media.dispatchEvent(pointerEvent(window, "pointerdown", { x: 110, y: 60 }));
+  advance(50);
+  window.dispatchEvent(pointerEvent(window, "pointermove", { x: 200, y: 200 }));
+  media = swapMedia(document, media);
+  advance(50);
+  window.dispatchEvent(pointerEvent(window, "pointerup", { x: 250, y: 300 }));
+  const dragged = gridActions().at(-1).action;
+  assert.equal(dragged.type, "dragPoints");
+  assert.deepEqual([dragged.fromX, dragged.fromY, dragged.toX, dragged.toY], [10, 10, 150, 250]);
+  assert.equal(dragged.displayHeight, 400);
+});

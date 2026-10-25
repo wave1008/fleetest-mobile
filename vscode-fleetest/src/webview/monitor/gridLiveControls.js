@@ -257,6 +257,15 @@ function isOriginPointer(event) {
   return event.clientX === 0 && event.clientY === 0;
 }
 
+// **押した後も絵の要素を握らず、毎回引き直す** —— 拡大表示の絵は配信の canvas と操作の結果の一枚絵の img を
+// 入れ替えて出す(deviceTiles.js の renderMirror)。押した時点の要素を握っていると、入れ替わった後の矩形は 0×0 で、
+// clampToRect が座標を絵の左上 (0,0) に丸め、軌跡が左上に吸われてデバイスにもその形で送られた(iOS Simulator)。
+// 測れない(0×0)ときは null
+function currentMediaRect() {
+  const rect = target?.previewEl.querySelector('.lane-preview-media')?.getBoundingClientRect();
+  return rect && rect.width > 0 && rect.height > 0 ? rect : null;
+}
+
 function clampToRect(event, rect) {
   return {
     x: Math.min(Math.max(event.clientX - rect.left, 0), rect.width),
@@ -292,7 +301,8 @@ function handlePointerDown(event) {
   // **押した時点の修飾キーを採る**(離す前に修飾キーが変わっても、構えた時点のモードで撃つ)
   releaseTraceOverlay(); // 前の軌跡の線は、次のドラッグで消す
   dragStart = {
-    id: target.id, media, pointerId: event.pointerId, downAt: performance.now(), x, y,
+    id: target.id, pointerId: event.pointerId, downAt: performance.now(), x, y,
+    displayWidth: rect.width, displayHeight: rect.height,
     doubleTap: event.metaKey, trace: event.altKey, moveAt: null, lastX: x, lastY: y,
     points: [{ x, y, t: 0 }],
   };
@@ -430,7 +440,10 @@ window.addEventListener('pointermove', (event) => {
   if (!dragStart || event.pointerId !== dragStart.pointerId) {
     return;
   }
-  const rect = dragStart.media.getBoundingClientRect();
+  const rect = currentMediaRect();
+  if (rect === null) {
+    return; // 絵が測れない瞬間の点は採らない(currentMediaRect)
+  }
   const { x, y } = clampToRect(event, rect);
   dragStart.lastX = x;
   dragStart.lastY = y;
@@ -461,10 +474,13 @@ window.addEventListener('pointerup', (event) => {
   if (!target || target.id !== start.id) {
     return;
   }
-  const rect = start.media.getBoundingClientRect();
-  // 離した位置が原点 (0,0) なら、最後に採った位置で離したことにする(isOriginPointer)
-  const { x, y } = isOriginPointer(event) ? { x: start.lastX, y: start.lastY } : clampToRect(event, rect);
-  const display = { displayWidth: rect.width, displayHeight: rect.height };
+  const rect = currentMediaRect();
+  // 離した位置が原点 (0,0)・絵が測れないなら、最後に採った位置で離したことにする(isOriginPointer・currentMediaRect)
+  const { x, y } = isOriginPointer(event) || rect === null
+    ? { x: start.lastX, y: start.lastY } : clampToRect(event, rect);
+  const display = rect === null
+    ? { displayWidth: start.displayWidth, displayHeight: start.displayHeight }
+    : { displayWidth: rect.width, displayHeight: rect.height };
   const upAt = performance.now();
   if (Math.hypot(x - start.x, y - start.y) < DRAG_MIN_PX) {
     // 動かさずに離した: Command ならダブルタップ、LONG_PRESS_MS 以上押していれば長押し、それ以外はタップ
