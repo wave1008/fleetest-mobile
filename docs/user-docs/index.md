@@ -3,13 +3,7 @@
 [in Japanese(日本語)](index_ja.md)
 
 fleetest is an E2E test tool for iOS / Android apps that you use by asking an AI assistant such as
-Claude Code in natural language. For the origin of the name and its features, see
-[What is fleetest?](overview/about.md).
-
-If you are new, go through the [Quick start](quick-start.md), from installation to running the sample app,
-then continue with the [Tutorial](#tutorial).
-
-**If you are deciding whether to adopt fleetest**, read [What is fleetest?](overview/about.md) → [Environment](overview/environments.md) → [Quality attributes](overview/quality.md) → [Notes and limitations](security/limitations.md) → [Network exposure and security](security/network_security.md), in that order.
+Claude Code in natural language.
 
 ## Repository
 
