@@ -1253,7 +1253,7 @@ struct ApiRunCommand: AsyncParsableCommand {
         // 届かず取りこぼす)
 
         // **sweep はここでは呼ばない** —— この run の掃除は "building" を書く入口で済んでいる
-        // (1 run で2回走らせない。DS-18.1「run 開始時に1回」)
+        // (1 run で2回走らせない。DS-18.4「run 開始時に1回」)
 
         // 段階「準備中」の控え。handoff が立たないまま抜けるときは defer で消す(writePreparingProgress の doc)
         let progressWriter = ProfileRunOrchestrator.writePreparingProgress(

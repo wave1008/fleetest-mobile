@@ -53,7 +53,7 @@ DS-10 の前半は dsl-syntax.md。
   `AndroidForegroundWindows` が `dumpsys window windows` を z 順に読み、アプリの window より
   手前で `isVisible=true` かつ別パッケージのものを返す。**アプリの a11y ツリーには他プロセスの
   window が出ない**ため、覆われていても要素一覧は正常に見え、`tap` は成功扱いで返る
-  (docs/verification/traps.md「操作は ✅ なのに画面が変わらないとき」)。
+  (docs/verification/triage.md「操作は ✅ なのに画面が変わらないとき」)。
   常時可視の装飾(StatusBar / Taskbar / NavigationBar / 画面装飾)とアプリ自身の別 window は
   除外し、アプリの window を特定できないときは黙る(誤った断定をしない)。
   配線は `FTScenarioRunner` からの closure 注入(FTDSL は FTAndroid に依存しないため)
@@ -246,7 +246,7 @@ DS-10 の前半は dsl-syntax.md。
   (「exist は非スクロール」の契約に反する)。判定は**症状ではなく機構**で書く
   (同一 frame・同 depth が3つ以上 かつ 原点を貸す上位要素が居て 群がそれより小さい)。
   消したときは `clampedStackHint` が理由と回避策(先にスクロール)を失敗文言へ添える。
-  規則の根拠と実採取は docs/verification/traps.md「画面外要素の frame は信用できない」
+  規則の根拠と実採取は docs/verification/constraints.md「画面外要素の frame は信用できない」
 - **飲まれたタップを失敗メッセージで名指しする**(`StepExecutor.tapDiagnosisHint`)。
   タップには事後検証が無く(何が起きるべきかをホストは知らない)、飲まれると落ちるのは
   2ステップ先の検証なので原因が遠い。**タップ直前に解決で使った木**を覚えておき、
@@ -254,7 +254,7 @@ DS-10 の前半は dsl-syntax.md。
   **追加のスナップショットを撮らないことが設計要件**(実行中に I/O を足すと事象が消える。
   docs/verification/ の heisenbug)。判定は変えず注記のみ。
   記録は `select` では消さない(`tap → select → textIs` が失敗の定型)。
-  機構・署名の作り方・誤検知の向きは docs/verification/traps.md「操作は ✅ なのに画面が変わらないとき」
+  機構・署名の作り方・誤検知の向きは docs/verification/triage.md「操作は ✅ なのに画面が変わらないとき」
 
 - **スクロール残像(ghost)は拒否せず、警告して撃つ**(`RefGuard.ghostWarning`)。Compose iOS は容器の外へ出た行をフルフレームで木に残し、`ios-xcuitest` はそれを座標で叩く
   (実測: 下部タブへ遷移して "tap done" を返した。`ios-inapp` は要素起動なので当たる = モードで割れる)。**応答に「何に当たったかもしれないか」を添え**、一覧の行にも

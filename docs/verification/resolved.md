@@ -2,9 +2,53 @@
 
 | 種別 | 範囲 | 読む場面 | 扱わないこと |
 |---|---|---|---|
-| 記録 | 直した不具合の調べ方と原因(スクロール直後のタップ・横カルーセルの戻し・interop WebView のタップ) | 同じ型の症状を調べるとき・直し方の根拠を確かめるとき | 現在の検証の手順(→ このフォルダの他のファイル) |
+| 記録 | 直した不具合・製品が吸収した制約の調べ方と原因 | 同じ型の症状を調べるとき・直し方の根拠を確かめるとき | 現在の検証の手順(→ このフォルダの他のファイル) |
 
 現在の仕様ではない。日付はその時点のもの。直した結果として残る規律は、各手順のファイルと design に置く。
+
+## iOS ランナー(Runner/)の再ビルドは供給時に自動化済み(2026-07-28)
+
+`BridgeProvisioner.prepareSharedBuilds` はランナーのソース
+(`Runner/FleetestRunnerUITests/`・`Runner/FleetestRunnerApp/`・`Runner/FleetestRunner.xcodeproj/project.xcproj`・
+共有 DTO の `Sources/FTCore/BridgeDTO.swift`)が xctestrun より新しければ
+build-for-testing を自動で再実行する(`BridgeLauncher.runnerNeedsRebuild`。
+InAppLauncher.needsBuild と対の mtime 判定)。稼働中の旧ランナーは
+`BridgeAPI.bridgeProtocolVersion` の /status 照合(xcuitest・inapp とも)で停止→立て直される。
+以前は「xctestrun が在れば build を飛ばす」実装で、Runner 変更後に旧ランナーが起動し続ける罠が
+あった(2026-07-26 に isChecked 追加で実害・2026-07-28 に /pressEnter 追加で再発し自動化)。
+**Xcode/SDK の更新も検知する**(2026-07-29): 判定にツールチェーンの指紋
+(`xcodebuild -version` + iphonesimulator SDK ビルド版。`ToolchainFingerprint`)を含め、
+成果物の隣(`<DerivedData>/.toolchain`・`InAppBridge/build/.toolchain`)に記録する。
+**Xcode を上げてもソースの mtime は動かない**ため、これが無いと旧 Xcode のランナー/旧 SDK の
+dylib が使われ続ける(macOS・Xcode がベータのうちは頻発する)。in-app dylib
+(`InAppLauncher.needsBuild`)も同じ判定。
+
+**残る罠**: mtime 判定なので、`git checkout` 等でソースの mtime が動かない巻き戻しは検知できない。
+疑わしいときは従来の手動手順が今も有効:
+
+```
+fleetest bridge down --all --platform ios
+find .fleetest/DerivedData -name "*.xctestrun" -delete
+fleetest bridge up --platform ios --device <名前>     # ここで再ビルドが走る
+```
+
+(Android ブリッジ側は versionCode 照合で自動再インストールされるため、この問題は iOS 側だけに出る)
+
+**この自動化が効くのは `BridgeProvisioner` を通る経路だけ**(2026-08-06 に踏んだ)。
+MCP の **profile 無しの iOS 経路**(`ft_snapshot` 等を `platform: ios` だけで呼ぶ形)は
+`ExploreDriverResolver` が**生きているポートへ素で繋ぐ**ので、provision を通らず版も照合しない。
+
+- 実害: ランナー側の修正2件を入れ、`bridgeProtocolVersion` も上げ、`swift test` も緑にした状態で
+  デバイスで確認したところ、**snapshot は直る前の木を返し続けた**。原因は稼働中の旧ランナー(v52)の
+  再利用で、`fleetest bridge down && fleetest bridge up` するまで「直っていない」ように見えた
+- 対処は**繋ぐたびに /status の版を照合し、ズレていれば既定で拒否する**
+  (`MCPServer+Driver.swift` の `enforceVersion` / `bridgeVersionSkew`。2026-08-09 に警告のみから反転)。
+  古いブリッジは自分の版の挙動・注記で答え、そこから書かれたセレクタは黙って誤るため
+  "Refusing to operate…" を throw して応答を信用しない。意図して古いブリッジを使うときは
+  `allowVersionSkew: true` で押し通せるが、**その間は毎回の応答に警告が付く**
+- **ブリッジを直したときの検証手順**: 版を上げる → `fleetest bridge down && fleetest bridge up`
+  → デバイスで確かめる。**down/up を省くと必ず旧版を測る**。iOS のシミュレータはブリッジを
+  起動し直すと**アプリが消えていることがある**ので、`ft_install` からやり直す
 
 ## スクロールした直後のタップ(2026-07-27 修正済み)
 

@@ -130,7 +130,7 @@ public enum RemoteDispatchQueue {
     /// 機械の中の話)—— `RemoteDispatchLockInfo.pid` が表示専用なのと同じ理由で、**発行側の pid は
     /// ランナーから見えない**ので生存判定に使えない。**失効しても run は1本も殺さない**
     /// (待機列から落ちて順番を失うだけ。ロック本体には時刻判定を一切入れない =
-    /// RR-5「既定では奪わない」)
+    /// RR-13「既定では奪わない」)
     public static let staleSeconds = 30
 
     // MARK: - ssh コマンド組み立て(1往復・純粋関数)

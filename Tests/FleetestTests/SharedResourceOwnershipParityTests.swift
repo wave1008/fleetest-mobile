@@ -126,7 +126,7 @@ final class SharedResourceOwnershipParityTests: XCTestCase {
         // (ForeignLeaseAutoRestartGateTests。自動起動の門は deviceGateMarkers の語彙とは別)
         "LiveBridgeAutoStarter.launchBridge",
         // ③供給(provision)経路の内部処理。ここに lease 判定を足すと run 自体が起動できなくなる
-        // (RR-18.7「門は CLI の口にだけ置く」)。**ただし「供給しているその1台は
+        // (.claude/rules/remote.md「門は CLI の口にだけ置く」)。**ただし「供給しているその1台は
         // 自分の物」は成り立たない** —— MCP の自動回復・bridge up・start-device も供給を通る。
         // 起動し直しを撃つ分岐の手前で hasForeignLease* を見る(executeBridge の .reuse 3分岐・recheckRunner・
         // MCP の2つの自動回復。RunnerSlownessProvisioningWiringTests / BridgeRecoveryWiringTests /

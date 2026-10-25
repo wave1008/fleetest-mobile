@@ -61,7 +61,7 @@ iOS の残り時間は XCUITest 経路のコストが支配する。**その内�
 **計測の前にモニターを止める** —— `fleetest monitor pause [--for <分>]`(解除は
 `fleetest monitor resume`)。kill では止まらない(拡張が `api monitor` も配信ヘルパーも
 数秒で再起動する)ので、無人計測はこのコマンドで条件を作る。効くのはこの機械の
-monitor だけ。機構と旧手段(pkill 3連打)は docs/verification/environment.md「モニターと E2E。
+monitor だけ。機構と旧手段(pkill 3連打)は docs/verification/operations.md「モニターと E2E」。
 
 **計測手段は「使いたい条件」で一度検算してから信じる。** 2026-08-01 に launch の内訳を
 出せるようにしたが、いざ 8 レーンで採ると `FT_EVENT_LOG_PATH` が並列書き込みで壊れ、

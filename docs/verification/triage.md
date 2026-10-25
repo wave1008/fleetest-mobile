@@ -1,43 +1,148 @@
-# 検証: 切り分けと実機・録画
+# 検証: 切り分け(全滅・誤った赤・画面が変わらない)
 
 | 種別 | 範囲 | 読む場面 | 扱わないこと |
 |---|---|---|---|
-| 手順 | 受け手フロー・常駐プロセス・FM 全滅・供給の失敗・全滅したときの切り分け・凍結・実機・録画・版数(解決済みの事例は resolved.md) | テストが全滅したとき・実機や録画を検証するとき | 毎回効く最重要ゲート(→ CLAUDE.md「ビルド・検証」) |
+| 手順 | 症状から原因を切り分ける手順 | テストが全滅したとき・成功しているのに失敗と報告されたとき・操作が効かないとき | 個々の制約の詳細(→ [constraints.md](constraints.md)) |
 
-節の一覧はこのフォルダの README.md。
+症状から引く。各節は「何を見るか」から始まる。
 
-## 受け手フロー(preflight / install.sh)の検証
+## 既知の間欠失敗(2026-08-13 時点)
 
-- **更新は `Scripts/update.sh`**(install.sh を再実行 + `project sync` + プラグイン更新と版照合)。
-  clone 構成でこれを回すとき、**受け手向けの整備がクローン自身に効かないこと**を確かめる
-  (実害: install.sh の `.gitignore` 追記がリポジトリを dirty にし、次の更新が pull ガードで
-  止まる。現在は clone 構成では skip する。`.gitignore` の項目は `ProjectScaffold.ensureGitignore`
-  と対 — 片方だけ変えない)
-- **クローンを dirty にしたまま `install.sh` を試すと必ず止まる**(ローカル変更の破棄を尋ね、
-  端末が無い実行では中止する仕様)。本体を触りながら試すときは **`--no-pull`** を付ける
-- 実行の記録は `<WORK_DIR>/.fleetest/install-<日時>.log`(実行ごとに別ファイル)。
-  端末出力を追わずに後から失敗を追える
-- **スキルが渡す新しい引数は、受け手のクローンが pull されるまで存在しない**。
-  スキルからは**スキルと一緒に届いた Scripts/**(手順書と同じ版。プラグインのキャッシュ)の
-  ファイルを `bash` で呼ぶ(`curl | bash` はエージェントの安全確認に止められるので使わない)。
-  実害: `--platform` を渡した初回が「不明なオプション」で落ちた(2026-07-29)
-- 個別コマンドを叩いて確かめる前に、**preflight と install.sh の出力に既にあるか**を見る
-  (`tool_root=` / `[ok] MCP` / `[ok] ルート解決`)。取り直しは承認回数を増やすだけ
+**単発の失敗を「退行」と読む前にここを見る。** どれも**実装の退行ではない**と反復で確かめてある。
 
-## 常駐プロセスの掃除
+| シナリオ | 頻度 | 症状 | 判定 |
+|---|---|---|---|
+| `E2E-iOS / フリックが正しく動くこと.S0010` | 並列負荷時 1/3 程度 | `flickRightToLeft(the screen did not settle)` → `scrollLeft ×3` → `#tag_01` not found。横カルーセルが戻り切らない | 既知。単独実行では 5/5 成功 |
+| `E2E-RN / 待機とタイムアウトが正しく効くこと.S0010` | **1/10**(2026-08-13 に実測) | `#btn_delay_1` タップ後の `exist "#txt_delayed"` が 5s で落ちる | **flake**。同じ周の別シーンでは同じ操作が成功しており決定的ではない |
 
-- **ディレクトリを消しても `.build` が戻る**のは、生きているプロセスが作り直しているから。復活させる
-  主体は MCP の rebuild-on-start(`.mcp.json` が起動のたびに `swift build`)と拡張のパネル respawn。
-  **VSCode 終了で止まらないのは XCUITest ランナーだけ**(親から切り離してあり PPID=1)。
-  順序と掃除の1行(`pgrep -fl` / `pkill -f`)は docs/user-docs/uninstall_ja.md
-- 再ビルド後の検証前に旧バイナリの常駐プロセス(monitor/host-metrics)を kill する
-  (生き残って検証を汚す・旧ブリッジを自動再起動する。PT-7)
-- ブリッジには無通信 TTL(既定2時間。DS-4.1)があるが、**検証の掃除で TTL を
-  当てにしない**(旧版ブリッジには入っていない・モニターのポーリングが心拍になり失効しない)
-- **調査で `fleetest api monitor` を手で回すときは stdin を開いたままにする**
-  (`tail -f /dev/null | fleetest api monitor ...`)。**stdin の EOF が終了指示**なので、
-  スクリプトからバックグラウンド実行すると /dev/null が即 EOF になり、
-  **1行も出さずに正常終了**する(「監視が何も返さない」ように見える罠)
+| `E2E-CMP / テキスト入力が正しくechoされること.S0040`(android) | **2/7**(08-12)+ 1/4(08-13) | step 5 の `type (replace)` が `clearInput reported success but the value remained: "単一行"` で落ちる。同じログに `Another window is in front of the app: InputMethod` | **既知の Android テキスト注入の間欠失敗**。**ただしメッセージは原因を取り違えている**(下記) |
+| `E2E-CMP / 否定と個数と方向セレクタが正しく動くこと.S0010` | 凍結機が居る間だけ 4/5 | `#btn_delay_1` タップ後の `exist "#txt_delayed"` が 5s で落ちる。同じログに `-01 dropped out because of a frozen screen` | **凍結機**。下の「退行に見えた」を読むこと |
+
+**「クリアが失敗した」と読める文言が、実際には「直前の入力が届かなかった」を指すことがある**
+(2026-08-13)。上の CMP/android の1件がそれ —— `clearInput reported success but the value
+remained: "単一行"` と出るが、**「単一行」はこの欄のヒント文字列**であって残留した入力ではない。
+step 4 の `type "abc"` が IME に飲まれて届かず、欄が**空のまま**(= `value` にヒントが見えている)
+だったので、`clearInput` は空の欄に対して正しく何もしていない。
+`residualClearValue` は `before != placeholder` で守っているが、**Android の CMP は
+`placeholder` を送らない**ので素通りする。**この文言を見たら、まず直前の入力が届いたかを疑う**。
+**空の欄の `value` にヒント・ラベルが見えていた実体はブリッジのテキスト昇格**(2026-10-01)——
+名前の無いクリック可能な入れ物に子孫の文字を写す処理が入力欄にも効き、子のヒント/ラベルの TextView を
+値として写していた(生の a11y では `text=''`)。Android ブリッジ v85 で入力欄を対象外にしたので、空の欄は
+空と読まれる。**この型の間欠失敗は以後、clearInput ではなく後の検証(echo の `textIs` 等)で落ちる**
+(同日の E2E で S0020 が `clearInput` 緑・`textIs "password="` 赤の形で1回出た。修正あり・HEAD とも
+6台×3周で 0/18 = 帰属は決まらず)。
+
+**「A では落ちて B では通る」を、順序を反転せずに退行と読まない**(2026-08-13)。上の CMP の1本は
+変更後のツリーで 4/5 落ち、HEAD のツリーでは 4/4 通ったので**退行に見えた**。
+**順序を反転したら HEAD のほうが同じ形で落ちた** —— 先に走ったほうが凍結機
+(`-01`)を引き、**その run が凍結を記録するので後続はその機を避けて通る**。
+交互に回すと**先攻が負ける**だけの構図で、コードは無関係だった。
+**A/B の前に、A と B を入れ替えた対照を取る**(片方向だけの比較は、共有資源の状態を
+「変更の効果」として読む)。
+
+**RN の iOS in-app は全ステップが `activate 不発 → 合成タッチ` に退化する**(ログに毎回出る)。
+合成タッチはタイミングに弱く、上の flake の温床と見られる。**落ちる位置は毎回同じではない**
+(フル実行ではステップ7・反復ではステップ14)ので、**「特定のステップが壊れている」と読まない**。
+
+## ブリッジの「誤った赤」を疑う手順(成功しているのに失敗と報告される)
+
+**症状**: ステップは失敗するのに、直後にスナップショットを撮ると**期待どおりの状態になっている**。
+2026-07-31 の Android WebView `type` がこれで、原因は a11y ノードのキャッシュを取り直さずに
+読んでいたこと(値は入っていたが読みが古い)。同型は「キャッシュ・遅延イベント・整定の打ち切り」の
+どれかを疑う。
+
+1. **まずホスト側から状態を撮る**。失敗した直後に `/snapshot` を撃ち、期待値になっていれば
+   誤った赤が確定する(「入っていない」のか「読めていない」のかはここで分かれる)
+2. **シナリオ経由で追わない**。1 run に1回しか通らない操作は再現率が低すぎる
+   (実測 111 run で 2 件 = 1.8%)。**ブリッジを直接叩くハーネス**をホストと同じ手順
+   (snapshot → ref 解決 → 操作)で書き、全デバイス並列で数十回まわすと同じ事象が
+   **20%** まで上がった。負荷は合成 CPU 負荷では足りず、別スイートの並走が要る
+3. **ブリッジ側に一時診断を足す**(期限切れの瞬間に何が見えていたか: ノードの有無・text・
+   focused・bounds・候補の全列挙)。**版を上げないと旧ブリッジが再利用されて意味がない**
+4. 直したら**同じ負荷・同じ回数**で前後比較する(修正前の実測が無いと「効いた」と言えない)
+
+**失敗レポートだけで誤った赤を確定できることがある**(2026-08-01・Android ネイティブ画面)。
+レポートは**要素一覧(a11y)とスクリーンショット(ピクセル取得なので a11y を通らない)を両方**
+載せるので、**この2つが食い違っていたら読みが古い**と即断できる(再現を待たなくてよい)。
+さらに強い判定材料は**要素一覧の内部矛盾**: 同じアプリ state から描かれる2要素(例 echo と
+入力欄の値)が同一フレームでは両立しない組み合わせで出ていたら、ツリーはキャッシュ混じり。
+「タップが落ちた」仮説とはここで切り分けられる —— タップが落ちただけなら他の要素は新しいままのはず。
+
+**この失敗クラスは WebView 限定ではない**: IME 等が前面にあるとネイティブ画面でも数秒古いツリーが
+返る。逆向き(遷移前の状態を期待するアサーションが**誤って成功する**)は沈黙するので、
+`notExist` や「クリア後の初期値」を見るステップが怪しく緑になっていないか疑うこと。
+
+**全ノード refresh は既定にできない**(2026-08-01 実測)。`SnapshotBuilder.collect` で
+`node.refresh()` を全ノードに広げると **snapshot 1回あたり +65ms**(アサーション中央値
+6〜22ms → 43〜99ms)、scenario sum は **E2E-Android +43%**(208.3→297.3s)・E2E(Compose)+2.5%。
+ノード数の多い View/XML SUT ほど重い。既定は WebView 内だけに留め、**ホストが期限切れで失敗と
+決める直前の1回だけ** `/snapshot?refresh=1` を要求する。
+
+## 操作は ✅ なのに画面が変わらないとき
+
+`tap` がエラーにならず成功として記録され、次の検証だけが「期待と違う」で落ちる形。
+**ロケータの問題ではない**ので、セレクタを直そうとすると時間を溶かす。
+
+**まず3つのクラスに分ける**(2026-08-05 に過去の失敗レポート 487 件を全数分類して整理した。
+機構が違うので混ぜると追えない):
+
+| クラス | 見分け方 | 状態 |
+|---|---|---|
+| **A. 座標が可視領域の外**(報告された frame が壊れている) | 失敗時の要素一覧で、対象の frame が容器の縁をまたぐ/外に居る。E2E-CMP S0110 の失敗 21 件中 **11 件**がこれ(`#row_30` が `y=206 h=26〜45`・容器の上端は 230 = **中心が容器の外**) | 機構は確定。**未対処**(下記「画面外要素の frame は信用できない」) |
+| **B. ghost(容器の外に並ぶ子)** | ステップに `the element is still reported outside its scroll container` の注記が付く | 対策済み(再解決+追加スワイプ)。取りこぼしが 21 件中 2 件 |
+| **C. 座標も正しく、イベントも受理され、アプリが反応しない** | A でも B でもない。注記も付かない | **真の未解明**。ただし混入していた環境要因が1つ判明(下記) |
+
+**C を追う前に環境を疑うこと**(2026-08-05 の教訓): C だと思っていた失敗のうち、
+**iOS シミュレータの画面凍結**(下記の節。真っ黒なのに a11y は健全でタップだけ届かない)が
+混ざっていた。今は失敗レポートに blank frame 警告が出るので、まずそこを見る。
+
+既知の原因は次のとおり。
+
+1. **アプリが別プロセスの window に覆われている**(システムダイアログ・IME の案内・通知シェード)。
+   アプリの a11y ツリーには他プロセスの window が出ないため、要素一覧は正常に見える。
+   **2026-07-27 以降は失敗時に自動で警告が出る**(コンソールとレポート。
+   `⚠️ アプリより手前に別の window があります: …`)。出ていたらこれが第一の容疑
+2. **アプリ内メッセージ**(お知らせ・キャンペーンのモーダル)。**同一プロセスなので 1 の検出では
+   捕まらない**。こちらは失敗メッセージに `(対象は #… に覆われています)` が付く(幾何判定・FM 不要)。
+   繰り返し出るなら `irregularHandler` を宣言して自動で閉じさせる(../design/dsl-execution.md「割り込みハンドラ」)
+3. **スクロール探索の直後**(下記の節)。こちらは修正済みだが、同じ症状の別原因として覚えておく
+4. **座標が要素の外**(下記「画面外要素の frame は信用できない」)。報告された frame の中心が
+   実際の可視領域の外にあり、タップが隙間や別の要素へ落ちる
+
+**2026-08-05 以降は「飲まれたタップ」を失敗文言が名指しする**: 直前のタップの**直前に解決で
+使った木**を覚えておき、失敗した検証が手元に持っている木と突き合わせて、**1ピクセルも変わって
+いなければ** `(the preceding tap … did not change the screen at all; the interaction may have
+been swallowed)` を添える(`StepExecutor.tapDiagnosisHint`)。
+- **iOS では「別プロセスのアラートを出した」可能性も併記する**(`, or it raised a system alert …`)。
+  iOS の木は in-app / XCUITest ともアプリのプロセスだけなので、権限の要求など SpringBoard の
+  アラートを出したタップも「無変化」に見える(M1mini の E2E-iOS 16 S0010 で、アラートが待ちの
+  5 秒に間に合わなかった赤を「飲まれた」と誤誘導した)。Android は権限ダイアログが木に載るので添えない
+- **追加のスナップショットは撮らない**。実行中に I/O を足すと事象そのものが消える
+  (下記「Compose の探索直後タップ」の heisenbug で 13 周回して再現しなかった)ため、
+  これは設計要件であって最適化ではない
+- **判定は変えない**(注記だけ)。「押しても画面が変わらないのが正しい」操作もあるため
+- 署名には**ラベル・値・enabled・checked も入れる**。飲まれたタップの実例は
+  `selected=-` のままか `selected=row_30` になるかの違いで、**座標は1ミリも動かない** ——
+  `settledSignature` の署名(frame だけ)を流用すると黙って取りこぼす。逆にラベルの振れ
+  (iOS の再利用セル)は「変わった」側に倒れるので、**誤って「無変化」と言うことはない**
+- 記録は `select` では消さない(`tap → select → textIs` が失敗の定型)。画面を変える他の操作で消える
+- **タップ点を手前の別要素が取っていた**ときは、無変化と同時に成立したときだけ名前も添える。
+  単独で出さないのは、画面外要素の frame がクランプされるフレームワーク(下記)では
+  **正常なタップでも普通に非 nil になる**ため
+- **木が変わっていて、かつ対象があの後動いていたら移動量を出す**(2026-08-05 追加)。
+  `(the target has moved (0,-100) since the preceding tap …)`。これが
+  **「座標が古くなった」と「本当に無反応だった」を分ける唯一の材料** ——
+  失敗時の幾何だけでは両者が同じ絵になり、実際に取り違えた(「掴んだ時点で壊れていた」と読んで
+  探索側を直したが、10周回して**一度も発火しなかった**)。閾値は 8pt(整定の揺れで出さない床。
+  実測の取りこぼしは 98pt 級)。対象が消えていたら黙る
+
+実例: Gboard の「タッチペンを試してみる」が送信ボタンを覆い、03_テキスト入力(旧 05)が間欠失敗した
+(抑止は `AndroidBridge.disableStylusHandwriting`)。**この手の教育用ポップアップは今後も増える**ので、
+1 の警告が出たら SUT ではなくデバイス設定側を疑う。
+
+**切り分けの定石(iOS)**: 同じシナリオを `ios-inapp` プロファイルでも回す。in-app は ref で、
+xcuitest は座標でタップするので、**片方だけ落ちるならタップ経路の問題**、両方落ちるならアプリ側か
+セレクタの問題と切り分けられる(スクロール直後のタップの機序特定で決め手になった)。
 
 ## FM(Foundation Models)が全滅したら
 
@@ -203,90 +308,6 @@ Scripts/heal-verify.sh --profile android-heal
 - 自己修復(`StepExecutor` の解決分岐・`LocatorFingerprint`・`LocatorFingerprintCache`・`heal` の配線)を
   触ったら回すことを**推奨する**(`e2e.sh` の終わりに出る。回すのはユーザーの指示があるとき = §陽性対照スイート)。実測(2026-09-15): iPhone 17 Pro Simulator で約 70 秒(シナリオのビルド込み)・Pixel 9 Emulator(`--profile android-heal`)で約 40 秒。どちらも全段が期待どおり
 
-## FM 呼び出しの許可枠(FMCallSlots)
-
-FM は**ホスト全体で共有される資源**。2026-07-22 時点の実測ではスループットは並列度によらず
-約1回/秒に見えたが、これは**枠1本(直列化)の上限**であって FM 自体の天井ではなかった
-(2026-09-01 の反証は `Sources/FTCore/FMCallSlots.swift` 冒頭が正 —— `fleetest doctor --fm-load` で
-門を通さず直接叩くと、並列度5で 7.81 回/秒(text)まで伸びる)。並列ワーカーから無制限に同時に
-投げるとやはり modelmanagerd のモデル積み降ろし(`unloadIfNeededToMakeRoom`)が増えるので、
-呼び出し側で**枠(既定1・`FT_FM_CONCURRENCY` で上書き)を作る**(`FMCallSlots`。
-~/Library/Caches/fleetest/fm.lock.<0..<枠数> への flock)。
-
-- **リポジトリ単位ではなくホスト単位**。別リポジトリの fleetest とも枠を共有する
-- **全ての FM 呼び出しがこのロックを通る**のが不変条件(occlusion / screenLooksLike /
-  TestbaseDrafter。自己修復は 2026-09-15 に FM を呼ばなくなり対象外)。
-  新しい FM 呼び出しを足すときは必ず通すこと。画像を伴う 2 つ(occlusion / screenLooksLike)は FM の常駐プロセスへ頼む側で通す
-  (実呼び出しは常駐プロセスが撃つ。MN-81)。
-  監査は `FMAccountingAuditTests`(セッションを作る関数と常駐プロセスへ頼む関数の両方)と
-  `FMServeTests.testOnlyTheFMProcessAndAuthoringToolsCreateSessions`(セッションを作ってよいファイルの集合)
-- **取れなければ FM をスキップする**(既定 20 秒)。全ワーカーが並ぶと最後尾の待ちが積み上がり
-  シナリオの壁時計タイムアウトを超えうるため、この安全弁は外せない。スキップは**失敗とは別に
-  数える**(`FMHealth.recordSkip`。失敗率の分母を汚さない)
-- **FM に狙って負荷をかけたいだけなら `fleetest doctor --fm-load`**(既定
-  `--fm-load-seconds 30 --fm-load-concurrency 5`。**この口だけは FMCallAdmission/FMCallSlots を通さない**
-  ので実行中の run と容量を奪い合う点に注意)。経路は2つ: 既定はテキスト経路、
-  `--fm-load-vision` は画像入力経路(occlusion-guard 相当)。**自己修復は 2026-09-15 に FM を
-  呼ばなくなったため、テキスト経路の実行時利用者はもう無い**(シナリオ下書き・命名コマンドは
-  実行時ではない)。**text と vision は独立に死ぬ**ので両方確かめたいときは両方回す。記録は
-  `FMHealth.record(kind: "loadtest")` を通るので監視の FM 行にも出る。E2E ではほぼ FM が焚けない
-  ため、flake 調査や負荷試験で意図的に FM を鳴らしたいときはこれを使う
-  (詳細と実測は PT-3.5)
-- **A/B 計測の殺しスイッチ**: `FT_FM_CALL_SLOTS=0` で無効化(acquire が常に true = 素通り)
-- **occlusion の FM 段は転写だけ**(2026-09-15。期待文字列を FM に渡さず `TranscriptMatch` が照合する)。
-  2 段化の殺しスイッチ `FT_FM_OCCLUSION_TWO_STAGE` は撤去した。方式と実測は
-  OG-5.18
-
-  ```bash
-  FT_FM_CALL_SLOTS=0 Scripts/e2e.sh   # 呼び出しの枠なし
-  Scripts/e2e.sh                      # 直列化あり(既定)
-  ```
-
-- **A/B は1回の再起動では取れない**。片方の実行で FM を殺すと、もう片方が死んだ状態から
-  始まってしまう(FM は一度落ちるとプロセスを変えても回復しない)。**アーム毎に再起動する**こと
-
-### 検証結果(2026-07-27): **直列化では FM の全滅を防げない**
-
-導入の動機だった「積み降ろしの連発 → 全滅」という因果は**反証された**。積み降ろしは全滅の
-随伴現象であって原因ではない。アーム毎に再起動して全 SUT の E2E を回した実測:
-
-| プロファイル(実行順) | 直列化 ON | 直列化 OFF |
-|---|---|---|
-| 1本目 | 21 calls / 0 失敗 | 21 calls / 0 失敗 |
-| 2本目 | 9 calls / **9 失敗** | 21 calls / **21 失敗** |
-| 3本目以降 | 全て 0% | 全て 0% |
-
-**ロックは正しく効いていた**(空振りではない)ことを次で確認済み:
-FM 呼び出しの時間的な重なりがゼロ(別プロセスが 1.5〜3 秒間隔で順番待ち)/
-p50 レイテンシ 2416ms → 1675ms(−31%)/ ロック待ちによる skip は 0 件。
-
-**崩壊のトリガーは時間でも並列度でもない**。再起動から E2E 開始まで 43 分あって FM は生きており
-(時間ではない)、直列化で並列度を 1 に落としても崩壊した(並列度でもない)。両アームとも
-**累積 20〜30 回の呼び出しで尽きる**ように見えるが、2 標本からの推測で確証はない。
-
-直列化は**この目的では効果が無かった**が、実測で害が無く p50 が下がるため残している。
-全滅そのものへの対策は**サーキットブレーカ**(下記)側で行う。
-
-## サーキットブレーカ(FMBreaker)
-
-FM は死んだら**再起動まで回復しない**ので、死んだ後も呼び続けるのは純粋な浪費
-(実測: 全滅した 1554 シナリオで合計 31 分を捨てていた)。**連続 3 回失敗したら以後は呼ばない**。
-
-- **入場は FMCallAdmission に一本化**している。`FMCallAdmission.enter()` が ①ブレーカ ②許可枠のロック(FMCallSlots)
-  を順に見る。
-  **新しい FM 呼び出しを足すときは必ずここを通す**(監査: `grep -c "FMCallAdmission.enter" Sources/FTFoundationModels/*.swift`
-  と、頼む側の関数(`FMServeWire.Request(kind: .transcribe` / `.screen`)・テキストの呼び出し(`TestbaseDrafter`)の数を突き合わせる。FMDoctor は可用性判定、FMServeServer は頼まれた実呼び出しなので対象外)
-- **ホスト単位**(~/Library/Caches/fleetest/fm-breaker.state の mtime)。全滅はホスト全体の事象で
-  ワーカーはプロセスが別なので、プロセス内カウンタだけだと 14 ワーカー分を無駄打ちする
-- **成功したら即座に復帰**する。10 分(cooldown)経過後は 1 回試させる(half-open)ので、
-  FM が復活したことを検知できる
-- ブレーカ由来のスキップは**失敗と別に数える**(失敗率の分母を汚さない)。実行後の警告に
-  「N 件はスキップしました」として出る
-- `FT_FM_BREAKER=0` で無効化(切り分け用)
-
-**実測(2026-07-27・FM 全滅状態)**: 同一シナリオの FM 呼び出しが **11 回 → 3 回**へ。
-浪費が 6.0 秒(3 回)で止まり、残り 8 回はスキップされた。
-
 ## デバイス供給の競合(モニターと run が同じデバイスを取り合う)
 
 拡張のモニターは watchdog で `api start-device` を投げる。run と同じデバイス群を使うので競合し得る。
@@ -409,445 +430,3 @@ apps プロファイルの healthCheckURL が実行開始時に警告を出す�
 エラー画面のまま要素が解決できない大量失敗。**決め手は失敗レポートの「失敗時点の要素一覧」**
 (エラー画面 `#view_error`「読み込みに失敗しました」が写っていればバックエンド起因で確定)。
 .ips が積まれていてもツールや OS beta を疑う前に `/health` を確認する。
-
-## Android 凍結まわりの検証の罠
-
-- **画面 OFF(KEYCODE_SLEEP)はフェイク凍結として万能ではない**: screencap は実凍結と同一の
-  一様フレーム(<30KB)になるため **blank 検出・事前修復パスの検証には使える**(検出→sleep/wake
-  修復→回復、が決定論的に再現する)。しかし **a11y 駆動(tap/type/textIs)は画面 OFF でも全て通る**
-  (実測: シナリオ実行中に画面 OFF にしても 18/18 成功)ため、「シナリオ失敗→凍結判定→修復」の
-  実行中経路は発火させられない。さらにシナリオの launch が画面を起こす過渡で別種の失敗が出る
-  (注入アーティファクト。実凍結の症状ではない)。実行中修復パスの実発火はフェイクで強制できず、
-  本番ログの「実行中の画面凍結を修復」で観測する
-- **実凍結は事前修復が先に治すため「実行中だけ凍結」を意図的に作れない**(実凍結の誘発は
-  8台並列 run の反復のみ。1台単独負荷・アイドルでは発生しない。PT-7)
-- **凍結のホスト側証跡は `~/Library/Logs/fleetest/emulator/<AVD>.log`**(DeviceBooter が
-  emulator stdout/stderr を保存。ブート毎 truncate)。根因の Metal エラー
-  (`GLDRendererMetal command buffer completion error` / `IOGPUCommandQueueErrorDomain 518`)は
-  ここにしか出ない(2026-07-25 実測)。凍結個体を調べるときはまずこのログを見る
-- **エミュレータ操作は既定で emulator gRPC(EmulatorController)経由**(スクショ/キー・タッチ注入/
-  停止等。実機・gRPC 失敗個体は自動で adb フォールバック。`Sources/FTAndroid/EmulatorControl.swift`)。
-  gRPC 起因を疑うときは **`FT_EMULATOR_CONTROL=adb`** で全面 adb に切り替えて比較できる
-  (gRPC を話すのは Swift だけ。拡張の凍結修復も `fleetest api repair-display` 経由でここを通るため、
-  この環境変数1つで両方効く)。挙動差の切り分けはまずこれ。
-  **iOS も同様に CoreSimulator 直叩きが既定**(DS-16.4)で、
-  **`FT_SIMULATOR_CONTROL=simctl`** が殺しスイッチ。対象は**列挙だけでなく
-  アプリ起動と未インストール検査も**(2026-08-02 拡張)なので、
-  「launch がおかしい」ときもこれ1つで simctl 経路と比較できる
-- **run が遅くなったら負荷トリアージを先に**: ① `top` で qemu の空転(劣化個体はアイドルでも
-  ~73%/デバイス消費しホスト全体を遅くする)② run 同梱の `host-metrics.ndjson`(遅い run だけ CPU 飽和
-  していれば環境要因)。Spotlight/mediaanalysisd のインデックスストームは CPU 数百%でも run を
-  ほぼ遅くしない(M2 Ultra 実測)ので容疑から外してよい
-- **guest reboot の完了判定は「1 でなくなる」→「1 になる」の2段で見る**: `adb reboot` 直後は
-  まだ旧セッションが `sys.boot_completed=1` を返すため、いきなりブート待ちに入ると即成功して
-  再判定が**凍結したままの旧画面**に当たる(run 前トリアージの実装 `ProfileWorkerFactory.rebootGuest`)。
-  また再起動中は screencap 自体が失敗し、blank プローブは安全側の「非 blank」に倒れるので、
-  **ブート完了を確認できない個体を blank 再判定に掛けてはいけない**(復帰と誤認する)
-- **CPU 描画(swiftshader)フォールバックは emulator プロセスを再起動しないと戻らない**
-  (`-gpu` は起動引数固定。ゲスト再起動・gRPC RESET では戻らない)。戻す経路はモニターの
-  「GPUで再起動」「デバイスを全て起動」と、実行プロファイルの `recoverCpuFallbackToGpu`
-  (DS-11)。**例外**: Wipe Data の再ブートは `startEmulator` の既定 `-gpu host` で
-  起き上がるため、しきい値超過の個体は副作用で GPU に戻る(意図した復帰機能ではない)
-- **凍結調査は両経路スイープで**(`adb screencap` サイズと gRPC スクショの画素一様判定を並記)。
-  readback 白化と host キャプチャ黒は独立に壊れるため片経路だけでは誤診する。シナリオ成功率は
-  表示層の劣化を映さない(凍結9/14台でも 18/18 成功する)。変種一覧・スケール上限・Metal エラー
-  指標の正本は PT-7
-
-## 実機(kind: physical)の検証
-
-プロファイルの書き方は DS-11.2。ここは実機でだけ踏む罠だけを置く。
-
-### Android 実機
-
-- **画面ロックは「なし」にしておく**。PIN/パターンが設定されていると adb から解除できず、
-  ロック中は `UiAutomation.getRootInActiveWindow()` が対象アプリにならないので **全シナリオが
-  launch 500(「アプリの画面が表示されませんでした」)で落ちる**
-- run 前に `AndroidPhysicalDevice.prepareForRun` が点灯・ロック解除を行う。**消灯は抑止しない**
-  (2026-09-05 ユーザー決定。`svc power stayon` は true も false も撃たない —— false を旧版の後始末として
-  撃っていた頃は、持ち主の「充電中はスリープしない」を run・MCP のたびに消していた)。
-  その代わり**シナリオごと(子プロセス)と MCP の呼び出しごとに1往復で画面を確かめ、消灯・ロック中の
-  ときだけ起こす**(`wakeIfAsleep`。0.07〜0.15 秒)。run 開始時の1回だけだと、途中で1回消えた後の
-  全シナリオが launch 500 で落ち、消灯に一言も触れなかった(2026-09-11 Pixel 4a で 22/24 赤)
-- **ロック状態の判定に `isKeyguardShowing` と `mCurrentFocus` を使ってはいけない**。
-  Pixel 4a/Android 13 実測(2026-07-25)で、実際には解除されランチャーが見えている状態でも
-  `true` / `NotificationShade` を返し続けた。**信用できるのは `topResumedActivity` の有無だけ**
-  (ロック中はどのアクティビティも resume されないので行ごと消える)
-- `wm dismiss-keyguard` は非同期で **解除完了まで実測 3〜7 秒**。待たずに launch すると
-  run の初回シナリオだけが落ちる(8 run 中 1 件の flake として現れた)
-- **Android 側の画面凍結(blank-screen)判定は実機では動かない**。閾値(30KB)が 1080x2424
-  エミュレータ較正で、誤判定すると健全な実機に `adb reboot` を撃つため、事前トリアージ・
-  事後プローブ・失敗時の blank 証跡判定のいずれからも実機を除外してある。
-  **2026-09-25 に観測だけは足した**(修復は今も無い): `BlankWorkerTriage` が両 OS の実機を
-  対象に含め、一様な絵を `FrozenEvidence.darkScreenPhysical`(`isConclusive=false`)として
-  **警告1行に留める** —— 消灯と wedge を分ける材料が無いので確定させない。
-  `adb reboot` を撃つ経路は上の3つのままで、そこに実機は入らない(docs/design/ の該当節)。
-  **2026-09-25 に修復も入った(Android 実機だけ)**: `mWakefulness=Awake` なのに一様なら
-  画面の sleep/wake を1回撃つ(`AndroidPhysicalDevice.cycleScreen`)。**再起動は撃たない**・
-  **戻らなくてもレーンからは外さない**・**消灯かもしれないデバイスには撃たない**。
-  iOS 実機は点灯状態を取る材料が無いので観測だけのまま
-- ブリッジ起動時のアニメーション無効化と `hidden_api_policy=1` は **実機では設定が永続する**
-  (使い捨てのエミュレータと違う)。戻すときは端末の開発者オプションから
-- 検証実績: Pixel 4a(Android 13 / arm64)で E2E-Android 全 21 シナリオ×6 連続グリーン
-  (消灯状態からの復帰込み。2026-07-25)
-
-### iOS 実機
-
-- **署名が要る**。`~/.config/fleetest/config.json` の `developmentTeam`(または環境変数
-  `FT_DEVELOPMENT_TEAM`)に Apple Developer の Team ID を入れる。bundle id プレフィックスは
-  `bundleIDPrefix` / `FT_BUNDLE_ID_PREFIX`(既定 `com.example` のままだと他チームが登録済みの
-  App ID と衝突しうる)。ビルドは `-allowProvisioningUpdates` 付きで走る
-- **Team ID は証明書の OU**。`security find-identity -v -p codesigning` の
-  `Apple Development: <you> (XXXXXXXXXX)` の**括弧内は証明書 ID であって Team ID ではない**
-  (取り違えると `No Account for Team "..."` で落ちる。2026-07-25 に実際に踏んだ)。正しくは:
-  ```
-  security find-certificate -c "Apple Development: <you>" -p | openssl x509 -noout -subject
-  # → subject= UID=..., CN=Apple Development: ... (証明書ID), OU=GF42S2868Q, ...  ← OU が Team ID
-  ```
-- 端末側は「このコンピュータを信頼」と **Developer Mode の有効化**が前提。
-  `xcrun devicectl list devices` に出ることを先に確認する
-- **端末のロックを解除しておく**(Android と同じ前提)。ロックされていると xcodebuild が
-  `Unlock <name> to Continue` で無言のまま止まる。**ビルドと起動の前にホストが現況を見て促す**
-  (`IOSPhysicalDeviceLock`。`xcrun devicectl device info lockState` の **`passcodeRequired`** =
-  「今パスコードの入力が要るか」で、静的な設定の有無ではない。実測 0.23 秒・消灯 true /
-  解除 false・自動ロック 30 秒での遷移も観測)。**ビルド前は促すだけで待たない**(ビルドに解除は
-  要らないので、その数分の間に解除してもらう)/ **起動の直前は解除まで待ち**(2 秒刻み・上限は
-  `BridgeLauncher.startupTimeoutSeconds` と同じ 180 秒)、**待ち切ったら撃たずに落とす**
-  (撃っても deviceprep に拒否され、もう 180 秒待って同じ理由で死ぬだけ)。
-  **パスコード未設定の端末では常に false** なので見落とすが、誤検知は出さない側に倒してあり、
-  従来の xcodebuild ログからの検出(`IOSDeviceTransport.blockingCondition`)に落ちる。
-  **`devicectl device info displays` の `backlightState` は使えない**(消灯中でも `activeOn`)。
-  **端末の自動ロックは「なし」にしておくこと**(設定 → 画面表示と明るさ → 自動ロック)。
-  **ツールは起こさない**(2026-09-05 にランナーのパルスを廃止した。版 89)——
-  合成した入力は実機では本物の HID で、「無害な玉」という前提が OS の版で反転する
-  (iOS 26.5.2 では `press(.home)` が SpringBoard に届かず、**26.6 では届いて対象アプリが
-  run の途中でホーム画面へ落ちた**)。`isIdleTimerDisabled` も効かない(2026-08-27 実測:
-  10 秒ごとに貼り直してもちょうど 30 秒で寝る。ランナーは対象アプリを起動した時点で背面に
-  回り、idle timer の申告は前面アプリのものしか効かない)。
-  自動ロックのまま走らせると、待ちの長いステップで寝て以後の launch が拒否される。
-- **端末で開発者証明書の信頼が要る**。ビルドとインストールが成功しても、起動時に
-  `The application could not be launched because the Developer App Certificate is not trusted.`
-  で落ちる。iPhone の **設定 → 一般 → VPN とデバイス管理** からデベロッパ App の証明書を「信頼」する。
-  **「初回だけ」ではない**: 証明書やプロビジョニングプロファイルが作り直されると再度必要になる
-  (2026-07-26 に一度信頼済みの端末で再発)
-- **端末が起動を拒否した条件は xcodebuild の終端マーカーを待ってはいけない**。証明書未信頼の
-  エラーはログの 20 秒時点に出ていたのに、`** TEST EXECUTE FAILED **` も `Testing failed:` も
-  最後まで出ず、締切 181 秒まで待たされたうえ「LAN アドレスを取得できません」という無関係な
-  理由で失敗した(2026-07-26 実測)。証明書未信頼・Developer Mode 無効は単独で終端扱いにする
-  (`IOSDeviceTransport.runnerFailureReason`)。理由を特定できない失敗だけは誤検知を避けるため
-  従来どおりマーカー待ち
-- `devicectl list devices` の **Identifier 列(UUID)と `hardwareProperties.udid`(`00008130-...`)は
-  別物**。`xcodebuild -destination id=` が受け付けるのは後者だけ(`devicectl --device` はどちらでも
-  通る)。プロファイルの `udid` には後者を書く(前者を書いても解決はする)
-- **`connection.state` は当てにならない**: USB 接続中で `devicectl list devices` が
-  `available (paired)` と表示している実機でも `disconnected` のままだった。未接続の実機は
-  そもそも一覧に出てこないので、一覧に居ること自体を到達性の主信号にしている
-- `hardware.reality`(CoreDevice の `DeviceReality`)は **`physical` / `simulated` / `virtual`(VM)
-  の三値**だが、**実機は値を出さずキーごと省略する**(Xcode 27 beta 4 実測: 68 台中 67 台が
-  `simulated`、実機 1 台はキー欠落)。`"physical"` 一致で拾うと**実機が 1 台も見えない**ので、
-  必ず「`simulated` 以外」で弾くこと
-- SUT の実機ビルド例: `E2EAppIOS/scripts/build-ios-device.sh`(`-sdk iphoneos` + 自動署名 →
-  `dist/ios-device/`)。シミュレータ版(`dist/ios-simulator/`)とは実体が別なので
-  **apps プロファイルを分ける**(`ft_e2e_ios_device.json` / 実行は `ios-device`)
-- **xcodebuild のテストログは CRLF**。Swift では `"\r\n"` が 1 つの Character なので
-  `split(separator: "\n")` は CRLF を**一切分割しない**(ログ全体が 1 行になる)。
-  ランナーの `FT_BRIDGE_ADDR` 宣言を拾う所で踏んで 180 秒待って失敗した。
-  ログを行単位で見るコードは `split(whereSeparator: \.isNewline)` を使うこと
-- ブリッジの到達手段の確立に失敗したら**必ず `launcher.stop()` する**。xcodebuild は実機で
-  走り続けるので、止めないと失敗のたびに常駐ランナーが端末に溜まる(実測で 5 本残った)
-- **実機とシミュレータを同じ run に混ぜられる**が、xctestrun は種別ごとに別物なので
-  `prepareSharedBuilds` は**種別ごとに build-for-testing する**(1 つだけビルドすると、
-  選ばれなかった側が `xctestrunNotFound` で落ちる)
-- 検証実績: iPhone 15 Pro(iOS 26.5.2)で E2E-iOS 全 20 シナリオ = LAN ×3・USB ×6 連続グリーン
-  (2026-07-25〜26)。ブリッジ供給は約 8 秒。壁時計は USB 181〜211s / LAN 241〜259s
-- **トランスポートは端末の接続形態で決まる**: `devicectl` の `transportType` が `wired` でなければ
-  (= WiFi のみ)**iproxy は USB トンネルを張れない**ので lan に落ちる。ここを見ずに
-  「iproxy があれば usb」で選ぶと、`network connection was lost` で 180 秒待って失敗するだけの
-  無情報な結果になる(2026-07-25 に実際に踏んだ)。明示指定 `FT_IOS_DEVICE_TRANSPORT` は尊重する
-- **端末ロックの検出は締切後にもう一度ログを読む**。xcodebuild は諦めた時点で初めて
-  `Unlock <name> to Continue`(deviceprep Code=-3)を書くことがあり、待機ループ内の読み取りだけでは
-  間に合わずタイムアウトとしか出ない(`BridgeLauncher.waitUntilReady` の physicalDiagnosis)
-- **ブリッジのトランスポートが 2 択**(デバイス内のループバックはホストから見えない。
-  Xcode 27 の devicectl にポート転送は無い)。`FT_IOS_DEVICE_TRANSPORT=lan|usb` で明示、
-  未指定なら iproxy があれば usb、無ければ lan。**usb を強く推奨**(下記実測):
-
-  | 経路 | 1 往復(`/status`) | ばらつき | E2E-iOS 20 本 |
-  |---|---|---|---|
-  | シミュレータ(loopback) | 1.1 ms | σ 0.2 | 174.6s(6 台並列で壁 38.5s) |
-  | 実機 **usb**(iproxy) | **4.7 ms** | σ 0.7 | **181.3s** |
-  | 実機 lan(WiFi) | 47.9 ms | σ 26.9 | 241.1s |
-
-  LAN が遅いのは **iOS の WiFi 省電力**(ICMP でも avg 74ms / σ 32ms)。DSL の 1 ステップは
-  セレクタ解決・操作・整定確認で 8〜13 回ブリッジを往復するため、48ms × 10 回 ≈ +0.5s/ステップに
-  なる。ペイロードは 0.1KB なので**帯域ではなく往復回数**の問題(2026-07-25 実測)。
-  usb にすると 1 シナリオあたり 12.1s → 9.1s で、シミュレータ(8.7s)とほぼ同等になる:
-  - `lan` … ランナーが `0.0.0.0` に bind し(`FT_BIND_ALL=1` を xctestrun に注入)、自分の
-    LAN IPv4 を `FT_BRIDGE_ADDR=<ip>:<port>` としてテストログ(`.fleetest/bridge-<port>.log`)に
-    1 行出す。ホストはそれを読んで宛先にする。**Mac と端末が同じネットワークに居ること**
-    (クライアント分離 WiFi では不可)
-  - `usb` … `iproxy`(`brew install libimobiledevice`)で USB トンネルを張り 127.0.0.1 を維持する
-- 実機とシミュレータで DerivedData を分けてある(`.fleetest/DerivedData-device`)。混在させると
-  `findXCTestRun` が iphoneos/iphonesimulator の誤った方を掴む
-- **mode=xcuitest ならデバイスで動く、は誤り**だった箇所: `FastLaunchDriver`(xcuitest でも既定 ON・
-  中身はアプリの再起動)と `LaunchPreflightDriver`(未インストール検査)は
-  実機では無効化される(`--physical`)。素の `XCUIApplication.launch()` 経路に落ちる。
-  どちらも 2026-08-02 に CoreSimulator 直叩き優先へ変えたが(DS-16.4)、
-  **シミュレータ専用という前提は変わっていない**(simctl も CoreSimulator も実機には効かない)
-- アプリは `xcrun devicectl device install app` で入る(**署名済みの .app/.ipa が要る**)。
-  SUT のシミュレータ用ビルド(`-sdk iphonesimulator`)はそのままでは使えない
-- **UDID の先頭は機種共通**(`00008130-` は iPhone 15 Pro 系の固定値)。先頭 8 文字を
-  識別子として表示すると同型機が全部同じ表示になる。個体固有なのはハイフン以降
-
-### iOS 実機ブリッジが立たないとき(3 大原因)
-
-原因はほぼこの 3 つ。**いずれも現在は原因が名指しで報告される**ので、まずメッセージを読む
-(そうなるまでに 3 回とも「180 秒待って無情報なタイムアウト」を踏んでいる)。
-ログは `.fleetest/bridge-<port>.log`:
-
-| 症状・ログ | 原因 | 対処 |
-|---|---|---|
-| `Unlock <name> to Continue`(deviceprep Code=-3) | 端末ロック | 解除し、**自動ロックを「なし」にする**(ランナーは端末を起こさない。上の「端末の自動ロックは「なし」にしておくこと」) |
-| `Developer App Certificate is not trusted` | 証明書未信頼 | 設定 → 一般 → VPN とデバイス管理 |
-| `network connection was lost` が延々続く | WiFi 接続なのに usb を選んだ | USB で繋ぐ(自動で lan に落ちる) |
-
-検出側の設計上の要点(**同じ間違いを繰り返さないため**):
-- ロックは「失敗」ではなく「進まない」だけなので、xcodebuild のログから拾う経路では throw せず
-  促す。ただし xcodebuild は**諦めた時点で初めて**理由を書くことがあるので、待機ループ内だけでなく
-  **締切後にもう一度**ログを読む(`BridgeLauncher.waitUntilReady` の physicalDiagnosis)。
-  **起動の直前の判定(`IOSPhysicalDeviceLock`)だけは待ち切ったら throw する** —— あちらは
-  「今ロックされている」ことを端末に直接訊いており、撃っても拒否されるのが確定しているため
-  (推測ではなく現況。`.unknown` では throw しない)
-- 証明書未信頼・Developer Mode 無効は**終端マーカーを待たずに確定**させる(理由を特定できない
-  失敗だけマーカー待ち)。詳細は上の「iOS 実機」節
-- トランスポートは `transportType` で決める。`FT_IOS_DEVICE_TRANSPORT` の明示指定は尊重する
-
-### 実機とモニター・API
-
-- `api list-devices` / `api monitor` は実機を返す。**状態判定は両者で共有**(`determineStates`)なので、
-  片方を直せば両方直る。実機で踏んだ罠:
-  - **Android 実機は `avd` が無いので、AVD 前提のままだと永久に offline**(「avd が未設定です」)。
-    `serial` を `adb devices` の接続一覧で確認する分岐が要る
-  - **iOS 実機の `/status` は device に機種名("iPhone")を返す**。実行プロファイルのデバイス名
-    (例「iPhone wave(実機)」)と一致しないため、名前照合では永久に connected にならない。
-    ランナープロセスの `-destination id=<UDID>` で帰属を決める(`BridgeLauncher.portsMatching`)
-  - LAN 経由の実機ブリッジは 127.0.0.1 に居ないので、ポートスキャンは `.endpoint` を見る
-  - **`ps -p <pid列>` を使ってはいけない**: 範囲外の pid が 1 つ混じるとエラーになり、
-    **生きている分も含めて出力が空になる**(pid ファイルは壊れた値を持ち得る)。全プロセスを
-    列挙して pid で引く。また monitor は 2 秒間隔でこれを呼ぶので、pid ごとに `ps` を spawn すると
-    常駐ブリッジ本数 × 0.5 回/秒のプロセス生成になる(1 回にまとめる)
-- `api installed-devices` は `ios.physicalDevices` / `android.physicalDevices` に接続中の実機を返す
-  (既存の `devices` / `avds` はシミュレータ・AVD のまま)。
-  AVD には `model`(config.ini の `hw.device.name`)と `os`(`image.sysdir.1` の `android-<API>`
-  から導出)も付く — エミュレータはプロファイルに機種/OS を持たないため、表示はここが唯一の出所
-- `kind`("virtual"/"physical")を `list-devices` と `monitor` の各デバイスに追加した。
-  拡張側は必須の欄として読む(欠けた行は不正。2026-09-20 の方針で後方互換の読み替えは置かない)
-
-### 実機と VSCode 拡張
-
-- 実行プロファイルのデバイス編集フォーム(`updateDeviceInMachineProfile`)は実機で表示が変わる:
-  iOS は機種/OS 行を隠し **udid** を、Android は AVD 行の代わりに **serial** を readonly 表示する
-  (いずれも実体を指すので変更不可)。実機で識別子を空にした保存は拒否する
-- デバイスタイルは実機に「実機」バッジを出す。右クリックの起動/停止は**項目を残したまま
-  ラベルを「ブリッジを起動/停止」に変える**(実機は端末そのものを起動・停止せず、操作対象は
-  ブリッジだけ)。**項目を隠してはいけない**: 隠すとモニターから実機のブリッジを起動できず、
-  タイルが「接続中」のまま何もできなくなる(2026-07-25 に実際にそうしてしまった)
-- `kind`/`serial` は拡張側の 2 箇所(`config.ts` の `MachineDeviceEntry` と `monitorModel.ts` の
-  同名型)に独立定義がある。**両方直すこと**(vscode 非依存を保つための意図的な重複)
-- webview→拡張の `machineDeviceUpdate.fields` に `serial` を足した。**拡張と webview のバンドルは
-  別々に更新されうる**ので、受信側は欠落を "" に補う(旧 webview と混ぜても壊さない)
-- 機種/OS はプロファイルに無ければ `installedDevicesRequest` で取りに行くが、**要求は
-  1 デバイス 1 回に絞ること**。この要求は毎回 `fleetest api installed-devices` を spawn する
-  (devicectl + adb getprop で数秒)ので、値が埋まらないデバイス(未接続の実機・`hw.device.name`
-  の無い AVD)では 応答→再描画→再要求 が閉じず CLI を叩き続ける(2026-07-25 のレビューで検出)
-- **ネイティブ `title` は表示遅延を指定できない**(ブラウザ/OS 固定で約 1 秒)。省略表示の全文を
-  素早く出したい所は自前ツールチップ(`hoverTip.js`、0.2 秒)を使う。要点は
-  ① `position: fixed` で body 直下に出す(名前ピルの親 `.tile-header`/`.lane-header` は
-  `overflow: hidden` なので子要素方式だと切られる)② 対象に `title=""` を置いて祖先の `title` が
-  遅れて二重に出るのを止める
-
-### 実機の画面配信(fleetest-devicepoll)
-
-**実機は両OSとも `fleetest-devicepoll`**(スクリーンショットのポーリング → MJPEG)に一本化した。
-既存の 2 ヘルパーが実機で使えないため:
-
-- `fleetest-simstream` は CoreSimulator/SimulatorKit の私有 API で deviceSet から UDID を引くので
-  **iOS 実機では原理的に不可**。macOS 27 では iOS 実機を AVCaptureDevice として出す
-  **DAL プラグインも消えている**(`/System/Library/CoreMediaIO/Plug-Ins/DAL` が存在せず、
-  カメラ権限を付与した Info.plist 埋め込みバイナリでも CoreMediaIO デバイス数 0。2026-07-25 実測)
-  ので、QuickTime 方式の代替も無い
-- `fleetest-androidstream`(adb screenrecord)は Android 実機だと **画面が動いている間しか
-  フレームが流れない**(操作中 455KB / 静止画面はキープアライブの 20 バイトのみ)。
-  エミュレータは静止時もフレームが出るためこの差は顕在化しない
-- あわせて **`screenrecord --time-limit 0`(無制限)は API 34 以上でしか使えない**ことも判明
-  (Android 13 実機は即終了して 47 バイト)。androidstream は API レベルで `0` / `180` を選ぶ
-
-devicepoll の要点:
-- 宛先は iOS が `--host/--port`(ブリッジの `/screenshot`)、Android が `--serial/--adb`
-  (`exec-out screencap -p`)。拡張は `api monitor` の `kind`/`host`/`port`/`serial` で振り分ける
-- 出力は **v1(MJPEG)固定**。`--max-width` は既存ヘルパーと同じく**幅**の上限
-  (ImageIO の `kCGImageSourceThumbnailMaxPixelSize` は**長辺**基準なので長辺換算して渡すこと。
-  そのまま渡すと 1080x2340 で 360 指定 → 166x360 になる)
-- 実測(2026-07-25、fps=2 / max-width 360): Android 実機 360x780 が 7 秒で 13 枚、
-  iOS 実機 360x781 が 8 秒で 16 枚。**静止画面でも出る**のがこの方式の要点
-
-## 常駐ブリッジのセッション(iOS xcuitest を CLI で直接叩くとき)
-
-`bridge up` で立てた常駐ランナーへ curl 等で直接 `/snapshot`・`/tap` すると、最初の1回が
-`409`(セッション無し)で返ることがある。ランナーはアプリ参照(`sessionBundleID`)を `/session`
-で初めて確立するため。**先に `POST /session` を投げる**こと(Runner/FleetestRunnerUITests/BridgeRouter.swift)。
-
-- `simctl launch` で既に起動済みのアプリへ後付けで繋ぐ場合は `{"bundleID":"...","attachOnly":true}`。
-  attachOnly は activate/launch せず前面到達だけ確認する(前面に無ければ即エラー)。通常 run は
-  driver が自動で `/session` を張るのでこの手順は不要=CLI 直叩き時だけの話。
-- **`/status` の `sessionBundleID` は次の `/session` まで残る in-memory 値**。対象アプリを
-  アンインストールしても消えないため、削除済みアプリの死んだ参照が見えることがある(無害。
-  次の `/session` で上書きされる)。`/status` の session 欄=「今アタッチ可能」の保証ではない。
-
-## 録画(record:true)の検証
-
-録画パイプライン(Recorder/Finalizer/Coordinator/`RecordingWallClock`)を触ったら、
-ユニットテストでは AVFoundation・デバイス境界を捕まえられないため、record:true の実 run で確認する:
-
-- **録画パイプラインの退行は `Scripts/e2e.sh --record` で検知できる**(各プロファイルの一時コピーに
-  record:true を付けて実行し、`Scripts/check-recordings.py` が schemaVersion・クリップ数・
-  クリップ長・mp4 存在を機械チェックする。元のプロファイルは書き換えない)
-- **クリップ数 = シナリオ数**(シナリオが来なかったアイドルワーカーの録画は破棄される)、
-  **クリップ長 ≒ シナリオ durationMs**(ミリ秒オーダーで一致するのが正常)、index.json(schemaVersion 2)の整合
-- **VFR の罠**: simctl/screenrecord は「画面が変化した時だけ」フレームを吐く。切り出しは
-  「区間開始前の最後のフレームを retime して先頭に置く」+「endSession で区間終了まで保持」が無いと
-  先頭/末尾が欠ける(実測: 11.1s ソースが endSession 無しで 8.7s に縮んだ)
-- **codec は H.264 固定**(再生側 = 拡張 webview の Chromium は HEVC 不可)。simctl に bitrate ノブは
-  無く、圧縮はファイナライズの再エンコードで行う(bitrate は run profile の recordBitrateKbps、
-  解像度は recordFullResolution。`VideoRecordingFinalizer` の shrinkThreshold を誤ると Android
-  ソースの二重縮小になる実害があった)
-- **サイズの目安**: 1テスト 0.1〜3MB(iOS 約50〜150KB/s、Android は静止的で約8〜30KB/s)。
-  大きく外れたら解像度判定(shrinkThreshold)かビットレートを疑う
-- Android screenrecord は180秒上限のセグメントループ。停止は**デバイス側プロセスへ kill -2**
-  (ホストの adb クライアント kill ではファイルが壊れる)。iOS simctl は SIGINT 停止・SIGKILL 禁止
-- **ホストの HW エンコーダ(AVE)無応答でファイナライズがハングし得る**(実害 2026-07-27:
-  macOS 27 beta で 5 並列エクスポート+モニターの simstream 5 本の負荷中、`finishWriting` →
-  `VTCompressionSessionInvalidate` → RemoteVideoEncoder の同期 XPC が AVE 応答待ちのまま止まり、
-  全シナリオ成功後に run が終わらなかった)。保護は VideoRecordingCoordinator に実装済み:
-  クリップ 1 本ごとに期限 `max(60s, ソース総尺)`・1 本でも期限超過したらその run の残りクリップを
-  断念(警告 1 回)・エクスポート同時実行は 2 本。期限側は敗者 task を放置する
-  (`cancelWriting` は固着した VT セッションのロックで共倒れし得るため呼ばない)
-- **「全シナリオ完了済みなのに run が終わらない」の診断**: `sample <fleetest の pid>` を取り、
-  `VTCompressionSessionInvalidate` / `RemoteVideoEncoder_EncodeFrame` が居れば上記のエンコーダ
-  無応答(相手側の VTEncoderXPCService プロセスも `AVE_UCRecv` で待っている)。ツールは期限で
-  自力離脱するので待てばよい。頻発するなら OS 再起動でしか AVE は復旧しない
-- **切り出しは今はハードウェア優先**(2026-10-18 に変更。採った理由と実測は PT-3.37・docs/design/ の録画の節)。
-  以下は 2026-09-17 にソフトウェアへ固定したときの記録:同じ素材・本番と同じ条件(12 秒クリップ
-  16 本・同時 2 本・期限 60 秒)で交互に 8 回ずつ回した実測: ハードウェアは 8 回中 2 回で 1 本ずつ
-  `VTCompressionSessionInvalidate` から戻らず期限の 60 秒を払った(その回の所要 64s、他は 10.5〜10.9s)。
-  ソフトウェアは 0 回・11.1〜11.6s。1 本の中央値は 1.35s / 1.39s でほぼ同じ、12 秒クリップの大きさは
-  2.79MB(指定 1500kbps の +24%)/ 2.07MB(−8%)。画質とモニターの配信を流した負荷下は比べていない。
-  計測は `VideoRecordingFinalizer.swift` を写した単体プログラムで行った(FTCore の内部関数で外から呼べない)
-- **端末側に録画セッションが残った iOS シミュレータ**(simctl が `Host recording is already in progress` か
-  `A recording is already in progress` = どちらも EBUSY で即落ちる。Xcode 27.2 で SIGKILL した client の後に残るのは後者。client プロセスが残っていなくても解けず、shutdown → boot でだけ解ける)は、
-  録画ありの run の**供給段階**で `HostRecordingProbe` が見つけ、凍結の回復と同じ経路で再起動する
-  (健全機の検査は 1 台約 0.4s・全台並列)。**陽性対照**: 起動中のシミュレータで
-  `xcrun simctl io <udid> recordVideo --codec=h264 --force /tmp/x.mov &` を 3 秒走らせて `kill -9` する
-  (SIGKILL で殺した recordVideo はセッションを残す = この状態を作れる。`Recording started` が出てから殺す)→ もう一度 recordVideo を撃って
-  EBUSY になることを確かめる(2026-10-18 に `A recording …` の形で再確認し、run の再起動で解けた) → そのデバイスを含む record:true の run を回し、
-  `hold a stale host recording session … rebooting` と `the stale recording session(s) are gone` の2行が出て、
-  そのデバイスのクリップが index.json に載り `sourcesFailed` が無いことを見る
-- **録画が run の途中で止まったときの静止画への切り替え**(`VideoRecordingCoordinator.prepareScenario`)の陽性対照(2026-10-18 に両 OS で確認):
-  1 台に絞った run(`--device … --runner local`・15 本)を起こし、45〜50 秒後から run が終わるまで録画を止め続ける。
-  Android は端末上の自分の screenrecord(cmdline に `/sdcard/ftrec-` を含むもの = 配信は巻き込まない)を 0.5 秒ごとに止める /
-  iOS は `pkill -INT -f 'io <udid> recordVideo'` を 0.2 秒ごと(**SIGKILL にしない** = 端末側のセッションが残り再起動まで録画できなくなる)。
-  見るもの: `the screen recording stopped and could not be restarted — … still frames` の1行・全シナリオ緑・index.json の
-  `sourceIssues` に `stillFramesFallback: true`・静止画のクリップが再生できること。Android を `kill -9` で止めると最初のセグメントが
-  読めなくなり、その区間のクリップは `no readable recording covers this scenario` として失敗に数えられる(黙って欠けない)
-- **iOS の録画の試し撮りが止まらずに残っていないか**: run の後に `ps -axo command | grep -E '^/[^ ]*simctl io .* recordVideo'` が空で、
-  `results/` に `*~smoke.mov*`(試し撮り)や `*.sb-*`(simctl の一時ファイル)が残っていないこと(残っていたら MN-87 の形)
-
-### WebView を触ったときの検証
-
-- **DOM 経路は in-app だけ**(`InAppWebViewDOM`)。利用者の既定モードは inapp モード = in-app ブリッジ優先で、
-  既定の e2e.sh も iOS を in-app で回すので既定スイートに入る(2026-08-11 の反転前は
-  xcuitest 既定で、この経路が丸ごと未検証のまま緑になっていた)。**`--ios-xcuitest` 側も回す** ——
-  WebView は xcuitest では a11y 経路になるため、両方通さないと片側の退行が残る。
-- **SUT を絞らない**。WebView の埋め込み方がフレームワークごとに違い、退行が SUT を跨がないと出ない:
-  ネイティブ(WKWebView 直)/ CMP(UIKitView interop)/ Flutter(platform view)。
-  実例: CMP と Flutter は interop が合成タッチと `insertText` を横取りするため DOM 経路を使わない
-  (uikit ホストのみ有効)。この分岐は E2E でしか壊れているとわからない。
-- **効果測定は `FT_WEBVIEW_DOM=off` との A/B** で取る。比較は
-  `TestProjects/E2E-iOS/results/runs/<YYYY-MM>/<run>/scenarios/WebViewの中身を操作できること.S0010.json` の
-  `timeline`(scene 2 以降の exist/textIs の中央値)と `scenes[0].durationMs`。
-- **ブリッジ版を上げ忘れない**。iOS = `bridgeProtocolVersion`、Android = `VERSION_CODE` +
-  `expectedBridgeVersionCode`。上げないと稼働中の旧ブリッジが再利用され、**変更が入っていないのに緑**になる。
-  開発中に同じ版のまま APK/dylib を差し替えるときは、明示的に `adb uninstall com.example.ftbridge` /
-  アプリ再注入で入れ直すこと(実際に1度踏んだ)。検出の仕組みは下記。
-
-## ブリッジ版数の上げ忘れ検出(2026-07-30)
-
-`BridgeContractTests` が2段で検出する。実装を変えたらここが落ちるので、**版を上げてから**期待値を
-貼り替える(貼り付け用のリテラルは失敗メッセージが出力する)。
-
-| 段 | 何を見る | 捕まえる事故 |
-|---|---|---|
-| ルート表 | ハンドラの `case ("GET", "/status")` 等を正規表現で抽出 | エンドポイントの増減 |
-| ソース指紋 | `BridgeSourceSet` が挙げる入力の内容 SHA256(ファイル単位) | **ルートが同じでハンドラだけ変えた**・入力ファイルの追加/削除 |
-
-- **入力ファイルの一覧は `Sources/FTCore/BridgeSourceSet.swift` が唯一の定義元**。
-  `InAppLauncher` の dylib 再ビルド判定も同じ一覧を使う(再掲するとズレる。実害: 共有 DTO の
-  `WebViewDOMSnapshot.swift` が `build.sh` の入力なのに再ビルド判定から漏れ、そのファイルだけを
-  編集しても古い dylib が注入され続ける状態だった)
-- **指紋は生バイト = コメント編集でも落ちる**(意図的)。文字列リテラル中の `//` を素朴に削る
-  コメント除去は**変更を見逃す側**に倒れるため、誤検出の側を選んでいる。版を上げるに値しない
-  変更なら期待値の貼り替えだけでよい
-- `AndroidRunner/build.sh` は `VERSION_CODE=` 行だけマスクしてハッシュする。マスクしないと
-  「版を上げた」こと自体で指紋が動き、「ソースが変わった」信号が濁る
-- **残る限界: 版を上げること自体は強制できない**。期待値を更新して版を据え置くことは手続き上
-  できてしまう。リポジトリ内の期待値は書き換え可能なので原理的にここが上限で、達成しているのは
-  「無音で緑」を「版数の判断を意識的に迫られる」へ変えることまで
-- **反復開発中は「同じ版・別バイナリ」も再利用される**(2026-08-01 実害)。版を先に上げてから
-  実装を差し替えていく開発ループでは、途中のビルドも最終ビルドも同じ版数なので、provision の
-  版一致再利用が**古い方の稼働中ランナー**を掴む。計測・e2e の前に該当ブリッジを
-  `bridge down` してから張り直すこと(版の照合では検出できない)
-- **計測ハーネスは対象の版を開始時と終了時の両方で読む**(2026-08-01 実害)。計測中にランナーが
-  死ぬとモニターが respawn するが、**張り直すのは別クローン・別ビルドのことがある**
-  (どの clone の監視が先に気付くか次第)。開始時の /status だけ見て「v29 を測った」と
-  思い込むと、途中から旧版を測っていても気付けない。終了時にも読んで食い違いを申告させる
-
-### 保留: ブリッジ自身にソース指紋を申告させる案(再発明防止)
-
-版数を人間が上げる代わりに、**ブリッジがビルド時に自分のソース指紋を埋め込み `/status` で申告し、
-ホストは自分が計算した指紋と一致するものだけ再利用する**——これなら上げ忘れという概念自体が消える。
-**Android で詰むため未着手**: コミット済み `AndroidRunner/prebuilt/ftbridge.apk` があるので、
-`.java` へのコメント1行の編集でも受け手側のホストが「指紋不一致」で再インストールを試み続ける
-(APK が古いままなので永久に一致しない = `AndroidBridgeVersionSyncTests` が警告している状態に
-全編集で入る)。全編集で APK の作り直し・コミットが必須になる。
-
-**再検討条件**: Android ブリッジの APK をコミット済み成果物ではなく供給時ビルドに変えられたとき、
-または指紋の対象を「ソース」ではなく「ビルド成果物(dex)」に取れる安価な手段ができたとき。
-
-## 未インストールのアプリを launch するとランナーが死ぬ(2026-08-06)
-
-外部フィードバック #7「Safari 操作後にブリッジが切断」は **Safari と無関係**だった。
-報告元のログで確定した経過:
-
-1. ポート 8123 のランナーで未インストールの `com.example.myapp` を launch → `TEST EXECUTE FAILED`
-   でランナー終了(04:47:34)。この時点で 8123 は死亡
-2. 以後 `port` を指定しなかった呼び出しは、**既定 8123 決め打ち**(当時)で死んだポートを叩き続け、
-   `Connection refused` になった。Safari を操作していた 8124 は別デバイスで、切断時も生きていた
-   (ログは t=187s まで継続)
-
-「ツールごとにポート解決経路が違うのでは」という推測は否定された ——
-`ft_snapshot` も `ft_screenshot` も同じ `driver(_:)`・同じキャッシュ鍵(`driverCacheKey` は
-port を含む)を通る。**port を書いた呼び出しと書かなかった呼び出しが混在していた**のが実態。
-
-**ランナー死は直接再現できる**(遊休ブリッジ1本を潰すので、使っていないポートで):
-
-```
-curl -s -X POST http://127.0.0.1:<port>/session -d '{"bundleID":"com.example.nonexistent"}'
-```
-
-無応答(**待受は継続**)が約5秒 → 10秒以内にランナーのプロセスが消え、待受も消える。
-原因は `XCUIApplication.launch()` の失敗 issue が main queue 上で記録されること(`requireLiveApp`
-のコメントにある無限再帰と同じ経路)。対処も同じで、**XCUI に触れる前にホスト側で弾く**
-(`MCPServer.installedVerdict`(判定そのものは `InstalledAppCheck.launchGuard`))。
-
-**この実験は「応答しないが生きている」状態の witness でもある** —— 上の約5秒間、`/status` は
-返らないのにポートは待受している。ブリッジ探索が「応答なし=死」と読むと、この隙に
-**別デバイスのブリッジへ黙って乗り換える**。`BridgeDiscovery.isBound`(TCP 接続可否)で
-死と忙しいを分けること。外部ログでは整定待ちで **33.7 秒**ブロックした区間が観測されている。

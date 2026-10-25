@@ -459,7 +459,7 @@ RecordingIndex.swift・RecordingWallClock.swift)。録画自体の失敗は run 
 「⚠︎AVE」を出す(死のときだけ)。**故障の兆候は履歴に追記する**(`VideoEncoderHistory` = `~/.fleetest/video-encoder-history.ndjson`。
 切り出しの失敗・固まり、台帳の死への変わり目・死からの回復。起動の識別子と起動からの経過つき = 監視して改善する方針・ユーザー決定)。
 注入は `FT_FAKE_VIDEO_ENCODER_DEAD=1`(ハードウェアに触らずに死を返す)。
-診断手順は docs/verification/triage.md「録画(record:true)の検証」。
+診断手順は docs/verification/operations.md「録画(record:true)の検証」。
 
 録画の付随設定(すべて `record: true` のときのみ意味を持つ): `recordFailuresOnly`(既定 false)
 は true で成功したシナリオのクリップを保存せず失敗(frozen 含む)分のみ残す。`recordBitrateKbps`

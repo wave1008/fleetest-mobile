@@ -31,7 +31,7 @@ public struct RemoteDispatchLockInfo: Codable, Equatable, Sendable {
     /// kill(pid,0) は無意味)。表示専用
     public let pid: Int32
     /// 取得時刻(UTC, ISO8601)。表示専用 ―― stale 判定に時刻を機械的には使わない
-    /// (RR-5「既定では奪わない」。長時間 run を誤って殺さないため)
+    /// (RR-13「既定では奪わない」。長時間 run を誤って殺さないため)
     public let acquiredAt: String
     /// 自己申告の帰属(LocalConfig.resolveIssuerId)。unlock の可否(`RemoteDispatchUnlock`)の照合に使う。
     /// 既定値を置かない = 書き手の渡し忘れをコンパイルで止める

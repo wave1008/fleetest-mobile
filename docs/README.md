@@ -41,11 +41,11 @@
 | 文書 | 種別 | 読む場面 |
 |---|---|---|
 | [verification/README.md](verification/README.md) | 索引 | 検証の罠と規律の節を探すとき |
-| [verification/environment.md](verification/environment.md) | 手順 | E2E を回す前・OS や Xcode を上げた後 |
+| [verification/constraints.md](verification/constraints.md) | 手順 | 不可解な挙動に当たったとき・同じ制約を踏みそうな変更をする前(iOS・Android・FM の制約と回避) |
+| [verification/triage.md](verification/triage.md) | 手順 | テストが全滅したとき・成功なのに失敗と出るとき・操作が効かないとき |
 | [verification/judgment.md](verification/judgment.md) | 手順 | flake・性能を判定するとき・A/B を取るとき |
-| [verification/detection-and-tests.md](verification/detection-and-tests.md) | 手順 | 検知やテストを足すとき・切り分けるとき |
-| [verification/traps.md](verification/traps.md) | 手順 | 画面や操作の不具合を調べるとき |
-| [verification/triage.md](verification/triage.md) | 手順 | テストが全滅したとき・実機や録画を検証するとき |
+| [verification/testing.md](verification/testing.md) | 手順 | 検知やテストを足すとき・原因を調べるとき |
+| [verification/operations.md](verification/operations.md) | 手順 | E2E・実機・録画の検証を回すとき |
 | [performance-tuning/README.md](performance-tuning/README.md) | 索引 | 性能の節を探すとき |
 | [performance-tuning/guide.md](performance-tuning/guide.md) | 手順 | 速さに手を入れる前(不採用の施策を先に読む) |
 | [performance-tuning/breakdown-1.md](performance-tuning/breakdown-1.md) | 手順 | 特定の操作の所要に手を入れる前(時間の内訳の前半) |
@@ -129,6 +129,11 @@ H1 の直後に次の表を置き、その下に1〜2文の導入を書く(こ�
   決定の出所は `決定: ユーザー 2026-10-20` の形で添えてよい
 - 記録には日付と、その時点の状態を書く(現在の仕様として読まれないように)
 - 同じ事実は1箇所に置き、他の文書からは ID で参照する
+- **手順**は中身で書き方を分ける
+  - **規律**(どう確かめれば誤った結論を出さないか)は正典と同じ: 見出しは規律そのものにして日付を置かず、冒頭の1行で
+    何をするかを言う。きっかけの事例は理由として1〜2行に縮める
+  - **制約と回避**(トラブルシュートで確かめた制約)は、発見の日付と事例をその制約が本物である証拠として残してよい
+  - 製品が吸収して今は気にしなくてよくなった制約と、直した不具合の調べ方は、記録(`verification/resolved.md` 等)へ移す
 
 ### 台帳の項目
 

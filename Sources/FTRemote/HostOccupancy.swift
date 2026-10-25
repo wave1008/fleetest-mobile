@@ -12,7 +12,7 @@
 //
 // **保持者が誰かは表示専用**(RemoteDispatchLockInfo と同じ規律 —— pid も issuer も自己申告)。
 // 配信の退避は**保持者が誰かによらず**効かせる: 配信とテストの干渉は他人の run でも自分の run
-// でも同じように起きる(docs/verification/environment.md「モニターと E2E」)。`mine` は文言と破壊的操作の確認にだけ使う。
+// でも同じように起きる(docs/verification/operations.md「モニターと E2E」)。`mine` は文言と破壊的操作の確認にだけ使う。
 //
 // **この判定は「出れば占有」であって「出なければ空き」ではない**: dispatch.lock を取らない
 // 経路(`--force-lock` で押し切った run・MCP の `ft_*`)は写らない。

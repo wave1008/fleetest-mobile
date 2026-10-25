@@ -1038,37 +1038,6 @@ iOS ブリッジと区別なく扱える。
   ときは「ダイアログ越しに前面」として掃除せず成功を返す**(権限ダイアログを force-stop すると権限フローが
   壊れる)。対象アプリの窓が見えない全画面の居座り(上の SafetyCenter の形)は従来どおり掃除+再試行
 
-### DS-8.7.1 Android の常駐ブリッジ(AndroidRunner)
-
-snapshot の 2 秒(uiautomator dump 自体のコスト)がフロー実行の支配項になったため、
-iOS と同型の常駐ブリッジを追加した(`AndroidRunner/`、自作 instrumentation APK)。
-
-- **共通コア部分は iOS ブリッジと同一プロトコル**(DS-4.5) → ホストは `BridgeClient` を無改修で流用
-  (`adb forward tcp:0 tcp:8123` 経由)。AppDriver/FTFoundationModels/FTCore は引き続き無変更
-- 純フレームワーク API の Java のみ(androidx/gradle 不要、SDK 付属ツールでビルド、
-  prebuilt APK を同梱)。初回操作時に自動インストール・自動起動(`AndroidBridge.swift`)。**他のセッション(run・MCP)が
-  使っているデバイスでは作り直さない**(force-stop がそのセッションのブリッジごと落とす)。呼び手がそのデバイスを持つ
-  run(とその子のシナリオ)なら MCP から引き取ったデバイスでも作り直す(`RunnerAccessibilityHealth.hasForeignLeaseUnlessOwnRun`)
-- 実測: snapshot 2.0s → 8.7ms(中央値)、フロー8本 87s → 38s。日本語 type も
-  ACTION_SET_TEXT で IME 不要(ADBKeyboard は不使用)
-- ブリッジ単一実装。adb 直叩き経路(uiautomator dump/input/screencap、Unicode IME 自動導入)は持たない。
-  操作毎の `/status` 事前プローブも持たず、接続拒否系エラー時のみ自動再プロビジョン+1回リトライする
-- 落とし穴: (1) UiAutomation は `am instrument -w` 必須(UiAutomationConnection が am
-  プロセス側に住む)→ デバイス内で `&` バックグラウンド化して常駐 (2) a11y 接続は実質1本
-  → ブリッジ稼働中は他の a11y クライアント(uiautomator dump 等)が Killed される
-  (3) **adbd の再起動(`adb tcpip` / `adb usb`)で UiAutomationConnection(shell・screenshot・
-  入力注入の口)だけが死ぬ** —— a11y は生きたままなので `getRootInActiveWindow()` は取れ、
-  `executeShellCommand` は RemoteException を握って空のパイプを返す(例外にならない)。
-  実測 2026-09-05・Pixel 4a: `DeadObjectException` ×47 のまま `/status` が `ready:true` を返し続け、
-  launch/screenshot が全部 500。版 63 から `/status` が `echo ft-alive` の往復で口の死活を見て
-  `ready:false` + `reason:"uiautomation-dead"` を返し、**自ら exit する**(ホストは connection refused
-  → `ensureBridge` の再セットアップへ倒れる。長寿命プロセスの `.active` キャッシュもこれで消える)。
-  版 64 から**操作系も同じ門を通る**(`BridgeRouter.assertConnectionAlive`): shell の出力が空・
-  `takeScreenshot` が null・`injectInputEvent` が false のときに死活を確かめ、死んでいれば
-  503 で落として exit する —— `/status` を誰も呼ばない長寿命プロセス(MCP・モニター)でも、
-  死んだ口に tap が黙って通ることが無い
-
-
 #### Android のテキスト注入の規律
 
 `InputInjector` の4経路(`setTextAppendingAt` / `clearTextAt` / `setTextAppending` /
@@ -1150,6 +1119,37 @@ a11y ブリッジが入力フォーカスのセマンティクスノードを持
 失敗率が 2/5 → 5/5 に悪化**した(フォーカス移動でノードが無効化される)。ホスト側での事前・事後の
 キーボード回避(閉じてから打つ/失敗したら閉じて再試行)は**発動しても効果が無い** —
 対策はブリッジの注入ループ内でなければ届かない。
+
+
+### DS-8.7.1 Android の常駐ブリッジ(AndroidRunner)
+
+snapshot の 2 秒(uiautomator dump 自体のコスト)がフロー実行の支配項になったため、
+iOS と同型の常駐ブリッジを追加した(`AndroidRunner/`、自作 instrumentation APK)。
+
+- **共通コア部分は iOS ブリッジと同一プロトコル**(DS-4.5) → ホストは `BridgeClient` を無改修で流用
+  (`adb forward tcp:0 tcp:8123` 経由)。AppDriver/FTFoundationModels/FTCore は引き続き無変更
+- 純フレームワーク API の Java のみ(androidx/gradle 不要、SDK 付属ツールでビルド、
+  prebuilt APK を同梱)。初回操作時に自動インストール・自動起動(`AndroidBridge.swift`)。**他のセッション(run・MCP)が
+  使っているデバイスでは作り直さない**(force-stop がそのセッションのブリッジごと落とす)。呼び手がそのデバイスを持つ
+  run(とその子のシナリオ)なら MCP から引き取ったデバイスでも作り直す(`RunnerAccessibilityHealth.hasForeignLeaseUnlessOwnRun`)
+- 実測: snapshot 2.0s → 8.7ms(中央値)、フロー8本 87s → 38s。日本語 type も
+  ACTION_SET_TEXT で IME 不要(ADBKeyboard は不使用)
+- ブリッジ単一実装。adb 直叩き経路(uiautomator dump/input/screencap、Unicode IME 自動導入)は持たない。
+  操作毎の `/status` 事前プローブも持たず、接続拒否系エラー時のみ自動再プロビジョン+1回リトライする
+- 落とし穴: (1) UiAutomation は `am instrument -w` 必須(UiAutomationConnection が am
+  プロセス側に住む)→ デバイス内で `&` バックグラウンド化して常駐 (2) a11y 接続は実質1本
+  → ブリッジ稼働中は他の a11y クライアント(uiautomator dump 等)が Killed される
+  (3) **adbd の再起動(`adb tcpip` / `adb usb`)で UiAutomationConnection(shell・screenshot・
+  入力注入の口)だけが死ぬ** —— a11y は生きたままなので `getRootInActiveWindow()` は取れ、
+  `executeShellCommand` は RemoteException を握って空のパイプを返す(例外にならない)。
+  実測 2026-09-05・Pixel 4a: `DeadObjectException` ×47 のまま `/status` が `ready:true` を返し続け、
+  launch/screenshot が全部 500。版 63 から `/status` が `echo ft-alive` の往復で口の死活を見て
+  `ready:false` + `reason:"uiautomation-dead"` を返し、**自ら exit する**(ホストは connection refused
+  → `ensureBridge` の再セットアップへ倒れる。長寿命プロセスの `.active` キャッシュもこれで消える)。
+  版 64 から**操作系も同じ門を通る**(`BridgeRouter.assertConnectionAlive`): shell の出力が空・
+  `takeScreenshot` が null・`injectInputEvent` が false のときに死活を確かめ、死んでいれば
+  503 で落として exit する —— `/status` を誰も呼ばない長寿命プロセス(MCP・モニター)でも、
+  死んだ口に tap が黙って通ることが無い
 
 
 ### DS-4.6 座標系の契約と Compose の frame 制約

@@ -6,7 +6,7 @@
 public enum ResponseMeasurementPolicy {
 
     /// 既定の繰り返し回数。根拠: 中央値・p90 は複数の標本が要る(RM-8.1)。
-    /// t2 は1回目から出る(木の履歴で判定する = RM-5「2b の方式」)ので、5 なら 5 標本
+    /// t2 は1回目から出る(木の履歴で判定する = RM-5「t2(操作可能)= 木の履歴で判定する」)ので、5 なら 5 標本
     public static let defaultRepeat = 5
     /// 下限 1: 1回でも firstFrameMs と t2 は測れる(繰り返しは標本を増やすだけ)
     public static let minRepeat = 1

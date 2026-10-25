@@ -131,7 +131,7 @@ if [ "$ALIGN" = 1 ]; then
 fi
 
 # ---- --performance: モニターの pause/resume はこのスクリプトが所有する --------------------
-# 「モニターを止めるのは性能を測るときだけ」(docs/verification/environment.md「モニターと E2E」)は
+# 「モニターを止めるのは性能を測るときだけ」(docs/verification/operations.md「モニターと E2E」)は
 # --performance と 1:1 なので、止める・戻すを人に任せない —— 戻し忘れが実害になった
 # (2026-09-01: 計測後の resume が後続作業に埋もれ、利用者が「モニターが戻らない」と報告)。
 # --for 60 は trap が走れない死に方(SIGKILL)への安全網。60分 = フルスイート(10〜30分)の2倍。

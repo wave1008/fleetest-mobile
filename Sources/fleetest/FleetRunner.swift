@@ -131,7 +131,7 @@ enum FleetRunner {
         return FleetProfile.aggregateExitCode(outcomes.map(\.exitCode))
     }
 
-    // MARK: - split(RR-8「シナリオバッチを複数 Mac に割り当てる」)
+    // MARK: - split(RR-8)
 
     /// **実績が無いシナリオの見積り**: このプロジェクトの既知シナリオの中央値を使う。
     /// プロジェクトごとに実行速度が大きく違うため、固定の秒数は使わない

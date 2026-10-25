@@ -7,7 +7,7 @@ import Foundation
 
 /// フリートの1エントリ。`host` は "local"(予約語)か RemoteHostRegistry の登録名のみ ——
 /// 生の ssh 宛先(user@host)は受け付けない。プロジェクト資産(git 管理)に ssh の実体を
-/// 混ぜないため(RR-13「実行プロファイルに host は埋めない」と同じ理由)。登録名かどうかの
+/// 混ぜないため(RR-0「プロファイルに ssh 実体を書かない」と同じ理由)。登録名かどうかの
 /// 判定は validate(_:project:registeredHostNames:) 側で行う(ここは形だけを保持する)
 public struct FleetRunEntry: Codable, Equatable, Sendable {
     public let host: String
