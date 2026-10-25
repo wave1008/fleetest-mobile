@@ -45,6 +45,8 @@ workspace). Each tile shows the device name, a platform badge (iOS/Android), a s
 the current screen — streamed live by default via a headless helper
 (`fleetest-simstream`/`fleetest-androidstream`), falling back to periodic screenshots if streaming
 is unavailable.
+Turning on **Use polling mode** in the Settings tab switches from streaming back to the classic
+polling (screenshots at a fixed interval); the choice is remembered per workspace.
 
 - Status badges: **Connected** (green) — bridge attached, ready to drive; **Starting**
   (yellow) — device is up but the bridge hasn't attached yet; **Not started**

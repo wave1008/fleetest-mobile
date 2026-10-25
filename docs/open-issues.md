@@ -1,274 +1,390 @@
 # 残件(未解決の不具合の候補)
 
+| 種別 | 範囲 | 読む場面 | 扱わないこと |
+|---|---|---|---|
+| 台帳 | 未解決の不具合の候補(バグ出し 2026-09-06・09-08・09-11 と、その後の負荷テスト・仕様監査・回帰で見つかり、まだ直していないもの) | 未解決の不具合の候補を探す/足す/直したら消すとき | 直した項目の経緯(→ コミット)・設計判断の根拠(→ [maintainer-notes.md](maintainer-notes.md))・仕様監査で「欠陥ではなかった」と確かめた項目(→ maintainer-notes.md §106) |
+
 バグ出し(2026-09-06・09-08・09-11)で見つかり、まだ直していない項目の一覧。台帳は削除したので、
 未解決の項目だけをここに残す。**当初の判定は 2026-10-07 の HEAD(c87b8c8f)のソースを読んだ結果で、デバイスでの再現はしていない**
 (その後に足した・確かめた項目は、各項目に日付と確かめた範囲を書く)。
-「(推測)」は、症状の経路か指摘の対象をコードから推して特定したもの。
+各項目の「状態」の「推測」は、症状の経路か指摘の対象をコードから推して特定したもの。
 
-直したら項目を消す(経緯はコミットに残す)。新しい残件は同じ形(症状・場所・手がかり)で足す。
+直したら項目を消す(経緯はコミットに残す)。新しい残件は同じ形(ID・状態・確認・症状・場所・手がかり)で足す。
+
 
 ## 再現の材料が要るもの(材料が無いまま直すと定数か推測を持ち込む)
 
-- **キーボードで押し上げられてステータスバーの下に入った要素を、done のまま外す**(09-11・推測)
-  - 場所: ステータスバーの帯を見る判定が MCP・`TapTargetGeometry`・`RefGuard` のどこにも無い
-  - 確かめた範囲: Android Emulator の4つの SUT(View/XML・CMP・Flutter・RN)のテキスト入力画面で、いちばん下の欄に焦点を
-    立ててキーボードを出しても、上端の帯(142px)に入る要素は出なかった(RN の見出しが帯の直下で止まる)。iOS の
-    キーボードの覆い画面は押し上げない作り
-  - 要る材料: 実例の木。ステータスバーの高さは木に載らない(画面の枠だけ)ので、定数で帯を決めると機種で黙って誤る。
-    ブリッジが安全領域(safeAreaInsets / WindowInsets)を申告する形なら根拠のある判定になる
+### OI-1 キーボードで押し上げられてステータスバーの下に入った要素を、done のまま外す
+- 状態: 推測
+- 確認: c87b8c8f(2026-10-07)
+- 経緯: 発見: 09-11
 
-- **inapp モードの WebView 委譲中に `keyboardIsNotShown` が「cannot determine」で落ちる**(2026-10-20 の仕様監査・推測)
-  - 場所: `Sources/FTBridgeClient/WebViewDelegatingDriver.swift`(委譲中は XCUITest の木を返す)/ `Sources/FTCore/KeyboardWait.swift`
-  - 要る材料: inapp モードで WebView の入力欄に打った後の `keyboardIsNotShown` の実例(木と失敗文)
+- 場所: ステータスバーの帯を見る判定が MCP・`TapTargetGeometry`・`RefGuard` のどこにも無い
+- 確かめた範囲: Android Emulator の4つの SUT(View/XML・CMP・Flutter・RN)のテキスト入力画面で、いちばん下の欄に焦点を
+  立ててキーボードを出しても、上端の帯(142px)に入る要素は出なかった(RN の見出しが帯の直下で止まる)。iOS の
+  キーボードの覆い画面は押し上げない作り
+- 要る材料: 実例の木。ステータスバーの高さは木に載らない(画面の枠だけ)ので、定数で帯を決めると機種で黙って誤る。
+  ブリッジが安全領域(safeAreaInsets / WindowInsets)を申告する形なら根拠のある判定になる
 
-- **MCP で払った `ft_snapshot waitFor` が `ft_draft_scenario` の下書きに写らず、下書きの `tap("#id")` が DSL 既定の約 0.7 秒の再試行しか持たず、遅い画面で赤になりうる**(2026-10-20 の仕様監査・推測)
-  - 場所: `Sources/fleetest-mcp/MCPServer+Draft.swift`(下書きは待ちを記録しない)。利用者向けには agent_guide(en/ja)の
-    「探索で払った待ちも下書きには写らない」で明記済み
-  - 確かめた範囲: 経路はコードで確定。デバイスで赤になった実例は無い
-  - 要る材料: 遅い画面を `waitFor` で待って作った下書きを、そのまま回して赤になった実例。あれば、直前に待った要素への tap に
-    `waitSeconds:` を出す直し方が根拠を持つ
+### OI-2 inapp モードの WebView 委譲中に `keyboardIsNotShown` が「cannot determine」で落ちる
+- 状態: 推測
+- 確認: コミット未記録(2026-10-20)
+- 経緯: 2026-10-20 の仕様監査
+
+- 場所: `Sources/FTBridgeClient/WebViewDelegatingDriver.swift`(委譲中は XCUITest の木を返す)/ `Sources/FTCore/KeyboardWait.swift`
+- 要る材料: inapp モードで WebView の入力欄に打った後の `keyboardIsNotShown` の実例(木と失敗文)
+
+### OI-3 MCP で払った `ft_snapshot waitFor` が `ft_draft_scenario` の下書きに写らず、下書きの `tap("#id")` が DSL 既定の約 0.7 秒の再試行しか持たず、遅い画面で赤になりうる
+- 状態: 経路確定
+- 確認: コミット未記録(2026-10-20)
+- 経緯: 2026-10-20 の仕様監査
+
+- 場所: `Sources/fleetest-mcp/MCPServer+Draft.swift`(下書きは待ちを記録しない)。利用者向けには agent_guide(en/ja)の
+  「探索で払った待ちも下書きには写らない」で明記済み
+- 確かめた範囲: 経路はコードで確定。デバイスで赤になった実例は無い
+- 要る材料: 遅い画面を `waitFor` で待って作った下書きを、そのまま回して赤になった実例。あれば、直前に待った要素への tap に
+  `waitSeconds:` を出す直し方が根拠を持つ
 
 ## run の中で自動回復するようにしたもの(原因は環境側に残る)
 
-- **Android Emulator の表示が止まり、ブリッジの撮影が数分前の絵を返し続ける**(2026-10-18・負荷下で 6 台中 5 台・15 分で再発)。
-  画像で判定する段(分類器・findImage・可視性検証)が古い絵で誤判定した。**run の中で検知して再起動する機能を組み込んだ**
-  (`DisplayFreezeWatch`。maintainer-notes §88・docs/design.md)。凍結そのものの原因(ホスト GPU の逼迫)は残る。
-  モニター(run の外)は同じ絵が 60 秒以上続いたら stderr に警告を出すだけ(デバイスは触らない。タイルへ出す欄は無い)
+### OI-4 Android Emulator の表示が止まり、ブリッジの撮影が数分前の絵を返し続ける
+- 状態: 再現済み
+- 確認: コミット未記録(2026-10-18)
+- 経緯: 2026-10-18・負荷下で 6 台中 5 台・15 分で再発
+
+画像で判定する段(分類器・findImage・可視性検証)が古い絵で誤判定した。**run の中で検知して再起動する機能を組み込んだ**
+(`DisplayFreezeWatch`。maintainer-notes §88・docs/design.md)。凍結そのものの原因(ホスト GPU の逼迫)は残る。
+モニター(run の外)は同じ絵が 60 秒以上続いたら stderr に警告を出すだけ(デバイスは触らない。タイルへ出す欄は無い)
 
 ## デバイスで赤のまま・原因未調査
 
-- **SE3(実機・inapp モード)の USB トンネル(iproxy)が実行中に消え、以後の起こし直しも届かない**(2026-10-25 の負荷テスト・1 回)
-  - 症状: `scrollTo` の途中で「Connection to the driver was refused … Could not connect to the server」→ 同じ run の残り3本の `launch` が
-    全部「the in-app bridge did not respond in time: connection refused」(各 30 秒)
-  - 分かったこと: 「Could not connect to the server」(`.cannotConnectToHost`)は Mac 側のポートで誰も待受していないときだけ出る
-    (実測: アプリだけを止めると iproxy がいったん受けてから切るので「The network connection was lost」になる)= **アプリではなく iproxy-8128 が消えていた**。
-    iproxy を止めるだけで同じ症状を再現できた(maintainer-notes §105.4)
-  - 未解決: 誰が止めたか。その時刻にログへ残る止め方(古いトンネルの差し替え・残骸の掃除)の記録は無い。`launcher.stop()` 経由の teardown は
-    止めても記録しなかったので、止めたときに1行残すようにした
-  - 要る材料: 次に起きたときの、各プロセスのログの「stopped the USB tunnel (iproxy pid …) on port …」
+### OI-5 SE3(実機・inapp モード)の USB トンネル(iproxy)が実行中に消え、以後の起こし直しも届かない
+- 状態: 再現済み
+- 確認: コミット未記録(2026-10-25)
+- 経緯: 2026-10-25 の負荷テスト・1 回
 
-- **頻度の低い赤(2026-10-22 の回帰・負荷テスト。いずれも再現の材料なし)**
-  - E2EX-Flutter Android「スワイプで行を削除」S0010(`Dismissible`): 3/58(10/5〜)。Android の注入は終点の MOVE を UP の前に撃つので上の型とは別
-  - E2EX-Flutter iOS XCUITest のグリッド S0010: 上への探索が cell_46 を見つけた後、慣性で流れ去って解決できない(1/63)
-  - E2EY-RN iOS XCUITest「入れ子の横の一覧の画面外のカードへ届くこと」S0010(2026-10-25・M1Max の4台同時で 1/12。単独 3/3 緑):
-    `tap("#card_7_12")` の横の探索が 8 回の送りを使い切り、失敗時の木では段 7 がカード 7-01〜03(ほぼ先頭)のまま。緑の回も
-    13 秒前後と「見えている部分を押した / 整定前に撮った」注記付きの 22 秒前後の2群に割れる
-  - E2EY-Flutter iOS XCUITest「スクロールで隠れるバーを扱えること」S0020(同じ条件で 1/12・単独 3/3 緑): `tap("#row_h_40")` の後の
-    `textIs "#txt_bars_state" == "bars=hidden"` が `bars=shown`
+- 症状: `scrollTo` の途中で「Connection to the driver was refused … Could not connect to the server」→ 同じ run の残り3本の `launch` が
+  全部「the in-app bridge did not respond in time: connection refused」(各 30 秒)
+- 分かったこと: 「Could not connect to the server」(`.cannotConnectToHost`)は Mac 側のポートで誰も待受していないときだけ出る
+  (実測: アプリだけを止めると iproxy がいったん受けてから切るので「The network connection was lost」になる)= **アプリではなく iproxy-8128 が消えていた**。
+  iproxy を止めるだけで同じ症状を再現できた(maintainer-notes §105.4)
+- 未解決: 誰が止めたか。その時刻にログへ残る止め方(古いトンネルの差し替え・残骸の掃除)の記録は無い。`launcher.stop()` 経由の teardown は
+  止めても記録しなかったので、止めたときに1行残すようにした
+- 要る材料: 次に起きたときの、各プロセスのログの「stopped the USB tunnel (iproxy pid …) on port …」
 
-- **AppleAVE の一時的な失敗(-17691)が 60 秒で戻る型と、その 2〜3 分後に Compose Multiplatform の iOS アプリが白紙を描く型**
-  (2026-10-18 の負荷テスト・M2 Ultra・3 回)
-  - 症状: 切り出しが -17691 で失敗 → probe が `becameDead` → 60 秒後の probe で `becameAlive`(09:29:39 / 〜10:02 / 10:08:31)。切り出しは SW で成功。
-    下の「再起動まで戻らない」型とは別で、10/18 の録画の修正(止まらない試し撮りの見張り)の後に観測
-  - そのたび 2〜3 分後に E2EY-CMP / E2EX-CMP の iOS(in-app)で「アプリ領域が単色」か「形だけで文字が無い」の notRendered(09:32:44〜09:33:11 に
-    4 台 7 本・10:11:04〜06 に 2 台 2 本)。数分後の同じ Simulator は正常に描く。配信 10 本 + 録画 8 本 + Emulator 8 台 + ビルドの負荷下
-  - 要る材料: 次に起きたときの GPU 側の記録(Metal/IOGPU のログ)。AVE の失敗と CMP の白紙が同じ GPU の逼迫の 2 つの症状かを分ける
-  - 規模(2026-10-20 に数えた): 10 月の E2E-CMP iOS の可視性検証の赤(notRendered)は失敗レポートで 736 件。シナリオに偏りは無い
-    (最多の WebView S0010 で 33 件)。「S0040 の type(replace:) の後に echo が更新されない」と見えていた赤 14 件も、木は `single=xyz` で
-    写真は形だけで文字が無い = この崩壊だった(もう一つの形 `password=xyz` は別の原因で直した = maintainer-notes §92.4)
-  - 2026-10-19 の負荷テスト(M2 Ultra)で採れた材料: CMP の iOS アプリ(プロセス名 `iosApp`)の Simulator 内ログに
-    `(Metal) Execution of the command buffer was aborted due to an error during execution (MTLCommandBufferErrorDomain error 1)` が
-    **全 Simulator で**出ていた(10 分で 25〜1,559 件。起動して 33 分の Simulator でも 773 件)= Simulator 個別の状態ではなくホスト側。
-    同じ Simulator で SwiftUI のアプリと設定アプリは描け、CMP だけが白紙(起動し直しても白紙のまま 10 分以上)。カーネルには
-    `IOGPUSysMemory::retainCPUWireMapping: failed to map memory for CPU wire mapping` / `AGXk: map block failed for cpu`(05:58:36)。
-    GPU の稼働率は 10%・Alloc system memory 36 GB。この回は白紙(05:51)の後に AVE の一時死(05:57)で、10/18 とは前後が逆。
-    負荷: Simulator 12 台(うち 2 台は別作業の iOS 27.2)・Emulator 10 台・配信・録画
-  - 2026-10-22 の材料(M2 Ultra・手元の E2E-CMP の iOS・in-app 1 回と XCUITest 2 回): 赤の塊と、CMP のアプリ(`iosApp`)の Simulator 内ログの
-    `Execution of the command buffer was aborted … (MTLCommandBufferErrorDomain error 1)` が**時間帯でも台でも重なった**。
-    窓ごとの中断の件数(8 台の合計)= 17:24〜17:31(in-app・赤 1 本)12 件で全部その赤の台(-02)/ 18:35〜18:39(XCUITest・赤 8 本)103 件・
-    中断 0 件の 2 台(-03・-04)は赤なし / 18:56〜18:58(同じ赤 8 本の回し直し・全部緑)0 件 / 20:23〜20:27(XCUITest・赤 4 本 + 一色 1 本)74 件。
-    -02 の赤は中断(17:25:00〜01 に 12 件)の 2〜8 秒後の検証。**この回はホストのカーネルに IOGPU・AGX の記録が無い**(10/19 の
-    `IOGPUSysMemory` / `map block failed` とは違う)・エンコーダの故障の記録も無い。`Metal` を含む行の大半はシェーダのコンパイルで、
-    数える対象は `command buffer was aborted` だけにする(`xcrun simctl spawn <udid> log show --predicate 'process == "iosApp" AND
-    eventMessage CONTAINS "command buffer was aborted"'`。zsh では `log` が組み込みなので `/usr/bin/log`)。
-    中断と白紙が同じ現象の 2 つの見え方か、中断が白紙を起こすのかは分けていない。次に見るもの: 中断の直前に Simulator の GPU の使用者が何だったか
-    (同じ時刻の配信・録画・Emulator の数)
-  - 2026-10-21 23:51(M2 Ultra・稼働約 28 時間)にも一時的な型が1回(約5分で自然回復)。引き金の候補は**配信の一斉の張り直し**:
-    モニターのパネルが隠れて全台の配信が止まり(`Live streams stopped (the monitor panel is hidden)`)、約14秒後に戻った瞬間に
-    手元の `fleetest-simstream` 10 本が同時にエンコードのセッションを開いて `AVE_USL_Drv_Start errorCode 0xfffffc0d`(-1011 → -17691)。
-    同じ日の 9 本の一斉起動(20:28・23:43)と、E2E 中の毎分 40〜50 セッションでは誤りゼロ = 十分条件ではない。
-    対処: 手元の iOS Simulator の h264 配信を 0.5秒に1本ずつ起こす(ユーザー決定。`remoteStreamAdmission.ts` の `LOCAL_HW_STREAM_STARTS_PER_WINDOW` /
-    `LOCAL_HW_STREAM_WINDOW_MS`。枠が尽きたらモニターの更新を待たずにタイマーで起こし直す。配信ヘルパーが落ちた後の
-    `StreamPipeline` の内部の起動し直しも同じ枠を通す = 負荷で全配信が同時に落ちても一斉に開き直さない)。
-    効いたかは次の発生の有無で見る
-- **AppleAVE(ハードウェアビデオエンコーダ)がマシン全体で壊れ、再起動まで戻らない**(2026-10-17〜18・M2 Ultra で3回)
-  - 症状: 切り出しが `-17691` で失敗/合成映像も固まる。Simulator の録画の試し撮りが空になり、iOS の h264 配信も巻き添え
-  - 確かめた範囲: 単独要因(切り出し・Simulator の録画・配信・Android の E2E・それらの組み合わせ)では再現しない(maintainer-notes §86)
-  - 要る材料: 次に壊れたときの `~/.fleetest/video-encoder-history.ndjson`(起動からの経過・直前の出来事)と、その日の run の並び
-  - 候補(未確認): 止まらなかった録画の試し撮りが裏で h264 を何時間も撮り続けていた(maintainer-notes §87。10/18 に修正)。直した後に故障が減るかを見る
-- **AppleAVE が壊れる直前の時間帯に、Compose Multiplatform の iOS アプリが文字だけを描かなくなる**(2026-10-17・E2E-CMP iOS・in-app)
-  - 症状: テキストの可視性検証が `notRendered` で赤(8 件)。失敗時のスクリーンショットは**ボタンの形は描かれ、アプリの文字だけが
-    画面全体で無い**(OS のキーボード・ステータスバーの文字はある)。**検証の誤りではない** —— CMP は形も文字も同じ Metal の1枚に描き、
-    in-app の撮影(`drawHierarchy`)はその1枚を写すので、文字だけを落とすことはできない = アプリの絵に文字が無かった
-  - 時期: 赤の塊は 13:58Z(1回目の故障の直前)と 16:45〜16:54Z(iOS 8 台の h264 配信を張った 12 run 中 7 run。その直前の配信なし
-    10 run は緑・直後の実験で3回目の故障)。**再起動後のきれいな状態では配信 8 本ありで 10 run・150 本とも緑**(2026-10-18 04:47〜04:58 JST)
-    = 配信だけでは起きず、壊れかけの状態に配信の負荷が重なったときに出た
-  - 要る材料: 次に起きたときの Simulator の実画面(`simctl io screenshot`)と `~/.fleetest/video-encoder-history.ndjson` の前後
+### OI-6 頻度の低い赤
+- 状態: 再現済み
+- 確認: コミット未記録(2026-10-22)
+- 経緯: 2026-10-22 の回帰・負荷テスト。いずれも再現の材料なし
 
-- **iPhone Duo の Simulator の開閉で、SpringBoard・testmanagerd・PosterBoard 等が `FBSDisplayMode` の検査で落ちる**(2026-10-17・Duo-01/02・新規作成の Duo)
-  - 症状: 開くたびに約半分の確率で PosterBoard・ウィジェットの拡張・InputUI・chronod が落ちる。ときどき SpringBoard と
-    **testmanagerd も落ち、XCUITest ランナーが道連れになる**(以後の操作は接続拒否 → 起動し直し)。スタックは全部
-    `CA::Display::Display::update` → `FBSDisplaySource` → `-[FBSDisplayMode _initWith…validityCheck:]`
-  - 確かめた範囲: ランナーの /hinge だけで開閉を4往復しても落ちる(撮影・木の読み・タップは一切無し)= 開閉そのものが引き金。
-    testmanagerd が落ちたのは開閉の直後に XCTest の撮影・木の読みが重なった回(ライブ操作の観測)。04:50〜05:35 は同じ操作を
-    何度しても1件も落ちず、それ以降は消去・新規作成した Duo でも・CoreSimulatorService を起動し直しても落ちる。
-    「表示していない画面を撮ると壊れる」と一度読んだが、撮らない対照でも落ちたので誤り(取り下げた)
-  - **ツールの変更とは無関係**: HEAD(43ed5fed・ブリッジ v185)のランナーで同じ4往復をしても 17 件落ちた(SpringBoard 4・
-    testmanagerd 2 を含む)。**Mac を再起動しても戻らない**(再起動直後の4往復で 16 件)
-  - **ヒンジの送り方とも無関係**: DeviceHub の開閉ボタンで手で開閉しても同じように落ちた(Duo-02・SpringBoard 6・testmanagerd 3。
-    ただしその間も拡張が起こした XCUITest ランナーが付いていた = XCTest の付いていない対照は未確認)。Simulator(27.2 beta)側の問題として扱う。
-    Xcode の更新で直るかを、開閉だけの4往復(撮影・木の読み無し)で数えて確かめる
-  - **Xcode 27.2 RC(27B48・ランタイム 24B91014)でも直っていない。計測では悪化**(2026-10-21・Duo-01・ランナーの /hinge だけ・10 秒間隔):
-    1回目の「開く」の直後に testmanagerd が落ちてランナーが死に(以後の7回の送信は届かず)、その後は**何も送らなくても SpringBoard が
-    約 8〜15 秒ごとに落ち続けた**(04:20〜04:24 の4分で SpringBoard 15・chronod 15・InputUI 15・PosterBoard 14・CalendarPosterExtension 3・
-    testmanagerd 1・splashboardd 1・ウィジェットの拡張 1 = 計 65 件・全部 `FBSDisplayMode` の検査)。`simctl shutdown` するまで止まらなかった。
-    10/17 のベータ 3 は4往復で 17 件(SpringBoard 4・testmanagerd 2)
-  - **ツールの開閉が無くても落ちる**(同日・Duo-02): 03:56:51 に backboardd が落ちて起動し直し(原因は未特定。直前にシナリオの失敗時の
-    SpringBoard の撮影が 45 秒返らなかった)→ 03:57:07 に SpringBoard が起動し直し → `-[SBSceneRegionsUpdater _updateHingeStatusWithPose:]`
-    → `FBSDisplayMode` の検査で落ちた。引き金は「SpringBoard が2画面の表示設定を作るときにヒンジの姿勢が渡ること」で、ヒンジの送信は
-    その一例。一方で同日の DSL の `31_折りたたみ`(02:4x〜02:5x)は緑で、その間の同種の落ちは InputUI 1 件だけ = 嵐になるかは
-    状態で大きく変わる(何が分けるかは未特定)
-  - 影響: DSL の `fold()` / `unfold()`・MCP の `ft_fold`・ライブ操作の開閉ボタンの全部。RC でも Duo の開閉は使えない前提で扱う
+- E2EX-Flutter Android「スワイプで行を削除」S0010(`Dismissible`): 3/58(10/5〜)。Android の注入は終点の MOVE を UP の前に撃つので上の型とは別
+- E2EX-Flutter iOS XCUITest のグリッド S0010: 上への探索が cell_46 を見つけた後、慣性で流れ去って解決できない(1/63)
+- E2EY-RN iOS XCUITest「入れ子の横の一覧の画面外のカードへ届くこと」S0010(2026-10-25・M1Max の4台同時で 1/12。単独 3/3 緑):
+  `tap("#card_7_12")` の横の探索が 8 回の送りを使い切り、失敗時の木では段 7 がカード 7-01〜03(ほぼ先頭)のまま。緑の回も
+  13 秒前後と「見えている部分を押した / 整定前に撮った」注記付きの 22 秒前後の2群に割れる
+- E2EY-Flutter iOS XCUITest「スクロールで隠れるバーを扱えること」S0020(同じ条件で 1/12・単独 3/3 緑): `tap("#row_h_40")` の後の
+  `textIs "#txt_bars_state" == "bars=hidden"` が `bars=shown`
 
-- **iPhone Duo の Simulator(Xcode 27.2 RC・ランタイム 24B91014)で SpringBoard の木が表示中の画面と一致せず、`tapAppIcon` が落ちる**(2026-10-21)
-  - 症状: `30_アプリの外の操作` の `home` / `appSwitcher` → `tapAppIcon "FT E2E iOS"` が Duo 2 台で赤(10/16 のベータ 3 では緑・iPhone 17 Pro では緑)。
-    ブリッジのトレース(`FT_BRIDGE_TRACE='FT E2E iOS'`)で、SpringBoard の木が 466x678 の画面にアイコンの枠 **[52, -75, 87x83]**(幅と高さが
-    入れ替わり・中心 (95, -33) = 画面の上の外)を2回続けて返し、そこを撃ってアプリが前面に来なかった。最初の run の「App icon not found」も同じ木の崩れ
-  - 木の形: 外側と内側の両方の画面の SpringBoard の場面が1つの木に載る(状態バー2組・片方は縦書き・Dock 2組)。寸法と枠は履歴で変わる —
-    起動直後の Duo-01 = 466x678 で内側の場面の枠(11 秒以上そのまま)/ 開閉を1往復した後 = 画面 951x669(内側の横向きの寸法)で数分戻らず /
-    Duo-02 = 正しい 466x678・(103, 52)。時間の経過・座標タップでは戻らず、正しい状態になった契機は未特定
-  - 確かめた範囲: ランナーへ直接 `/home` を3回送ってから `/session springboard` → `/snapshot` を 0.5 秒ごとに読む形で、Duo-01 だけ再現(Duo-02 は正しい)。
-    `press(.home)` が効かない事象(17 Pro 0.8 秒 / Duo 8.4 秒 = 仮想 HID の救済経路)と、2 画面で `simctl io` が画面指定を要する事象は RC でも変わらず
-    (救済と画面の選択は引き続き有効)。開閉(`fold` / `unfold` / `hinge`)は新ランタイムでも緑。失敗時の SpringBoard の撮影が 45 秒返らなかった回あり
-  - 起動し直した直後(トレース付き・2 台とも)は第3の形: 木の画面が 951x669 で**アイコンが1つも載らない**(`frames={}`・ページ送りの始点
-    760.8 = 951×0.8)。2 回送っても変わらず「App icon not found」。失敗時の SpringBoard の撮影はここでも 45 秒返らなかった
-  - ツール側の防御(2 段): ①内蔵画面が2枚の Simulator では、最初に読んだ木の画面の大きさを `devicectl` の表示中の画面(pt)と照合し、
-    違えば探さずに明示して失敗(`AppIconLocator.treeMatchesShownDisplay`)②中心が画面の外の枠は撃たず、`screenWaitTimeout` まで
-    読み直して直らなければ明示して失敗(`AppIconLocator.isCentreOnScreen`)。どちらも崩れを直すものではない。防御を入れた後の run(10/21)で
-    Duo-01 は正しい木で緑・Duo-02 は1回目に②(中心 (95,-33))・振り直しの2回目(ブリッジの起動し直し後)に①(951x669)が出て、2段が実データで
-    それぞれ発火した。iPhone 17 Pro は2本とも緑のまま
-  - 影響: Duo で SpringBoard を読む機能全般(`tapAppIcon`・システムアラートの検出と操作・`appSwitcher` 後の復帰)。次に見るもの: Apple の次の版・
-    DeviceHub を付けて起動した Duo で同じか(起動時のヒンジの初期化が違う可能性)
+### OI-7 AppleAVE の一時的な失敗(-17691)が 60 秒で戻る型と、その 2〜3 分後に Compose Multiplatform の iOS アプリが白紙を描く型
+- 状態: 再現済み
+- 確認: コミット未記録(2026-10-18)
+- 経緯: 2026-10-18 の負荷テスト・M2 Ultra・3 回
 
-- **FM が ANE の仮想メモリの枯渇(`VM exhausted` → `Code=53 no memory`)で死に、Mac を再起動するまで戻らない**(2026-10-16・M1Ultra)
-  - 症状: E2EX の開始直後に text / vision とも死に、2 時間半戻らなかった。fm-serve の入れ替えでは戻らない
-  - 確かめた範囲・再現の試み・修正の効果の比較・調べ方の罠は maintainer-notes §83.9。暖機・期限切れ推論の重なりを塞いだ d0d0d08d で、
-    同じ負荷の FM の失敗は 3 周で 9 → 0 回・`VM exhausted` は 361 → 52 件に減った。**枯渇そのものは残る**
-  - 出どころの追加調査(10/17): 従来52件中40件はFMサービスのプログラム・中間バッファへハンドルで帰属。新しい3周はANE0で107件(96件がFM・11件未確定)、
-    ANE2で18件(全件FM)。FMは121呼び出し・2失敗で、終了後text / visionは生存。「再起動まで戻らない死」は再現しなかった
-  - 寿命の追加解析(10/17): 2失敗は300m.mm_guardの画像トークン化で、ANEが約5.6秒再試行して中断。保存ログから全占有量は復元できず、
-    管理者権限の5秒ktraceでページ変換更新を採れたが、IOVMアロケータの予約・解放・空き連続領域は未取得
-  - 中断への対処: 2008だけを候補に、元の20秒期限内で画像推論を1回追加する。回数と回答の有無を結果JSONへ記録する。
-    2008でも戻らなかった実例があり、枯渇の解消や回復は保証しない。実地での効果は未測定(仕様は maintainer-notes §83.9)
-  - 次に見るもの: アロケータ自身の状態を採る診断口と、未確定資源の識別子。**失敗した要求の所有者と、空間を使い切った原因は別**。
-    `compile-ocr`やホスト側デーモンの寄与も未確定。追加3周の前に診断口を確認する。詳細は maintainer-notes §83.9
+- 症状: 切り出しが -17691 で失敗 → probe が `becameDead` → 60 秒後の probe で `becameAlive`(09:29:39 / 〜10:02 / 10:08:31)。切り出しは SW で成功。
+  下の「再起動まで戻らない」型とは別で、10/18 の録画の修正(止まらない試し撮りの見張り)の後に観測
+- そのたび 2〜3 分後に E2EY-CMP / E2EX-CMP の iOS(in-app)で「アプリ領域が単色」か「形だけで文字が無い」の notRendered(09:32:44〜09:33:11 に
+  4 台 7 本・10:11:04〜06 に 2 台 2 本)。数分後の同じ Simulator は正常に描く。配信 10 本 + 録画 8 本 + Emulator 8 台 + ビルドの負荷下
+- 要る材料: 次に起きたときの GPU 側の記録(Metal/IOGPU のログ)。AVE の失敗と CMP の白紙が同じ GPU の逼迫の 2 つの症状かを分ける
+- 規模(2026-10-20 に数えた): 10 月の E2E-CMP iOS の可視性検証の赤(notRendered)は失敗レポートで 736 件。シナリオに偏りは無い
+  (最多の WebView S0010 で 33 件)。「S0040 の type(replace:) の後に echo が更新されない」と見えていた赤 14 件も、木は `single=xyz` で
+  写真は形だけで文字が無い = この崩壊だった(もう一つの形 `password=xyz` は別の原因で直した = maintainer-notes §92.4)
+- 2026-10-19 の負荷テスト(M2 Ultra)で採れた材料: CMP の iOS アプリ(プロセス名 `iosApp`)の Simulator 内ログに
+  `(Metal) Execution of the command buffer was aborted due to an error during execution (MTLCommandBufferErrorDomain error 1)` が
+  **全 Simulator で**出ていた(10 分で 25〜1,559 件。起動して 33 分の Simulator でも 773 件)= Simulator 個別の状態ではなくホスト側。
+  同じ Simulator で SwiftUI のアプリと設定アプリは描け、CMP だけが白紙(起動し直しても白紙のまま 10 分以上)。カーネルには
+  `IOGPUSysMemory::retainCPUWireMapping: failed to map memory for CPU wire mapping` / `AGXk: map block failed for cpu`(05:58:36)。
+  GPU の稼働率は 10%・Alloc system memory 36 GB。この回は白紙(05:51)の後に AVE の一時死(05:57)で、10/18 とは前後が逆。
+  負荷: Simulator 12 台(うち 2 台は別作業の iOS 27.2)・Emulator 10 台・配信・録画
+- 2026-10-22 の材料(M2 Ultra・手元の E2E-CMP の iOS・in-app 1 回と XCUITest 2 回): 赤の塊と、CMP のアプリ(`iosApp`)の Simulator 内ログの
+  `Execution of the command buffer was aborted … (MTLCommandBufferErrorDomain error 1)` が**時間帯でも台でも重なった**。
+  窓ごとの中断の件数(8 台の合計)= 17:24〜17:31(in-app・赤 1 本)12 件で全部その赤の台(-02)/ 18:35〜18:39(XCUITest・赤 8 本)103 件・
+  中断 0 件の 2 台(-03・-04)は赤なし / 18:56〜18:58(同じ赤 8 本の回し直し・全部緑)0 件 / 20:23〜20:27(XCUITest・赤 4 本 + 一色 1 本)74 件。
+  -02 の赤は中断(17:25:00〜01 に 12 件)の 2〜8 秒後の検証。**この回はホストのカーネルに IOGPU・AGX の記録が無い**(10/19 の
+  `IOGPUSysMemory` / `map block failed` とは違う)・エンコーダの故障の記録も無い。`Metal` を含む行の大半はシェーダのコンパイルで、
+  数える対象は `command buffer was aborted` だけにする(`xcrun simctl spawn <udid> log show --predicate 'process == "iosApp" AND
+  eventMessage CONTAINS "command buffer was aborted"'`。zsh では `log` が組み込みなので `/usr/bin/log`)。
+  中断と白紙が同じ現象の 2 つの見え方か、中断が白紙を起こすのかは分けていない。次に見るもの: 中断の直前に Simulator の GPU の使用者が何だったか
+  (同じ時刻の配信・録画・Emulator の数)
+- 2026-10-21 23:51(M2 Ultra・稼働約 28 時間)にも一時的な型が1回(約5分で自然回復)。引き金の候補は**配信の一斉の張り直し**:
+  モニターのパネルが隠れて全台の配信が止まり(`Live streams stopped (the monitor panel is hidden)`)、約14秒後に戻った瞬間に
+  手元の `fleetest-simstream` 10 本が同時にエンコードのセッションを開いて `AVE_USL_Drv_Start errorCode 0xfffffc0d`(-1011 → -17691)。
+  同じ日の 9 本の一斉起動(20:28・23:43)と、E2E 中の毎分 40〜50 セッションでは誤りゼロ = 十分条件ではない。
+  対処: 手元の iOS Simulator の h264 配信を 0.5秒に1本ずつ起こす(ユーザー決定。`remoteStreamAdmission.ts` の `LOCAL_HW_STREAM_STARTS_PER_WINDOW` /
+  `LOCAL_HW_STREAM_WINDOW_MS`。枠が尽きたらモニターの更新を待たずにタイマーで起こし直す。配信ヘルパーが落ちた後の
+  `StreamPipeline` の内部の起動し直しも同じ枠を通す = 負荷で全配信が同時に落ちても一斉に開き直さない)。
+  効いたかは次の発生の有無で見る
+### OI-8 AppleAVE(ハードウェアビデオエンコーダ)がマシン全体で壊れ、再起動まで戻らない
+- 状態: 再現済み
+- 確認: コミット未記録(2026-10-17〜18)
+- 経緯: 2026-10-17〜18・M2 Ultra で3回
 
-- **テキストの可視性検証の FM の段が、読める文字に空の転写を返して notRendered の赤**(2026-10-15・maintainer-notes §82.10)
-  - 症状: Flutter・Android の WebView の `textIs "wv_result=*" == "wv_result=-"` が `[notRendered] … observed=""`。切り抜きには文字がはっきり写る。
-    注記は `ocr-shortcut-not-ready`(この Mac は OCR が死んでいた = 突き合わせの相手が居ない)
-  - 次に見るもの: 同じ切り抜きを FM に何度か渡して空が返る率。空の転写を「描かれていない」の根拠にしてよいか(インク量が十分ある絵で)
-  - 2026-10-24: **OCR の段がオンの構成は救うようにした**(確かめの OCR も未準備の Vision の空を受けていた = 24 本同時で 23/24 赤 → 0/24。
-    maintainer-notes §104.4)。残るのは FM の空振りの率そのものと、OCR の段がオフの構成(下の項目)
+- 症状: 切り出しが `-17691` で失敗/合成映像も固まる。Simulator の録画の試し撮りが空になり、iOS の h264 配信も巻き添え
+- 確かめた範囲: 単独要因(切り出し・Simulator の録画・配信・Android の E2E・それらの組み合わせ)では再現しない(maintainer-notes §86)
+- 要る材料: 次に壊れたときの `~/.fleetest/video-encoder-history.ndjson`(起動からの経過・直前の出来事)と、その日の run の並び
+- 候補(未確認): 止まらなかった録画の試し撮りが裏で h264 を何時間も撮り続けていた(maintainer-notes §87。10/18 に修正)。直した後に故障が減るかを見る
+### OI-9 AppleAVE が壊れる直前の時間帯に、Compose Multiplatform の iOS アプリが文字だけを描かなくなる
+- 状態: 再現済み
+- 確認: コミット未記録(2026-10-17)
+- 経緯: 2026-10-17・E2E-CMP iOS・in-app
 
-- **E2EX-CMP の XCUITest で「貼り付く見出しのリストを扱えること」が断続的に赤**(2026-10-08・13 回中 1 回)
-  - 症状: 上へ探して `tap "#row_s_B1"` が緑のまま、echo が `sticky=row_s_F3` のまま(撃つ前の警告・撃った後の注記なし)
-  - 確かめた範囲: 整定の周期を 350ms にした後(31449e05)の run 5 回中 1 回・MCP の ft_batch 8 回中 0 回。赤の回だけ
-    そのタップの待ち(waitMs)が約 1 秒長い(1913ms・緑の回は約 970ms)。慣性の途中で撃った形と同じ見え方だが確かめていない
-  - 次に見るもの: 赤の回のタップの直前の木の時刻列(払った後の整定の各周回)
-  - 2026-10-20 の棚卸し(M1Ultra・8 台並列 × 3 周): 24 回中 2 回(同じ形)
+- 症状: テキストの可視性検証が `notRendered` で赤(8 件)。失敗時のスクリーンショットは**ボタンの形は描かれ、アプリの文字だけが
+  画面全体で無い**(OS のキーボード・ステータスバーの文字はある)。**検証の誤りではない** —— CMP は形も文字も同じ Metal の1枚に描き、
+  in-app の撮影(`drawHierarchy`)はその1枚を写すので、文字だけを落とすことはできない = アプリの絵に文字が無かった
+- 時期: 赤の塊は 13:58Z(1回目の故障の直前)と 16:45〜16:54Z(iOS 8 台の h264 配信を張った 12 run 中 7 run。その直前の配信なし
+  10 run は緑・直後の実験で3回目の故障)。**再起動後のきれいな状態では配信 8 本ありで 10 run・150 本とも緑**(2026-10-18 04:47〜04:58 JST)
+  = 配信だけでは起きず、壊れかけの状態に配信の負荷が重なったときに出た
+- 要る材料: 次に起きたときの Simulator の実画面(`simctl io screenshot`)と `~/.fleetest/video-encoder-history.ndjson` の前後
 
-- **E2EX-Flutter の XCUITest で、探索の終わりの空打ちが対象の行そのものを押す**(2026-10-08・フル回帰で 1 回)
-  - 症状: `tap("#nav_native", scroll: .down)` が「cannot resolve the locator」で赤。失敗時の木は**既に遷移先(固有部品)の画面**。
-    録画では最下段まで送った後、ツールのタップより前に最下段の行に押下の波紋が 1 回出て遷移している = 空打ち
-    (`settleAfterFind` の縦抜き。全幅の行は横へ抜けない)がクリックとして成立した。注記は `settle-capped`
-  - 確かめた範囲: M1Ultra の -08 で同じドラッグ(行の中心 → 行の上端の 4pt 外・press 0.05 秒・0.3 秒)をランナーへ直接撃つと、
-    止まった一覧 6 回・送った直後 6 回とも成立しない(0/12)。同じシナリオの run 6 回も緑。空打ちを切る(`FT_EMPTY_DRAG=off`)と
-    E2EX-Flutter の貼り付く見出し S0040 が赤(§74.10 の「慣性を止める役」)なので外せない
-  - 実害の向き: 押された先に同じ座標の部品があれば本番のタップがそれを押す(二重の操作)。今回は遷移先に対象が無く赤で止まった
-  - 次に見るもの: 成立した回の空打ちの時点の一覧の状態(端の跳ね返りの途中か)。空打ちの直前・直後の木の時刻列
-  - 2026-10-20 の棚卸し(M1Ultra・8 台並列 × 3 周): 24 回中 1 回(失敗時の木は遷移先の画面 = 同じ形)
-  - **Compose の形は原因が分かり直した**(2026-10-21・デバイスでは run での再発の有無は未検証): E2EX-CMP の XCUITest で 1 回、
-    `tap("#nav_infinite", scroll: .down)` の空打ち(201,825)→(201,818) の直後に上の行(nav_native)の画面へ遷移した。押す点が下端の帯で
-    825 に頭打ちになり、抜き先(行の上端の 4pt 外)が近づいて **7pt しか動かず、タッチの遊び(Compose iOS `CUPERTINO_TOUCH_SLOP` 10pt)に
-    収まってただのタップになった**。軸に沿う抜きでクリックを取り消しているのは「矩形の外で離すこと」ではなく「遊びを超えてスクロールに
-    取られること」(ホームで実測: 中心から 5pt はクリック・10〜60pt は行の中で離しても外で離してもスクロール)。軸に沿う抜きの移動を
-    22pt 以上にした(`StepExecutor.emptyDragMinAlongAxisTravelPt` = Flutter `kTouchSlop` 18 + 余白 4)。起動直後のホームで同じ押す点から
-    撃ち比べると、7pt は 5 回中 5 回が上の行を押し、22pt は 5 回中 0 回
-  - Flutter の 1 回(上の症状)は、全幅の行の中心から上端の外まで(約 28pt = Flutter の遊び 18 を超える)抜いていて、この形とは条件が
-    違う可能性がある(押す点の頭打ちが起きていたかは記録が無い)
+### OI-10 iPhone Duo の Simulator の開閉で、SpringBoard・testmanagerd・PosterBoard 等が `FBSDisplayMode` の検査で落ちる
+- 状態: 再現済み
+- 確認: コミット未記録(2026-10-17)
+- 経緯: 2026-10-17・Duo-01/02・新規作成の Duo
 
-- **E2EY-CMP の iOS(in-app)で、隠れるバーのアニメの途中の枠を OCR して誤った赤**(2026-10-08・1 回 / 2026-10-11 の負荷テストで 2 回・
-  同じ `hara-hiddan`。どちらも FM が死んで OCR だけの判定になっていた回)
-  - 症状: `scrollDown` の後の `textIs "#txt_bars_state" == "bars=hidden"` が「OCR だけの判定で見えていない(`hara-hiddan`)」で赤。
-    判定時の木では `#txt_bars_state` の枠が高さ 10pt(文字は約 24pt)で、隠れていくバー(`btn_top_action`・「受信トレイ」)が同じ帯に
-    重なって載っていた。失敗時のスクリーンショットでは `bars=hidden` が見えている(撮ったのは判定の後)
-  - 見立て(確かめていない): バーが引っ込むアニメの途中の木で、文字の上下を切った枠を OCR した。FM が死んでいる機械で
-    OCR だけの判定になる回にだけ表に出る
+- 症状: 開くたびに約半分の確率で PosterBoard・ウィジェットの拡張・InputUI・chronod が落ちる。ときどき SpringBoard と
+  **testmanagerd も落ち、XCUITest ランナーが道連れになる**(以後の操作は接続拒否 → 起動し直し)。スタックは全部
+  `CA::Display::Display::update` → `FBSDisplaySource` → `-[FBSDisplayMode _initWith…validityCheck:]`
+- 確かめた範囲: ランナーの /hinge だけで開閉を4往復しても落ちる(撮影・木の読み・タップは一切無し)= 開閉そのものが引き金。
+  testmanagerd が落ちたのは開閉の直後に XCTest の撮影・木の読みが重なった回(ライブ操作の観測)。04:50〜05:35 は同じ操作を
+  何度しても1件も落ちず、それ以降は消去・新規作成した Duo でも・CoreSimulatorService を起動し直しても落ちる。
+  「表示していない画面を撮ると壊れる」と一度読んだが、撮らない対照でも落ちたので誤り(取り下げた)
+- **ツールの変更とは無関係**: HEAD(43ed5fed・ブリッジ v185)のランナーで同じ4往復をしても 17 件落ちた(SpringBoard 4・
+  testmanagerd 2 を含む)。**Mac を再起動しても戻らない**(再起動直後の4往復で 16 件)
+- **ヒンジの送り方とも無関係**: DeviceHub の開閉ボタンで手で開閉しても同じように落ちた(Duo-02・SpringBoard 6・testmanagerd 3。
+  ただしその間も拡張が起こした XCUITest ランナーが付いていた = XCTest の付いていない対照は未確認)。Simulator(27.2 beta)側の問題として扱う。
+  Xcode の更新で直るかを、開閉だけの4往復(撮影・木の読み無し)で数えて確かめる
+- **Xcode 27.2 RC(27B48・ランタイム 24B91014)でも直っていない。計測では悪化**(2026-10-21・Duo-01・ランナーの /hinge だけ・10 秒間隔):
+  1回目の「開く」の直後に testmanagerd が落ちてランナーが死に(以後の7回の送信は届かず)、その後は**何も送らなくても SpringBoard が
+  約 8〜15 秒ごとに落ち続けた**(04:20〜04:24 の4分で SpringBoard 15・chronod 15・InputUI 15・PosterBoard 14・CalendarPosterExtension 3・
+  testmanagerd 1・splashboardd 1・ウィジェットの拡張 1 = 計 65 件・全部 `FBSDisplayMode` の検査)。`simctl shutdown` するまで止まらなかった。
+  10/17 のベータ 3 は4往復で 17 件(SpringBoard 4・testmanagerd 2)
+- **ツールの開閉が無くても落ちる**(同日・Duo-02): 03:56:51 に backboardd が落ちて起動し直し(原因は未特定。直前にシナリオの失敗時の
+  SpringBoard の撮影が 45 秒返らなかった)→ 03:57:07 に SpringBoard が起動し直し → `-[SBSceneRegionsUpdater _updateHingeStatusWithPose:]`
+  → `FBSDisplayMode` の検査で落ちた。引き金は「SpringBoard が2画面の表示設定を作るときにヒンジの姿勢が渡ること」で、ヒンジの送信は
+  その一例。一方で同日の DSL の `31_折りたたみ`(02:4x〜02:5x)は緑で、その間の同種の落ちは InputUI 1 件だけ = 嵐になるかは
+  状態で大きく変わる(何が分けるかは未特定)
+- 影響: DSL の `fold()` / `unfold()`・MCP の `ft_fold`・ライブ操作の開閉ボタンの全部。RC でも Duo の開閉は使えない前提で扱う
 
-- **高負荷のときだけ、`tap(sel, linkText:)` の OCR が要素の中の文字を 1 文字も読めない**(2026-10-07 の負荷テストで 9 件・
-  2026-10-08 の E2EY の回帰で 5 件。両 OS・CMP / View / SwiftUI)
-  - 症状: 「cannot find the link text … (OCR read no text in the element; 3 OCR passes)」。失敗時の絵(判定の後に撮る)には
-    文字が描かれている。静かな状態では E2EY-Android の同じクラスを 3 回回して 0 件
-  - 見立て(確かめていない): 撮り直し 3 回・0.5 秒おき(`LinkTextLocator.ocrShotAttempts` / `ocrReshotInterval`)は軽い負荷で
-    詰めた秒数で、高負荷では画面の切り替えがそれより長引く。OCR が見た絵を証跡に残していないので、白い絵だったのか読みの
-    失敗なのかは分けられていない。次に見るもの: 失敗した回に OCR へ渡した絵(`evidenceImage` で持ち帰る)
-  - 2026-10-11 の負荷テスト(E2EY-CMP の Android・3 件)で分けられた: 1 件は OCR へ渡した絵 3 枚のアプリ領域が一色(撮った絵が白い)、
-    2 件は OCR の生死の確認(既知の文字を描いた絵)も読めなかった(同じ時刻に別プロセスの OCR は読めていた = 機械全体の死ではなく、
-    その瞬間の読み手の失敗)。どちらもツールの判定の誤りではなく、高負荷の Emulator の描画と OCR の一時的な失敗
+### OI-11 iPhone Duo の Simulator(Xcode 27.2 RC・ランタイム 24B91014)で SpringBoard の木が表示中の画面と一致せず、`tapAppIcon` が落ちる
+- 状態: 再現済み
+- 確認: コミット未記録(2026-10-21)
+
+- 症状: `30_アプリの外の操作` の `home` / `appSwitcher` → `tapAppIcon "FT E2E iOS"` が Duo 2 台で赤(10/16 のベータ 3 では緑・iPhone 17 Pro では緑)。
+  ブリッジのトレース(`FT_BRIDGE_TRACE='FT E2E iOS'`)で、SpringBoard の木が 466x678 の画面にアイコンの枠 **[52, -75, 87x83]**(幅と高さが
+  入れ替わり・中心 (95, -33) = 画面の上の外)を2回続けて返し、そこを撃ってアプリが前面に来なかった。最初の run の「App icon not found」も同じ木の崩れ
+- 木の形: 外側と内側の両方の画面の SpringBoard の場面が1つの木に載る(状態バー2組・片方は縦書き・Dock 2組)。寸法と枠は履歴で変わる —
+  起動直後の Duo-01 = 466x678 で内側の場面の枠(11 秒以上そのまま)/ 開閉を1往復した後 = 画面 951x669(内側の横向きの寸法)で数分戻らず /
+  Duo-02 = 正しい 466x678・(103, 52)。時間の経過・座標タップでは戻らず、正しい状態になった契機は未特定
+- 確かめた範囲: ランナーへ直接 `/home` を3回送ってから `/session springboard` → `/snapshot` を 0.5 秒ごとに読む形で、Duo-01 だけ再現(Duo-02 は正しい)。
+  `press(.home)` が効かない事象(17 Pro 0.8 秒 / Duo 8.4 秒 = 仮想 HID の救済経路)と、2 画面で `simctl io` が画面指定を要する事象は RC でも変わらず
+  (救済と画面の選択は引き続き有効)。開閉(`fold` / `unfold` / `hinge`)は新ランタイムでも緑。失敗時の SpringBoard の撮影が 45 秒返らなかった回あり
+- 起動し直した直後(トレース付き・2 台とも)は第3の形: 木の画面が 951x669 で**アイコンが1つも載らない**(`frames={}`・ページ送りの始点
+  760.8 = 951×0.8)。2 回送っても変わらず「App icon not found」。失敗時の SpringBoard の撮影はここでも 45 秒返らなかった
+- ツール側の防御(2 段): ①内蔵画面が2枚の Simulator では、最初に読んだ木の画面の大きさを `devicectl` の表示中の画面(pt)と照合し、
+  違えば探さずに明示して失敗(`AppIconLocator.treeMatchesShownDisplay`)②中心が画面の外の枠は撃たず、`screenWaitTimeout` まで
+  読み直して直らなければ明示して失敗(`AppIconLocator.isCentreOnScreen`)。どちらも崩れを直すものではない。防御を入れた後の run(10/21)で
+  Duo-01 は正しい木で緑・Duo-02 は1回目に②(中心 (95,-33))・振り直しの2回目(ブリッジの起動し直し後)に①(951x669)が出て、2段が実データで
+  それぞれ発火した。iPhone 17 Pro は2本とも緑のまま
+- 影響: Duo で SpringBoard を読む機能全般(`tapAppIcon`・システムアラートの検出と操作・`appSwitcher` 後の復帰)。次に見るもの: Apple の次の版・
+  DeviceHub を付けて起動した Duo で同じか(起動時のヒンジの初期化が違う可能性)
+
+### OI-12 FM が ANE の仮想メモリの枯渇(`VM exhausted` → `Code=53 no memory`)で死に、Mac を再起動するまで戻らない
+- 状態: 再現済み
+- 確認: コミット未記録(2026-10-16)
+- 経緯: 2026-10-16・M1Ultra
+
+- 症状: E2EX の開始直後に text / vision とも死に、2 時間半戻らなかった。fm-serve の入れ替えでは戻らない
+- 確かめた範囲・再現の試み・修正の効果の比較・調べ方の罠は maintainer-notes §83.9。暖機・期限切れ推論の重なりを塞いだ d0d0d08d で、
+  同じ負荷の FM の失敗は 3 周で 9 → 0 回・`VM exhausted` は 361 → 52 件に減った。**枯渇そのものは残る**
+- 出どころの追加調査(10/17): 従来52件中40件はFMサービスのプログラム・中間バッファへハンドルで帰属。新しい3周はANE0で107件(96件がFM・11件未確定)、
+  ANE2で18件(全件FM)。FMは121呼び出し・2失敗で、終了後text / visionは生存。「再起動まで戻らない死」は再現しなかった
+- 寿命の追加解析(10/17): 2失敗は300m.mm_guardの画像トークン化で、ANEが約5.6秒再試行して中断。保存ログから全占有量は復元できず、
+  管理者権限の5秒ktraceでページ変換更新を採れたが、IOVMアロケータの予約・解放・空き連続領域は未取得
+- 中断への対処: 2008だけを候補に、元の20秒期限内で画像推論を1回追加する。回数と回答の有無を結果JSONへ記録する。
+  2008でも戻らなかった実例があり、枯渇の解消や回復は保証しない。実地での効果は未測定(仕様は maintainer-notes §83.9)
+- 次に見るもの: アロケータ自身の状態を採る診断口と、未確定資源の識別子。**失敗した要求の所有者と、空間を使い切った原因は別**。
+  `compile-ocr`やホスト側デーモンの寄与も未確定。追加3周の前に診断口を確認する。詳細は maintainer-notes §83.9
+
+### OI-13 テキストの可視性検証の FM の段が、読める文字に空の転写を返して notRendered の赤
+- 状態: 再現済み
+- 確認: コミット未記録(2026-10-15)
+- 経緯: 2026-10-15・maintainer-notes §82.10
+
+- 症状: Flutter・Android の WebView の `textIs "wv_result=*" == "wv_result=-"` が `[notRendered] … observed=""`。切り抜きには文字がはっきり写る。
+  注記は `ocr-shortcut-not-ready`(この Mac は OCR が死んでいた = 突き合わせの相手が居ない)
+- 次に見るもの: 同じ切り抜きを FM に何度か渡して空が返る率。空の転写を「描かれていない」の根拠にしてよいか(インク量が十分ある絵で)
+- 2026-10-24: **OCR の段がオンの構成は救うようにした**(確かめの OCR も未準備の Vision の空を受けていた = 24 本同時で 23/24 赤 → 0/24。
+  maintainer-notes §104.4)。残るのは FM の空振りの率そのものと、OCR の段がオフの構成(下の項目)
+
+### OI-14 E2EX-CMP の XCUITest で「貼り付く見出しのリストを扱えること」が断続的に赤
+- 状態: 再現済み
+- 確認: コミット未記録(2026-10-08)
+- 経緯: 2026-10-08・13 回中 1 回
+
+- 症状: 上へ探して `tap "#row_s_B1"` が緑のまま、echo が `sticky=row_s_F3` のまま(撃つ前の警告・撃った後の注記なし)
+- 確かめた範囲: 整定の周期を 350ms にした後(31449e05)の run 5 回中 1 回・MCP の ft_batch 8 回中 0 回。赤の回だけ
+  そのタップの待ち(waitMs)が約 1 秒長い(1913ms・緑の回は約 970ms)。慣性の途中で撃った形と同じ見え方だが確かめていない
+- 次に見るもの: 赤の回のタップの直前の木の時刻列(払った後の整定の各周回)
+- 2026-10-20 の棚卸し(M1Ultra・8 台並列 × 3 周): 24 回中 2 回(同じ形)
+
+### OI-15 E2EX-Flutter の XCUITest で、探索の終わりの空打ちが対象の行そのものを押す
+- 状態: 再現済み
+- 確認: コミット未記録(2026-10-08)
+- 経緯: 2026-10-08・フル回帰で 1 回
+
+- 症状: `tap("#nav_native", scroll: .down)` が「cannot resolve the locator」で赤。失敗時の木は**既に遷移先(固有部品)の画面**。
+  録画では最下段まで送った後、ツールのタップより前に最下段の行に押下の波紋が 1 回出て遷移している = 空打ち
+  (`settleAfterFind` の縦抜き。全幅の行は横へ抜けない)がクリックとして成立した。注記は `settle-capped`
+- 確かめた範囲: M1Ultra の -08 で同じドラッグ(行の中心 → 行の上端の 4pt 外・press 0.05 秒・0.3 秒)をランナーへ直接撃つと、
+  止まった一覧 6 回・送った直後 6 回とも成立しない(0/12)。同じシナリオの run 6 回も緑。空打ちを切る(`FT_EMPTY_DRAG=off`)と
+  E2EX-Flutter の貼り付く見出し S0040 が赤(§74.10 の「慣性を止める役」)なので外せない
+- 実害の向き: 押された先に同じ座標の部品があれば本番のタップがそれを押す(二重の操作)。今回は遷移先に対象が無く赤で止まった
+- 次に見るもの: 成立した回の空打ちの時点の一覧の状態(端の跳ね返りの途中か)。空打ちの直前・直後の木の時刻列
+- 2026-10-20 の棚卸し(M1Ultra・8 台並列 × 3 周): 24 回中 1 回(失敗時の木は遷移先の画面 = 同じ形)
+- **Compose の形は原因が分かり直した**(2026-10-21・デバイスでは run での再発の有無は未検証): E2EX-CMP の XCUITest で 1 回、
+  `tap("#nav_infinite", scroll: .down)` の空打ち(201,825)→(201,818) の直後に上の行(nav_native)の画面へ遷移した。押す点が下端の帯で
+  825 に頭打ちになり、抜き先(行の上端の 4pt 外)が近づいて **7pt しか動かず、タッチの遊び(Compose iOS `CUPERTINO_TOUCH_SLOP` 10pt)に
+  収まってただのタップになった**。軸に沿う抜きでクリックを取り消しているのは「矩形の外で離すこと」ではなく「遊びを超えてスクロールに
+  取られること」(ホームで実測: 中心から 5pt はクリック・10〜60pt は行の中で離しても外で離してもスクロール)。軸に沿う抜きの移動を
+  22pt 以上にした(`StepExecutor.emptyDragMinAlongAxisTravelPt` = Flutter `kTouchSlop` 18 + 余白 4)。起動直後のホームで同じ押す点から
+  撃ち比べると、7pt は 5 回中 5 回が上の行を押し、22pt は 5 回中 0 回
+- Flutter の 1 回(上の症状)は、全幅の行の中心から上端の外まで(約 28pt = Flutter の遊び 18 を超える)抜いていて、この形とは条件が
+  違う可能性がある(押す点の頭打ちが起きていたかは記録が無い)
+
+### OI-16 E2EY-CMP の iOS(in-app)で、隠れるバーのアニメの途中の枠を OCR して誤った赤
+- 状態: 再現済み
+- 確認: コミット未記録(2026-10-08)
+- 経緯: 2026-10-08・1 回 / 2026-10-11 の負荷テストで 2 回・同じ `hara-hiddan`。どちらも FM が死んで OCR だけの判定になっていた回
+
+- 症状: `scrollDown` の後の `textIs "#txt_bars_state" == "bars=hidden"` が「OCR だけの判定で見えていない(`hara-hiddan`)」で赤。
+  判定時の木では `#txt_bars_state` の枠が高さ 10pt(文字は約 24pt)で、隠れていくバー(`btn_top_action`・「受信トレイ」)が同じ帯に
+  重なって載っていた。失敗時のスクリーンショットでは `bars=hidden` が見えている(撮ったのは判定の後)
+- 見立て(確かめていない): バーが引っ込むアニメの途中の木で、文字の上下を切った枠を OCR した。FM が死んでいる機械で
+  OCR だけの判定になる回にだけ表に出る
+
+### OI-17 高負荷のときだけ、`tap(sel, linkText:)` の OCR が要素の中の文字を 1 文字も読めない
+- 状態: 再現済み
+- 確認: コミット未記録(2026-10-07)
+- 経緯: 2026-10-07 の負荷テストで 9 件・2026-10-08 の E2EY の回帰で 5 件。両 OS・CMP / View / SwiftUI
+
+- 症状: 「cannot find the link text … (OCR read no text in the element; 3 OCR passes)」。失敗時の絵(判定の後に撮る)には
+  文字が描かれている。静かな状態では E2EY-Android の同じクラスを 3 回回して 0 件
+- 見立て(確かめていない): 撮り直し 3 回・0.5 秒おき(`LinkTextLocator.ocrShotAttempts` / `ocrReshotInterval`)は軽い負荷で
+  詰めた秒数で、高負荷では画面の切り替えがそれより長引く。OCR が見た絵を証跡に残していないので、白い絵だったのか読みの
+  失敗なのかは分けられていない。次に見るもの: 失敗した回に OCR へ渡した絵(`evidenceImage` で持ち帰る)
+- 2026-10-11 の負荷テスト(E2EY-CMP の Android・3 件)で分けられた: 1 件は OCR へ渡した絵 3 枚のアプリ領域が一色(撮った絵が白い)、
+  2 件は OCR の生死の確認(既知の文字を描いた絵)も読めなかった(同じ時刻に別プロセスの OCR は読めていた = 機械全体の死ではなく、
+  その瞬間の読み手の失敗)。どちらもツールの判定の誤りではなく、高負荷の Emulator の描画と OCR の一時的な失敗
 
 ## 直し方は分かっていて、判断か作業が残っているもの(2026-10-20 の負荷テスト)
 
-- **E2EX-Flutter の in-app で「ツールチップを出せること」が、3 秒の長押しの間に後のステップが収まらず赤**
-  (2026-10-21・M1Ultra の 8 台 × 2 周で 16 回中 1 回 + 退行の確認で 1 回)
-  - 形: `hold("#btn_tooltip_anchor", 3s)` は押したまま返り、`exist("これはツールチップです")` → `select` → `textIs("tooltip=shown")` が
-    続く。赤の回は `exist` に 3.3 秒かかり(ブリッジへの要求が 2.6 秒無い = ホスト側の可視性検証とみられる)、その間に長押しが切れて
-    ツールチップが閉じた(注記 `hold-ended-before-block`)。もう 1 回は最初の絵が一色(フェードインの途中)で待ち直している間に切れた
-    (注記 `first-frame-pending`)
-  - 直し方の候補: シナリオの長押しを長くする(SUT のシナリオ = ユーザー資産)か、長押しの間の検証の所要を減らす。ツールの判定の
-    誤りではない(注記がその事実を記録している)
+### OI-18 E2EX-Flutter の in-app で「ツールチップを出せること」が、3 秒の長押しの間に後のステップが収まらず赤
+- 状態: 再現済み
+- 確認: コミット未記録(2026-10-21)
+- 経緯: 2026-10-21・M1Ultra の 8 台 × 2 周で 16 回中 1 回 + 退行の確認で 1 回
 
-- **MCP の `ft_results` が、サーバでそのプロジェクトを初めて引く回だけ遅い**(E2E-CMP で約 13 秒・負荷の下では未測定)
-  - 修正前は負荷テスト(10/18・10/19・10/20)で呼び出しの約 8% が 11〜61 秒。`.fleetest/mcp-rpc.log` で 5 秒を超えた 12 件は、どれも同じ
-    サーバの3回目以降だった = 毎回 90 日ぶんを解読し直していた側で、メモリの控え(`RunRecordMemo`。docs/results-json.md §RunRecordPack)で
-    E2E-CMP の2回目以降が 13 秒 → 1 秒前後になった(2026-10-20)。効いたかは次の負荷テストの mcp-rpc.log を同じ集計で見る
-  - 残るのは初めて引く回の素の読み込み(約 7.3 万ファイル)。負荷の下で読み込みと CPU のどちらが効いているかは未測定
-  - 手がかり: 1回目も速くするなら CLI のパックの共有が要る(パックの鍵は実行ファイルの素性 = そのままでは CLI と書き潰し合う)
+- 形: `hold("#btn_tooltip_anchor", 3s)` は押したまま返り、`exist("これはツールチップです")` → `select` → `textIs("tooltip=shown")` が
+  続く。赤の回は `exist` に 3.3 秒かかり(ブリッジへの要求が 2.6 秒無い = ホスト側の可視性検証とみられる)、その間に長押しが切れて
+  ツールチップが閉じた(注記 `hold-ended-before-block`)。もう 1 回は最初の絵が一色(フェードインの途中)で待ち直している間に切れた
+  (注記 `first-frame-pending`)
+- 直し方の候補: シナリオの長押しを長くする(SUT のシナリオ = ユーザー資産)か、長押しの間の検証の所要を減らす。ツールの判定の
+  誤りではない(注記がその事実を記録している)
 
-- **ブリッジ側の ref の二重の備え**(XCUITest ランナーは実装済み・**in-app と Android が残り**)
-  - 実装済み(ブリッジ版 198): `/tap` `/press` `/type` `/clear` の要求に任意の `expect: {identifier?, type}` を添え、ランナーが自分の
-    `refElements[ref]` と照らして、両方にある identifier か型が食い違えば撃たずに 422 `stale-ref`。ラベル・位置は比べない。
-    `expect` を送らない呼び手は従来どおり。ホストは `BridgeClient` が自分の最後の `/snapshot` から控えて添える
-  - 残り: ①in-app ブリッジと Android の注入層は `expect` を見ない(未知のフィールドとして無視される)。Android の `refIds` は
-    ブリッジ自身の表から引いた identifier で、ホストの期待との照合ではない ②`expect` は `AppDriver` のプロトコルを通さず
-    `BridgeClient` が自分の表から添えるので、**別のクライアントが木を撮り直して表が入れ替わった**ときは断てるが、
-    同じクライアントの中でステップ実行器が古い木の ref を撃つ誤りは `expect` では断てない(`/type` `/clear` の撃つ直前の
-    撮り直しだけが断つ。`/tap` `/press` は撮り直さない)
-  - 手がかり: ホストの新しい経路が古い ref で撃つ誤り(maintainer-notes §92.4)を `/tap` でも断つなら、`AppDriver` に期待を渡す口を
-    足すか、`/tap` にも撮り直しを入れる(1 回 30〜120ms の費用との相談)
-  - 測り方(ブリッジ版 211): `FT_STALE_TAP_PROBE=1` で回すと、XCUITest ランナーの ref の `/tap` が撃つ直前に撮り直し、要素がもう
-    控えた枠に居なかった回に注記 `stale-ref-at-tap` を残す(断らずに撃つ = 判定は変わらない)。率が 0 なら `/tap` は据え置き、
-    出るなら `/type` と同じ断り → 引き直しを、出た画面の形に絞って入れる。`/press`・in-app・Android は測っていない
-  - 2026-10-22 の測定(ブリッジ v211・`--ios-xcuitest`・手元の E2E 4 SUT + M1Ultra の E2EX 4 SUT): ref の `/tap` 約 4,200 回で
-    `stale-ref-at-tap` は **0 回** → `/tap` の撮り直しは入れない(据え置き)。0 回の信頼: 陽性対照(ランナーへ直接、遷移の後に
-    遷移前の ref を撃つと `movedBeforeFire`・変わっていない ref では出ない)と、プローブ1回の費用(同じ画面で +21ms)が run の
-    タップの所要の伸び(+22ms)と一致 = run の中で効いていた。`/type` の約6割(`stale-ref-retried`)は、押した欄が展開して位置が
-    変わる検索バーの流れに特有
+### OI-19 MCP の `ft_results` が、サーバでそのプロジェクトを初めて引く回だけ遅い
+- 状態: 再現済み
+- 確認: コミット未記録(2026-10-20)
+- 経緯: E2E-CMP で約 13 秒・負荷の下では未測定
 
-- **OCR の段をオフにした構成では、FM の空の転写(読める文字に `""`)が今も赤になる**
-  - 場所: `StepExecutor+Assert.swift` の空の転写の確認は `ocrTextVisibilityCheck` がオンのときだけ OCR を使う(オフの段は使わない)
-  - 手がかり: OCR を使わずに直すなら FM へ訊き直す等の別の手が要る。注記 `fm-empty-transcript-on-ink` の率で要否を見る
+- 修正前は負荷テスト(10/18・10/19・10/20)で呼び出しの約 8% が 11〜61 秒。`.fleetest/mcp-rpc.log` で 5 秒を超えた 12 件は、どれも同じ
+  サーバの3回目以降だった = 毎回 90 日ぶんを解読し直していた側で、メモリの控え(`RunRecordMemo`。docs/results-json.md §RunRecordPack)で
+  E2E-CMP の2回目以降が 13 秒 → 1 秒前後になった(2026-10-20)。効いたかは次の負荷テストの mcp-rpc.log を同じ集計で見る
+- 残るのは初めて引く回の素の読み込み(約 7.3 万ファイル)。負荷の下で読み込みと CPU のどちらが効いているかは未測定
+- 手がかり: 1回目も速くするなら CLI のパックの共有が要る(パックの鍵は実行ファイルの素性 = そのままでは CLI と書き潰し合う)
+
+### OI-20 ブリッジ側の ref の二重の備え
+- 状態: 経路確定
+- 確認: コミット未記録(2026-10-22)
+- 残り: XCUITest ランナーは実装済み・**in-app と Android が残り**
+
+- 実装済み(ブリッジ版 198): `/tap` `/press` `/type` `/clear` の要求に任意の `expect: {identifier?, type}` を添え、ランナーが自分の
+  `refElements[ref]` と照らして、両方にある identifier か型が食い違えば撃たずに 422 `stale-ref`。ラベル・位置は比べない。
+  `expect` を送らない呼び手は従来どおり。ホストは `BridgeClient` が自分の最後の `/snapshot` から控えて添える
+- 残り: ①in-app ブリッジと Android の注入層は `expect` を見ない(未知のフィールドとして無視される)。Android の `refIds` は
+  ブリッジ自身の表から引いた identifier で、ホストの期待との照合ではない ②`expect` は `AppDriver` のプロトコルを通さず
+  `BridgeClient` が自分の表から添えるので、**別のクライアントが木を撮り直して表が入れ替わった**ときは断てるが、
+  同じクライアントの中でステップ実行器が古い木の ref を撃つ誤りは `expect` では断てない(`/type` `/clear` の撃つ直前の
+  撮り直しだけが断つ。`/tap` `/press` は撮り直さない)
+- 手がかり: ホストの新しい経路が古い ref で撃つ誤り(maintainer-notes §92.4)を `/tap` でも断つなら、`AppDriver` に期待を渡す口を
+  足すか、`/tap` にも撮り直しを入れる(1 回 30〜120ms の費用との相談)
+- 測り方(ブリッジ版 211): `FT_STALE_TAP_PROBE=1` で回すと、XCUITest ランナーの ref の `/tap` が撃つ直前に撮り直し、要素がもう
+  控えた枠に居なかった回に注記 `stale-ref-at-tap` を残す(断らずに撃つ = 判定は変わらない)。率が 0 なら `/tap` は据え置き、
+  出るなら `/type` と同じ断り → 引き直しを、出た画面の形に絞って入れる。`/press`・in-app・Android は測っていない
+- 2026-10-22 の測定(ブリッジ v211・`--ios-xcuitest`・手元の E2E 4 SUT + M1Ultra の E2EX 4 SUT): ref の `/tap` 約 4,200 回で
+  `stale-ref-at-tap` は **0 回** → `/tap` の撮り直しは入れない(据え置き)。0 回の信頼: 陽性対照(ランナーへ直接、遷移の後に
+  遷移前の ref を撃つと `movedBeforeFire`・変わっていない ref では出ない)と、プローブ1回の費用(同じ画面で +21ms)が run の
+  タップの所要の伸び(+22ms)と一致 = run の中で効いていた。`/type` の約6割(`stale-ref-retried`)は、押した欄が展開して位置が
+  変わる検索バーの流れに特有
+
+### OI-21 OCR の段をオフにした構成では、FM の空の転写(読める文字に `""`)が今も赤になる
+- 状態: 経路確定
+- 確認: コミット未記録(日付未記録)
+
+- 場所: `StepExecutor+Assert.swift` の空の転写の確認は `ocrTextVisibilityCheck` がオンのときだけ OCR を使う(オフの段は使わない)
+- 手がかり: OCR を使わずに直すなら FM へ訊き直す等の別の手が要る。注記 `fm-empty-transcript-on-ink` の率で要否を見る
 
 ## 設計判断で据え置いているもの(直さないと決めた。症状が出たら見直す)
+
+### OI-22 描画崩壊の判定は自前描画とフレームワーク不明のアプリだけ
+- 状態: 据え置き
+- 確認: コミット未記録(日付未記録)
 
 - 描画崩壊の判定は自前描画(Compose・Flutter)とフレームワーク不明のアプリだけ。SwiftUI・UIKit・RN で**画面全体が写っていない**
   (ステータスバーまで一色)まま木だけの検証が緑になる形は拾わない。失敗レポートでは SwiftUI 648 枚中 3 枚・同日の SwiftUI/RN の
   200 本超の run では 0 件。何か1つ落ちれば既存の凍結の検知が端末を外す。誤った緑を実際に観測したら判定をこの形だけ広げる
   (maintainer-notes §90.3)
 
+### OI-23 `activateSnapshotNode` が UIView まで辿れないノードを許可する
+- 状態: 据え置き
+- 確認: コミット未記録(日付未記録)
+
 - `activateSnapshotNode` の古い木: 撃つ前に `isReachable` で照合するが、UIView まで辿れないノードは許可する
   (`InAppBridge.swift:776-777`)ので、SwiftUI の AX だけのノードでは古いノードが発火し得る
+
+### OI-24 `InAppSettle` は keyWindow だけを見る
+- 状態: 据え置き
+- 確認: コミット未記録(日付未記録)
+
 - `InAppSettle` は keyWindow だけを見る(`InAppSettle.swift:91-99`)。別の窓のアニメは見ない
+
+### OI-25 CLI の `tap --ref` が画面外でも ✅
+- 状態: 据え置き
+- 確認: コミット未記録(日付未記録)
+
 - CLI の `tap --ref` が画面外でも ✅: CLI の tap は状態を持たず、撮り直すと ref が振り直されて利用者が見た番号の意味が変わる
+
+### OI-26 dry-run の `--device` の黙殺
+- 状態: 据え置き
+- 確認: コミット未記録(日付未記録)
+
 - dry-run の `--device` の黙殺: 機械ごとの子 run へ渡す内部向けのフラグで、断ると内部の経路を壊しうる
+
+### OI-27 `api bridge-sources` の平文・`remote status --json` の `"-"`・引数なし `doctor` のブリッジ停止
+- 状態: 据え置き
+- 確認: コミット未記録(日付未記録)
+
 - `api bridge-sources` の平文・`remote status --json` の `"-"`・引数なし `doctor` のブリッジ停止: 仕様どおり
+
+### OI-28 DSL の側は ref の拒否ボタン押しとキーボードの下の tap を断らない
+- 状態: 据え置き
+- 確認: コミット未記録(日付未記録)
+
 - I4 の DSL 側(XCUITest の DSL で ref を撃つと XCTest が拒否ボタンを押す)・DSL の tap のキーボード下: 断るのは MCP だけと決めた

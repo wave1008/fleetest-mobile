@@ -15,7 +15,7 @@ description: セットアップ済みのプロジェクトに、Swift DSL のテ
 
 既存プロジェクト(`fleetest init` / `fleetest project create` 済み・アプリ/デバイス/実行プロファイルが
 ある)に、**1本のテストシナリオ .swift** を作る。DSL の正典は docs/design.md §10「Swift DSL」と
-README.md「Swift DSL」節。ここはエージェントが順に実行するための手順書。
+docs/commands.md・docs/user-docs/reference/(testclass/・selector/)。ここはエージェントが順に実行するための手順書。
 
 未セットアップなら `/fleetest-setup`、対象アプリ・デバイス・実行プロファイルが無ければ `/fleetest-profiles`。
 

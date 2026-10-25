@@ -35,6 +35,13 @@ fleetest bridge down --all              # 全ブリッジ停止
 同じ実行に Android シナリオがあれば専用ワーカーが自動で立ちます(1シナリオ=1サブプロセスで
 分離されるため、プラットフォームは混ざりません)。
 
+Android のブリッジは初回操作時に自動でインストール・起動されるので、通常は手で起動する必要はありません。
+多数の Emulator を並列で回す前にあらかじめ起動しておきたいときは、
+`fleetest bridge up --platform android`(`--serial <S>` で1台に絞る。省略すると接続中の全デバイス)を使います。
+`bridge down` / `bridge status` も同じく `--platform android [--serial <S>]` で使えます。
+ブリッジは起動時に window / transition / animator のアニメーションを無効化します。
+ブリッジの稼働中は、アクセシビリティ接続が実質1本の排他なので `uiautomator dump` を手で実行できません。
+
 ## 目安
 
 - **デバイスを増やせば速くなるとは限りません。** Mac が飽和した先では、1本ずつのシナリオが遅くなるだけで

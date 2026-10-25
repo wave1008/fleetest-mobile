@@ -1,5 +1,9 @@
 # 保守者向けの事故台帳
 
+| 種別 | 範囲 | 読む場面 | 扱わないこと |
+|---|---|---|---|
+| 記録 | CLAUDE.md の規則の由来(一度壊した記録と判断の経緯) | 規則を緩めたく/消したくなったとき・同じ型の設計判断をするとき | 規則そのもの(→ CLAUDE.md・.claude/rules/) |
+
 CLAUDE.md は**規則だけ**を持つ。ここは、その規則が**なぜその形なのか**を思い出すための台帳
 ——「一度実際に壊した」記録と、判断の経緯を置く。
 
@@ -5468,3 +5472,18 @@ worktree の run がそれらの端末を「別のワークスペースのブリ
   (ScenarioRunnerMain・MCP の CrashLogs は元から実機を除いていた = 同型はこの2か所)
 - 誰が iproxy を止めたかは未解決(docs/open-issues.md)。`launcher.stop()` 経由の teardown(`IOSDeviceTransport.stopIproxy`)だけが
   止めても記録しなかったので、生きた iproxy を止めたときに止めた側のログへ1行残す
+
+## 106. 仕様監査で「欠陥ではなかった」と確かめたもの(2026-10-20)
+
+2026-10-19〜20 の仕様監査(文書と実装の食い違い・未定義・沈黙する縮退)で欠陥の候補に挙がり、調べた結果、意図した設計か
+既に文書にあったもの。**同じ指摘を再調査しないための記録**。番号は監査時の通し番号(監査の本文は git 履歴の docs/spec-defects.md)。
+片付けた欠陥の決定は commands.md・design.md・user-docs へ反映済み。
+
+- **可視性検証の親スイッチが幾何の段まで切る**(旧 3 番): 意図した契約だった。`fmTextVisibilityCheck` と
+  `ocrTextVisibilityCheck` を両方 false にすると、画面外の要素も `exist` が素通りする。docs/commands.md の `requireVisible` は
+  「確認が実際に走るのは…が有効な run」と書き、`StepExecutorTests.testOffscreenMatchPassesWhenTheVisibilityGuardIsOff` が
+  この形を固定している。幾何の段だけを常に効かせるなら、この契約を変える決定が要る(既定はどちらも true なので、効かないのは両方を切った run だけ)
+- **`fold` / `unfold` / `hinge` の非対応の実機の扱いが OS で割れる**(旧 27 番): 意図した設計。iOS 実機は折りたためるかを観測できないので、分からないものを黙って対象外(skipped)にせず失敗にする。docs/commands.md の `fold` に「物理端末は非対応で失敗」と明記がある。Android 実機は `device_state` で折りたためるかを読めるので、折りたためない機は skipped になる
+- **`type("…")` の1引数形がセレクタらしい文字列を断る**(旧 33 番): 利用者向けの type のページ(ja/en)に、断る理由と2引数形の逃げ道が既に書いてある
+- **iOS の `back()` が結果を確かめない**(旧 23 番): DSL の `back()` は前後の木を読み比べ、変わらなければ注記 `backIneffective` を残す(`FTCore.BackEffect` を MCP の `ft_navigate` と共有)。監査ではドライバの `back()` だけを読んでいた
+- **Android 実機だけの run でも公開ポートを LAN に開く**(旧 41 番): 意図した設計。Android 実機のアプリが LAN のアドレスを焼き込んでビルドされていれば `adb reverse` では届かないので、LAN 公開と reverse の両方を用意する。docs の「実機のレーンを含む run では必須」と一致

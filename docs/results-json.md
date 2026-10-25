@@ -1,5 +1,9 @@
 # 実行結果の JSON(results/)
 
+| 種別 | 範囲 | 読む場面 | 扱わないこと |
+|---|---|---|---|
+| 正典 | `results/` に貯まる実行結果の JSON のスキーマ(唯一の定義元) | 結果 JSON を読む/変えるとき | 結果の分析コマンドの使い方(→ [user-docs/reference/running/results_analysis_ja.md](user-docs/reference/running/results_analysis_ja.md)) |
+
 `fleetest run` / `fleetest api run` は結果を `<project>/results/` に貯める。
 **このページがスキーマの唯一の定義元**(DTO は `Sources/FTCore/RunRecord.swift`)。
 

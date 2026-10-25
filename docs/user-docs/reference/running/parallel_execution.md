@@ -35,6 +35,14 @@ fleetest bridge down --all              # stop every bridge
 Android scenarios in the same run get their own worker automatically (each scenario runs in its
 own subprocess, so platforms stay isolated).
 
+The Android bridge is installed and started automatically on first use, so you normally do not
+start it by hand. To warm up many Emulators before a parallel run, use
+`fleetest bridge up --platform android` (add `--serial <S>` for one device; without it, every
+connected device). `bridge down` and `bridge status` take the same `--platform android [--serial <S>]`.
+On start the bridge disables the window, transition and animator animations.
+While the bridge is running you cannot run `uiautomator dump` by hand, because the accessibility
+connection is effectively exclusive to one client.
+
 ## Sizing
 
 - **More devices is not always faster.** Past the point where the Mac is saturated, each scenario

@@ -1,5 +1,9 @@
 # MCP 監査ラウンドの回し方(深さでなく幅)
 
+| 種別 | 範囲 | 読む場面 | 扱わないこと |
+|---|---|---|---|
+| 手順 | 実アプリで MCP(`ft_*`)の欠陥を拾う監査の回し方 | 監査を回すとき | ツールの仕様(→ Sources/fleetest-mcp のツール説明・[user-docs/reference/tools/mcp_server_ja.md](user-docs/reference/tools/mcp_server_ja.md)) |
+
 実アプリを触って MCP(`ft_*`)の欠陥を拾い、直す作業の手順書。
 **1ラウンド = 初見の「形」1つ**(アプリ1本ではない。次節)。
 

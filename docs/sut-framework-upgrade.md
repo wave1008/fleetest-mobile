@@ -1,5 +1,9 @@
 # SUT の UI フレームワークの版を上げる手順
 
+| 種別 | 範囲 | 読む場面 | 扱わないこと |
+|---|---|---|---|
+| 手順 | SUT の Flutter・React Native・Compose Multiplatform の版上げ | SUT の UI フレームワークの版を上げるとき | SUT の画面の契約(→ E2EAppCMP/docs/ui-contract.md) |
+
 fleetest 自身の SUT(E2E・E2EX・E2EY)の Flutter・React Native・Compose Multiplatform を最新の安定版へ
 上げるときの手順と、2026-10-13 に Flutter 3.44.7 → 3.47.7・RN 0.86.2 → 0.87.1 を上げたときに踏んだ罠。
 **受け手が作るアプリは新しい版で作られる**ので、SUT が古いままだと受け手が最初に踏む不具合を先に見つけられない。

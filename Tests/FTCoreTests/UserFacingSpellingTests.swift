@@ -29,7 +29,7 @@ final class UserFacingSpellingTests: XCTestCase {
     }
     private static func isNlsJa(_ p: String) -> Bool { p == "vscode-fleetest/package.nls.ja.json" }
     private static func isUserFacing(_ p: String) -> Bool {
-        isUserDocJa(p) || isI18n(p) || isNlsJa(p) || p == "README.md" || p == "vscode-fleetest/README.md"
+        isUserDocJa(p) || isI18n(p) || isNlsJa(p) || p == "README.md" || p == "README_ja.md" || p == "vscode-fleetest/README.md"
     }
 
     private static let rules: [Rule] = [
@@ -80,7 +80,7 @@ final class UserFacingSpellingTests: XCTestCase {
     func testScanReachesUserFacingSurfaces() throws {
         let scanned = try Self.scan().scanned
         for path in ["docs/user-docs/overview/glossary_ja.md", "docs/user-docs/quick-start_ja.md",
-                     "vscode-fleetest/src/i18n/strings/deviceOps.ts", "vscode-fleetest/package.nls.ja.json", "README.md"] {
+                     "vscode-fleetest/src/i18n/strings/deviceOps.ts", "vscode-fleetest/package.nls.ja.json", "README.md", "README_ja.md"] {
             XCTAssertTrue(scanned.contains(path), "走査が届いていない: \(path)")
         }
         XCTAssertGreaterThan(scanned.count, 100, "走査が利用者向けの面に届いていない")

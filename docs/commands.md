@@ -1,9 +1,13 @@
 # DSL コマンドリファレンス
 
+| 種別 | 範囲 | 読む場面 | 扱わないこと |
+|---|---|---|---|
+| 正典 | DSL の操作・検証コマンドの引数と挙動 | コマンドの挙動を確かめる/変えるとき | 構造コマンドとセレクタ記法(→ [user-docs/reference/testclass/](user-docs/reference/testclass/testcode_structure_ja.md)・[selector/](user-docs/reference/selector/selector_expression_ja.md))・Shirates との対応(→ [shirates-parity.md](shirates-parity.md)) |
+
 シナリオ(`TestProjects/<name>/scenarios/*.swift`)で使える**操作・検証コマンド**の説明。読者は**シナリオを書く利用者**。
 **構造コマンド**(`scenario` / `scene` / `condition` / `action` / `expectation`)と**セレクタ記法**
 (`#id` `ラベル` `*部分一致*` `.型[n]` `&&` `||` `(a|b)` `!` `>>` `:rightSwitch` など)は
-README「Swift DSL」章を参照。コマンド名・引数・挙動は Shirates(Classic) に準拠している。
+docs/user-docs/reference/testclass/testcode_structure_ja.md と docs/user-docs/reference/selector/selector_expression_ja.md を参照。コマンド名・引数・挙動は Shirates(Classic) に準拠している。
 
 引数の `sel` はセレクタ式(文字列)。**対象セレクタを取る全コマンドに型付きセレクタ(`Sel`)版が併設**
 されている(`tap(.id("login_btn"))` 等。意味・記録・ヒールは文字列版と同一)。**例外は `scrollFrame:` 引数で、こちらは

@@ -20,7 +20,7 @@ If you work inside the foundation-tester clone, `swift run fleetest` is equivale
 
 `fleetest help <subcommand>` shows every option of that subcommand with its default.
 `bridge`, `project`, `profile`, `devices`, `results`, `remote`, `services`, `hooks`, `monitor`, `vision` and `api` have
-child commands. `fleetest --version` shows the version.
+child commands. `fleetest --version` shows `<short git revision> (protocol <version>)`; `fleetest api version` is a separate entry that returns only the protocol version as JSON.
 
 ## Preparation and diagnosis
 
@@ -42,7 +42,7 @@ child commands. `fleetest --version` shows the version.
 | `project copy <source> <new-name>` | Duplicate a test project under a new name (excludes reports / results / `.fleetest` state) | — | Same as above |
 | `project rename <old-name> <new-name>` | Rename a test project and update `Package.swift` | — | Same as above |
 | `project delete <name>` | Move a test project to the Trash and remove it from `Package.swift` | `--yes` (required; without it nothing is deleted) | Same as above |
-| `profile setup` | Create app and run profiles consistently (idempotent) | `--platform`, `--app-id`, `--auto-device`, `--count`, `--app-path` | [Profiles](../project/profiles.md) |
+| `profile setup` | Create app and run profiles consistently (idempotent) | `--platform`, `--app-id`, `--auto-device`, `--count`, `--accept-licenses`, `--app-path` | [Profiles](../project/profiles.md) |
 | `profile list` | List run profiles and their component profiles, and show how they resolve on this machine | `--project` | Same as above |
 
 The settings of a run profile are in [Run profile settings](../project/run_profile.md).
@@ -71,7 +71,7 @@ The settings of a run profile are in [Run profile settings](../project/run_profi
 |---|---|---|---|
 | `devices up` | Start the devices in the run profiles (at most two at a time; already-running devices are skipped) | `--profile`, `--no-bridge`, `--device-machine` | [Running scenarios](../running/running_scenarios.md) |
 | `devices down` | Stop every bridge and shut down simulators and emulators (physical devices are never shut down, only their bridges are stopped). With `--profile`, only that profile's devices | `--profile`, `--device-machine`, `--force` | [Parallel Execution](../running/parallel_execution.md) |
-| `bridge up` | Start the bridge and keep it resident (iOS: a simulator runner / Android: an on-device server) | `--device`, `--port`, `--physical`, `--platform` | [Parallel Execution](../running/parallel_execution.md) |
+| `bridge up` | Start the bridge and keep it resident (iOS: a simulator runner / Android: an on-device server) | `--device`, `--port`, `--physical`, `--platform`, `--with-sample-app` (iOS only: also build and install SampleApp) | [Parallel Execution](../running/parallel_execution.md) |
 | `bridge down` | Stop the bridge | `--port`, `--all`, `--platform`, `--force` | [Parallel Execution](../running/parallel_execution.md), [Adding physical devices](../../fleet/adding_physical_devices.md) |
 | `bridge status` | Show the bridge status | `--platform`, `--port`, `--serial` | [Troubleshooting](../../in_action/troubleshooting.md) |
 | `install <package-path>` | Install an app from a package file (iOS: `.app` bundle / Android: `.apk` or `.apks`) | `--platform`, `--port`, `--serial` | "Operating a device by hand" below |
@@ -155,6 +155,7 @@ here; `fleetest api --help` shows all of them.
 | `api validate-profile` | Validate the profile JSON (apps / runs) |
 | `api results` | Aggregate the run-results database (the machine-facing side of `fleetest results`) |
 | `api retention` | Read or update the retention policy |
+| `api install-ios-runtime --version <SDK version>` | Download and install the iOS Simulator runtime of the selected Xcode (NDJSON). Does nothing if it is installed; refuses a version other than the Xcode SDK's. The VSCode extension's "Add device" calls it once before creating a device |
 
 For the extension see the [VS Code Extension](./vscode_extension.md), and for MCP see the [MCP Server](./mcp_server.md).
 

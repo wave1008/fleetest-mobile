@@ -1,5 +1,9 @@
 # fleetest mobile 設計書
 
+| 種別 | 範囲 | 読む場面 | 扱わないこと |
+|---|---|---|---|
+| 正典 | アーキテクチャ・ブリッジ・FM・DSL・プロファイル・モニター・結果 DB の設計 | 設計を変える前 | 規則の由来と事故(→ [maintainer-notes.md](maintainer-notes.md))・検証の手順(→ [verification.md](verification.md)) |
+
 Foundation Models framework(オンデバイス 3B モデル。macOS 26+、視覚検証は 27+)を最大限活用する、
 iOS / Android 両対応のアプリ E2E テストツール。iOS を先行実装し、Android は同じ
 `AppDriver` 抽象の上に後続実装した(経緯・時系列は §7, §8 参照)。
@@ -1193,7 +1197,7 @@ fleetest snapshot [--json] | tap | type | swipe | press | screenshot
 - **`bridge up` が起動するのは xcuitest ブリッジ(iOS)/デバイス内サーバ(Android)のみ**(in-app ブリッジを
   起動する経路は無い)。プロセスは常駐し、停止は `bridge down` か `devices down` を要する
 - **`run --profile` は終了時にブリッジを停止しない**(常駐を残すのが仕様。次の run が版一致なら再利用する。
-  利用者向けのコマンドは README「コマンド一覧」)
+  利用者向けのコマンドは docs/user-docs/reference/tools/cli_ja.md)
 - **手動駆動プリミティブの宛先解決(ポート探索・serial の自動採用・版ズレの拒否 `--allow-version-skew`)は
   MCP(ft_*)と同じ `FTBridgeClient.BridgeTargetResolution` / `FTAndroid.AndroidTargetResolution` を通す**
   (判定は1箇所・文言は呼び手ごと)。ref の撮り直し照合・snapshot のキャッシュ回避・入力の読み返しといった

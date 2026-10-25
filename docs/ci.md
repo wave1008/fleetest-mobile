@@ -1,5 +1,9 @@
 # CI で回す(JUnit 出力と Jenkins の例)
 
+| 種別 | 範囲 | 読む場面 | 扱わないこと |
+|---|---|---|---|
+| 手順 | テストパッケージを CI で回す最小構成(JUnit 出力・Jenkins の例・flaky の扱い) | CI の構成を案内する/直すとき | 利用者向けの案内(→ [user-docs/in_action/ci_ja.md](user-docs/in_action/ci_ja.md)) |
+
 シナリオは LLM なしの決定的実行なので CI に向く(exit code と JUnit XML で結果を機械処理できる)。
 このドキュメントは**受け手パッケージを CI で回す**ための最小構成。
 
@@ -135,6 +139,6 @@ CI 用のシナリオ単位リトライは**実装していない**。自動リ�
 - 結果 JSON のスキーマと、落ちた run の仕分け(フェーズ・素性・ワーカー異常):
   [docs/results-json.md](results-json.md)
 - 結果 DB の分析コマンド: `fleetest results --help`(サブコマンドの一覧は
-  [README「コマンド一覧」](../README.md#コマンド一覧)。docs/commands.md は**シナリオ用 DSL** の
+  [CLI リファレンス](user-docs/reference/tools/cli_ja.md)。docs/commands.md は**シナリオ用 DSL** の
   リファレンスなので `results` は載っていない)
 - 導入・更新の詳細: [docs/user-docs/quick-start_ja.md](user-docs/quick-start_ja.md)

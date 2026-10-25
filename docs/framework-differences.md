@@ -1,5 +1,9 @@
 # UI フレームワーク別の差異(fleetest から見た)
 
+| 種別 | 範囲 | 読む場面 | 扱わないこと |
+|---|---|---|---|
+| 正典 | UI フレームワークごとの木の見え方と操作の効き方の差 | フレームワークで挙動が割れる変更を入れるとき(表に1行足す) | 部品ごとのシナリオの書き方(→ [user-docs/reference/writing/ui_component_patterns_ja.md](user-docs/reference/writing/ui_component_patterns_ja.md)) |
+
 アプリの UI フレームワーク(Compose Multiplatform / Jetpack Compose・SwiftUI・UIKit・Android View/XML・
 Flutter・React Native)によって、**木の見え方と操作の効き方が違う**。この文書は、その差を3つに分けて並べる。
 

@@ -20,7 +20,7 @@ foundation-tester のクローン内で作業している場合は `swift run fl
 
 `fleetest help <サブコマンド>` で、そのサブコマンドの全オプションと既定値が出ます。
 `bridge`・`project`・`profile`・`devices`・`results`・`remote`・`services`・`hooks`・`monitor`・`vision`・`api` は
-子コマンドを持ちます。`fleetest --version` で版を確かめられます。
+子コマンドを持ちます。`fleetest --version` は `<git の短い revision> (protocol <版>)` を表示します(`fleetest api version` はプロトコル版だけを JSON で返す別の口です)。
 
 ## 準備と診断
 
@@ -42,7 +42,7 @@ foundation-tester のクローン内で作業している場合は `swift run fl
 | `project copy <元> <新>` | テストプロジェクトを別名で複製する(reports / results / `.fleetest` の状態は除く) | — | 同上 |
 | `project rename <旧> <新>` | テストプロジェクトの名前を変え、`Package.swift` を更新する | — | 同上 |
 | `project delete <名前>` | テストプロジェクトをゴミ箱へ移し、`Package.swift` から外す | `--yes`(必須。無いと何もしない) | 同上 |
-| `profile setup` | アプリプロファイルと実行プロファイルを整合させて作る(冪等) | `--platform`・`--app-id`・`--auto-device`・`--count`・`--app-path` | [プロファイル](../project/profiles_ja.md) |
+| `profile setup` | アプリプロファイルと実行プロファイルを整合させて作る(冪等) | `--platform`・`--app-id`・`--auto-device`・`--count`・`--accept-licenses`・`--app-path` | [プロファイル](../project/profiles_ja.md) |
 | `profile list` | 実行プロファイルと構成要素を一覧し、この Mac での解決結果を表示する | `--project` | 同上 |
 
 実行プロファイルの設定項目は[実行プロファイルの設定項目](../project/run_profile_ja.md)にあります。
@@ -71,7 +71,7 @@ foundation-tester のクローン内で作業している場合は `swift run fl
 |---|---|---|---|
 | `devices up` | 実行プロファイルのデバイスを起動する(同時に 2 台まで。起動済みは飛ばす) | `--profile`・`--no-bridge`・`--device-machine` | [シナリオの実行](../running/running_scenarios_ja.md) |
 | `devices down` | ブリッジを止め、Simulator / Emulator を停止する(実機は停止せずブリッジだけ止める)。`--profile` を付けるとそのプロファイルのデバイスだけ | `--profile`・`--device-machine`・`--force` | [並列実行](../running/parallel_execution_ja.md) |
-| `bridge up` | ブリッジを起動して常駐させる(iOS: Simulator のランナー / Android: デバイス上のサーバー) | `--device`・`--port`・`--physical`・`--platform` | [並列実行](../running/parallel_execution_ja.md) |
+| `bridge up` | ブリッジを起動して常駐させる(iOS: Simulator のランナー / Android: デバイス上のサーバー) | `--device`・`--port`・`--physical`・`--platform`・`--with-sample-app`(iOS のみ。SampleApp もビルドして入れる) | [並列実行](../running/parallel_execution_ja.md) |
 | `bridge down` | ブリッジを止める | `--port`・`--all`・`--platform`・`--force` | [並列実行](../running/parallel_execution_ja.md)・[実機を追加する](../../fleet/adding_physical_devices_ja.md) |
 | `bridge status` | ブリッジの状態を表示する | `--platform`・`--port`・`--serial` | [トラブルシューティング](../../in_action/troubleshooting_ja.md) |
 | `install <パッケージ>` | パッケージからアプリを入れる(iOS: `.app` / Android: `.apk` か `.apks`) | `--platform`・`--port`・`--serial` | 下の「デバイスを手で操作する」 |
@@ -153,6 +153,7 @@ MCP の `ft_*` ツール([MCP サーバー](./mcp_server_ja.md))と同じ操作�
 | `api validate-profile` | プロファイル(apps / runs)の JSON を検証する |
 | `api results` | 結果データベースを集計する(`fleetest results` の機械向け) |
 | `api retention` | 保持容量(掃除の上限)の方針を読む・更新する |
+| `api install-ios-runtime --version <SDK の版>` | 選択中の Xcode の iOS Simulator ランタイムを導入する(NDJSON)。導入済みなら何もせず、Xcode の SDK と違う版は拒みます。VSCode 拡張の「デバイスを追加」が、デバイスを作る前に1回だけ呼びます |
 
 拡張の使い方は [VSCode 拡張](./vscode_extension_ja.md)、MCP は [MCP サーバー](./mcp_server_ja.md)を参照してください。
 

@@ -1,5 +1,9 @@
 # リモートランナーのセットアップ
 
+| 種別 | 範囲 | 読む場面 | 扱わないこと |
+|---|---|---|---|
+| 手順 | ランナー機(別の Mac)を用意してディスパッチできる状態にする | ランナー機を用意するとき | 設計と背景(→ [remote-runner.md](remote-runner.md))・利用者向けの手順(→ [user-docs/fleet/adding_mac_ja.md](user-docs/fleet/adding_mac_ja.md)) |
+
 **別の Mac(ランナー機)へ SSH でジョブを投げ、結果を手元に受け取る**ための手順書。
 設計と背景は [remote-runner.md](remote-runner.md)(こちらは読まなくてよい)。
 

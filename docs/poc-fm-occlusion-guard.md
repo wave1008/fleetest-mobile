@@ -1,5 +1,9 @@
 # PoC レポート: FM 視覚照合によるアサーションの誤った緑の排除(occlusion-guard)
 
+| 種別 | 範囲 | 読む場面 | 扱わないこと |
+|---|---|---|---|
+| 記録 | テキストの可視性検証(FM・OCR の段)の PoC と実測 | 判定の根拠と実測を確かめるとき | 現在の仕様(→ [design.md](design.md)・.claude/rules/fm-occlusion.md) |
+
 ブランチ: `poc/fm-occlusion-verify` / 実施日: 2026-07-21 / 実行: メインセッション(Claude Code)
 
 ## 1. 背景と課題

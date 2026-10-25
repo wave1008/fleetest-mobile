@@ -271,7 +271,7 @@ struct RunScenarios: AsyncParsableCommand {
     var setOverrides: [String] = []
 
     @Flag(name: .customLong("dry-run"),
-          help: "Enumerate and validate the steps without touching a device (No-Load-Run). Catches selector syntax errors, unreachable scenes and expectation blocks with no assertions")
+          help: "Enumerate and validate the steps without touching a device (No-Load-Run). Catches selector syntax errors, expectation blocks with no assertions, #ids absent from captured screens and (with --profile) commands the devices cannot run")
     var dryRun = false
 
     @Flag(help: "Run only the scenarios that failed last time (results are recorded in .fleetest/last-results/ on every run)")

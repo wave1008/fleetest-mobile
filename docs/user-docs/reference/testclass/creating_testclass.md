@@ -39,9 +39,9 @@ class LoginTest {
 ```
 
 - `import FTDSL` is required.
-- `@TestClass` marks the class. **`app:` is normally omitted** — the target app is resolved
+- `@TestClass` marks the class. **`@TestClass` takes no `app:`** — the target app is resolved
   from the run profile (app profile → running platform's `ios.app`/`android.app`), which is
-  what lets the same scenario run against different bundle IDs on iOS and Android. Add
+  what lets the same scenario run against different bundle IDs on iOS and Android (without a profile, pass `--app-id`). Add
   `@TestClass(platform: "ios")` (or `"android"`) only when the class only makes sense on one
   OS; a run that doesn't cover that OS records it as skipped, not failed.
 - `@Test("description")` marks a test method. **Method names follow `S0010`, `S0020`, …**

@@ -13,33 +13,20 @@
 
 ## ドキュメント
 
-### 利用者向け
+**どの文書に何があるか(読む場面ごとの索引)と書き方の規約は docs/README.md**。ここには文書を
+直すときの規則だけを置く。
 
 - **利用者向けドキュメント(Shirates 流の en/ja 対)は docs/user-docs/**。入口は `index.md` /
   `index_ja.md`。1ページ = `<name>.md`(英)+ `<name>_ja.md`(日)で**片方だけ変えない**
   (`userDocsIntegrity.test.mjs` が対の欠落・切れたリンク・言語の混線・index 未掲載を検出)。
   DSL の挙動を変えたら docs/commands.md と併せて該当ページも直す
-- 受け手向けの導入(事前準備・インストール・サンプルアプリでの実行): docs/user-docs/quick-start_ja.md。更新は docs/user-docs/update_ja.md・アンインストールは docs/user-docs/uninstall_ja.md
-- DSL コマンドリファレンス(全コマンドの引数・挙動): docs/commands.md
-- CI 連携(`fleetest run --junit` の JUnit 出力・GitHub Actions 例・flaky 方針): docs/ci.md
-- リリース(git タグ発行。**受け手の配布口は最新リリースタグ**・main は開発線で版固定の導線は案内しない。
-  `FLEETEST_REF` は保守者のブランチ検証口): docs/releasing.md(`Scripts/release.sh`)
-
-### 設計・検証
-
-- 設計書(アーキテクチャ・Swift DSL 仕様・セレクタ記法・プロファイル): docs/design.md
-- **UI フレームワーク別の差異の索引**(揃えている / 揃っていない / 経路だけ違う、の3区分で横に並べる):
-  docs/framework-differences.md。**フレームワークで挙動が割れる変更を入れたら表に1行足す**
-- SUT の UI フレームワーク(Flutter・RN・CMP)の版を上げる手順と罠: docs/sut-framework-upgrade.md
-- シナリオのサンドボックス(Seatbelt)の知見(実測した性質・要った許可・調べ方・壁の外に残るもの):
-  docs/sandbox-seatbelt.md
-- 検証の詳細(flake/性能の判定規律・ベータ整合・全滅時の切り分け・e2e.sh のオプション): docs/verification.md
-- 性能チューニング(調整ノブ・不採用施策と再検討条件・計測手順): docs/performance-tuning.md
-- Shirates(Classic)との対応表(何が揃っていて何を持たないか・意図的に持たないものの理由・
-  OS で挙動が割れるもの・足す価値がある残り): docs/shirates-parity.md。
-  **コマンドを足す/名前を変えるときは必ずここも更新する**
-- 保守者向けの事故台帳(規則の由来): docs/maintainer-notes.md
-- 残件(未解決の不具合の候補。直したら項目を消す): docs/open-issues.md
+- **README.md(英)/ README_ja.md(日)は入口だけ**(何か・必要環境・利用者と保守者の入口)。仕様を書かない ——
+  仕様は user-docs と docs/ に置き、README からは指すだけ
+- **受け手の配布口は最新リリースタグ**・main は開発線で版固定の導線は案内しない。`FLEETEST_REF` は
+  保守者のブランチ検証口(docs/releasing.md)
+- フレームワークで挙動が割れる変更を入れたら docs/framework-differences.md の表に1行足す
+- コマンドを足す/名前を変えるときは docs/shirates-parity.md も更新する
+- 残件を直したら docs/open-issues.md の項目を消す
 
 ### 失敗の記録と操作の規律
 
@@ -101,6 +88,7 @@ grep やシェル(`cat`)で見るだけのとき・新しいファイルを読�
 | `.claude/rules/app-framework-scroll.md` | UI フレームワーク判定・容器推定・スクロールの端 |
 | `.claude/rules/bridge-provision.md` | ブリッジ(版・ポート・供給) |
 | `.claude/rules/device-health.md` | デバイスの健康状態(凍結) |
+| `.claude/rules/docs.md` | 保守者向けドキュメント(索引・書き方・節の ID) |
 | `.claude/rules/dsl-commands.md` | DSL コマンド(索引・引数名・スクロール指定・操作の待ち) |
 | `.claude/rules/e2e-sut.md` | fleetest 自身の E2E(SUT) |
 | `.claude/rules/executor.md` | StepExecutor(実行時設定・失敗の文言・システムアラート) |

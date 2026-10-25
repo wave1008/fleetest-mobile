@@ -1,5 +1,9 @@
 # レスポンス計測(試作の記録と設計の方針)
 
+| 種別 | 範囲 | 読む場面 | 扱わないこと |
+|---|---|---|---|
+| 記録 | レスポンス計測の試作と設計の方針 | レスポンス計測の設計を変えるとき | 利用者向けの説明(→ [user-docs/response/measuring_app_response_ja.md](user-docs/response/measuring_app_response_ja.md)) |
+
 **状態: 試作(2026-10-15・ブランチ `poc/response-measurement`)。製品コードとブリッジには何も入れていない。**
 試作のスクリプトは `Scripts/poc/response-poc.py`(計測)と `Scripts/poc/response-poc-summary.py`(集計)。
 

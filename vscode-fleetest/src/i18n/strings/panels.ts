@@ -437,7 +437,7 @@ export const panelsStrings = {
     ja: "画面全体をピンチで拡大します(マップ・画像ビューア用)",
     en: "Pinch the whole screen to zoom in (for maps and image viewers)",
   },
-  /// 画面領域の tooltip。**割り当ての一覧はここが唯一の表示**(README にも同じ表がある)
+  /// 画面領域の tooltip。**割り当ての一覧はここが唯一の表示**(docs/user-docs/reference/tools/vscode_extension の en/ja にも同じ表がある)
   "panels.live.zoomOutButton": { ja: "縮小", en: "Zoom out" },
   "panels.live.zoomOutTitle": {
     ja: "画面全体をピンチで縮小します",

@@ -278,7 +278,7 @@ UI 文字列は `src/i18n/`(拡張側ランタイム `i18n/index.ts`、辞書 `i
 - シナリオの `platform`(`@TestClass` の指定)に対応するデバイスがプロファイルに無い場合、
   そのシナリオは「担当ワーカーがありません」という理由で失敗として扱われます
   (他のシナリオの実行は継続されます)。
-- プロファイルの詳細(`apps/`/`machines`/`runs/` の構成)はリポジトリルートの `README.md` を
+- プロファイルの詳細(`apps/`/`machines`/`runs/` の構成)は`docs/user-docs/reference/project/profiles_ja.md` を
   参照してください。
 
 ## 実行プロファイルの編集支援
