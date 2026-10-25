@@ -10,6 +10,8 @@
 
 ### 再起動直後の最初の xcuitest 供給は冷えたブートがランナーの予算に混ざる(2026-09-14)
 
+確認環境(2026-09-14 時点を git から復元): iOS ブリッジ v105。macOS・Xcode・ランタイム・デバイスは未記録
+
 Mac の再起動直後(シミュレータ 0 台)に `--ios-xcuitest` を回すと、8 台のランナーが**何も書かないまま**
 `startupTimeoutSeconds`(180 秒)を跨いで全滅する。xcodebuild は設定を書き出した後、
 テスト本体が始まるまでログに何も書かず、しかも Shutdown のシミュレータを**自分でブートしてから**始めるので、
@@ -22,6 +24,8 @@ Mac の再起動直後(シミュレータ 0 台)に `--ios-xcuitest` を回す�
 「booting the simulator before starting the xcuitest runner」が並び、落ちなければ効いている)。
 
 ### Mac の再起動の後、シミュレータのソフトキーボードが出なくなる(2026-09-19)
+
+確認環境(2026-09-19 時点を git から復元): iOS ブリッジ v119・Compose Multiplatform 1.11.0・Kotlin 2.4.10。macOS・Xcode・ランタイム・デバイスは未記録
 
 再起動の直後の `e2e.sh --ios-inapp` で、ローカル機の `keyboardIsShown` だけが決定的に赤(E2E-CMP / Flutter の 03。
 リモートの3機は緑)。欄に焦点は立つがソフトキーボードが出ない = iOS がハードウェアキーボードがあると見なして
@@ -36,6 +40,8 @@ false のデバイス(-02)は出た。**Simulator.app 側の `ConnectHardwareKey
 **実機はホストから変えられない**(実機でソフトキーボードが出ないときは端末側でハードウェアキーボードを外す)。
 
 ### 長く生きた XCUITest ランナーは AX 照会のたびに数秒待つ状態に落ちることがある(2026-09-14)
+
+確認環境(2026-09-14 時点を git から復元): iOS ブリッジ v105。macOS・Xcode・ランタイム・デバイスは未記録
 
 同じ 1 シナリオがデバイスによって 6 秒と 22 秒に割れたら(tap 0.5 秒 → 4 秒)、そのデバイスのランナーのログに
 `Ignoring failure to get hierarchy for remote element in process <pid>` が**約 3.7 秒おき**に並んでいないかを見る。
@@ -71,6 +77,8 @@ remote element を諦める時間だけ待つ。隣のデバイスでは同じ�
   緑のたびに「restarted …; a one-element query now takes 0.0Xs — the lane continues」
 
 ### 高負荷では XCUITest の `typeText` が打鍵を取りこぼす(2026-07-31)
+
+確認環境(2026-07-31 時点を git から復元): iOS ブリッジ v27。macOS・Xcode・ランタイム・デバイスは未記録
 
 `/clear` は「残り文字数ぶんの delete を送る」を繰り返すが、**送った打鍵が全部入る保証はない**。
 実測(6シミュレータ並列 + Android スイート並走)では毎周 6 割前後しか入らず、
@@ -160,6 +168,8 @@ S0030 型(type が成功扱いなのに後段の検証で値が空)の再発ゼ�
 
 ### 同時刻クラスタは環境要因(kAXErrorAPIDisabled・2026-08-04)
 
+確認環境(2026-08-04 時点を git から復元): iOS ブリッジ v50。macOS・Xcode・ランタイム・デバイスは未記録
+
 iOS で `Error getting main window kAXErrorAPIDisabled`(500)が出ることがある。
 **19件すべてが時刻の塊**だった(00:55:29〜34 に6件・別日に7件の塊)= **全レーンに一斉**なので、
 シナリオやアプリの問題ではなく XCTest の a11y サーバ側の一時停止。数秒で復旧する。
@@ -173,6 +183,8 @@ iOS で `Error getting main window kAXErrorAPIDisabled`(500)が出ることが�
 
 ### WebView の入力が黙って落ちる(domInterop・2026-08-04)
 
+確認環境(2026-08-04 時点を git から復元): iOS ブリッジ v50・Compose Multiplatform 1.11.0・Kotlin 2.4.10。macOS・Xcode・ランタイム・デバイスは未記録
+
 Compose/Flutter ホストの WebView(domInterop)の入力は「座標タップでフォーカス →
 フォーカス中要素へ typeText」なので、**タップがフォーカスを立て損なうと打鍵が丸ごと落ちる**
 (値は空のまま 200 が返り、後段の検証だけが落ちる)。E2E-CMP で 4/78。
@@ -183,6 +195,8 @@ Compose/Flutter ホストの WebView(domInterop)の入力は「座標タップ�
 **二重入力**になる(Android の `ACTION_SET_TEXT` で踏んだ二重追記と同じ型)。
 
 ### iOS シミュレータも「画面だけ死ぬ」——a11y は健全・タップだけ届かない(2026-08-05 実測)
+
+確認環境(2026-08-05 時点を git から復元): iOS ブリッジ v51・Compose Multiplatform 1.11.0・Kotlin 2.4.10。macOS・Xcode・ランタイム・デバイスは未記録
 
 Android エミュレータの表示凍結([[emulator-display-freeze-wedge]])と**同じ病理が iOS でも起きる**。
 2026-08-05 に E2E-CMP/ios-xcuitest の `-06` で観測:
@@ -251,6 +265,8 @@ Android エミュレータの表示凍結([[emulator-display-freeze-wedge]])と*
 
 ### スクロール探索の「飛び越し」を決定的に再現する(2026-08-06)
 
+確認環境(2026-08-06 時点を git から復元): iOS ブリッジ v52・Compose Multiplatform 1.11.0・Kotlin 2.4.10。macOS・Xcode・ランタイム・デバイスは未記録
+
 探索は「木を撮る → 解決する → 1回スワイプ」の繰り返しなので、**スワイプの合間に一度も
 木に出なかった要素は原理的に見つからない**。既定経路(`scrollFrame` 未指定)は刻みが
 ブリッジ任せで、1回の移動が容器を超えると起きる。発生率は 0.8% しかなく効果を測れなかったので、
@@ -269,6 +285,8 @@ Android エミュレータの表示凍結([[emulator-display-freeze-wedge]])と*
    飛び越しではなく「掴めるが撃つと飲まれる」になる。**Android が飛び越しの正**
 
 ### 端に着いたら探索を打ち切り、逆向きに拾い直す(2026-08-06)
+
+確認環境(2026-08-06 時点を git から復元): iOS ブリッジ v52。macOS・Xcode・ランタイム・デバイスは未記録
 
 上の witness を使って2つ入れた。**どちらも `containerInference` で切れる**。
 
@@ -302,6 +320,8 @@ Android エミュレータの表示凍結([[emulator-display-freeze-wedge]])と*
 
 ### ghost へのタップ防御は「そのステップが探索したか」を条件にしてはいけない(2026-08-06)
 
+確認環境(2026-08-06 時点を git から復元): iOS ブリッジ v52・Compose Multiplatform 1.11.0・Kotlin 2.4.10。macOS・Xcode・ランタイム・デバイスは未記録
+
 iOS(Compose)は可視域の外に出た行を木に残し、frame は容器の外を指す。掴んだままタップすると
 **容器の外を撃って画面が何も変わらないまま成功として記録**され、後段の検証だけが落ちる。
 
@@ -334,6 +354,8 @@ ghost を検出しておきながら**1本も送らずにそのままタップ**
 (機構は特定の画面でしか発火しないので、内訳に偏りが出るはず)。
 
 ### 画面外要素の frame は信用できない —— XCUITest は容器の原点へクランプする(2026-08-05 実測)
+
+確認環境(2026-08-05 時点を git から復元): iOS ブリッジ v51・Compose Multiplatform 1.11.0・Kotlin 2.4.10。macOS・Xcode・ランタイム・デバイスは未記録
 
 **一時的な不整合ではなく、静止画面で常に成立する規則**。1回スナップショットを撮れば確認できる
 (長時間の再現待ちは要らない)。E2E-iOS のスクロール画面(`UITableView`)を開いた直後の実採取:
@@ -435,6 +457,8 @@ viewport が画面全体になり**、「見えている」と誤判定して探
 
 ### SpringBoard の確認アラートはアプリスコープのスナップショットに出ない(2026-08-09)
 
+確認環境(2026-08-09 時点を git から復元): iOS ブリッジ v61。macOS・Xcode・ランタイム・デバイスは未記録
+
 ../design/dsl-syntax.md「openURL 後の SpringBoard 確認アラート自動了承」の実装対象。**システム UI が
 アプリの上に載っていても、アプリスコープの木には1要素も現れない**(`com.apple.springboard` へ
 attach したときだけ見える)。**「操作(タップ・入力)が効かないのに snapshot は正常」のときは、
@@ -442,6 +466,8 @@ attach したときだけ見える)。**「操作(タップ・入力)が効か�
 到達できない。
 
 ### 常駐ブリッジのセッション(iOS xcuitest を CLI で直接叩くとき)
+
+確認環境: 未記録(観測日の記載が無い)
 
 `bridge up` で立てた常駐ランナーへ curl 等で直接 `/snapshot`・`/tap` すると、最初の1回が
 `409`(セッション無し)で返ることがある。ランナーはアプリ参照(`sessionBundleID`)を `/session`
@@ -455,6 +481,8 @@ attach したときだけ見える)。**「操作(タップ・入力)が効か�
   次の `/session` で上書きされる)。`/status` の session 欄=「今アタッチ可能」の保証ではない。
 
 ### 未インストールのアプリを launch するとランナーが死ぬ(2026-08-06)
+
+確認環境(2026-08-06 時点を git から復元): iOS ブリッジ v52。macOS・Xcode・ランタイム・デバイスは未記録
 
 外部フィードバック #7「Safari 操作後にブリッジが切断」は **Safari と無関係**だった。
 報告元のログで確定した経過:
@@ -488,6 +516,8 @@ curl -s -X POST http://127.0.0.1:<port>/session -d '{"bundleID":"com.example.non
 ## Android
 
 ### ポーリングはキャッシュを突破しない —— 「撮り直せば新しくなる」は Android では偽(2026-08-14)
+
+確認環境(2026-08-14 時点を git から復元): Android ブリッジ VERSION_CODE 61・Compose Multiplatform 1.11.0・Kotlin 2.4.10・React Native 0.86.2。macOS・Xcode・ランタイム・デバイスは未記録
 
 `clearInput` の事後検証は「クリア前の値」と「クリア後の値」を比べ、`after == before` なら
 「消えていない」と報告する。ここが E2E-CMP/android の S0040 で**並列負荷 10 周中 8 周落ちた**。
@@ -619,6 +649,8 @@ step5 を直した瞬間に step12 が毎周走るようになり、そこで初
 
 ### Android ブリッジの版を上げた直後の1回目は落ちることがある(2026-08-01)
 
+確認環境(2026-08-01 時点を git から復元): Android ブリッジ VERSION_CODE 37。macOS・Xcode・ランタイム・デバイスは未記録
+
 `expectedBridgeVersionCode` を上げると各機のブリッジ APK が再インストールされる。これが
 **実行中のレーンを踏む**と、そのシナリオは `Cannot reach the driver ... The network connection
 was lost` で落ちる(実測: 版上げ直後の E2E-Android で 4/40 失敗 → 全機が新版になった直後の
@@ -645,6 +677,8 @@ was lost` で落ちる(実測: 版上げ直後の E2E-Android で 4/40 失敗 �
 
 ### Android の実行時間はセッション内で劣化する(前後比較は必ず同セッションで取り直す)
 
+確認環境(2026-08-01 時点を git から復元): Android ブリッジ VERSION_CODE 37。macOS・Xcode・ランタイム・デバイスは未記録
+
 2026-08-01 実測: 同じ E2E-CMP/android が**同一コード**で 262.9s(セッション序盤)→ 325.7〜352.8s
 (1.5 時間・10 スイート後)。**+24〜33% がコード変更なしで出る**。iOS は同時刻でも +0.8% しか
 動かなかったので、ホスト CPU ではなくエミュレータ側の劣化。
@@ -656,6 +690,8 @@ was lost` で落ちる(実測: 版上げ直後の E2E-Android で 4/40 失敗 �
   (実際に 2026-08-01 に「Android +24%」を見て一度その結論に傾いた)
 
 ### Android 凍結まわりの検証の罠
+
+確認環境(2026-07-25 時点を git から復元): Android ブリッジ VERSION_CODE 12。本文に記載のある環境: M2 Ultra
 
 - **画面 OFF(KEYCODE_SLEEP)はフェイク凍結として万能ではない**: screencap は実凍結と同一の
   一様フレーム(<30KB)になるため **blank 検出・事前修復パスの検証には使える**(検出→sleep/wake
@@ -701,6 +737,8 @@ was lost` で落ちる(実測: 版上げ直後の E2E-Android で 4/40 失敗 �
 ## FM(Foundation Models)
 
 ### FM が死んでいる run は「守りが効いていない run」(2026-08-20 に可視化)
+
+確認環境(2026-08-20 時点を git から復元): ブリッジ・フレームワークの版は該当なし。macOS・Xcode・ランタイム・デバイスは未記録
 
 FM の実呼び出しが全滅していると、**`screenLooksLike` は黙って素通りし、occlusion-guard(`exist` の既定
 requireVisible)は OCR だけで判定する**(`OCROnlyVisibility`。OCR が判定できない形は素通り・
@@ -753,6 +791,8 @@ requireVisible)は OCR だけで判定する**(`OCROnlyVisibility`。OCR が判�
 あるので既定スイートでは1度も実行されない)。
 
 ### FM 呼び出しの許可枠(FMCallSlots)
+
+確認環境(2026-07-22 時点を git から復元): ブリッジ・フレームワークの版は該当なし。macOS・Xcode・ランタイム・デバイスは未記録
 
 FM は**ホスト全体で共有される資源**。2026-07-22 時点の実測ではスループットは並列度によらず
 約1回/秒に見えたが、これは**枠1本(直列化)の上限**であって FM 自体の天井ではなかった
@@ -817,6 +857,8 @@ p50 レイテンシ 2416ms → 1675ms(−31%)/ ロック待ちによる skip は
 全滅そのものへの対策は**サーキットブレーカ**(下記)側で行う。
 
 ### サーキットブレーカ(FMBreaker)
+
+確認環境(2026-07-27 時点を git から復元): ブリッジ・フレームワークの版は該当なし。macOS・Xcode・ランタイム・デバイスは未記録
 
 FM は死んだら**再起動まで回復しない**ので、死んだ後も呼び続けるのは純粋な浪費
 (実測: 全滅した 1554 シナリオで合計 31 分を捨てていた)。**連続 3 回失敗したら以後は呼ばない**。

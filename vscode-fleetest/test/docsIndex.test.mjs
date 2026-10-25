@@ -177,6 +177,25 @@ test("分割したフォルダの README はフォルダ内の全 ## ID を載�
   assert.deepEqual(missing, [], "フォルダの README(目次)に節が載っていない");
 });
 
+/** 制約の節(`### `)のうち、冒頭の数行に `確認環境` の行を持たないもの(docs/README.md「正典と記録」の手順の書き方)。 */
+export function constraintsMissingEnv(text) {
+  const body = text.replace(/```[\s\S]*?```/g, "");
+  const lines = body.split("\n");
+  const missing = [];
+  lines.forEach((l, i) => {
+    if (!l.startsWith("### ")) return;
+    if (!lines.slice(i + 1, i + 4).some((x) => x.startsWith("確認環境"))) missing.push(l.slice(4, 60));
+  });
+  return missing;
+}
+
+test("制約と回避の各節は確認環境の行を持つ", () => {
+  const text = readFileSync(path.join(DOCS, "verification/constraints.md"), "utf8");
+  assert.ok((text.match(/^### /gm) ?? []).length >= 10, "制約の節が読めない");
+  assert.deepEqual(constraintsMissingEnv(text), [], "確認環境の行が無い(版を上げたとき見直す対象を選べない)");
+  assert.deepEqual(constraintsMissingEnv("### A\n\n確認環境: 未記録\n### B\n本文\n"), ["B"]);
+});
+
 test("§ と目次の検出器は形の崩れを拾う", () => {
   assert.equal(bareSectionRefs("MN-72 と §3.1 と §メモ"), 1);
   assert.deepEqual(tocMissing("# T\n\n## 目次\n\n- MN-1 a\n\n## MN-1 a\n## MN-2 b\n"), ["MN-2 b"]);

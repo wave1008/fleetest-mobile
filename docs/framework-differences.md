@@ -38,7 +38,11 @@ Flutter・React Native)によって、**木の見え方と操作の効き方が�
 
 ## FD-1 木の見え方(型・`#id`・ラベル)
 
+確認環境: 未記録(観測日の記載が無い)
+
 ### FD-1.1 型の対照表(同じ `#id` を指したときの型。実測)
+
+確認環境: 未記録(観測日の記載が無い)
 
 | 要素 | CMP(iOS) | CMP(Android) | SwiftUI/UIKit | View/XML | Flutter(iOS) | Flutter(Android) | RN(iOS) | RN(Android) |
 |---|---|---|---|---|---|---|---|---|
@@ -58,6 +62,8 @@ Flutter・React Native)によって、**木の見え方と操作の効き方が�
 
 ### FD-1.2 `#id` の出し方(アプリ側の作法。守らないと `#id` が全滅する)
 
+確認環境: 未記録(観測日の記載が無い)
+
 | フレームワーク | 作法 | 罠 |
 |---|---|---|
 | Compose(Android) | `testTagsAsResourceId = true` をルートで立てる | **ダイアログは別ウィンドウ**なので、ダイアログにも付け直す(忘れると Android だけダイアログ内の `#id` が全滅) |
@@ -68,6 +74,8 @@ Flutter・React Native)によって、**木の見え方と操作の効き方が�
 | React Native | `testID` | RN 0.65 以降(それ以前は Android に出ない)。Modal 内にも届く |
 
 ### FD-1.3 ツールが揃えている木の違い(A)
+
+確認環境: 未記録(観測日の記載が無い)
 
 | フレームワーク | 素の挙動 | ツールの吸収 | 場所 |
 |---|---|---|---|
@@ -94,6 +102,8 @@ Flutter・React Native)によって、**木の見え方と操作の効き方が�
 
 ### FD-1.4 揃っていない木の違い(B)
 
+確認環境(2026-10-02 最後に確かめた日の時点を git から復元): iOS ブリッジ v139・Android ブリッジ VERSION_CODE 85・Compose Multiplatform 1.11.0・Kotlin 2.4.10・React Native 0.86.2。macOS・Xcode・ランタイム・デバイスは未記録
+
 | フレームワーク | 違い | シナリオでの扱い |
 |---|---|---|
 | 自作の部品(SwiftUI の Button で作ったチェックボックス・ラジオ等) | チェック状態を a11y に一切出さない(value も selected trait も無い) | **見本画像を `vision/classifiers/CheckStateClassifier/[ON]`・`[OFF]` に置けば画像で判定できる**(CheckStateClassifier。witness は E2E-iOS の `#cb_agree` / `#radio_*`)。見本が無いと `checkIsON` は「reports no check state」で落ちる。ほかの手段は **echo の文字列**(`agree=true` 等)か、アプリ側で公開する(SwiftUI なら `.accessibilityRepresentation { Toggle(...) }`) |
@@ -111,7 +121,11 @@ Flutter・React Native)によって、**木の見え方と操作の効き方が�
 
 ## FD-2 操作
 
+確認環境: 未記録(観測日の記載が無い)
+
 ### FD-2.1 タップ
+
+確認環境: 未記録(観測日の記載が無い)
 
 | フレームワーク | 違い | 区分 | ツールの動き |
 |---|---|---|---|
@@ -125,6 +139,8 @@ Flutter・React Native)によって、**木の見え方と操作の効き方が�
 
 ### FD-2.2 スクロール探索の直後のタップ(空打ち)
 
+確認環境(2026-10-11 最後に確かめた日の時点を git から復元): iOS ブリッジ v175・Android ブリッジ VERSION_CODE 100・Compose Multiplatform 1.11.0・Kotlin 2.4.10・React Native 0.86.2。macOS・Xcode・ランタイム・デバイスは未記録
+
 - **Compose / Flutter(iOS)**: スクロール容器が**次の1タッチを消費する** → 探索の終わりに、クリックにならない
   ドラッグ(空打ち)で肩代わりする。**A**(利用者は意識しない)
   - 指を離す点は要素の矩形の外へ横に抜く(矩形の中で離すとクリックが成立して行が選ばれる)
@@ -137,6 +153,8 @@ Flutter・React Native)によって、**木の見え方と操作の効き方が�
     —— `waitForSettle` は利用者が自分で払った直後のタップ向け
 
 ### FD-2.3 スクロール
+
+確認環境: 未記録(観測日の記載が無い)
 
 | フレームワーク | 素の制約 | ツールの手段(iOS in-app) | 区分 |
 |---|---|---|---|
@@ -174,6 +192,8 @@ Flutter・React Native)によって、**木の見え方と操作の効き方が�
 
 ### FD-2.4 文字入力・Enter・消去(iOS in-app の受け口の違い。すべて C)
 
+確認環境: 未記録(観測日の記載が無い)
+
 | フレームワーク | `type` | `pressEnter` | `clearInput` |
 |---|---|---|---|
 | Compose | 別ウィンドウにある本物の受け口(`IntermediateTextInputUIView`)を探して `insertText` | `insertText("\n")` が IME アクションになる(完全一致の `"\n"` だけ) | 全範囲を空に置換 → 残れば deleteBackward |
@@ -196,6 +216,8 @@ Flutter・React Native)によって、**木の見え方と操作の効き方が�
 
 ### FD-2.5 ジェスチャ(iOS in-app)
 
+確認環境(2026-09-24 最後に確かめた日の時点を git から復元): iOS ブリッジ v127・Android ブリッジ VERSION_CODE 73・Compose Multiplatform 1.11.0・Kotlin 2.4.10・React Native 0.86.2。macOS・Xcode・ランタイム・デバイスは未記録
+
 | 操作 | Compose / Flutter | SwiftUI / UIKit / RN | 区分 |
 |---|---|---|---|
 | doubleTap | in-app で撃つ(**Compose は XCTest の合成タッチをダブルタップとして一度も数えない** —— 2回の独立したタッチで間隔を 0.1〜0.25 秒にしても同じ。2026-09-24 実測。ios-xcuitest の設定では Compose のダブルタップは成立しない) | XCUITest へ回す(ランナーは非公開 API で2回の独立したタッチを送る。XCTest の `doubleTap()` = 1回のタッチに tapCount=2 は RN が単タップと読む) | C |
@@ -211,6 +233,8 @@ Flutter・React Native)によって、**木の見え方と操作の効き方が�
 ---
 
 ### FD-2.6 チェック状態(`checkIsON` / `checkIsOFF` / `checked=`)
+
+確認環境(2026-09-19 最後に確かめた日の時点を git から復元): iOS ブリッジ v119・Android ブリッジ VERSION_CODE 68・Compose Multiplatform 1.11.0・Kotlin 2.4.10・React Native 0.86.2。macOS・Xcode・ランタイム・デバイスは未記録
 
 iOS は実装ごとに状態の出し方が違う(2026-09-18 実測・両モード同値)。**A. 揃えている** ——
 `FTCore.CheckStateReading` が全部を読み、オン / オフ / indeterminate / 不明に畳む。
@@ -263,6 +287,8 @@ Android の4 SUT と RN iOS は、どの部品もオン/オフとも a11y が判
 
 ## FD-3 待ちと鮮度
 
+確認環境: 未記録(観測日の記載が無い)
+
 | フレームワーク | 違い | 区分 | ツールの動き |
 |---|---|---|---|
 | Compose・Flutter(Android) | 新しく出た要素を a11y のキャッシュへ 800ms 以上出さない。まばらに読むと出現の検出が1周期遅れる(50ms 刻みで読み続けると遅れは出ない) | A | 待つ間の**2回目以降の読みだけ**キャッシュを迂回する(`repollBypassesCache`)。1秒遅延の出現待ちが CMP で 2.9 → 1.1 秒。**迂回はキャッシュを更新しない**ので、迂回の周で待ちが成立したら**次の操作の解決の1枚も迂回する**(`nextResolveBypassesCache`。素取得だと兄弟の古い位置を叩く = E2E-CMP 09 S0010 が実機 Android で 8/9 赤) |
@@ -285,6 +311,8 @@ Android の4 SUT と RN iOS は、どの部品もオン/オフとも a11y が判
 
 ## FD-4 WebView
 
+確認環境: 未記録(観測日の記載が無い)
+
 | 構成 | 木の出どころ | 操作 | 区分 |
 |---|---|---|---|
 | iOS in-app・SwiftUI/UIKit ホスト | DOM を JS で読む(in-app から WebView の a11y は見えない) | 合成タッチ | C |
@@ -301,6 +329,8 @@ Android の4 SUT と RN iOS は、どの部品もオン/オフとも a11y が判
 
 ## FD-5 起動の速さ
 
+確認環境: 未記録(観測日の記載が無い)
+
 - **CMP(iOS)は SwiftUI より起動が約 0.8 秒遅い**(B・アプリ自身の性質)。in-app の launch の待ちは「アプリのメインスレッドが
   空いてブリッジが答えるまで」で、差はそこにだけ出る。仕組みの違う XCUITest の launch でも同じ差(PT-6)
 - Android でも CMP の起動は他より遅め。ツールの待ち方(80ms 間隔の問い合わせ)は全フレームワーク共通
@@ -308,6 +338,8 @@ Android の4 SUT と RN iOS は、どの部品もオン/オフとも a11y が判
 ---
 
 ## FD-5.1 各フレームワークの固有部品(E2EX で実測)
+
+確認環境(2026-10-08 最後に確かめた日の時点を git から復元): iOS ブリッジ v158・Android ブリッジ VERSION_CODE 88・Compose Multiplatform 1.11.0・Kotlin 2.4.10・React Native 0.86.2。本文に記載のある環境: API 34・Pixel 3a・Pixel 9
 
 共通契約の SUT に載らない**定番部品**は、別の5 SUT(`E2EXAppCMP/`・`E2EXAppFlutter/`・`E2EXAppRN/`・`E2EXAppAndroid/`・
 `E2EXAppIOS/`。画面・`#id`・echo の契約は `E2EXAppCMP/docs/ui-contract.md` と `ui-contract-wave2.md`、SUT ごとの差分は
@@ -407,5 +439,7 @@ SwiftUI の pinch(SUT が枠で切り取っていなかった)・inputs S0030/40
 - フレームワークで挙動が割れる変更を入れたら、該当節の表に1行足す(区分 A / B / C を必ず付ける)。
   **B を A に変えた**ときは、witness(赤になるシナリオ)を併記する
 - 型・`#id` の実測値そのものは各 SUT の `docs/ui-contract.md` が正典。ここへは結論だけ写す
+- 各節の冒頭の `確認環境:` の行に、最後に確かめたときの UI フレームワークとブリッジの版を書く。行を足す・直すたびに更新する
+  (分からない項目は「未記録」。フレームワークの版を上げたら、この行が古い節から見直す)
 - 利用者向けの書き方の指針(`#id` で指す・echo で確かめる等)は `docs/user-docs/` と
   `E2EAppCMP/docs/ui-contract.md` の全体規約が正典

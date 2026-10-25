@@ -154,6 +154,12 @@ for u in org/jetbrains/compose/compose-gradle-plugin org/jetbrains/kotlin/kotlin
 - **sut-ec-mobile は JDK 25(LTS)固定**(887ec92。出力の向き先も Java 25・サーバーのイメージは `eclipse-temurin:25-jre-alpine`)。
   クイックスタートの指示文は「無ければ Homebrew で JDK 25」= `openjdk@25`(素の `openjdk` は 25 ではない)
 
+## 5.9 版を上げた後に見直す文書
+
+上げた後、`docs/framework-differences.md` の各節と `docs/verification/constraints.md` の各節の `確認環境:` の行を見て、
+上げたフレームワークの古い版でしか確かめていない差・制約を見直す。E2E・E2EX・E2EY で再現を確かめたら、`確認環境:` を新しい版に更新する。
+再現しなくなったものは、製品が吸収したなら `docs/verification/resolved.md` へ、差が消えたなら該当の行を区分 A へ移す。
+
 ## 6. 実行中に起きたこと
 
 ### FM が ANE の「no memory」で止まる
