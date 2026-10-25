@@ -16,7 +16,7 @@ Installs, uninstalls, or resets the data of the app under test.
 
 ```swift
 installApp()                       // path from the app profile's appPath
-launchApp()                        // on iOS in `inapp` mode, call it right after install
+launchApp()                        // on iOS in `inapp-boost` mode, call it right after install
 installApp("/path/to/MyApp.app")
 clearAppData()                     // back to a first-run state
 removeApp()
@@ -24,7 +24,7 @@ removeApp()
 
 ## Notes
 
-- **On iOS in the default `inapp` mode, call `launchApp()` right after `installApp()`.** The install ends the bridge inside the app, and
+- **On iOS in the default `inapp-boost` mode, call `launchApp()` right after `installApp()`.** The install ends the bridge inside the app, and
   operations such as `tap` do not reach the app until the next `launchApp()` reinjects it (the step carries the note `the in-app bridge
   will be reinjected on the next launchApp()`).
 - **Reinstalling does not restore permissions.** On an iOS Simulator, uninstalling and

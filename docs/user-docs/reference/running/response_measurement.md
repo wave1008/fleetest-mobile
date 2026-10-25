@@ -69,7 +69,7 @@ fleetest run --profile <name> --set responseMeasurement=true --set responseRepea
     with `fleetest monitor pause` is left as it is; a hold with `--for` is replaced by one without a limit for the run and restored at
     the end if it has not expired yet.
 - It cannot be combined with the following (the run stops with a named error): `enableAnimations: false`; `fmTextVisibilityCheck`,
-  `ocrTextVisibilityCheck`, `screenLooksLike` or `record` set to `true`; `iosMode` or the device's `mode` set to `inapp`;
+  `ocrTextVisibilityCheck`, `screenLooksLike` or `record` set to `true`; `iosMode` or the device's `mode` set to `inapp-boost`;
   `--broadcast`, `--fleet`, `--split`.
   Measurement mode turns these off by itself when the keys are not written. A profile that sets one explicitly to `true` is refused, so set it to `false` or remove the key.
 

@@ -1,5 +1,5 @@
 {
-  "app": "ft_e2e",
+  "app": "ft_e2e_flutter",
   "devices": [
     {
       "platform": "ios",
@@ -355,6 +355,6 @@
     }
   ],
   "heal": true,
-  "iosMode": "inapp",
+  "iosMode": "inapp-boost",
   "wipeDataOnBloat": true
 }

@@ -63,8 +63,8 @@ public enum ResponseMeasurementPolicy {
                 run: run, device: device.name, platform: device.platform)
         }
         // 計測は XCUITest ランナーにしか無い(in-app ブリッジは 501)。解決は計測の run の既定を xcuitest に倒すので、
-        // ここで inapp が残るのはデバイスに mode を明示したときだけ
-        if device.platform == "ios", device.spec.mode == IOSMode.inapp {
+        // ここで inapp-boost が残るのはデバイスに mode を明示したときだけ
+        if device.platform == "ios", device.spec.mode == IOSMode.inappBoost {
             throw ProfileError.responseMeasurementConflict(run: run, key: "mode", required: IOSMode.xcuitest)
         }
     }
@@ -77,7 +77,7 @@ public enum ResponseMeasurementPolicy {
         if doc.enableAnimations == false {
             throw ProfileError.responseMeasurementConflict(run: run, key: "enableAnimations", required: "true")
         }
-        if doc.iosMode == IOSMode.inapp {
+        if doc.iosMode == IOSMode.inappBoost {
             throw ProfileError.responseMeasurementConflict(run: run, key: "iosMode", required: IOSMode.xcuitest)
         }
         let mustNotBeTrue: [(String, Bool?)] = [

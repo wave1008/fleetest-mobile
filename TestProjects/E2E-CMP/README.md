@@ -22,7 +22,7 @@ cd E2EAppCMP
 
 ```sh
 fleetest run --project E2E-CMP --profile ios        # iPhone 17 Pro(iOS 27.0)・xcuitest モード(全件グリーンの基準)
-fleetest run --project E2E-CMP --profile ios-inapp  # 同じ端末を inapp モードで(モード差分の観測用)
+fleetest run --project E2E-CMP --profile ios-inapp-boost  # 同じ端末を inapp-boost モードで(モード差分の観測用)
 fleetest run --project E2E-CMP --profile android    # Pixel 9(Android 15)-01
 ```
 
@@ -44,8 +44,8 @@ fleetest run --project E2E-CMP --profile android    # Pixel 9(Android 15)-01
 (現在はその向きにスクロール余地があるビューだけを対象にし、無ければ 501)。
 (2) 合成タッチへ迂回してもジェスチャ認識器は drag/長押しを受理しない(Compose も SwiftUI も)。
 
-**ただし inapp モード(`iosMode: "inapp"`)では自動でフォールバックする**(2026-07-23)。
-inapp モードは in-app と XCUITest の両ブリッジを張るので、ジェスチャだけ XCUITest 側へ回せばよい:
+**ただし inapp-boost モード(`iosMode: "inapp-boost"`)では自動でフォールバックする**(2026-07-23)。
+inapp-boost モードは in-app と XCUITest の両ブリッジを張るので、ジェスチャだけ XCUITest 側へ回せばよい:
 
 - `/status` の `unsupportedActions` 申告(compose は `["swipe","press"]`、uikit は `["press"]`)を
   起動時プローブで見て、該当する操作は**最初から** XCUITest へ回す
@@ -56,7 +56,7 @@ inapp モードは in-app と XCUITest の両ブリッジを張るので、ジ�
 - フォールバックしたステップはレポートに `(XCUITest へフォールバック)` と注記が付く
   (ロケータのフォールバックとは別扱いで、セレクタ更新の提案は出さない)
 
-この結果 **`ios-inapp` も 18/18 で通る**(37.3s。フォールバック導入前は3シナリオが落ちて 93.9s)。
+この結果 **`ios-inapp-boost` も 18/18 で通る**(37.3s。フォールバック導入前は3シナリオが落ちて 93.9s)。
 `tap`/`type`/スナップショットは高速な in-app のまま、ジェスチャだけが XCUITest 経由になる。
 詳細は DS-23。
 
@@ -84,7 +84,7 @@ E2E のシナリオは全て `@TestClass` で `platform:` を持たない(=両OS
 |---|---|---|
 | `ios`(xcuitest・iPhone 17 Pro/iOS 27.0) | ✅ 18/18 | 176s |
 | `android`(Pixel 9/Android 15) | ✅ 18/18 | 82s |
-| `ios-inapp`(2026-07-27 再測) | ✅ 25/25(XCUITest フォールバック+activate 再試行の導入後) | — |
+| `ios-inapp-boost`(2026-07-27 再測) | ✅ 25/25(XCUITest フォールバック+activate 再試行の導入後) | — |
 
 ## シナリオ一覧
 
@@ -121,7 +121,7 @@ E2E のシナリオは全て `@TestClass` で `platform:` を持たない(=両OS
 - `94_指紋照合.swift` / `95_指紋照合の前提切替.swift` — 自己修復(ロケータの指紋照合)の witness と、
   その前提(id スキーマ)を切り替える補助。run を跨いで初めて意味を持つので、`Scripts/heal-verify.sh` で
   1台に固定して順に回す(個別に回しても何も検証しない)。
-- `91_クラッシュ検知.swift` — アプリを実際にクラッシュさせる破壊的シナリオ。**`ios-inapp` で回すこと**
+- `91_クラッシュ検知.swift` — アプリを実際にクラッシュさせる破壊的シナリオ。**`ios-inapp-boost` で回すこと**
   (クラッシュレポート添付は inapp 固有。xcuitest はブリッジが別プロセスなので切断しない)。
   **2026-07-22 検証済み**: エラー行に `.ips` のパスと終了理由が付くことを確認。
 

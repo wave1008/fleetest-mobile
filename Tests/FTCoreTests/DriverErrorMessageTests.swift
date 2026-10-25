@@ -22,7 +22,7 @@ final class DriverErrorMessageTests: XCTestCase {
     func testUnreachableIOSInAppSimulator() {
         let text = DriverErrorMessage.unreachable(context: iosInAppSimulator, detail: "connection refused")
         XCTAssertEqual(text,
-            "Cannot reach the driver (not running, or slow to respond). In inapp mode the"
+            "Cannot reach the driver (not running, or slow to respond). In inapp-boost mode the"
                 + " backgrounded app can be suspended, so TCP is accepted but no HTTP response comes"
                 + " back. Check: fleetest bridge up."
                 + " connection refused")
@@ -70,8 +70,8 @@ final class DriverErrorMessageTests: XCTestCase {
         let text = DriverErrorMessage.connectionRefused(context: iosInAppSimulator, detail: "refused")
         XCTAssertEqual(text,
             "Connection to the driver was refused (nothing listening on the port). If this happened"
-                + " mid-run, the app under test most likely exited or crashed (on iOS inapp the bridge"
-                + " lives inside the app, so it becomes unreachable the moment the app dies)."
+                + " mid-run, the app under test most likely exited or crashed (the in-app bridge lives"
+                + " inside the app, so it becomes unreachable the moment the app dies)."
                 + " If the app has not been started yet, check: fleetest bridge up. Detail: refused")
     }
 

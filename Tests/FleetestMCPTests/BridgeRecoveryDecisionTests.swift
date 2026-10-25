@@ -19,7 +19,7 @@ final class BridgeRecoveryDecisionTests: XCTestCase {
             isConnectionRefused: false, bridge: "xcuitest", alreadyFailedThisSession: false, isPhysical: false, heldByAnotherSession: false))
     }
 
-    /// in-app ブリッジを含む構成(inapp モード)は起動し直しの単位が違う(対象アプリごと落ちる)ので対象外
+    /// in-app ブリッジを含む構成(inapp-boost モード)は起動し直しの単位が違う(対象アプリごと落ちる)ので対象外
     func testDoesNotRecoverInAppBridges() {
         XCTAssertFalse(MCPServer.shouldAttemptXCUITestBridgeRecovery(
             isConnectionRefused: true, bridge: "inapp", alreadyFailedThisSession: false, isPhysical: false, heldByAnotherSession: false))

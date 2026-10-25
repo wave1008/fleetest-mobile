@@ -430,10 +430,10 @@ final class RemoteDispatchTests: XCTestCase {
 
     func testRemoteRunArgsMinimal() {
         XCTAssertEqual(
-            RemoteRunArgs.build(project: "E2E", profile: "ios-inapp", scenarios: [], folders: [],
+            RemoteRunArgs.build(project: "E2E", profile: "ios-inapp-boost", scenarios: [], folders: [],
                                 noLPT: false, lptHistoryRuns: nil, performanceMode: false,
                                 remoteJUnitPath: nil, reportDir: nil),
-            ["run", "--project", "E2E", "--profile", "ios-inapp", "--quiet", "--runner", "local"])
+            ["run", "--project", "E2E", "--profile", "ios-inapp-boost", "--quiet", "--runner", "local"])
     }
 
     /// **リモートのサブ実行はデバイスの絞り込みを中継しないと効かない**(2026-08-17 の実走)。
@@ -515,7 +515,7 @@ final class RemoteDispatchTests: XCTestCase {
 
     func testRemoteRunArgsEverything() {
         XCTAssertEqual(
-            RemoteRunArgs.build(project: "E2E", profile: "ios-inapp",
+            RemoteRunArgs.build(project: "E2E", profile: "ios-inapp-boost",
                                 scenarios: ["Login.S0010", "Login.S0020"], folders: ["smoke"],
                                 setOverrides: ["heal": true, "iosPreActionPing": true, "enableAnimations": true],
                                 noLPT: true, lptHistoryRuns: 3,
@@ -523,7 +523,7 @@ final class RemoteDispatchTests: XCTestCase {
                                 remoteJUnitPath: "/remote/junit.xml",
                                 reportDir: "/remote/reports"),
             [
-                "run", "--project", "E2E", "--profile", "ios-inapp", "--quiet", "--runner", "local",
+                "run", "--project", "E2E", "--profile", "ios-inapp-boost", "--quiet", "--runner", "local",
                 "--report-dir", "/remote/reports",
                 "--scenario", "Login.S0010", "--scenario", "Login.S0020",
                 "--folder", "smoke",
@@ -556,7 +556,7 @@ final class RemoteDispatchTests: XCTestCase {
 
     func testRemoteRunArgsReportDirOmittedWhenNil() {
         XCTAssertFalse(
-            RemoteRunArgs.build(project: "E2E", profile: "ios-inapp", scenarios: [], folders: [],
+            RemoteRunArgs.build(project: "E2E", profile: "ios-inapp-boost", scenarios: [], folders: [],
                                 noLPT: false, lptHistoryRuns: nil, performanceMode: false,
                                 remoteJUnitPath: nil, reportDir: nil)
                 .contains("--report-dir"))
@@ -695,7 +695,7 @@ final class RemoteDispatchTests: XCTestCase {
         let layout = RemoteLayout(base: "/Users/ci/fleetest-runner", issuer: "alice", home: "/Users/ci")
         let command = RemoteShell.remoteRunCommand(
             layout: layout,
-            fleetestArgs: ["run", "--project", "E2E", "--profile", "ios-inapp", "--quiet"])
+            fleetestArgs: ["run", "--project", "E2E", "--profile", "ios-inapp-boost", "--quiet"])
         let workDir = "/Users/ci/fleetest-runner/users/alice/work"
         let binary = "/Users/ci/fleetest-runner/foundation-tester/.build/debug/fleetest"
         XCTAssertEqual(command,
@@ -706,7 +706,7 @@ final class RemoteDispatchTests: XCTestCase {
             + "export FT_DISPATCH_LOCK_HELD='local' && export FT_DISPATCHED_RUN=1 && test -x '\(binary)' || "
             + "{ echo \"fleetest binary not found on remote — run: swift build --product fleetest\" >&2; exit 90; } && "
             + "'\(binary)' project sync >/dev/null 2>&1 || true && "
-            + "'\(binary)' 'run' '--project' 'E2E' '--profile' 'ios-inapp' '--quiet'")
+            + "'\(binary)' 'run' '--project' 'E2E' '--profile' 'ios-inapp-boost' '--quiet'")
     }
 
     /// **run は「このロックは親が握っている」印を運び、exec は運ばない**。
@@ -952,17 +952,17 @@ final class RemoteDispatchTests: XCTestCase {
 
     func testBuildApiMinimal() {
         XCTAssertEqual(
-            RemoteRunArgs.buildApi(project: "E2E", profile: "ios-inapp", scenarios: ["Login.S0010"],
+            RemoteRunArgs.buildApi(project: "E2E", profile: "ios-inapp-boost", scenarios: ["Login.S0010"],
                                    noLPT: false, lptHistoryRuns: nil,
                                    performanceMode: false,
                                    defaultTimeout: nil, scenarioTimeout: nil, reportDir: nil),
-            ["api", "run", "--project", "E2E", "--profile", "ios-inapp", "--runner", "local",
+            ["api", "run", "--project", "E2E", "--profile", "ios-inapp-boost", "--runner", "local",
              "--scenario", "Login.S0010"])
     }
 
     func testBuildApiEverything() {
         XCTAssertEqual(
-            RemoteRunArgs.buildApi(project: "E2E", profile: "ios-inapp",
+            RemoteRunArgs.buildApi(project: "E2E", profile: "ios-inapp-boost",
                                    scenarios: ["Login.S0010", "Login.S0020"],
                                    setOverrides: ["heal": true],
                                    noLPT: true, lptHistoryRuns: 3,
@@ -970,7 +970,7 @@ final class RemoteDispatchTests: XCTestCase {
                                    defaultTimeout: 5.5, scenarioTimeout: 90,
                                    reportDir: "/remote/reports"),
             [
-                "api", "run", "--project", "E2E", "--profile", "ios-inapp", "--runner", "local",
+                "api", "run", "--project", "E2E", "--profile", "ios-inapp-boost", "--runner", "local",
                 "--report-dir", "/remote/reports",
                 "--scenario", "Login.S0010", "--scenario", "Login.S0020",
                 "--set", "heal=true", "--no-lpt", "--lpt-history-runs", "3", "--performance",

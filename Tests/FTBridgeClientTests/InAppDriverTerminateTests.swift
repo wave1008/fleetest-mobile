@@ -41,7 +41,7 @@ private final class StatusStubServer: @unchecked Sendable {
         self.serverFD = fd
 
         let body = """
-        {"ready":true,"device":"stub","osVersion":"iOS 27.0","mode":"inapp",\
+        {"ready":true,"device":"stub","osVersion":"iOS 27.0",\
         "sessionBundleID":"\(sessionBundleID)"}
         """
         Thread.detachNewThread { [weak self, fd] in

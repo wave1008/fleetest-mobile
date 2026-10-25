@@ -134,7 +134,7 @@
     }
   ],
   "heal": true,
-  "iosMode": "inapp",
+  "iosMode": "inapp-boost",
   "record": true,
   "screenLooksLike": true,
   "fmTextVisibilityCheck": true,

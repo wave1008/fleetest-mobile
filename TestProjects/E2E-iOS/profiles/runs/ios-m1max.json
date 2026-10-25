@@ -20,6 +20,6 @@
     }
   ],
   "heal": true,
-  "iosMode": "inapp",
+  "iosMode": "inapp-boost",
   "wipeDataOnBloat": true
 }

@@ -72,7 +72,7 @@ enum ProfileRunOrchestrator {
                 return !serials.contains(serial)
             },
             bridgeLogSize: { worker in
-                // xcuitest ランナーのログのみ有効(inapp モードは xcuiPort 側。in-app はホスト側ログが
+                // xcuitest ランナーのログのみ有効(inapp-boost モードは xcuiPort 側。in-app はホスト側ログが
                 // AX 処理で成長しないため nil を返して /status のみの判定にフォールバックさせる)
                 guard let port = worker.connection.xcuiPort
                     ?? ((worker.connection.mode == nil || worker.connection.mode == "xcuitest")
@@ -94,7 +94,7 @@ enum ProfileRunOrchestrator {
                 return ProcessLiveness.isAlive(pid)
             },
             probeBridge: { worker in
-                // inapp モードの主ポート(in-app)は別アプリのシナリオ中サスペンドされ TCP 受理・HTTP
+                // inapp-boost モードの主ポート(in-app)は別アプリのシナリオ中サスペンドされ TCP 受理・HTTP
                 // 無応答になる(DS-8.8)ため、死活確認は suspend されない xcuitest 側で行う
                 guard let port = worker.connection.xcuiPort ?? worker.connection.port else {
                     return .silent

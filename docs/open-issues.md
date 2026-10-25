@@ -26,13 +26,13 @@
 - 要る材料: 実例の木。ステータスバーの高さは木に載らない(画面の枠だけ)ので、定数で帯を決めると機種で黙って誤る。
   ブリッジが安全領域(safeAreaInsets / WindowInsets)を申告する形なら根拠のある判定になる
 
-### OI-2 inapp モードの WebView 委譲中に `keyboardIsNotShown` が「cannot determine」で落ちる
+### OI-2 inapp-boost モードの WebView 委譲中に `keyboardIsNotShown` が「cannot determine」で落ちる
 - 状態: 推測
 - 確認: コミット未記録(2026-10-20)
 - 経緯: 2026-10-20 の仕様監査
 
 - 場所: `Sources/FTBridgeClient/WebViewDelegatingDriver.swift`(委譲中は XCUITest の木を返す)/ `Sources/FTCore/KeyboardWait.swift`
-- 要る材料: inapp モードで WebView の入力欄に打った後の `keyboardIsNotShown` の実例(木と失敗文)
+- 要る材料: inapp-boost モードで WebView の入力欄に打った後の `keyboardIsNotShown` の実例(木と失敗文)
 
 ### OI-3 MCP で払った `ft_snapshot waitFor` が `ft_draft_scenario` の下書きに写らず、下書きの `tap("#id")` が DSL 既定の約 0.7 秒の再試行しか持たず、遅い画面で赤になりうる
 - 状態: 経路確定
@@ -58,7 +58,7 @@
 
 ## デバイスで赤のまま・原因未調査
 
-### OI-5 SE3(実機・inapp モード)の USB トンネル(iproxy)が実行中に消え、以後の起こし直しも届かない
+### OI-5 SE3(実機・inapp-boost モード)の USB トンネル(iproxy)が実行中に消え、以後の起こし直しも届かない
 - 状態: 再現済み
 - 確認: コミット未記録(2026-10-25)
 - 経緯: 2026-10-25 の負荷テスト・1 回

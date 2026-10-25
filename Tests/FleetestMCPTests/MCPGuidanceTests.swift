@@ -31,7 +31,7 @@ final class MCPGuidanceTests: XCTestCase {
         XCTAssertTrue(hint.contains("com.apple.springboard"), hint)
     }
 
-    /// **inapp モードの in-app ブリッジには出さない**: in-app ブリッジは注入先アプリ専用で springboard を掴めず、
+    /// **inapp-boost モードの in-app ブリッジには出さない**: in-app ブリッジは注入先アプリ専用で springboard を掴めず、
     /// 案内どおりにやると 409 が増えるだけになる
     func testInAppBridgeGetsNoSpringboardHint() {
         for bridge in ["inapp", "android"] {
@@ -177,7 +177,7 @@ final class MCPGuidanceTests: XCTestCase {
 
     /// 「Could not connect」だけでは何が起きたか分からない。**今どこに何が居るか**と
     /// 復帰手順まで返す(ランナー死の筆頭原因は同一シミュレータの2本目)
-    /// inapp モードの in-app ブリッジが消えたときは、XCUITest のランナーと言わず ft_launch で戻すと言う
+    /// inapp-boost モードの in-app ブリッジが消えたときは、XCUITest のランナーと言わず ft_launch で戻すと言う
     /// (in-app は `bridge up` で起こす物ではなく、アプリの起動で注入される)
     func testConnectionLostForAnInAppBridgeDoesNotTalkAboutTheXCUITestRunner() {
         let message = MCPServer.connectionLostMessage(connection: "port 8123", running: [], bridge: "inapp")

@@ -5,7 +5,7 @@
 // 現れない)。指せるのは表示テキスト・`aria-label`・型だけ。
 // **この SUT に置く意味**: iOS の WKWebView は中身の a11y が別プロセスにあり、in-app からは
 // 見えない。uikit ホストでは fleetest が DOM を JS で読む(InAppWebViewDOM)経路が主役になるので、
-// その経路の実地検証を兼ねる(`--ios-inapp` で回さないとこの経路は一切通らない)。
+// その経路の実地検証を兼ねる(`--ios-inapp-boost` で回さないとこの経路は一切通らない)。
 
 import FTDSL
 

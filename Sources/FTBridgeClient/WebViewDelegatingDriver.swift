@@ -1,4 +1,4 @@
-// inapp モードで WebView 画面だけを XCUITest(対象アプリへ attach)へ委譲するデコレータ。
+// inapp-boost モードで WebView 画面だけを XCUITest(対象アプリへ attach)へ委譲するデコレータ。
 //
 // in-app は WKWebView の中身を a11y ツリーからは採れない(Web コンテンツの AX は WebContent
 // プロセスが提供し、プロセス内走査では届かない)。uikit ホストでは in-app が DOM を JS で読んで
@@ -49,7 +49,7 @@ public final class WebViewDelegatingDriver: AppDriver {
 
     /// Web コンテンツが現れるまでの初回待ちの**上限**。XCUITest 側の WebView AX 活性化は
     /// **Simulator の実測 2.3s** で、これはそれに余裕を持たせた値。
-    /// **inapp モードは実機でも動く**ので、この上限が実機で足りる保証は無い ——
+    /// **inapp-boost モードは実機でも動く**ので、この上限が実機で足りる保証は無い ——
     /// だから尽きたときは黙らず `WebViewPath.delegatedEmpty` を名乗る。
     /// 名乗らないと「AX がまだ出ていない空の木」と「本当に空のページ」が区別できず、
     /// 否定アサーションが誤って通り、肯定側は「見つからない」で誤誘導される
@@ -150,7 +150,7 @@ public final class WebViewDelegatingDriver: AppDriver {
         // 経路は**返した本人が名乗る**(StepExecutor が失敗文言に添える。要素の形から
         // 推測させると Android が「XCUITest へ委譲」を名乗る事故になる)
         snapshot.webViewPath = WebViewPath.delegated
-        // offscreen ヒントはxcuitest モード限定にする: inapp モードの WebView スクロールは
+        // offscreen ヒントはxcuitest モード限定にする: inapp-boost モードの WebView スクロールは
         // in-app の contentOffset 短絡が既に速く(実測 scrollToTop 1.5s)、ヒントが乗ると
         // StepExecutor の跳躍(実ドラッグ)が優先されて計測済みの挙動が変わる
         snapshot.offscreen = nil

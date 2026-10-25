@@ -99,10 +99,10 @@ It returns `true` when both stages finish in time.
   something that never stops keeps failing it, pass a `selector` that excludes it, or adjust `quietSeconds` /
   `waitSeconds`.
 - **The judgement happens inside the bridge; the images never go to the host.**
-  - On iOS, the pixels are always captured by the XCUITest runner, even in the default inapp mode. The
+  - On iOS, the pixels are always captured by the XCUITest runner, even in the default inapp-boost mode. The
     in-app bridge sees only the app's own drawing (no keyboard, system alerts or other processes), and capturing
     in-process would block the app's main thread. The tree stage uses the driver that resolves the next step (in
-    inapp mode: the in-app tree).
+    inapp-boost mode: the in-app tree).
   - On Android, the bridge running in the instrumentation captures the pixels.
 - `ft_batch` (MCP) accepts the `waitForSettle` key with the same arguments.
 

@@ -34,7 +34,7 @@ wait ほぼ 0ms = 固定 sleep の残骸なし):
 
 | プロファイル | launch 中央 | actionMs(simctl) | waitMs | 内訳外 |
 |---|---:|---:|---:|---:|
-| ios-inapp | 3,563ms | 909ms | 2,379ms | 3ms |
+| ios-inapp-boost | 3,563ms | 909ms | 2,379ms | 3ms |
 | ios-xcuitest(改善前) | 5,135ms | 788ms | 3,038ms | **1,515ms** |
 | ios-xcuitest(改善後) | 4,536ms | 883ms | 3,029ms | 703ms |
 
@@ -52,8 +52,8 @@ wait ほぼ 0ms = 固定 sleep の残骸なし):
 インストール確認(`applicationIsInstalled:type:error:`)を足して置き換えた。
 
 実測(8レーン・E2E-CMP/40本): ios-xcuitest sum 427.4→**394.2s**・launch 中央 4,567→3,892ms
-(起動呼び出し 920→**205ms**)/ ios-inapp sum 266.5→**253.7s**。E2E-iOS 419.5→392.3s、
-E2E-Flutter 396.3→372.0s。全 466 本(既定+`--ios-inapp`)成功。
+(起動呼び出し 920→**205ms**)/ ios-inapp-boost sum 266.5→**253.7s**。E2E-iOS 419.5→392.3s、
+E2E-Flutter 396.3→372.0s。全 466 本(既定+`--ios-inapp-boost`)成功。
 
 **律速は初期化に移った**。CoreSimulator は**プロセスごとに約 384ms**の初期化
 (dlopen 13ms + `SimServiceContext` 327ms + deviceSet 44ms)が要り、以降の呼び出しは **0〜1ms**。
@@ -117,9 +117,9 @@ Demo 16 シナリオ(iOS 6+Android 10)を iOS/Android 同数のデバイスで A
    終わってから片付ける(`PreparedSupply.settle`。走っている iOS の準備の横で終了スクリプトやサービスの停止を走らせない)
 3. **コールド供給のデバイス間並列化**(`BridgeProvisioner.provision`): 「差分判定(並列)→
    プランニング=ポート採番(直列)→ 共有ビルド(直列)→ 起動(デバイス単位で並列)」に分離。
-   inapp モードの 2 ブリッジは同一シミュレータへの simctl 競合を避けるためデバイス内では従来どおり直列。
+   inapp-boost モードの 2 ブリッジは同一シミュレータへの simctl 競合を避けるためデバイス内では従来どおり直列。
    `installIfNeeded` の autoInstall 差分判定(iOS バンドル深比較 / Android md5。アプリサイズ比例)も
-   ワーカー単位で並列化。実測: 3 台 inapp モード(=6 ブリッジ)の完全コールド(sim ブート+install 込み)
+   ワーカー単位で並列化。実測: 3 台 inapp-boost モード(=6 ブリッジ)の完全コールド(sim ブート+install 込み)
    +ログイン系 3 シナリオ並列で **99s・3/3 passed**(旧直列はデバイス毎に足し算)
 
 効果の出所はあくまで固定費とコールド供給で、ウォームのシナリオ実行本編は不変:
@@ -631,7 +631,7 @@ APK 変更なので `AndroidRunner/build.sh` の `VERSION_CODE` と
 そこで各レイヤについて `isDecorativeChrome`(= `String(describing: type(of: layer))` + 2 回の
 `contains`)を**無条件に**計算していたが、その結果は `animationKeys()` が空でないときしか読まない。
 
-実測(E2E-iOS / ios-inapp・205 settle):
+実測(E2E-iOS / ios-inapp-boost・205 settle):
 
 | 指標 | 中央値 | p90 | max |
 |---|---:|---:|---:|
@@ -656,7 +656,7 @@ APK 変更なので `AndroidRunner/build.sh` の `VERSION_CODE` と
 整定の**挙動**が変わり、旧ブリッジ再利用が緑の偽装になり得たから。計測時の新旧混在は
 `fleetest bridge down --all` で潰す(こちらは版数と無関係に必要)。
 
-検証: iOS 全 3 SUT(E2E-CMP / E2E-iOS / E2E-Flutter)× `ios-inapp` で 91 シナリオ全成功・振り直し 0 件。
+検証: iOS 全 3 SUT(E2E-CMP / E2E-iOS / E2E-Flutter)× `ios-inapp-boost` で 91 シナリオ全成功・振り直し 0 件。
 
 ### PT-3.11 WebView 委譲中のスクロールを in-app の contentOffset へ(2026-08-01 実装)
 
@@ -666,7 +666,7 @@ XCUITest の実スワイプになっていた。だが **WKWebView の中の `WK
 横取りするのは**タッチだけ**なので `contentOffset` は素通しで効く。委譲したままスクロールだけ
 in-app へ戻す。
 
-きっかけは 3 SUT の同一シナリオ(`WebViewの中身を操作できること.S0010` / `ios-inapp`)の差:
+きっかけは 3 SUT の同一シナリオ(`WebViewの中身を操作できること.S0010` / `ios-inapp-boost`)の差:
 
 | SUT | 修正前 | 修正後 | actionMs |
 |---|---:|---:|---|
@@ -704,7 +704,7 @@ ref の名前空間を跨ぐので別施策(PT-8)。
 `bridgeProtocolVersion` 27 → 28(ブリッジの挙動が変わる。上げないと稼働中の旧 dylib が
 再利用され、短縮が効かないまま緑になる)。
 
-検証: iOS 全 3 SUT(E2E-CMP / E2E-iOS / E2E-Flutter)× `ios-inapp` で **115 シナリオ全成功**・
+検証: iOS 全 3 SUT(E2E-CMP / E2E-iOS / E2E-Flutter)× `ios-inapp-boost` で **115 シナリオ全成功**・
 振り直し 0 件(40 + 37 + 38。PT-3.8〜3.10 の「91 シナリオ」は当時の本数)。
 
 ### PT-3.13 interop の WebView を「読みは DOM・触るのは XCUITest の座標」へ(2026-08-02 実装)
@@ -724,7 +724,7 @@ ref を使う操作だけホスト側で座標へ解決して XCUITest の実タ
 
 実測(シナリオ単体): CMP 29.5→**13.2s**(3回とも同値)/ Flutter 26.4→13.0〜14.1s。
 uikit ホストの同シナリオ(元から DOM 経路)が 11.3s なので、ほぼそこまで落ちた。
-スイートでは E2E-CMP/ios-inapp 253.7→226.7s・E2E-Flutter/ios-inapp 277.2→264.6s。
+スイートでは E2E-CMP/ios-inapp-boost 253.7→226.7s・E2E-Flutter/ios-inapp-boost 277.2→264.6s。
 
 - **不変条件の守り方**: `ref` を XCUITest へ**渡さない**。委譲先は自分が最後に撮った別 snapshot の
   ref 名前空間を持つので、混ぜると別要素を指す。ホストが ref → 矩形中心 → 座標に解決する

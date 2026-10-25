@@ -100,7 +100,7 @@ final class WaitForSettleExecutorTests: XCTestCase {
         XCTAssertEqual(driver.waitForSettleRequests.first?.request.region, listFrame)
     }
 
-    /// iOS は常に XCUITest 側で撮る。inapp モードで in-app(driver)へ先に送ると、画面全体を撮れず主スレッドも塞ぐ。
+    /// iOS は常に XCUITest 側で撮る。inapp-boost モードで in-app(driver)へ先に送ると、画面全体を撮れず主スレッドも塞ぐ。
     /// 段2の木は driver から取る(次のステップのロケータを解決するほう)
     func testInappModeCapturesWithTheTypeDriverAndReadsTheTreeFromTheDriver() async throws {
         let log = CallLog()

@@ -379,7 +379,7 @@
   "containerInference": true,
   "heal": true,
   "homeOnStart": true,
-  "iosMode": "inapp",
+  "iosMode": "inapp-boost",
   "iosPreActionPing": true,
   "ocrTextVisibilityCheck": true,
   "playProtectBypass": true,

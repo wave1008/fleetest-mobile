@@ -22,7 +22,7 @@ keyboardIsNotShown()
 
 ## 注意点
 
-- **「非表示」を確定できるのは iOS の inapp モードと Android だけです。** iOS の xcuitest モードは
+- **「非表示」を確定できるのは iOS の inapp-boost モードと Android だけです。** iOS の xcuitest モードは
   「キーボードを見た」か「不明」しか言えず、非表示を確定できません。このモードでは
   `keyboardIsNotShown` は必ず失敗します — 見えていれば「keyboard is still shown」、
   見ていなければ「cannot determine the keyboard state」というメッセージになります

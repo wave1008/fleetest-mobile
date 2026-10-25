@@ -25,7 +25,7 @@
       }
     },
     {
-      "project": "E2E-iOS", "file": "97_入力欄でないrefへのtype.swift", "profile": "ios-inapp", "os": "ios",
+      "project": "E2E-iOS", "file": "97_入力欄でないrefへのtype.swift", "profile": "ios-inapp-boost", "os": "ios",
       "class": "入力欄でないrefへのtype",
       "guards": "欄に焦点を残したまま入力欄でない要素へ type しても、前の欄へ打たずに撃つ前に断る(nonTextInputPreflightRefusal)。409 で XCUITest へ撃ち直さない門(nonTextInputFallbackRefusal)はボタン型の容器でしか届かず、この画面には無いので単体テスト(StepExecutorTests の buttonWrappingOneField を使う3本)が持つ",
       "watches": ["Sources/FTCore/StepExecutor+Actions.swift", "Sources/FTCore/StepExecutor+TypeClear.swift", "Sources/FTCore/TapTargetGeometry.swift", "Sources/FTCore/NonTextInputTarget.swift", "Sources/FTCore/TypeReadback.swift", "Sources/FTBridgeClient/HybridFallbackDriver.swift", "Sources/FTBridgeClient/HybridDriverComposition.swift", "InAppBridge/Sources/InAppBridge.swift", "InAppBridge/Sources/InAppSnapshot.swift"],
@@ -48,7 +48,7 @@
       }
     },
     {
-      "project": "E2E-iOS", "file": "94_システムアラート.swift", "profile": "ios-inapp", "os": "ios",
+      "project": "E2E-iOS", "file": "94_システムアラート.swift", "profile": "ios-inapp-boost", "os": "ios",
       "class": "システムアラートの陽性対照",
       "resetPhotos": "com.ftester.e2e.ios",
       "guards": "OS の権限アラートが覆っている間は背面のアプリへの操作を撃たない(登録はあるがボタンが一致しない形)",
@@ -71,9 +71,9 @@
       }
     },
     {
-      "project": "E2E-iOS", "file": "91_クラッシュ検知.swift", "profile": "ios-inapp", "os": "ios",
+      "project": "E2E-iOS", "file": "91_クラッシュ検知.swift", "profile": "ios-inapp-boost", "os": "ios",
       "class": "クラッシュ検知でブリッジ切断とレポートが記録されること",
-      "guards": "アプリのクラッシュを .ips 付きで記録する(inapp モード)",
+      "guards": "アプリのクラッシュを .ips 付きで記録する(inapp-boost モード)",
       "watches": ["Sources/FTBridgeClient/InAppDriver.swift", "Sources/FTBridgeClient/InAppLauncher.swift", "Sources/FTBridgeClient/SimulatorCrashReport.swift", "Sources/FTBridgeClient/SimulatorAppProcess.swift", "Sources/FTCore/AppCrashRecord.swift"],
       "scenarios": {
         "S0010": { "expect": "red", "command": "tap", "failureKind": "driver-unreachable",
@@ -90,9 +90,9 @@
       }
     },
     {
-      "project": "E2E-CMP", "file": "91_クラッシュ検知.swift", "profile": "ios-inapp", "os": "ios",
+      "project": "E2E-CMP", "file": "91_クラッシュ検知.swift", "profile": "ios-inapp-boost", "os": "ios",
       "class": "クラッシュ検知でブリッジ切断とレポートが記録されること",
-      "guards": "アプリのクラッシュを .ips 付きで記録する(inapp モード)",
+      "guards": "アプリのクラッシュを .ips 付きで記録する(inapp-boost モード)",
       "watches": ["Sources/FTBridgeClient/InAppDriver.swift", "Sources/FTBridgeClient/InAppLauncher.swift", "Sources/FTBridgeClient/SimulatorCrashReport.swift", "Sources/FTBridgeClient/SimulatorAppProcess.swift", "Sources/FTCore/AppCrashRecord.swift"],
       "scenarios": {
         "S0010": { "expect": "red", "command": "tap", "failureKind": "driver-unreachable",
@@ -100,9 +100,9 @@
       }
     },
     {
-      "project": "E2E-Flutter", "file": "91_クラッシュ検知.swift", "profile": "ios-inapp", "os": "ios",
+      "project": "E2E-Flutter", "file": "91_クラッシュ検知.swift", "profile": "ios-inapp-boost", "os": "ios",
       "class": "クラッシュ検知でブリッジ切断とレポートが記録されること",
-      "guards": "アプリのクラッシュを .ips 付きで記録する(inapp モード・SIGSEGV)",
+      "guards": "アプリのクラッシュを .ips 付きで記録する(inapp-boost モード・SIGSEGV)",
       "watches": ["Sources/FTBridgeClient/InAppDriver.swift", "Sources/FTBridgeClient/InAppLauncher.swift", "Sources/FTBridgeClient/SimulatorCrashReport.swift", "Sources/FTBridgeClient/SimulatorAppProcess.swift", "Sources/FTCore/AppCrashRecord.swift"],
       "scenarios": {
         "S0010": { "expect": "red", "command": "tap", "failureKind": "driver-unreachable",
@@ -110,9 +110,9 @@
       }
     },
     {
-      "project": "E2E-RN", "file": "91_クラッシュ検知.swift", "profile": "ios-inapp", "os": "ios",
+      "project": "E2E-RN", "file": "91_クラッシュ検知.swift", "profile": "ios-inapp-boost", "os": "ios",
       "class": "クラッシュ検知でブリッジ切断とレポートが記録されること",
-      "guards": "アプリのクラッシュを .ips 付きで記録する(inapp モード)",
+      "guards": "アプリのクラッシュを .ips 付きで記録する(inapp-boost モード)",
       "watches": ["Sources/FTBridgeClient/InAppDriver.swift", "Sources/FTBridgeClient/InAppLauncher.swift", "Sources/FTBridgeClient/SimulatorCrashReport.swift", "Sources/FTBridgeClient/SimulatorAppProcess.swift", "Sources/FTCore/AppCrashRecord.swift"],
       "scenarios": {
         "S0010": { "expect": "red", "command": "tap", "failureKind": "driver-unreachable",
@@ -156,7 +156,7 @@
       }
     },
     {
-      "project": "E2E-iOS", "file": "90_シナリオ全体の打ち切り.swift", "profile": "ios-inapp", "os": "ios",
+      "project": "E2E-iOS", "file": "90_シナリオ全体の打ち切り.swift", "profile": "ios-inapp-boost", "os": "ios",
       "class": "シナリオ全体の打ち切り",
       "guards": "@Test(scenarioTimeout:) がプロファイルより優先し、進み続けるシナリオも全体の上限で打ち切る(値の出所と最後の出力からの秒を行に残す)",
       "watches": ["Sources/FTCore/ScenarioHost.swift", "Sources/FTCore/ScenarioTimeoutResolution.swift", "Sources/FTCore/ScenarioIdleWatch.swift", "Sources/FTDSLMacros/TestClassMacro.swift"],
@@ -166,7 +166,7 @@
       }
     },
     {
-      "project": "E2E-iOS", "file": "90_出力の途切れの打ち切り.swift", "profile": "ios-inapp", "os": "ios",
+      "project": "E2E-iOS", "file": "90_出力の途切れの打ち切り.swift", "profile": "ios-inapp-boost", "os": "ios",
       "class": "出力の途切れの打ち切り", "slow": true,
       "guards": "出力が 2 × commandTimeout を超えて途切れた子を打ち切り、長さを申告した待ち(ifCanSelect の waitSeconds)は打ち切らない。約 8 分かかるので e2e-negative.sh --with-slow のときだけ",
       "watches": ["Sources/FTCore/ScenarioHost.swift", "Sources/FTCore/ScenarioIdleWatch.swift", "Sources/FTCore/IdleAllowance.swift", "Sources/FTDSL/CommandsAppControl.swift"],
@@ -177,7 +177,7 @@
     }
   ],
   "photosAlertCleanup": {
-    "project": "E2E-iOS", "file": "98_写真の権限アラートを閉じる.swift", "profile": "ios-inapp",
+    "project": "E2E-iOS", "file": "98_写真の権限アラートを閉じる.swift", "profile": "ios-inapp-boost",
     "class": "写真の権限アラートを閉じる"
   },
   "delegated": [

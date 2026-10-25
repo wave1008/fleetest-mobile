@@ -442,7 +442,7 @@ fleetest run --runner M1Max --profile <実行プロファイル>
 
 ```jsonc
 { "runs": [
-    { "host": "local",   "profile": "ios-inapp" },   // "local" は手元での実行
+    { "host": "local",   "profile": "ios-inapp-boost" },   // "local" は手元での実行
     { "host": "M1Max",   "profile": "ios-m1max" } ] }
 ```
 

@@ -11,7 +11,7 @@ Compose Multiplatform で作った E2EY(実アプリで頻出し、ツールの�
   各画面の「罠」を実際に踏む手順で、成否は echo の文字列で確かめる
 
 ```sh
-Scripts/e2ey.sh                 # iOS(inapp モード = 既定)と Android。SUT はソースが新しければ再ビルド
+Scripts/e2ey.sh                 # iOS(inapp-boost モード = 既定)と Android。SUT はソースが新しければ再ビルド
 Scripts/e2ey.sh --ios-xcuitest  # iOS だけを xcuitest モードで
 Scripts/e2ey.sh --rebuild       # SUT を必ず再ビルド
 ```

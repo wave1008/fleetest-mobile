@@ -11,7 +11,7 @@ function run(overrides = {}) {
   return {
     runID: "R1",
     runGroup: undefined,
-    profile: "ios-inapp",
+    profile: "ios-inapp-boost",
     host: "H",
     startedAt: "2026-09-26T00:00:00Z",
     total: 10,
@@ -23,8 +23,8 @@ function run(overrides = {}) {
 
 test("selectComparisonGroups: 同じ profile で全構成 run が完了している直前のグループを返す", () => {
   const groups = [
-    [run({ runID: "R2", profile: "ios-inapp" })],
-    [run({ runID: "R1", profile: "ios-inapp" })],
+    [run({ runID: "R2", profile: "ios-inapp-boost" })],
+    [run({ runID: "R1", profile: "ios-inapp-boost" })],
   ];
   const result = selectComparisonGroups(groups);
   assert.deepEqual(result.latest, groups[0]);
@@ -33,9 +33,9 @@ test("selectComparisonGroups: 同じ profile で全構成 run が完了してい
 
 test("selectComparisonGroups: profile が違うグループはスキップして次を見る", () => {
   const groups = [
-    [run({ runID: "R3", profile: "ios-inapp" })],
+    [run({ runID: "R3", profile: "ios-inapp-boost" })],
     [run({ runID: "R2", profile: "android" })],
-    [run({ runID: "R1", profile: "ios-inapp" })],
+    [run({ runID: "R1", profile: "ios-inapp-boost" })],
   ];
   const result = selectComparisonGroups(groups);
   assert.equal(result.previous[0].runID, "R1");
@@ -43,8 +43,8 @@ test("selectComparisonGroups: profile が違うグループはスキップして
 
 test("selectComparisonGroups: 構成 run の集計が1本でも未完了なら候補から外す", () => {
   const groups = [
-    [run({ runID: "R2", profile: "ios-inapp" })],
-    [run({ runID: "R1a", profile: "ios-inapp" }), run({ runID: "R1b", profile: "ios-inapp", total: null, passed: null, failed: null })],
+    [run({ runID: "R2", profile: "ios-inapp-boost" })],
+    [run({ runID: "R1a", profile: "ios-inapp-boost" }), run({ runID: "R1b", profile: "ios-inapp-boost", total: null, passed: null, failed: null })],
   ];
   const result = selectComparisonGroups(groups);
   assert.equal(result, null);
@@ -54,7 +54,7 @@ test("selectComparisonGroups: 比較相手が無ければ null(グループ1個�
   assert.equal(selectComparisonGroups([]), null);
   assert.equal(selectComparisonGroups([[run()]]), null);
   assert.equal(
-    selectComparisonGroups([[run({ profile: "ios-inapp" })], [run({ profile: "android" })]]),
+    selectComparisonGroups([[run({ profile: "ios-inapp-boost" })], [run({ profile: "android" })]]),
     null,
   );
 });

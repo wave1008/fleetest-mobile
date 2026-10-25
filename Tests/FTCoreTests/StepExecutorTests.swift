@@ -1209,7 +1209,7 @@ final class StepExecutorTests: XCTestCase {
                        "登録が無いのに聞いてはいけない: \(log.entries)")
     }
 
-    /// **ランナーが居ない構成でも1往復も払わない**。ここが止まると inapp モード固定と
+    /// **ランナーが居ない構成でも1往復も払わない**。ここが止まると inapp-boost モード固定と
     /// Android が全滅する
     func testActionCostsNothingWithoutAFallbackBridge() async throws {
         let log = CallLog()

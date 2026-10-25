@@ -89,9 +89,9 @@ final class BridgeIdentityCheckTests: XCTestCase {
     }
 
     // ホスト側プローブの期待値: xcuiPort を叩くときだけ期待ブリッジが xcuitest に固定される
-    // (inapp モードの in-app 側を期待にすると、xcuitest ランナーの正しい応答を mismatch と誤検知する)
+    // (inapp-boost モードの in-app 側を期待にすると、xcuitest ランナーの正しい応答を mismatch と誤検知する)
     func testExpectedForInappModeConnectionProbedAtXCUIPortExpectsXcuitest() {
-        let connection = DriverConnection(platform: "ios", port: 8138, mode: "inapp", udid: "SIM-1",
+        let connection = DriverConnection(platform: "ios", port: 8138, mode: "inapp-boost", udid: "SIM-1",
                                           xcuiPort: 8124, deviceName: "iPhone 17 Pro-01")
         let expected = BridgeIdentityCheck.expected(for: connection, probedPort: 8124)
         XCTAssertEqual(expected.bridge, "xcuitest")
@@ -102,7 +102,7 @@ final class BridgeIdentityCheckTests: XCTestCase {
     }
 
     func testExpectedForConnectionProbedAtItsOwnPortKeepsTheConnectionBridge() {
-        let connection = DriverConnection(platform: "ios", port: 8138, mode: "inapp", udid: "SIM-1")
+        let connection = DriverConnection(platform: "ios", port: 8138, mode: "inapp-boost", udid: "SIM-1")
         let expected = BridgeIdentityCheck.expected(for: connection, probedPort: 8138)
         XCTAssertEqual(expected.bridge, "inapp")
         XCTAssertEqual(BridgeIdentityCheck.verdict(expected: expected, status: status(bridge: "inapp"), remedy: "REMEDY"), .ok)
@@ -122,7 +122,7 @@ final class BridgeIdentityCheckTests: XCTestCase {
         }
     }
 
-    // MARK: - hybridFallbackDrift(MN-51.2。inapp モードが主とは別に握るポートの本人確認。
+    // MARK: - hybridFallbackDrift(MN-51.2。inapp-boost モードが主とは別に握るポートの本人確認。
     // 呼び手は MCP とライブ操作(api live serve)の2つ、どちらも FTBridgeClient.HybridFallbackIdentity 経由)
 
     /// **本命**: fallback ポートが今は別デバイスの XCUITest ブリッジ。以前は無検査で
@@ -168,14 +168,14 @@ final class BridgeIdentityCheckTests: XCTestCase {
             .sameDeviceBridgeChanged, "in-app を期待しているのに xcuitest が答えたら bridge 違いのはず")
     }
 
-    /// シナリオ実行バイナリの事前確認が駆るのは XCUITest ブリッジだけ。モードを期待に渡すと、inapp モードで
+    /// シナリオ実行バイナリの事前確認が駆るのは XCUITest ブリッジだけ。モードを期待に渡すと、inapp-boost モードで
     /// 別アプリを XCUITest ブリッジへ回したとき、udid を名乗らない実機のランナーが「別のブリッジ」と誤判定される
     func testScenarioRunnerPreflightExpectsTheXCUITestBridge() throws {
         let root = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
         let source = try String(contentsOf: root.appendingPathComponent(
             "Sources/FTScenarioRunner/ScenarioRunnerMain.swift"), encoding: .utf8)
-        XCTAssertTrue(source.contains("port: preflightPort, udid: udid, physical: physical, bridge: IOSMode.xcuitest,"))
+        XCTAssertTrue(source.contains(#"port: preflightPort, udid: udid, physical: physical, bridge: "xcuitest","#))
         XCTAssertTrue(source.contains("preflightPort = xcuiPort"), "別アプリの分岐で突き合わせるポートを XCUITest 側へ向けていない")
         // 判定そのもの: 実機(udid なし)の XCUITest ランナーに in-app を期待すると誤って食い違う
         let wrong = BridgeIdentityCheck.Expected(port: 8124, udid: "PHYS", physical: true, bridge: "inapp")

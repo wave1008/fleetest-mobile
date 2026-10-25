@@ -14,7 +14,7 @@ import FTCore
 struct DeviceSession {
     var driver: AppDriver?
     /// 「実際に主となったブリッジ」。iosModeHint がこれで助言を出し分ける
-    /// (引数からは決まらない: profile 無しでも in-app を掴めば inapp モード)
+    /// (引数からは決まらない: profile 無しでも in-app を掴めば inapp-boost モード)
     var bridge: String?
     /// **直前にエージェントへ返した木**。ref を撃つ直前に撮り直して同じ要素を引き直すための起点
     /// (RefGuard 参照)。**ref はスナップショットごとに振り直される**ので、番号ではなく要素の同一性で照合する
@@ -146,7 +146,7 @@ struct DeviceSession {
     /// —— 表示用の文と機械判定を同じ文字列に相乗りさせると、表記を整えるたびに判定が壊れる。
     /// タイムアウト時にそのポートがまだ生きているかを確かめる `connectionLostHint` が使う
     var connectedPort: UInt16?
-    /// inapp モード(in-app + XCUITest)キャッシュ命中の XCUITest フォールバックポート。
+    /// inapp-boost モード(in-app + XCUITest)キャッシュ命中の XCUITest フォールバックポート。
     /// **`connectedPort` とは別枠**(あちらは主(in-app)のポート): `HybridFallbackDriver` の
     /// fallback は home/drag/座標 press/gesture 等をこちらへ回すので、起動し直しで別デバイスへ
     /// 移っていないかは主の udid だけでは検知できない(MN-51.2。hybridFallbackDrifted 参照)

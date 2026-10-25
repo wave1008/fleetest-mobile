@@ -316,7 +316,7 @@ public struct DriverErrorContext: Sendable, Equatable {
 
 /// `DriverError.errorDescription` の文言組み立て(純粋関数。`DriverErrorMessageTests` が
 /// 構成ごとの文面を等号固定する)。**構成ごとに、その構成で実際に起こりうる原因だけを並べる**
-/// —— 負荷テストで、Android の一時的な adb 断に iOS inapp モード向けの案内
+/// —— 負荷テストで、Android の一時的な adb 断に iOS inapp-boost モード向けの案内
 /// (「シミュレータ専用」)が付き、iOS xcuitest ランナーを外から殺した接続拒否で
 /// 「アプリが落ちた」が第一容疑にされていた(xcuitest はアプリと別プロセスなので的外れ)
 public enum DriverErrorMessage {
@@ -325,7 +325,7 @@ public enum DriverErrorMessage {
         let hint: String
         switch context.bridge {
         case .iosInApp:
-            hint = " In inapp mode the backgrounded app can be suspended, so TCP is accepted"
+            hint = " In inapp-boost mode the backgrounded app can be suspended, so TCP is accepted"
                 + " but no HTTP response comes back. Check: fleetest bridge up."
         case .iosXCUITest:
             hint = " Check: fleetest bridge up."
@@ -343,11 +343,11 @@ public enum DriverErrorMessage {
             // 実機は端末との経路(USB トンネル・WiFi)が間に入るので、アプリの死とは言い切らない
             // (経路ごとの事実は BridgeClient が detail に足す: usbTunnelAdvice / lanTransportAdvice)
             suspect = context.physicalDevice
-                ? " If this happened mid-run, either the app under test exited (on iOS inapp the bridge"
+                ? " If this happened mid-run, either the app under test exited (on iOS the in-app bridge"
                     + " lives inside the app) or the link to the physical device was lost — the note in"
                     + " the detail says which when the transport can tell."
                 : " If this happened mid-run, the app under test most likely exited or crashed"
-                    + " (on iOS inapp the bridge lives inside the app, so it becomes unreachable the"
+                    + " (the in-app bridge lives inside the app, so it becomes unreachable the"
                     + " moment the app dies)."
         case .iosXCUITest:
             suspect = context.physicalDevice

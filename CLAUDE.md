@@ -221,11 +221,11 @@ grep やシェル(`cat`)で見るだけのとき・新しいファイルを読�
   (ユニットテストはデバイス境界のバグを1つも捕まえない)。**ブリッジのスナップショット/型写像と、
   StepExecutor の操作合成(タップ/ドラッグ/スクロール探索の終端処理)を触ったら SUT を絞らず全部**
   回す(フレームワーク差の退行は SUT を跨がないと出ない)→ MN-4.4.1
-- **既定の e2e.sh は iOS を inapp モードで回す**(**利用者の既定も inapp モード**
+- **既定の e2e.sh は iOS を inapp-boost モードで回す**(**利用者の既定も inapp-boost モード**
   なので、既定スイートが見るべきはそちら)。**フル E2E はモード・SUT・OS を指定しない `Scripts/e2e.sh` だけ**
   (xcuitest は含めない。置き場の指定 `--local` / `--align` は可)。**XCUITest ブリッジを触ったときだけ xcuitest モードを
   的を絞って回す**(`fleetest run --profile ios-xcuitest --scenario <クラス>`)。
-  モード指定(`--ios-inapp` / `--ios-xcuitest`)は **iOS だけを回す**(Android にモードの
+  モード指定(`--ios-inapp-boost` / `--ios-xcuitest`)は **iOS だけを回す**(Android にモードの
   選択肢は無いので既定スイートと同一の実行を二度払うだけ)。OS の絞り込みは `--ios` / `--android`
 - **この漏れは e2e.sh が検出する** —— **回さなかった側**のブリッジ入力集合(`BridgeSourceSet`)の
   digest を、そのモードの実行が**全部成功したときだけ** `.fleetest/<bridge>-e2e-verified` へ
@@ -246,7 +246,7 @@ grep やシェル(`cat`)で見るだけのとき・新しいファイルを読�
 | 改名・シグネチャ変更・型に閉じたリファクタ | **`swift test --parallel` だけ**。追随漏れは必ずコンパイルエラーになる |
 | ホスト側ロジック(`StepExecutor` の分岐・セレクタ解決) | `swift test` + **該当シナリオ1〜2本** |
 | ブリッジの挙動(注入・スナップショット・型写像) | 該当 SUT の**1プロファイル**で通るシナリオ。フレームワーク差が絡むなら全 SUT の同じ画面のシナリオ |
-| 入力・キー・IME 系 | 上記 + **xcuitest モード**(`--profile ios-xcuitest`。既定は inapp モードなので、もう片方のモード) |
+| 入力・キー・IME 系 | 上記 + **xcuitest モード**(`--profile ios-xcuitest`。既定は inapp-boost モードなので、もう片方のモード) |
 | **幾何・容器推定・整定**(実ジェスチャの慣性で挙動が変わるもの) | 上記 + **xcuitest モード**。**in-app ブリッジは慣性を持たない**ので、この種の退行は既定スイートでは原理的に出ない(MN-4.5.1) |
 | flake 調査・性能 | 該当プロファイルを**反復10周**(docs/verification/judgment.md) |
 | run 制御(再キュー・ワーカー離脱など。シナリオ実行の中身を触らない) | `swift test` + **その経路を強制的に通す陽性対照**。緑の run では1度も実行されないのでフルは情報ゼロ |
@@ -466,8 +466,8 @@ grep やシェル(`cat`)で見るだけのとき・新しいファイルを読�
 **「デバイスで動かした」と書きたくなった瞬間に、何の上で動かしたかを確認する**
 → MN-7
 
-**用語(iOS のモードとブリッジ)**: 利用者が選ぶ設定は**モード**(`iosMode` / `devices[].mode` の値 `inapp` / `xcuitest`。
-「`inapp` モード」= in-app ブリッジ主 + XCUITest ブリッジの合成)、部品は**ブリッジ**(「in-app ブリッジ」「XCUITest ブリッジ」と
+**用語(iOS のモードとブリッジ)**: 利用者が選ぶ設定は**モード**(`iosMode` / `devices[].mode` の値 `inapp-boost` / `xcuitest`。
+「`inapp-boost` モード」= XCUITest ブリッジに in-app ブリッジを足したハイブリッド構成。in-app ブリッジで撃てる操作はそちらで速く撃ち、撃てない操作は XCUITest ブリッジで撃つ。`bridge: "inapp"` はブリッジの種類の値でモード名ではない。**モードの値を /status の `bridge` との比較へそのまま渡さない** —— 主ポートのブリッジは `IOSMode.primaryBridge(forMode:)` で引く)、部品は**ブリッジ**(「in-app ブリッジ」「XCUITest ブリッジ」と
 ハイフン付きで書く)。「エンジン」と、モード名としての hybrid は使わない(`platform: "hybrid"` = iOS と Android の両方、は別の語)。
 `IOSModeVocabularyTests` が走査で落とす
 

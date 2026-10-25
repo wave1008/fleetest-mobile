@@ -38,11 +38,11 @@ Flutter・React Native)によって、**木の見え方と操作の効き方が�
 
 ## FD-1 木の見え方(型・`#id`・ラベル)
 
-確認環境: 2026-10-25 の E2E(この Mac の全 SUT・両 OS・iOS は inapp モード)で、この節の witness を含むシナリオが全部通った環境: macOS 27.2(26B118)・Xcode 27.2(27B48)・Simulator iPhone 17 Pro / iOS 27.0・Emulator Pixel 9 / Android 15・Compose Multiplatform 1.12.1・Kotlin 2.4.21・Flutter 3.47.7・React Native 0.87.1・iOS ブリッジ v214・Android ブリッジ VERSION_CODE 109。xcuitest モードでの差は未確認
+確認環境: 2026-10-25 の E2E(この Mac の全 SUT・両 OS・iOS は inapp-boost モード)で、この節の witness を含むシナリオが全部通った環境: macOS 27.2(26B118)・Xcode 27.2(27B48)・Simulator iPhone 17 Pro / iOS 27.0・Emulator Pixel 9 / Android 15・Compose Multiplatform 1.12.1・Kotlin 2.4.21・Flutter 3.47.7・React Native 0.87.1・iOS ブリッジ v214・Android ブリッジ VERSION_CODE 109。xcuitest モードでの差は未確認
 
 ### FD-1.1 型の対照表(同じ `#id` を指したときの型。実測)
 
-確認環境: 2026-10-25 の E2E(この Mac の全 SUT・両 OS・iOS は inapp モード)で、この節の witness を含むシナリオが全部通った環境: macOS 27.2(26B118)・Xcode 27.2(27B48)・Simulator iPhone 17 Pro / iOS 27.0・Emulator Pixel 9 / Android 15・Compose Multiplatform 1.12.1・Kotlin 2.4.21・Flutter 3.47.7・React Native 0.87.1・iOS ブリッジ v214・Android ブリッジ VERSION_CODE 109。xcuitest モードでの差は未確認
+確認環境: 2026-10-25 の E2E(この Mac の全 SUT・両 OS・iOS は inapp-boost モード)で、この節の witness を含むシナリオが全部通った環境: macOS 27.2(26B118)・Xcode 27.2(27B48)・Simulator iPhone 17 Pro / iOS 27.0・Emulator Pixel 9 / Android 15・Compose Multiplatform 1.12.1・Kotlin 2.4.21・Flutter 3.47.7・React Native 0.87.1・iOS ブリッジ v214・Android ブリッジ VERSION_CODE 109。xcuitest モードでの差は未確認
 
 | 要素 | CMP(iOS) | CMP(Android) | SwiftUI/UIKit | View/XML | Flutter(iOS) | Flutter(Android) | RN(iOS) | RN(Android) |
 |---|---|---|---|---|---|---|---|---|
@@ -62,7 +62,7 @@ Flutter・React Native)によって、**木の見え方と操作の効き方が�
 
 ### FD-1.2 `#id` の出し方(アプリ側の作法。守らないと `#id` が全滅する)
 
-確認環境: 2026-10-25 の E2E(この Mac の全 SUT・両 OS・iOS は inapp モード)で、この節の witness を含むシナリオが全部通った環境: macOS 27.2(26B118)・Xcode 27.2(27B48)・Simulator iPhone 17 Pro / iOS 27.0・Emulator Pixel 9 / Android 15・Compose Multiplatform 1.12.1・Kotlin 2.4.21・Flutter 3.47.7・React Native 0.87.1・iOS ブリッジ v214・Android ブリッジ VERSION_CODE 109。xcuitest モードでの差は未確認
+確認環境: 2026-10-25 の E2E(この Mac の全 SUT・両 OS・iOS は inapp-boost モード)で、この節の witness を含むシナリオが全部通った環境: macOS 27.2(26B118)・Xcode 27.2(27B48)・Simulator iPhone 17 Pro / iOS 27.0・Emulator Pixel 9 / Android 15・Compose Multiplatform 1.12.1・Kotlin 2.4.21・Flutter 3.47.7・React Native 0.87.1・iOS ブリッジ v214・Android ブリッジ VERSION_CODE 109。xcuitest モードでの差は未確認
 
 | フレームワーク | 作法 | 罠 |
 |---|---|---|
@@ -75,7 +75,7 @@ Flutter・React Native)によって、**木の見え方と操作の効き方が�
 
 ### FD-1.3 ツールが揃えている木の違い(A)
 
-確認環境: 2026-10-25 の E2E(この Mac の全 SUT・両 OS・iOS は inapp モード)で、この節の witness を含むシナリオが全部通った環境: macOS 27.2(26B118)・Xcode 27.2(27B48)・Simulator iPhone 17 Pro / iOS 27.0・Emulator Pixel 9 / Android 15・Compose Multiplatform 1.12.1・Kotlin 2.4.21・Flutter 3.47.7・React Native 0.87.1・iOS ブリッジ v214・Android ブリッジ VERSION_CODE 109。xcuitest モードでの差は未確認
+確認環境: 2026-10-25 の E2E(この Mac の全 SUT・両 OS・iOS は inapp-boost モード)で、この節の witness を含むシナリオが全部通った環境: macOS 27.2(26B118)・Xcode 27.2(27B48)・Simulator iPhone 17 Pro / iOS 27.0・Emulator Pixel 9 / Android 15・Compose Multiplatform 1.12.1・Kotlin 2.4.21・Flutter 3.47.7・React Native 0.87.1・iOS ブリッジ v214・Android ブリッジ VERSION_CODE 109。xcuitest モードでの差は未確認
 
 | フレームワーク | 素の挙動 | ツールの吸収 | 場所 |
 |---|---|---|---|
@@ -102,7 +102,7 @@ Flutter・React Native)によって、**木の見え方と操作の効き方が�
 
 ### FD-1.4 揃っていない木の違い(B)
 
-確認環境: 2026-10-25 の E2E(この Mac の全 SUT・両 OS・iOS は inapp モード)で、この節の witness を含むシナリオが全部通った環境: macOS 27.2(26B118)・Xcode 27.2(27B48)・Simulator iPhone 17 Pro / iOS 27.0・Emulator Pixel 9 / Android 15・Compose Multiplatform 1.12.1・Kotlin 2.4.21・Flutter 3.47.7・React Native 0.87.1・iOS ブリッジ v214・Android ブリッジ VERSION_CODE 109。xcuitest モードでの差は未確認。以前の確認(2026-10-02 最後に確かめた日の時点を git から復元): iOS ブリッジ v139・Android ブリッジ VERSION_CODE 85・Compose Multiplatform 1.11.0・Kotlin 2.4.10・React Native 0.86.2。macOS・Xcode・ランタイム・デバイスは未記録
+確認環境: 2026-10-25 の E2E(この Mac の全 SUT・両 OS・iOS は inapp-boost モード)で、この節の witness を含むシナリオが全部通った環境: macOS 27.2(26B118)・Xcode 27.2(27B48)・Simulator iPhone 17 Pro / iOS 27.0・Emulator Pixel 9 / Android 15・Compose Multiplatform 1.12.1・Kotlin 2.4.21・Flutter 3.47.7・React Native 0.87.1・iOS ブリッジ v214・Android ブリッジ VERSION_CODE 109。xcuitest モードでの差は未確認。以前の確認(2026-10-02 最後に確かめた日の時点を git から復元): iOS ブリッジ v139・Android ブリッジ VERSION_CODE 85・Compose Multiplatform 1.11.0・Kotlin 2.4.10・React Native 0.86.2。macOS・Xcode・ランタイム・デバイスは未記録
 
 | フレームワーク | 違い | シナリオでの扱い |
 |---|---|---|
@@ -121,11 +121,11 @@ Flutter・React Native)によって、**木の見え方と操作の効き方が�
 
 ## FD-2 操作
 
-確認環境: 2026-10-25 の E2E(この Mac の全 SUT・両 OS・iOS は inapp モード)で、この節の witness を含むシナリオが全部通った環境: macOS 27.2(26B118)・Xcode 27.2(27B48)・Simulator iPhone 17 Pro / iOS 27.0・Emulator Pixel 9 / Android 15・Compose Multiplatform 1.12.1・Kotlin 2.4.21・Flutter 3.47.7・React Native 0.87.1・iOS ブリッジ v214・Android ブリッジ VERSION_CODE 109。xcuitest モードでの差は未確認
+確認環境: 2026-10-25 の E2E(この Mac の全 SUT・両 OS・iOS は inapp-boost モード)で、この節の witness を含むシナリオが全部通った環境: macOS 27.2(26B118)・Xcode 27.2(27B48)・Simulator iPhone 17 Pro / iOS 27.0・Emulator Pixel 9 / Android 15・Compose Multiplatform 1.12.1・Kotlin 2.4.21・Flutter 3.47.7・React Native 0.87.1・iOS ブリッジ v214・Android ブリッジ VERSION_CODE 109。xcuitest モードでの差は未確認
 
 ### FD-2.1 タップ
 
-確認環境: 2026-10-25 の E2E(この Mac の全 SUT・両 OS・iOS は inapp モード)で、この節の witness を含むシナリオが全部通った環境: macOS 27.2(26B118)・Xcode 27.2(27B48)・Simulator iPhone 17 Pro / iOS 27.0・Emulator Pixel 9 / Android 15・Compose Multiplatform 1.12.1・Kotlin 2.4.21・Flutter 3.47.7・React Native 0.87.1・iOS ブリッジ v214・Android ブリッジ VERSION_CODE 109。xcuitest モードでの差は未確認
+確認環境: 2026-10-25 の E2E(この Mac の全 SUT・両 OS・iOS は inapp-boost モード)で、この節の witness を含むシナリオが全部通った環境: macOS 27.2(26B118)・Xcode 27.2(27B48)・Simulator iPhone 17 Pro / iOS 27.0・Emulator Pixel 9 / Android 15・Compose Multiplatform 1.12.1・Kotlin 2.4.21・Flutter 3.47.7・React Native 0.87.1・iOS ブリッジ v214・Android ブリッジ VERSION_CODE 109。xcuitest モードでの差は未確認
 
 | フレームワーク | 違い | 区分 | ツールの動き |
 |---|---|---|---|
@@ -139,7 +139,7 @@ Flutter・React Native)によって、**木の見え方と操作の効き方が�
 
 ### FD-2.2 スクロール探索の直後のタップ(空打ち)
 
-確認環境: 2026-10-25 の E2E(この Mac の全 SUT・両 OS・iOS は inapp モード)で、この節の witness を含むシナリオが全部通った環境: macOS 27.2(26B118)・Xcode 27.2(27B48)・Simulator iPhone 17 Pro / iOS 27.0・Emulator Pixel 9 / Android 15・Compose Multiplatform 1.12.1・Kotlin 2.4.21・Flutter 3.47.7・React Native 0.87.1・iOS ブリッジ v214・Android ブリッジ VERSION_CODE 109。xcuitest モードでの差は未確認。以前の確認(2026-10-11 最後に確かめた日の時点を git から復元): iOS ブリッジ v175・Android ブリッジ VERSION_CODE 100・Compose Multiplatform 1.11.0・Kotlin 2.4.10・React Native 0.86.2。macOS・Xcode・ランタイム・デバイスは未記録
+確認環境: 2026-10-25 の E2E(この Mac の全 SUT・両 OS・iOS は inapp-boost モード)で、この節の witness を含むシナリオが全部通った環境: macOS 27.2(26B118)・Xcode 27.2(27B48)・Simulator iPhone 17 Pro / iOS 27.0・Emulator Pixel 9 / Android 15・Compose Multiplatform 1.12.1・Kotlin 2.4.21・Flutter 3.47.7・React Native 0.87.1・iOS ブリッジ v214・Android ブリッジ VERSION_CODE 109。xcuitest モードでの差は未確認。以前の確認(2026-10-11 最後に確かめた日の時点を git から復元): iOS ブリッジ v175・Android ブリッジ VERSION_CODE 100・Compose Multiplatform 1.11.0・Kotlin 2.4.10・React Native 0.86.2。macOS・Xcode・ランタイム・デバイスは未記録
 
 - **Compose / Flutter(iOS)**: スクロール容器が**次の1タッチを消費する** → 探索の終わりに、クリックにならない
   ドラッグ(空打ち)で肩代わりする。**A**(利用者は意識しない)
@@ -154,7 +154,7 @@ Flutter・React Native)によって、**木の見え方と操作の効き方が�
 
 ### FD-2.3 スクロール
 
-確認環境: 2026-10-25 の E2E(この Mac の全 SUT・両 OS・iOS は inapp モード)で、この節の witness を含むシナリオが全部通った環境: macOS 27.2(26B118)・Xcode 27.2(27B48)・Simulator iPhone 17 Pro / iOS 27.0・Emulator Pixel 9 / Android 15・Compose Multiplatform 1.12.1・Kotlin 2.4.21・Flutter 3.47.7・React Native 0.87.1・iOS ブリッジ v214・Android ブリッジ VERSION_CODE 109。xcuitest モードでの差は未確認
+確認環境: 2026-10-25 の E2E(この Mac の全 SUT・両 OS・iOS は inapp-boost モード)で、この節の witness を含むシナリオが全部通った環境: macOS 27.2(26B118)・Xcode 27.2(27B48)・Simulator iPhone 17 Pro / iOS 27.0・Emulator Pixel 9 / Android 15・Compose Multiplatform 1.12.1・Kotlin 2.4.21・Flutter 3.47.7・React Native 0.87.1・iOS ブリッジ v214・Android ブリッジ VERSION_CODE 109。xcuitest モードでの差は未確認
 
 | フレームワーク | 素の制約 | ツールの手段(iOS in-app) | 区分 |
 |---|---|---|---|
@@ -192,7 +192,7 @@ Flutter・React Native)によって、**木の見え方と操作の効き方が�
 
 ### FD-2.4 文字入力・Enter・消去(iOS in-app の受け口の違い。すべて C)
 
-確認環境: 2026-10-25 の E2E(この Mac の全 SUT・両 OS・iOS は inapp モード)で、この節の witness を含むシナリオが全部通った環境: macOS 27.2(26B118)・Xcode 27.2(27B48)・Simulator iPhone 17 Pro / iOS 27.0・Emulator Pixel 9 / Android 15・Compose Multiplatform 1.12.1・Kotlin 2.4.21・Flutter 3.47.7・React Native 0.87.1・iOS ブリッジ v214・Android ブリッジ VERSION_CODE 109。xcuitest モードでの差は未確認
+確認環境: 2026-10-25 の E2E(この Mac の全 SUT・両 OS・iOS は inapp-boost モード)で、この節の witness を含むシナリオが全部通った環境: macOS 27.2(26B118)・Xcode 27.2(27B48)・Simulator iPhone 17 Pro / iOS 27.0・Emulator Pixel 9 / Android 15・Compose Multiplatform 1.12.1・Kotlin 2.4.21・Flutter 3.47.7・React Native 0.87.1・iOS ブリッジ v214・Android ブリッジ VERSION_CODE 109。xcuitest モードでの差は未確認
 
 | フレームワーク | `type` | `pressEnter` | `clearInput` |
 |---|---|---|---|
@@ -216,7 +216,7 @@ Flutter・React Native)によって、**木の見え方と操作の効き方が�
 
 ### FD-2.5 ジェスチャ(iOS in-app)
 
-確認環境: 2026-10-25 の E2E(この Mac の全 SUT・両 OS・iOS は inapp モード)で、この節の witness を含むシナリオが全部通った環境: macOS 27.2(26B118)・Xcode 27.2(27B48)・Simulator iPhone 17 Pro / iOS 27.0・Emulator Pixel 9 / Android 15・Compose Multiplatform 1.12.1・Kotlin 2.4.21・Flutter 3.47.7・React Native 0.87.1・iOS ブリッジ v214・Android ブリッジ VERSION_CODE 109。xcuitest モードでの差は未確認。以前の確認(2026-09-24 最後に確かめた日の時点を git から復元): iOS ブリッジ v127・Android ブリッジ VERSION_CODE 73・Compose Multiplatform 1.11.0・Kotlin 2.4.10・React Native 0.86.2。macOS・Xcode・ランタイム・デバイスは未記録
+確認環境: 2026-10-25 の E2E(この Mac の全 SUT・両 OS・iOS は inapp-boost モード)で、この節の witness を含むシナリオが全部通った環境: macOS 27.2(26B118)・Xcode 27.2(27B48)・Simulator iPhone 17 Pro / iOS 27.0・Emulator Pixel 9 / Android 15・Compose Multiplatform 1.12.1・Kotlin 2.4.21・Flutter 3.47.7・React Native 0.87.1・iOS ブリッジ v214・Android ブリッジ VERSION_CODE 109。xcuitest モードでの差は未確認。以前の確認(2026-09-24 最後に確かめた日の時点を git から復元): iOS ブリッジ v127・Android ブリッジ VERSION_CODE 73・Compose Multiplatform 1.11.0・Kotlin 2.4.10・React Native 0.86.2。macOS・Xcode・ランタイム・デバイスは未記録
 
 | 操作 | Compose / Flutter | SwiftUI / UIKit / RN | 区分 |
 |---|---|---|---|
@@ -234,7 +234,7 @@ Flutter・React Native)によって、**木の見え方と操作の効き方が�
 
 ### FD-2.6 チェック状態(`checkIsON` / `checkIsOFF` / `checked=`)
 
-確認環境: 2026-10-25 の E2E(この Mac の全 SUT・両 OS・iOS は inapp モード)で、この節の witness を含むシナリオが全部通った環境: macOS 27.2(26B118)・Xcode 27.2(27B48)・Simulator iPhone 17 Pro / iOS 27.0・Emulator Pixel 9 / Android 15・Compose Multiplatform 1.12.1・Kotlin 2.4.21・Flutter 3.47.7・React Native 0.87.1・iOS ブリッジ v214・Android ブリッジ VERSION_CODE 109。xcuitest モードでの差は未確認。以前の確認(2026-09-19 最後に確かめた日の時点を git から復元): iOS ブリッジ v119・Android ブリッジ VERSION_CODE 68・Compose Multiplatform 1.11.0・Kotlin 2.4.10・React Native 0.86.2。macOS・Xcode・ランタイム・デバイスは未記録
+確認環境: 2026-10-25 の E2E(この Mac の全 SUT・両 OS・iOS は inapp-boost モード)で、この節の witness を含むシナリオが全部通った環境: macOS 27.2(26B118)・Xcode 27.2(27B48)・Simulator iPhone 17 Pro / iOS 27.0・Emulator Pixel 9 / Android 15・Compose Multiplatform 1.12.1・Kotlin 2.4.21・Flutter 3.47.7・React Native 0.87.1・iOS ブリッジ v214・Android ブリッジ VERSION_CODE 109。xcuitest モードでの差は未確認。以前の確認(2026-09-19 最後に確かめた日の時点を git から復元): iOS ブリッジ v119・Android ブリッジ VERSION_CODE 68・Compose Multiplatform 1.11.0・Kotlin 2.4.10・React Native 0.86.2。macOS・Xcode・ランタイム・デバイスは未記録
 
 iOS は実装ごとに状態の出し方が違う(2026-09-18 実測・両モード同値)。**A. 揃えている** ——
 `FTCore.CheckStateReading` が全部を読み、オン / オフ / indeterminate / 不明に畳む。
@@ -287,7 +287,7 @@ Android の4 SUT と RN iOS は、どの部品もオン/オフとも a11y が判
 
 ## FD-3 待ちと鮮度
 
-確認環境: 2026-10-25 の E2E(この Mac の全 SUT・両 OS・iOS は inapp モード)で、この節の witness を含むシナリオが全部通った環境: macOS 27.2(26B118)・Xcode 27.2(27B48)・Simulator iPhone 17 Pro / iOS 27.0・Emulator Pixel 9 / Android 15・Compose Multiplatform 1.12.1・Kotlin 2.4.21・Flutter 3.47.7・React Native 0.87.1・iOS ブリッジ v214・Android ブリッジ VERSION_CODE 109。xcuitest モードでの差は未確認
+確認環境: 2026-10-25 の E2E(この Mac の全 SUT・両 OS・iOS は inapp-boost モード)で、この節の witness を含むシナリオが全部通った環境: macOS 27.2(26B118)・Xcode 27.2(27B48)・Simulator iPhone 17 Pro / iOS 27.0・Emulator Pixel 9 / Android 15・Compose Multiplatform 1.12.1・Kotlin 2.4.21・Flutter 3.47.7・React Native 0.87.1・iOS ブリッジ v214・Android ブリッジ VERSION_CODE 109。xcuitest モードでの差は未確認
 
 | フレームワーク | 違い | 区分 | ツールの動き |
 |---|---|---|---|
@@ -304,14 +304,14 @@ Android の4 SUT と RN iOS は、どの部品もオン/オフとも a11y が判
 | Flutter(Android 12 の実機) | 入力欄の外を叩いて IME が閉じ始めると、dumpsys は即「非表示」なのに a11y の木は**約 5.4 秒**キーボードを申告し続け、下端のタブバーを `isVisibleToUser = false` で落とす(`refresh` しても同じ。Pixel 3a で実測・Pixel 4a の Android 13 は 0.32 秒) | A | `hideKeyboard` の後、次のロケータ操作の最初の解決で木がキーボードを申告していれば消えるまで待ってから整定を見る(`pendingHideKeyboardWait`。上限 5 秒 = `FlowStep.defaultWaitSeconds`(実測の 5.4 秒は IME が閉じ始めた時刻から。hideKeyboard の時点では残り約 4.7 秒)。Android だけ・消えていれば費用ゼロ) |
 | Android(全般・OS で割れる) | `type` は焦点を要求して文字を書き込むとすぐ返り、ソフトキーボードの表示を待たない(表示要求から表示完了まで中央値 0.2 秒・最大 0.89 秒)。次の解決の木にまだ無いと、後で出てダイアログが動き古い座標を撃つ。iOS の `type` は出現まで返らないので起きない | A | Android だけ、打つ前も次の木にもキーボードが無く改行で終わらない `type` の後、次のロケータ操作の解決の前に最大 1.5 秒(`KeyboardWait.appearSeconds`)、出現を待ってから整定を見る。出なければ注記 `keyboard-not-shown-after-type`・以降の木で出たら `keyboard-appeared-late` |
 | Flutter(Android) | 起動直後の数百 ms はタップを取りこぼす。タップ直後は入力接続が未確立 | B | SUT のシナリオは起動直後・タップ直後に `exist` を1往復挟む |
-| iOS(全フレームワーク・inapp モード) | `waitForSettle` の画素の撮影。in-app のスクリーンショットはアプリ自身の描画しか写さず(キーボード・システムアラート・他プロセスが無い)、アプリのプロセスの中で撮り続けるとメインスレッドを塞ぐ | C | inapp モード(既定)でも撮影は常に XCUITest ランナー(判定はブリッジの中で完結し、画像はホストへ出ない)。木の段は次のステップを解決するドライバ(inapp モードなら in-app ブリッジの木)。Android は instrumentation ブリッジの中で撮る |
+| iOS(全フレームワーク・inapp-boost モード) | `waitForSettle` の画素の撮影。in-app のスクリーンショットはアプリ自身の描画しか写さず(キーボード・システムアラート・他プロセスが無い)、アプリのプロセスの中で撮り続けるとメインスレッドを塞ぐ | C | inapp-boost モード(既定)でも撮影は常に XCUITest ランナー(判定はブリッジの中で完結し、画像はホストへ出ない)。木の段は次のステップを解決するドライバ(inapp-boost モードなら in-app ブリッジの木)。Android は instrumentation ブリッジの中で撮る |
 | Compose Multiplatform(iOS) ほか(`waitForSettle`) | 慣性の終わりの描画間隔の最大がフレームワークで違う(iOS の Compose は 1px ずつの這いで 650ms・SwiftUI 368ms・Android は負荷時 385ms)。窓が短いと這いの途中で「止まった」と誤る | A | `quietSeconds` の既定を分ける: iOS の Compose(とフレームワーク不明)= 0.8 秒・それ以外の iOS と Android = 0.5 秒(実測の最大 × 約 1.2。`WaitForSettleDefaults`)。実測は PT-3.34 |
 
 ---
 
 ## FD-4 WebView
 
-確認環境: 2026-10-25 の E2E(この Mac の全 SUT・両 OS・iOS は inapp モード)で、この節の witness を含むシナリオが全部通った環境: macOS 27.2(26B118)・Xcode 27.2(27B48)・Simulator iPhone 17 Pro / iOS 27.0・Emulator Pixel 9 / Android 15・Compose Multiplatform 1.12.1・Kotlin 2.4.21・Flutter 3.47.7・React Native 0.87.1・iOS ブリッジ v214・Android ブリッジ VERSION_CODE 109。xcuitest モードでの差は未確認
+確認環境: 2026-10-25 の E2E(この Mac の全 SUT・両 OS・iOS は inapp-boost モード)で、この節の witness を含むシナリオが全部通った環境: macOS 27.2(26B118)・Xcode 27.2(27B48)・Simulator iPhone 17 Pro / iOS 27.0・Emulator Pixel 9 / Android 15・Compose Multiplatform 1.12.1・Kotlin 2.4.21・Flutter 3.47.7・React Native 0.87.1・iOS ブリッジ v214・Android ブリッジ VERSION_CODE 109。xcuitest モードでの差は未確認
 
 | 構成 | 木の出どころ | 操作 | 区分 |
 |---|---|---|---|
@@ -329,7 +329,7 @@ Android の4 SUT と RN iOS は、どの部品もオン/オフとも a11y が判
 
 ## FD-5 起動の速さ
 
-確認環境: 2026-10-25 の E2E(この Mac の全 SUT・両 OS・iOS は inapp モード)で、この節の witness を含むシナリオが全部通った環境: macOS 27.2(26B118)・Xcode 27.2(27B48)・Simulator iPhone 17 Pro / iOS 27.0・Emulator Pixel 9 / Android 15・Compose Multiplatform 1.12.1・Kotlin 2.4.21・Flutter 3.47.7・React Native 0.87.1・iOS ブリッジ v214・Android ブリッジ VERSION_CODE 109。xcuitest モードでの差は未確認
+確認環境: 2026-10-25 の E2E(この Mac の全 SUT・両 OS・iOS は inapp-boost モード)で、この節の witness を含むシナリオが全部通った環境: macOS 27.2(26B118)・Xcode 27.2(27B48)・Simulator iPhone 17 Pro / iOS 27.0・Emulator Pixel 9 / Android 15・Compose Multiplatform 1.12.1・Kotlin 2.4.21・Flutter 3.47.7・React Native 0.87.1・iOS ブリッジ v214・Android ブリッジ VERSION_CODE 109。xcuitest モードでの差は未確認
 
 - **CMP(iOS)は SwiftUI より起動が約 0.8 秒遅い**(B・アプリ自身の性質)。in-app の launch の待ちは「アプリのメインスレッドが
   空いてブリッジが答えるまで」で、差はそこにだけ出る。仕組みの違う XCUITest の launch でも同じ差(PT-6)
@@ -370,10 +370,10 @@ Android の4 SUT と RN iOS は、どの部品もオン/オフとも a11y が判
 
 | 症状 → 直し方 | 起きた構成 |
 |---|---|
-| M3 SearchBar(iOS)で `type` が入力を重複(`apapapapap`)→ 値が1文字も動かなければ OCR で画面を見る(コンパイルを待つ・キリル同形異字を `OCRHomoglyphs` で畳む)・追送は1回まで | iOS inapp モード |
+| M3 SearchBar(iOS)で `type` が入力を重複(`apapapapap`)→ 値が1文字も動かなければ OCR で画面を見る(コンパイルを待つ・キリル同形異字を `OCRHomoglyphs` で畳む)・追送は1回まで | iOS inapp-boost モード |
 | HorizontalPager の `scrollToLeftEdge` が端の手前で止まる → 端の署名に id とラベル(**送っている容器の中だけ**。容器の外の表示は送りの副作用で変わる = `edgeContentRegion`) | 全モード |
 | 上端で状態が行き来する一覧(RefreshIndicator)で上限まで送る → **一度見た署名へ戻ったら進んでいない**(ドライバが動いたと申告した直後は数えない) | Flutter iOS |
-| in-app の `tap(x:y:)` が Popup の外側に届かないのに緑 → 自前描画(か不明)で要素の無い点は XCUITest | iOS inapp モード |
+| in-app の `tap(x:y:)` が Popup の外側に届かないのに緑 → 自前描画(か不明)で要素の無い点は XCUITest | iOS inapp-boost モード |
 | `swipeBy` の始点が Android の戻るの帯 → 帯の幅を SystemUI の dump から読んで経路を寄せる / 比率 >0.9 は注記 | Android |
 | 画面の最下端から始まる座標ドラッグ(`swipeElementToElement` / `swipePointToPoint` / `swipeBy`)が Android のホーム操作に取られアプリが離脱する → 下端のジェスチャ帯(dump の `mBottomGestureHeight`。Pixel 9 の Emulator・ジェスチャーナビで 84px = 32dp を実測。読めなければ 48dp × 密度 = 3 ボタンの高さを上限とした見積り)の中なら始点を帯の上へ寄せて注記(`ScrollGeometry.clearingBottomGestureBand`)。`gesture` の多点は寄せない | Android |
 | 画面の最下端の要素への `tap` / 長押し / `doubleTap` が Android のホーム操作に取られアプリが離脱する(E2EY-Flutter のミニプレーヤー `#txt_mini_title` = 中心 y=2340 が帯 2340〜2424 の上端ちょうど。負荷下でランチャーへ抜けた)→ 要素の中心が帯の中で要素が帯より上へ出ていれば、上に出ている部分の中心を座標で撃って注記(判定は `BottomGestureBandTap` = DSL・MCP の ft_tap / ft_long_press / ft_double_tap・ライブ操作の ref の tap / doubleTap が共有。中心が下端の 48dp より上なら帯を問い合わせない)。全体が帯の中なら中心のまま。帯の上端ちょうども帯の中(半開区間)。失敗時はアプリの窓が見えず別アプリが前面ならその名前を「Another window is in front」に載せる(`AndroidForegroundWindows.frontAppWhileHidden`) | Android |

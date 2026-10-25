@@ -31,20 +31,22 @@ Results are stable, runs are fast, and there are no charges.
 
 Fleetest implements its own custom drivers for both iOS and Android and optimizes them. It does not depend on existing general-purpose drivers, which leaves it free to make its own improvements.
 
-## The `inapp` mode for iOS
+## The `inapp-boost` mode for iOS
 
-The `inapp` mode is one of Fleetest's distinctive mechanisms. It automatically switches between a fast in-app bridge and a general-purpose XCUITest bridge. It works on Simulators and on physical devices running a development-signed (debuggable) app.
+The `inapp-boost` mode is one of Fleetest's distinctive mechanisms. It is the XCUITest bridge plus a fast in-app bridge: operations the in-app bridge can perform go through it, the rest go through the XCUITest bridge. It works on Simulators and on physical devices running a development-signed (debuggable) app.
 
 - **In-app bridge**
   - Injected into the process of the app under test when the app launches. With no cross-process round trip, it runs fast.
 - **XCUITest bridge**
-  - Handles operations outside the app under test. Operations the in-app bridge cannot perform are routed here.
+  - The base bridge; it can also operate outside the app under test (system alerts, the home screen, other apps). Operations the in-app bridge cannot perform run here.
 
 | Example operation | Bridge used |
 |---|---|
 | Reading the screen, text entry, taps | in-app |
 | Reading and tapping OS system alerts | XCUITest |
 | Home screen, app switcher, other apps | XCUITest |
+
+inapp-boost is the default mode. You can also choose xcuitest mode, which runs with the XCUITest bridge only (`iosMode` in the run profile; response measurement switches to xcuitest mode automatically). Normally you can keep the default. The differences between the two modes are under "iOS mode" in [Run profile settings](../reference/project/run_profile.md).
 
 ## No changes to your app
 

@@ -31,7 +31,7 @@ const FORM_FIELDS = {
   ocr: true,
   ocrTextVisibilityCheck: true,
   preferCheckStateClassifier: true,
-  iosMode: "inapp",
+  iosMode: "inapp-boost",
   iosPreActionPing: true,
   homeOnStart: true,
   playProtectBypass: true,

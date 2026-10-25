@@ -26,7 +26,7 @@
 //
 // 回し方:
 //   cp _disabled/94_システムアラート.swift ../ && \
-//   fleetest run --project E2E-iOS --profile ios-inapp --scenario システムアラートの陽性対照.S0010
+//   fleetest run --project E2E-iOS --profile ios-inapp-boost --scenario システムアラートの陽性対照.S0010
 //
 // 期待する結果: **背面を撃つ tap で失敗**(操作側の門)。アラートの出現を観測してから撃つので、
 // 後段の exist で止まったら**操作側の門が漏れて背面を撃っている**。メッセージに "system UI is covering the app" が出て、

@@ -8,7 +8,7 @@ agent (AI assistant) writing scenarios** — if the app's screen has one of thes
 matching section before writing.
 
 - Verified on: Compose Multiplatform 1.12.1 (≈ Material3 1.4), Flutter 3.47.7, React Native 0.87.1 (New
-  Architecture / Fabric), Android Views + Material Components, and SwiftUI. iOS 27 Simulator (inapp
+  Architecture / Fabric), Android Views + Material Components, and SwiftUI. iOS 27 Simulator (inapp-boost
   mode / xcuitest mode) and Android 15 Emulator
 - Every behaviour here reproduces with the verification apps bundled with fleetest
   (`E2EXAppCMP/`, `E2EXAppFlutter/`, `E2EXAppRN/`, `E2EXAppAndroid/`, `E2EXAppIOS/`) and their
@@ -57,7 +57,7 @@ scenario cannot fix this on its own (it depends on the target app's implementati
 
 **Current limitation**: **On Flutter's iOS**, once an overlay (a `Tooltip`, a dialog, etc.) has been
 shown on a screen, **that screen's a11y rects are reported at 1/screen-scale (1/3 on an iPhone) until
-the next screen transition** (Flutter's own report). **The default iOS mode (inapp) corrects this
+the next screen transition** (Flutter's own report). **The default iOS mode (inapp-boost) corrects this
 automatically**, so nothing changes in how you write scenarios. Only **xcuitest mode**
 (`iosMode: "xcuitest"`) cannot correct it, and taps land in the wrong spot. Workaround (xcuitest
 mode only): after showing an overlay on a screen, move to another screen and come back before the
@@ -583,7 +583,7 @@ select("#txt_focus_echo").textIs("focus=second")
 - **Android refuses `ACTION_SET_TEXT` on some fields** (observed on Material's `SearchView` and some
   Flutter fields). There is no workaround; `type` types normally via regular keystrokes anyway (only
   the bulk, a11y-driven write is refused, not ordinary `type` keystrokes)
-- **On React Native's iOS (inapp mode), a suggestion shown right below the field may not be tappable** (under
+- **On React Native's iOS (inapp-boost mode), a suggestion shown right below the field may not be tappable** (under
   investigation). The keyboard stays up after `pressEnter()`, so the suggestion stays hidden beneath it. Workaround:
   lay the screen out so suggestions are not covered by the keyboard, or check the committed value through the app's own echo
 

@@ -95,9 +95,9 @@ private final class NoDragPrimary: AppDriver {
 
 final class ScrollSearchCarouselRecoveryTests: XCTestCase {
 
-    /// **inapp モード(in-app 主 + XCUITest typeDriver)でも同じ**: 主ドライバが drag を 501 で断っても
+    /// **inapp-boost モード(in-app 主 + XCUITest typeDriver)でも同じ**: 主ドライバが drag を 501 で断っても
     /// 回復ドラッグは typeDriver から出て通る。2026-08-23 まで slowDrag は `driver.drag` を直に呼び
-    /// 501 を失敗扱いにしていた = 利用者の既定モード(inapp)では見切れ回復が一度も出ていなかった
+    /// 501 を失敗扱いにしていた = 利用者の既定モード(inapp-boost)では見切れ回復が一度も出ていなかった
     func testRecoveryDragFallsBackToTheTypeDriverWhenThePrimaryCannotDrag() async {
         let carousel = CarouselDriver()
         let primary = NoDragPrimary(inner: carousel)

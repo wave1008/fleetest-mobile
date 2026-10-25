@@ -33,11 +33,11 @@ public enum BridgeIdentityCheck {
     }
 
     /// ホスト側プローブ用: DriverConnection から期待値を組む。**probedPort が xcuiPort なら期待ブリッジは
-    /// xcuitest**(inapp モードの死活確認は in-app 側でなく xcuitest 側ポートを叩く。RunOrchestrator.bridgeUnreachable)。
-    /// それ以外は connection.mode(inapp モードの主ポートは in-app ブリッジ。nil = xcuitest 既定は verdict 側の規則)
+    /// xcuitest**(inapp-boost モードの死活確認は in-app 側でなく xcuitest 側ポートを叩く。RunOrchestrator.bridgeUnreachable)。
+    /// それ以外はモードの主ブリッジ(inapp-boost モードの主ポートは in-app ブリッジ。nil = xcuitest 既定は verdict 側の規則)
     public static func expected(for connection: DriverConnection, probedPort: UInt16) -> Expected {
         let bridge = (connection.xcuiPort != nil && connection.xcuiPort == probedPort)
-            ? "xcuitest" : connection.mode
+            ? "xcuitest" : IOSMode.primaryBridge(forMode: connection.mode)
         return Expected(port: probedPort, udid: connection.udid, physical: connection.physical,
                         bridge: bridge, deviceName: connection.deviceName)
     }
@@ -103,7 +103,7 @@ public enum BridgeIdentityCheck {
     }
 
     /// **ブリッジの決まったポートの本人確認**(udid + ブリッジ)。呼び手は MCP のキャッシュ命中と
-    /// ライブ操作の命令ごと(`FTBridgeClient.HybridFallbackIdentity` 経由)で、inapp モードの予備
+    /// ライブ操作の命令ごと(`FTBridgeClient.HybridFallbackIdentity` 経由)で、inapp-boost モードの予備
     /// (XCUITest)ポートと、主ポート(xcuitest / in-app)の両方に使う。`physical: false` 固定でよい
     /// —— 実機のランナーが名乗らない udid は呼び手が `statusForIdentityCheck` で台帳から補ってから
     /// 渡す(補えなければ udid の比較は素通り = 不明を「変わった」にしない)。`expectedBridge` は

@@ -84,7 +84,7 @@ When the element a search finds only just peeks in at the edge it is scrolling t
 width of it (44 pt / dp) is visible, fleetest slowly scrolls half the container once more before touching it.
 Touching such a thin strip can be taken by the screen-edge gestures (Android's back and home) or land on
 something else.
-On iOS in the default `inapp` mode, Compose Multiplatform and Flutter scroll exactly one page per swipe, so this extra scroll does not happen there.
+On iOS in the default `inapp-boost` mode, Compose Multiplatform and Flutter scroll exactly one page per swipe, so this extra scroll does not happen there.
 
 ## Container-inference corrections
 

@@ -444,7 +444,7 @@ public enum IOSDeviceTransport {
     static func stalePeerPorts(entries: [(port: UInt16, command: String)],
                                hostPort: UInt16, deviceUDID: String,
                                keepPeerPorts: Set<UInt16> = []) -> [UInt16] {
-        // inapp モードの実機は同じデバイスに2本のトンネル(in-app + xcuitest)を張る。相方のポートは残す
+        // inapp-boost モードの実機は同じデバイスに2本のトンネル(in-app + xcuitest)を張る。相方のポートは残す
         entries
             .filter { $0.port != hostPort && !keepPeerPorts.contains($0.port) }
             .filter { iproxyMatches(command: $0.command, deviceUDID: deviceUDID) }

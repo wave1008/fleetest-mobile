@@ -1,6 +1,6 @@
 import XCTest
 
-/// suite プロファイル(ios-inapp / ios-xcuitest / android)のレーンは**全プロジェクト共通**
+/// suite プロファイル(ios-inapp-boost / ios-xcuitest / android)のレーンは**全プロジェクト共通**
 /// (ユーザー決定 2026-09-01)。共通集合の根拠は実測(docs/verification/ の run #2):
 /// 最大36本で稼働 ≈80%・test time の下限は最長シナリオ1本なのでこれ以上増やしても速くならない。
 /// 片方のプロジェクトだけ台数を変えると LPT の分散比較と計測の前提(デバイス構成の一致)が
@@ -19,11 +19,11 @@ final class SuiteProfileLaneParityTests: XCTestCase {
 
     /// project -> このプロジェクトが持つ suite プロファイル(存在しない組は書かない)
     private static let suiteProfiles: [String: [String: Set<String>]] = [
-        "E2E-CMP": ["ios-inapp": iosLanes, "ios-xcuitest": iosLanes, "android": androidLanes],
-        "E2E-iOS": ["ios-inapp": iosLanes, "ios-xcuitest": iosLanes],
+        "E2E-CMP": ["ios-inapp-boost": iosLanes, "ios-xcuitest": iosLanes, "android": androidLanes],
+        "E2E-iOS": ["ios-inapp-boost": iosLanes, "ios-xcuitest": iosLanes],
         "E2E-Android": ["android": androidLanes],
-        "E2E-Flutter": ["ios-inapp": iosLanes, "ios-xcuitest": iosLanes, "android": androidLanes],
-        "E2E-RN": ["ios-inapp": iosLanes, "ios-xcuitest": iosLanes, "android": androidLanes],
+        "E2E-Flutter": ["ios-inapp-boost": iosLanes, "ios-xcuitest": iosLanes, "android": androidLanes],
+        "E2E-RN": ["ios-inapp-boost": iosLanes, "ios-xcuitest": iosLanes, "android": androidLanes],
     ]
 
     private struct RunProfileDevices: Decodable {

@@ -151,7 +151,7 @@ test("準備中の run は本数でなく「準備中」を出し、進捗バー
   t.after(() => window.close());
   post(window, { type: "monitorRuns", machine: "M1Max", observed: true, runs: [{
     pid: 41233, runID: "run-1", mine: true, phase: "preparing", requeued: 0, laneDropouts: 0, supply: [],
-    project: "E2E-iOS", profile: "ios-inapp",
+    project: "E2E-iOS", profile: "ios-inapp-boost",
     elapsedSeconds: 12, total: 0, done: 0, failed: 0, lanes: [],
   }] });
   // **run の行に限って見る** —— run の無い機械の行も同じ作り(.run-board-row)なので、素の
@@ -178,7 +178,7 @@ test("準備中の run は供給の段階を1つ出す(ランナーのビルド�
   ];
   post(window, { type: "monitorRuns", machine: "M1Max", observed: true, runs: [{
     pid: 41233, runID: "run-1", mine: true, phase: "preparing", requeued: 0, laneDropouts: 0, supply,
-    project: "E2E-iOS", profile: "ios-inapp",
+    project: "E2E-iOS", profile: "ios-inapp-boost",
     elapsedSeconds: 12, total: 0, done: 0, failed: 0, lanes: [],
   }] });
   const [runRow] = runRows(document);
@@ -192,7 +192,7 @@ test("準備中の run は供給の段階を1つ出す(ランナーのビルド�
     supply: [{ name: "", platform: "ios", step: "runnerBuild" },
              { name: "iPhone 17-01", platform: "ios", step: "ready" },
              { name: "iPhone 17-02", platform: "ios", step: "installing" }],
-    project: "E2E-iOS", profile: "ios-inapp",
+    project: "E2E-iOS", profile: "ios-inapp-boost",
     elapsedSeconds: 20, total: 0, done: 0, failed: 0, lanes: [],
   }] });
   assert.equal(runRows(document)[0].querySelector(".run-board-counts").textContent,
@@ -207,7 +207,7 @@ test("ビルド中・コンパイル中は供給の段階を添えない", (t) =
     post(window, { type: "monitorRuns", machine: "M1Max", observed: true, runs: [{
       pid: 41233, runID: "run-1", mine: true, phase, requeued: 0, laneDropouts: 0,
       supply: [{ name: "iPhone 17-01", platform: "ios", step: "booting" }],
-      project: "E2E-iOS", profile: "ios-inapp",
+      project: "E2E-iOS", profile: "ios-inapp-boost",
       elapsedSeconds: 12, total: 0, done: 0, failed: 0, lanes: [],
     }] });
     assert.equal(runRows(document)[0].querySelector(".run-board-counts").textContent, expected, phase);
@@ -221,7 +221,7 @@ test("供給の段階がすべて ready の準備中は「テストを開始し�
   post(window, { type: "monitorRuns", machine: "M1Max", observed: true, runs: [{
     pid: 41233, runID: "run-1", mine: true, phase: "preparing", requeued: 0, laneDropouts: 0,
     supply: [{ name: "iPhone 17-01", platform: "ios", step: "ready" }],
-    project: "E2E-iOS", profile: "ios-inapp",
+    project: "E2E-iOS", profile: "ios-inapp-boost",
     elapsedSeconds: 12, total: 0, done: 0, failed: 0, lanes: [],
   }] });
   assert.equal(runRows(document)[0].querySelector(".run-board-counts").textContent,
@@ -236,7 +236,7 @@ test("設定を書き込んでいる端末が残る準備中は「デバイス�
     pid: 41233, runID: "run-1", mine: true, phase: "preparing", requeued: 0, laneDropouts: 0,
     supply: [{ name: "iPhone 17-01", platform: "ios", step: "ready" },
              { name: "iPhone 17-02", platform: "ios", step: "configuring" }],
-    project: "E2E-iOS", profile: "ios-inapp",
+    project: "E2E-iOS", profile: "ios-inapp-boost",
     elapsedSeconds: 12, total: 0, done: 0, failed: 0, lanes: [],
   }] });
   assert.equal(runRows(document)[0].querySelector(".run-board-counts").textContent,
@@ -274,7 +274,7 @@ test("Vision のコンパイル待ちの run は「Vision コンパイル中」�
   t.after(() => window.close());
   post(window, { type: "monitorRuns", machine: "M1Max", observed: true, runs: [{
     pid: 41233, runID: "run-1", mine: true, phase: "compiling", requeued: 0, laneDropouts: 0, supply: [],
-    project: "E2E-iOS", profile: "ios-inapp",
+    project: "E2E-iOS", profile: "ios-inapp-boost",
     elapsedSeconds: 30, total: 4, done: 0, failed: 0, lanes: [],
   }] });
   const [runRow] = runRows(document);
@@ -287,7 +287,7 @@ test("動画の切り出し中は残りの代わりに「動画を編集中 n/m�
   t.after(() => window.close());
   post(window, { type: "monitorRuns", observed: true, runs: [{
     pid: 41233, runID: "run-1", mine: true, phase: "running", requeued: 0, laneDropouts: 0, supply: [],
-    project: "E2E-iOS", profile: "ios-inapp", elapsedSeconds: 171, total: 48, done: 48, failed: 0, lanes: [],
+    project: "E2E-iOS", profile: "ios-inapp-boost", elapsedSeconds: 171, total: 48, done: 48, failed: 0, lanes: [],
     videoClips: { done: 12, total: 48 },
   }] });
   const [runRow] = runRows(document);
@@ -300,7 +300,7 @@ test("失敗があるときだけ ❌失敗数 を足し、無ければ本数だ
   const { window, document } = createWebview();
   t.after(() => window.close());
   const base = { pid: 41233, runID: "run-1", mine: true, phase: "running", requeued: 0, laneDropouts: 0, supply: [],
-    project: "E2E-iOS", profile: "ios-inapp", elapsedSeconds: 30, lanes: [] };
+    project: "E2E-iOS", profile: "ios-inapp-boost", elapsedSeconds: 30, lanes: [] };
   post(window, { type: "monitorRuns", observed: true, runs: [{ ...base, total: 54, done: 54, failed: 2 }] });
   assert.equal(runRows(document)[0].querySelector(".run-board-counts").textContent, "54/54❌2");
   post(window, { type: "monitorRuns", observed: true, runs: [{ ...base, total: 54, done: 10, failed: 0 }] });
@@ -651,7 +651,7 @@ test("「起動中のデバイス」で絞っていてもツリーの台は消�
   // ビルド中 = レーンがまだ1本も無い。デバイスの一覧だけがツリーの供給源になる
   post(window, { type: "monitorRuns", observed: true, runs: [{
     pid: 41233, runID: "run-1", mine: true, phase: "building", requeued: 0, laneDropouts: 0, supply: [],
-    project: "E2E-CMP", profile: "ios-inapp",
+    project: "E2E-CMP", profile: "ios-inapp-boost",
     elapsedSeconds: 8, total: 0, done: 0, failed: 0, lanes: [],
   }] });
   const row = runRows(document)[0];
@@ -784,7 +784,7 @@ test("準備中に開いた run の行は、走り出して runID が付いて�
   t.after(() => window.close());
   sendDevices(window, [{ name: "iPhone 17 Pro-01", udid: "U-L1" }]);
   const run = (fields) => ({ type: "monitorRuns", observed: true, runs: [Object.assign({
-    pid: 41233, mine: true, requeued: 0, laneDropouts: 0, supply: [], project: "E2E-iOS", profile: "ios-inapp",
+    pid: 41233, mine: true, requeued: 0, laneDropouts: 0, supply: [], project: "E2E-iOS", profile: "ios-inapp-boost",
     elapsedSeconds: 3, total: 0, done: 0, failed: 0, lanes: [],
   }, fields)] });
   post(window, run({ phase: "preparing" }));

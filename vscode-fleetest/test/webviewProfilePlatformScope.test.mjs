@@ -120,7 +120,7 @@ function runProfileData(app, devices) {
       containerInference: true,
       ocrTextVisibilityCheck: true,
       preferCheckStateClassifier: true,
-      iosMode: "inapp",
+      iosMode: "inapp-boost",
       iosPreActionPing: true,
       homeOnStart: true,
       playProtectBypass: true,

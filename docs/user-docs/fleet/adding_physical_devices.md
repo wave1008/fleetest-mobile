@@ -292,8 +292,8 @@ A physical device connected to a runner machine works with the same steps. **Do 
   point's client isolation (privacy separator) must be off. What matters is the runner machine's LAN, not your Mac.
 - Install `brew install libimobiledevice` on runner machines that use physical devices too.
 - If the app uses services (compose.yaml), also put `services.publishForPhysicalDevices` (the runner machine's LAN address) in the runner machine's machine settings (a run reads the runner machine's machine settings).
-- The bridge used by inapp mode is signed with the app's certificate by the Mac that sends out the test, and
-  sent along with it. It works on in-app even if the runner machine's keychain does not hold the app's signing key
+- The in-app bridge that inapp-boost mode injects into the app is signed with the app's certificate by the Mac that sends out the test, and
+  sent along with it. inapp-boost mode works even if the runner machine's keychain does not hold the app's signing key
   (step 3 above is still needed to build the XCUITest bridge).
 
 ## What is different on physical devices
@@ -303,7 +303,7 @@ A physical device connected to a runner machine works with the same steps. **Do 
 | Adding photos and videos (`addMedia`) | Not possible. Run on a Simulator, or put the file on the device by hand | Works |
 | Clearing app data (`clearAppData`) | Done by reinstalling the app. Granted permissions are cleared too. Needs `appPathPhysical` | Works |
 | Recording | A flip-book of screens taken around each operation (about 50 ms per capture) | Records normally |
-| Mode | inapp mode works when the app is development-signed (built and installed from Xcode). fleetest signs the injected bridge with the app's own certificate. An app that cannot use them (TestFlight / App Store builds) runs in xcuitest mode, and the `⚠️ … ran in xcuitest mode instead of inapp mode — <reason>` line at the end of the run says so | — |
+| Mode | inapp-boost mode works when the app is development-signed (built and installed from Xcode). fleetest signs the injected bridge with the app's own certificate. An app that cannot use them (TestFlight / App Store builds) runs in xcuitest mode, and the `⚠️ … ran in xcuitest mode instead of inapp-boost mode — <reason>` line at the end of the run says so | — |
 | Device settings | Set Auto-Lock to Never | Set the screen lock to None. Settings fleetest changes stay |
 | System alerts with no button to press | Can remain (it cannot restart SpringBoard as on a Simulator) | — |
 | Reading elements inside Safari | Turn on Settings → Safari → Advanced → Web Inspector on the device | — |

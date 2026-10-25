@@ -3,7 +3,7 @@ import XCTest
 import FTCore
 
 /// in-app dylib の再ビルド判定。存在チェックだけだった頃、ブリッジのソースを直しても古い dylib が
-/// 注入され続け、ios-inapp/ios-heal だけ「checked が取れない」「switch 型が出ない」で落ちた
+/// 注入され続け、ios-inapp-boost/ios-heal だけ「checked が取れない」「switch 型が出ない」で落ちた
 ///。入力(InAppBridge/Sources/* + build.sh + 共有 DTO)の更新を必ず検知すること。
 final class InAppLauncherBuildTests: XCTestCase {
 

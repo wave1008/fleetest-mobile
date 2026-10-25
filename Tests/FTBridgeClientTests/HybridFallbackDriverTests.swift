@@ -1,4 +1,4 @@
-// inapp モードで「in-app ブリッジが原理的に不可な操作だけを XCUITest ブリッジへ回す」振り分けを固定する。
+// inapp-boost モードで「in-app ブリッジが原理的に不可な操作だけを XCUITest ブリッジへ回す」振り分けを固定する。
 //
 // ここが緩むと2種類の事故になる:
 //   - 回さなすぎ: MCP の ft_* が in-app ブリッジで素の 501 を返す(2026-07-28 に live/MCP を
@@ -441,7 +441,7 @@ final class HybridFallbackDriverTests: XCTestCase {
     }
 
     // MARK: - 入力系(pressEnter/type/clearInput の ref なし)は 409 でも回す
-    // **DSL 側(StepExecutor+Actions)と同じ判定を通す**: 片方だけが回ると、同じ inapp モードの構成の
+    // **DSL 側(StepExecutor+Actions)と同じ判定を通す**: 片方だけが回ると、同じ inapp-boost モードの構成の
     // 同じ操作がシナリオでは通り MCP/ライブ操作では落ちる
 
     /// pressEnter / type(ref: nil) / clearInput(ref: nil) は 409(一時的競合)でも回す

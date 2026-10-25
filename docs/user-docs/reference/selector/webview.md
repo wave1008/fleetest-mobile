@@ -9,10 +9,10 @@ native screens, though.
 ## `#id` availability depends on the read path
 
 Whether the HTML `id` attribute is usable as `#id` depends on how the tree is read: it works
-when the DOM can be read directly (iOS's inapp mode; Android WebViews and browsers), or
+when the DOM can be read directly (iOS's inapp-boost mode; Android WebViews and browsers), or
 when accessibility exposes id (Android WebView 150+). **iOS's xcuitest mode does not
 expose it** — WebKit doesn't forward HTML `id` into accessibility. iOS's default mode
-(inapp) handles reading and delegating into WebView content automatically, so no special
+(inapp-boost) handles reading and delegating into WebView content automatically, so no special
 handling is needed on the scenario side there.
 
 ## Links appear as two elements

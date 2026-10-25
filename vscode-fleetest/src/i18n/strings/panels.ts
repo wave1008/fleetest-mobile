@@ -142,8 +142,8 @@ export const panelsStrings = {
   "panels.runProfile.iosSectionTitle": { ja: "iOS", en: "iOS" },
   "panels.runProfile.iosModeLabel": { ja: "iOS のモード", en: "iOS mode" },
   "panels.runProfile.iosModeInapp": {
-    ja: "inapp(in-app ブリッジ + XCUITest ブリッジ)",
-    en: "inapp (in-app bridge + XCUITest bridge)",
+    ja: "inapp-boost(XCUITest ブリッジ + in-app ブリッジ)",
+    en: "inapp-boost (XCUITest bridge + in-app bridge)",
   },
   "panels.runProfile.iosModeXcuitest": {
     ja: "xcuitest(XCUITest ブリッジだけ)",

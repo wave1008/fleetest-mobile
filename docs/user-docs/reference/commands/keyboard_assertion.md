@@ -23,7 +23,7 @@ keyboardIsNotShown()
 
 ## Notes
 
-- **"Hidden" can only be confirmed in iOS inapp mode and on Android.** iOS xcuitest
+- **"Hidden" can only be confirmed in iOS inapp-boost mode and on Android.** iOS xcuitest
   mode can only say "keyboard seen" or "unknown" — it never confirms absence. In that mode,
   `keyboardIsNotShown` fails: with "keyboard is still shown" if it is visible, or "cannot
   determine the keyboard state" if not — unknown is never read as hidden, to avoid a false

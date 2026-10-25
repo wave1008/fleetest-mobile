@@ -17,7 +17,7 @@ cd E2EAppIOS
 
 ```sh
 fleetest run --project E2E-iOS --profile ios-xcuitest   # 全件グリーンの基準
-fleetest run --project E2E-iOS --profile ios-inapp      # モード差分の観測用
+fleetest run --project E2E-iOS --profile ios-inapp-boost      # モード差分の観測用
 fleetest run --project E2E-iOS --profile ios-heal       # --heal
 ```
 
@@ -29,14 +29,14 @@ fleetest run --project E2E-iOS --profile ios-heal       # --heal
 |---|---|---|
 | `ios-xcuitest` | ✅ 20/20 | 91.3s |
 | `ios-heal` | ✅ 20/20 | — |
-| `ios-inapp` | ✅ 20/20 | 30.4s |
+| `ios-inapp-boost` | ✅ 20/20 | 30.4s |
 
-## `ios-inapp` で判明し、修正した fleetest 側の穴2件(2026-07-23)
+## `ios-inapp-boost` で判明し、修正した fleetest 側の穴2件(2026-07-23)
 
 この SUT を作って初めて見えた2点。**どちらも Compose 固有ではなく SwiftUI ネイティブでも起きていた**。
-いずれも修正済みで、現在 `ios-inapp` は 20/20 グリーン(30.4s。xcuitest の 42.6s より速い)。
+いずれも修正済みで、現在 `ios-inapp-boost` は 20/20 グリーン(30.4s。xcuitest の 42.6s より速い)。
 
-### 1. in-app のジェスチャ空振りが inapp モードでフォールバックされなかった
+### 1. in-app のジェスチャ空振りが inapp-boost モードでフォールバックされなかった
 
 `press` / `swipe` が 200 を返して成功扱いになるのに `onLongPressGesture` / `DragGesture` が
 発火しない、という「黙った空振り」。原因は `InAppBridge` が `unsupportedActions` の申告も 501 の
@@ -97,7 +97,7 @@ simctl terminate する(ログに「別アプリに注入された in-app ブリ
 **`_disabled/` は SPM のビルド対象外**(`Package.swift` の `exclude`)。回すときは
 `scenarios/` 直下へ移動 → `swift build --product fleetest-scenarios-E2E-iOS` → 実行 → 元に戻す。
 
-- `91_クラッシュ検知.swift` — アプリを実際にクラッシュさせる破壊的シナリオ。**`ios-inapp` で回すこと**。
+- `91_クラッシュ検知.swift` — アプリを実際にクラッシュさせる破壊的シナリオ。**`ios-inapp-boost` で回すこと**。
   **2026-07-23 検証済み**: `fatalError` でプロセスが落ち、エラー行に `.ips` のパスと終了理由
   (`EXC_BREAKPOINT SIGTRAP`)が付く。この検証で fleetest 側のバグを2件発見・修正した
   (`.ips` の探索が早すぎて取りこぼす / 前の実行の古い `.ips` を拾う)

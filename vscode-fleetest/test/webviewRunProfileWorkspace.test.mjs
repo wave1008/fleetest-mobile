@@ -107,7 +107,7 @@ const RUN_PROFILE_FIELDS = {
   containerInference: true,
   ocrTextVisibilityCheck: true,
   preferCheckStateClassifier: true,
-  iosMode: "inapp",
+  iosMode: "inapp-boost",
   homeOnStart: true,
   enableAnimations: false,
   responseMeasurement: false,
@@ -152,7 +152,7 @@ test("開始/終了スクリプトは入力欄を持たず、雛形を作るボ�
   assert.equal(posted[0].workspace, "../shared-ws");
 });
 
-test("iosMode に inapp / xcuitest 以外が書かれていたら、その値を選んだまま見せる(黙って inapp に書き換えない)", (t) => {
+test("iosMode に inapp-boost / xcuitest 以外が書かれていたら、その値を選んだまま見せる(黙って inapp-boost に書き換えない)", (t) => {
   const { window, sendToWebview } = createWebview();
   t.after(() => window.close());
   sendToWebview(PROFILE_INFO);
@@ -164,11 +164,11 @@ test("iosMode に inapp / xcuitest 以外が書かれていたら、その値を
   assert.equal(select.value, "hybrid");
   assert.equal(select.querySelectorAll("option[data-unknown]").length, 1);
   assert.match(select.selectedOptions[0].textContent, /hybrid/);
-  assert.equal(inappOptions.style.display, "none", "inapp モードの補助欄は inapp のときだけ");
+  assert.equal(inappOptions.style.display, "none", "inapp-boost モードの補助欄は inapp-boost のときだけ");
 
   // 別のプロファイルへ切り替えたら不明な値の選択肢は残さない。補助欄は読み込んだ値で決まる
   sendToWebview({ type: "runProfileData", profile: "android-1", ok: true, error: null, fields: RUN_PROFILE_FIELDS });
-  assert.equal(select.value, "inapp");
+  assert.equal(select.value, "inapp-boost");
   assert.equal(select.querySelectorAll("option[data-unknown]").length, 0);
   assert.equal(inappOptions.style.display, "");
 });

@@ -110,7 +110,7 @@ been swallowed)` を添える(`StepExecutor.tapDiagnosisHint`)。
 (抑止は `AndroidBridge.disableStylusHandwriting`)。**この手の教育用ポップアップは今後も増える**ので、
 1 の警告が出たら SUT ではなくデバイス設定側を疑う。
 
-**切り分けの定石(iOS)**: 同じシナリオを `ios-inapp` プロファイルでも回す。in-app は ref で、
+**切り分けの定石(iOS)**: 同じシナリオを `ios-inapp-boost` プロファイルでも回す。in-app は ref で、
 xcuitest は座標でタップするので、**片方だけ落ちるならタップ経路の問題**、両方落ちるならアプリ側か
 セレクタの問題と切り分けられる(スクロール直後のタップの機序特定で決め手になった)。
 
@@ -391,7 +391,7 @@ connection was lost」で落ちる(そのデバイスは never joined = 準備�
 - ランナー側の決め手は `.fleetest/bridge-<xcuiPort>.log` の
   `Failed to application <bundleID> is not running`。**その bundleID が対象アプリと違えば**
   セッションの取り違え(使い回した XCUITest ブリッジが前のプロジェクトのアプリを指したまま)
-- **再現条件は「複数 SUT を連続で回す」**。`Scripts/e2e.sh --ios --ios-inapp --cmp` のように
+- **再現条件は「複数 SUT を連続で回す」**。`Scripts/e2e.sh --ios --ios-inapp-boost --cmp` のように
   SUT を1つに絞ると出ない(プロジェクトを跨いだセッション残留が起きないため)。
   切り分けは必ずフル構成で、**A/B は変更を `git stash` して同じ条件で並べる**
   (実測: ベースライン フル×2 = 各1件離脱、修正後 フル×2 = 0件)

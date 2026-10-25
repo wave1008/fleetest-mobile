@@ -1,7 +1,7 @@
 // 97_入力欄でないrefへのtype.swift
 // **陽性対照**(既定スイートには載せない): 欄に焦点を残したまま**入力欄でない要素**へ type すると、
 // 前の欄へ打たずに断ることを、**hybrid の DSL を端から端まで**通して確かめる。
-// 回すのは Scripts/e2e-negative.sh(ios-inapp。期待値は Scripts/negative-controls.json)。
+// 回すのは Scripts/e2e-negative.sh(ios-inapp-boost。期待値は Scripts/negative-controls.json)。
 // **S0010 は落ちるのが正常**: ホストが type を**撃つ前に**断る(`nonTextInputPreflightRefusal`。文言
 // 「the target is a button, not a text field — refusing before anything is typed」)。ボタンへ撃つと
 // ドライバがまずタップするので押してしまう(送信・購入)。

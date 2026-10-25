@@ -9,7 +9,7 @@
 // (`fleetest bridge up` / run の供給と同じ経路。二つ目の実装を書かない)。
 //
 // **対象はシミュレータの xcuitest ブリッジだけ**(RunnerMidRunRecheck.target と同じ絞り込み):
-// inapp モード/in-app ブリッジは起動し直しの単位が違う(対象アプリごと落ちる)・実機は provision() の対象外。
+// inapp-boost モード/in-app ブリッジは起動し直しの単位が違う(対象アプリごと落ちる)・実機は provision() の対象外。
 // それ以外の接続は connectionLostHint の案内だけに落ちる(退化ではなく対象外なだけ)。
 //
 // **入口は 2 つ**: ①覚えたポートの接続拒否(`dispatchRetryingAfterBridgeRecovery`)②udid の畳み込みで「その Simulator に

@@ -336,7 +336,7 @@ struct Bridge: AsyncParsableCommand {
             }
         }
 
-        /// inapp モードは1台に in-app と XCUITest の2本があり、ポートを1つ止めても片割れが残る。
+        /// inapp-boost モードは1台に in-app と XCUITest の2本があり、ポートを1つ止めても片割れが残る。
         /// 残ったのが XCUITest ランナーだと、Simulator を止めた直後に xcodebuild が起こし直す
         /// (約1分後にランナー自身が止める)。止めないのは片方だけ止めて縮退を確かめる使い方を残すため。
         /// in-app の台帳はアプリが死んでも残るので数えない(生きたプロセスを照合する portsMatching だけ)

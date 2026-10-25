@@ -4,19 +4,19 @@ import XCTest
 /// どのモードで走ったかの記録(シナリオの `mode`・run.json の `workerModes`)とコンソールの文言
 final class WorkerModeRecordTests: XCTestCase {
 
-    /// XCUITest は接続情報に mode が入らない(inapp だけ入る)ので、iOS の nil は xcuitest と書く。Android は書かない
+    /// XCUITest は接続情報に mode が入らない(inapp-boost だけ入る)ので、iOS の nil は xcuitest と書く。Android は書かない
     func testRecordedModeOfAConnection() {
-        XCTAssertEqual(DriverConnection(platform: "ios", port: 8123, mode: "inapp").recordedMode, "inapp")
+        XCTAssertEqual(DriverConnection(platform: "ios", port: 8123, mode: "inapp-boost").recordedMode, "inapp-boost")
         XCTAssertEqual(DriverConnection(platform: "ios", port: 8123, mode: nil).recordedMode, "xcuitest")
         XCTAssertNil(DriverConnection(platform: "android", serial: "emulator-5554").recordedMode)
     }
 
     /// 縮退した(頼んだものと違う)ときだけ理由を残す。頼んだものが分からなければ実効モードと同じとみなす
     func testFallbackReasonIsKeptOnlyWhenTheModeDiffers() {
-        let fellBack = WorkerModeRecord.resolved(worker: "ios:iPhone 13(実機)", requested: "inapp",
+        let fellBack = WorkerModeRecord.resolved(worker: "ios:iPhone 13(実機)", requested: "inapp-boost",
                                                    effective: "xcuitest", fallbackReason: "not in this machine's keychain")
         XCTAssertEqual(fellBack.reason, "not in this machine's keychain")
-        let same = WorkerModeRecord.resolved(worker: "ios:SE3", requested: "inapp", effective: "inapp",
+        let same = WorkerModeRecord.resolved(worker: "ios:SE3", requested: "inapp-boost", effective: "inapp-boost",
                                                fallbackReason: "stale")
         XCTAssertNil(same.reason)
         let unknown = WorkerModeRecord.resolved(worker: "ios:sim", requested: nil, effective: "xcuitest", fallbackReason: nil)
@@ -25,21 +25,21 @@ final class WorkerModeRecordTests: XCTestCase {
 
     func testSummaryNamesEveryDeviceAndWarnsOnFallback() {
         let lines = WorkerModeSummary.lines([
-            WorkerModeRecord(worker: "ios:SE3", requested: "inapp", effective: "inapp", reason: nil),
-            WorkerModeRecord(worker: "ios:iPhone 13(実機)", requested: "inapp", effective: "xcuitest",
+            WorkerModeRecord(worker: "ios:SE3", requested: "inapp-boost", effective: "inapp-boost", reason: nil),
+            WorkerModeRecord(worker: "ios:iPhone 13(実機)", requested: "inapp-boost", effective: "xcuitest",
                                reason: "in-app injection is not available (x)"),
         ])
         XCTAssertEqual(lines, [
-            "🔧 Modes: SE3 inapp, iPhone 13(実機) xcuitest",
-            "⚠️ iPhone 13(実機): ran in xcuitest mode instead of inapp mode — in-app injection is not available (x)",
+            "🔧 Modes: SE3 inapp-boost, iPhone 13(実機) xcuitest",
+            "⚠️ iPhone 13(実機): ran in xcuitest mode instead of inapp-boost mode — in-app injection is not available (x)",
         ])
         XCTAssertEqual(WorkerModeSummary.lines([]), [])
     }
 
     /// 見出しのラベル("<名前>(ios:<port>)")から記録を引く。デバイス名に括弧があっても末尾の括弧群だけを落とす
     func testModeIsFoundFromTheWorkerLabel() {
-        let records = [WorkerModeRecord(worker: "ios:iPhone 13(実機)", requested: "inapp", effective: "inapp", reason: nil)]
-        XCTAssertEqual(WorkerModeSummary.mode(forLabel: "iPhone 13(実機)(ios:8134)", in: records), "inapp")
+        let records = [WorkerModeRecord(worker: "ios:iPhone 13(実機)", requested: "inapp-boost", effective: "inapp-boost", reason: nil)]
+        XCTAssertEqual(WorkerModeSummary.mode(forLabel: "iPhone 13(実機)(ios:8134)", in: records), "inapp-boost")
         XCTAssertNil(WorkerModeSummary.mode(forLabel: "Pixel(android:emulator-5554)", in: records))
         XCTAssertNil(WorkerModeSummary.mode(forLabel: "SE3(ios:8123)", in: records))
     }
@@ -66,18 +66,18 @@ final class WorkerModeRecordTests: XCTestCase {
     /// 欄は古い記録に無い(nil = 不明)。書いた値が読み戻せること
     func testRecordsRoundTripTheNewFields() throws {
         let builder = ScenarioRecordBuilder(scenarioID: "T.S0010", platform: "ios", title: nil, worker: "ios:SE3",
-                                            mode: "inapp")
+                                            mode: "inapp-boost")
         let record = builder.build(passed: true, timedOut: false, startedAt: Date(), durationMs: 1, packageRoot: nil)
         let decoded = try JSONDecoder().decode(ScenarioRunRecord.self, from: JSONEncoder().encode(record))
-        XCTAssertEqual(decoded.mode, "inapp")
+        XCTAssertEqual(decoded.mode, "inapp-boost")
         let old = try JSONDecoder().decode(ScenarioRunRecord.self, from: JSONEncoder().encode(
             ScenarioRunRecord(scenarioID: "T.S0010", platform: "ios", passed: true, startedAt: "x", durationMs: 1,
                               steps: StepCountsRecord())))
         XCTAssertNil(old.mode)
         let meta = RunMetaRecord(runID: "r", project: "p", profile: nil, host: "h", trigger: "cli", startedAt: "s",
-                                 workerModes: [WorkerModeRecord(worker: "ios:SE3", requested: "inapp",
-                                                                    effective: "inapp", reason: nil)])
+                                 workerModes: [WorkerModeRecord(worker: "ios:SE3", requested: "inapp-boost",
+                                                                    effective: "inapp-boost", reason: nil)])
         let metaDecoded = try JSONDecoder().decode(RunMetaRecord.self, from: JSONEncoder().encode(meta))
-        XCTAssertEqual(metaDecoded.workerModes?.first?.effective, "inapp")
+        XCTAssertEqual(metaDecoded.workerModes?.first?.effective, "inapp-boost")
     }
 }

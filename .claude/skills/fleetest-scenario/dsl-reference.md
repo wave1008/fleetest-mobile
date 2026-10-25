@@ -47,8 +47,8 @@ fleetest-scenario スキル(SKILL.md)のステップ3「シナリオ .swift を�
 - **`ifCanSelect` だけは既定で即時判定**(`waitSeconds:0`)。遷移直後に分岐条件を待ちたいときは
   先行 `wait` ではなく `ifCanSelect(sel, waitSeconds:)` を使う(解決できたら即進む)。
 - **`type` は Compose Multiplatform / Flutter 等(UIKit の入力欄を持たないアプリ)でもそのまま書いてよい**。
-  iOS の既定の inapp モードが Compose を自動判定し、type だけ XCUITest ブリッジ実行に切り替える(tap/exist は
-  高速な in-app ブリッジのまま)。Android は常に inapp で type 可。`type` は打つ前に対象を自分でタップするので、前に `tap` を置かない。
+  iOS の既定の inapp-boost モードが Compose を自動判定し、type だけ XCUITest ブリッジ実行に切り替える(tap/exist は
+  高速な in-app ブリッジのまま)。Android はモードの選択肢が無く、常に type できる。`type` は打つ前に対象を自分でタップするので、前に `tap` を置かない。
 - **パスワード・アカウントをシナリオに直書きしない**。`account()` で受け取り、値は `dataset/accounts.json` に置く
   (本物のパスワードを git に入れたくないなら、🧑 にその Mac の `~/.config/fleetest/dataset/<proj>/accounts.json` へ
   置いてもらう)。データセットファイルが無ければ、作る前に 🧑 に値を聞く(推測した値を置かない)。
@@ -140,7 +140,7 @@ fleetest-scenario スキル(SKILL.md)のステップ3「シナリオ .swift を�
 - **launchApp が直前画面から再開する**アプリは、一覧/先頭画面へ正規化してから進める
   (`ifCanSelect("#詳細ビュー") { tap("#BackButton") }` 等)。
 - **WebView(Web コンテンツ)内は規約が違う**(スナップショットに `.webView` 型が出たらこの画面):
-  **`#id`(HTML の `id`)が使えるかは読み取り経路で決まる**。DOM を読める経路(iOS の inapp モード /
+  **`#id`(HTML の `id`)が使えるかは読み取り経路で決まる**。DOM を読める経路(iOS の inapp-boost モード /
   Android のアプリ内 WebView・ブラウザ)と、a11y が id を出す構成(Android WebView 150 以降)では
   使える。**iOS の xcuitest モードでは出ない**(WebKit が HTML id を a11y へ渡さない)。
   id が使えない構成では表示テキスト・`aria-label`・型で指す。**リンクは `.link` と `.staticText` の

@@ -155,7 +155,7 @@ final class ApiLiveBridgeIdentityWiringTests: XCTestCase {
                       "ループバックかを先に見ること(LAN 宛先では lsof を撃たない)")
     }
 
-    /// inapp モードの in-app 側(別ポート)も本人確認する——xcuitest 側だけでは検分できない
+    /// inapp-boost モードの in-app 側(別ポート)も本人確認する——xcuitest 側だけでは検分できない
     func testInappModeInAppEndpointIsAlsoVerified() throws {
         let code = try source("Sources/fleetest/ApiLiveCommand.swift")
         guard let composeRange = code.range(of: "private func composeDriver(") else {
@@ -164,11 +164,11 @@ final class ApiLiveBridgeIdentityWiringTests: XCTestCase {
         guard let guardRange = code.range(
             of: "guard let inApp = resolution.inApp", range: composeRange.upperBound..<code.endIndex)
         else {
-            return XCTFail("inapp モード判定の guard が見当たらない — テストを見直すこと")
+            return XCTFail("inapp-boost モード判定の guard が見当たらない — テストを見直すこと")
         }
         guard let secondVerifyRange = code.range(
             of: "endpoint: inApp.endpoint", range: guardRange.upperBound..<code.endIndex) else {
-            return XCTFail("inapp モードの in-app 側(inApp.endpoint)を本人確認していない")
+            return XCTFail("inapp-boost モードの in-app 側(inApp.endpoint)を本人確認していない")
         }
         XCTAssertTrue(guardRange.upperBound < secondVerifyRange.lowerBound)
     }

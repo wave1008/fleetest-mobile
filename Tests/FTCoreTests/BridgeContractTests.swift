@@ -40,9 +40,9 @@ final class BridgeContractTests: XCTestCase {
     //   /pinch・/doubletap … 3実装とも持つ(in-app は 2026-08-04 に追加。合成タッチの間隔と
     //                 指の距離を自分で決められるぶん XCTest より正確な場面がある)
     //   /rotate    … iOS の2実装だけ(62)。Android は host-side adb(AndroidDriver)で行うため持たない
-    //   /gesture   … XCUITest ランナーと Android だけ(iOS 126 / Android 72)。in-app は持たず、inapp モードは
+    //   /gesture   … XCUITest ランナーと Android だけ(iOS 126 / Android 72)。in-app は持たず、inapp-boost モードは
     //                 既定の 501 で XCUITest へ回す(指ごとの時刻つき経路を1回で再生する)
-    //   /hold      … XCUITest ランナーと Android だけ。in-app は持たず、inapp モードは XCUITest へ回す
+    //   /hold      … XCUITest ランナーと Android だけ。in-app は持たず、inapp-boost モードは XCUITest へ回す
     //                 (指を置いたら応答を返す = 置いている間に木を読める)
     static let inAppRoutes: Set<String> = [
         "GET /screenshot", "GET /snapshot", "GET /status",
@@ -131,7 +131,7 @@ final class BridgeContractTests: XCTestCase {
         .inApp: [
             "InAppBridge/Sources/Bridging.h": "08799e6d190f958eed7c6bb4406f1cbbfea1bed1d252ce4572636273c65a5aad",
             "InAppBridge/Sources/DisplayHeartbeat.swift": "845b796af6d9a176780a96c852f9a2ccace5923d672ca947404adf2ba156b0de",
-            "InAppBridge/Sources/InAppBridge.swift": "531df209535777b339e22b18a4603572f001ec7b4ec05211a57d9c60a273e96e",
+            "InAppBridge/Sources/InAppBridge.swift": "70dce3f7417f601b0c8bf29d3f39b65c344d5c355a0a1fd1689ddcac81bfb75b",
             "InAppBridge/Sources/InAppHTTPServer.swift": "2c0dd9eaa35bb794004378e8c9fb8655fc66b42630bd582dd75e73754d361f9c",
             "InAppBridge/Sources/InAppInput.h": "334537da65d98ae36f9fb11fa0b29d5f0b2586e2e4298415d4637bcc36c113cd",
             "InAppBridge/Sources/InAppInput.m": "64b9a5dd7bfec42e3bed87ed047574c3e94a1ff2d722891ec9b3c712645c28da",
@@ -142,7 +142,7 @@ final class BridgeContractTests: XCTestCase {
             "InAppBridge/Sources/boot.m": "b23fc93fbc99ce2579c9fd8ae75a6f9bbfd0ec6122bec60eb6cd00775dd635ef",
             "InAppBridge/build.sh": "3cf8cb7316059b4f5d4e2a33d915c6b4cd5318dad7a68718f18a010b630c8713",
             "Sources/FTCore/AXFrameRescale.swift": "eef63f86079f246da9f30f7543f4efb7e912eb70f6a01c721dde6789a1ebe7e7",
-            "Sources/FTCore/BridgeDTO.swift": "38a04f85a60776a20f3c20961555147ddbbfc4d5cdbc41a5310d55f51de88cf7",
+            "Sources/FTCore/BridgeDTO.swift": "92d1c5f9d9eac691f346d9eff6898bd37486c41c28e90028dee6bf0ca0a110a1",
             "Sources/FTCore/TypeReadback.swift": "540049e120e476538772df5e4611e3a78ec5717cd42fb7a683fdb606fad88027",
             "Sources/FTCore/UIFrameworkMarkers.swift": "94c8d9c5774a35b79ec1261ac77e3fe30ae40adb92507ef8d5cdf7bd5057c869",
             "Sources/FTCore/WebViewDOMSnapshot.swift": "aa4dea12295f5da76b1f0b97cd59a2c00e4ad2aa8ee838ccbf5d4abc2eba22ca",
@@ -150,8 +150,8 @@ final class BridgeContractTests: XCTestCase {
         .xcuitest: [
             "Runner/FleetestRunnerUITests/BridgeHTTPServer.swift": "ef8c6573ab25f9cbdfed21e483ce74f1eb5d1a4345bc57a2d5b9ed2eb86b860e",
             "Runner/FleetestRunnerUITests/BridgeRouter+Snapshot.swift": "55f5bdc9607198d489299ee946d4c2521802836219e3f9d2712bc06adace4334",
-            "Runner/FleetestRunnerUITests/BridgeRouter+TextInput.swift": "dcb0933d10c2f49bd59ba2d4e8c03bdd26deaf1a43cd34b6213c1d854b7f65a8",
-            "Runner/FleetestRunnerUITests/BridgeRouter.swift": "7019d570bab4b3f3f8256b1668d6f0014c676e58816e57bd03603f9c4367dd46",
+            "Runner/FleetestRunnerUITests/BridgeRouter+TextInput.swift": "dec41899a74684281e8ca9636ed1f321fcf320c60a7746baa3e022031a023122",
+            "Runner/FleetestRunnerUITests/BridgeRouter.swift": "357e488b9438a8d4aa136f28c4f484830d1a3fe263ab7fbe399a7c900f3822c8",
             "Runner/FleetestRunnerUITests/BridgingHeader.h": "f7ff424d9283644d0e7a0c6e202911ecbf2d9c12d469eea330d91471c4788272",
             "Runner/FleetestRunnerUITests/CoordinatePinch.swift": "b4034f271fc9c321ea8f1afca227ef5a9bce91dc1367fb35560785dbf5547100",
             "Runner/FleetestRunnerUITests/DisplayHeartbeat.swift": "c62c30a45e842d5ec7aff60210284d679b76f6e44358a3f4c97429fe918e5ffa",
@@ -164,7 +164,7 @@ final class BridgeContractTests: XCTestCase {
             "Runner/FleetestRunnerUITests/ResponseMeasurement.swift": "6254e04c6f0a85d4504e45657f847f6d1a761fe2f635819b482457c34dd095b1",
             "Runner/FleetestRunnerUITests/VirtualHID.swift": "8ee358d73f27c9aabefbd6f98e41091dfde837ee8f15e5066997df1d97df802e",
             "Sources/FTCore/AXFrameRescale.swift": "eef63f86079f246da9f30f7543f4efb7e912eb70f6a01c721dde6789a1ebe7e7",
-            "Sources/FTCore/BridgeDTO.swift": "38a04f85a60776a20f3c20961555147ddbbfc4d5cdbc41a5310d55f51de88cf7",
+            "Sources/FTCore/BridgeDTO.swift": "92d1c5f9d9eac691f346d9eff6898bd37486c41c28e90028dee6bf0ca0a110a1",
             "Sources/FTCore/ResponseMeasurementWire.swift": "19f9ba212d1ce05ad3431dd350895329f0fc62a8bdbf6210c362583d22175dcd",
             "Sources/FTCore/SnapshotDedupe.swift": "f987a913f2010e8cd81e381c595c15242f58225c71a11a9be206590baccf8c9b",
             "Sources/FTCore/TypeReadback.swift": "540049e120e476538772df5e4611e3a78ec5717cd42fb7a683fdb606fad88027",

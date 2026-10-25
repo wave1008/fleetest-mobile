@@ -16,7 +16,7 @@ public struct InAppLauncher: Sendable {
     public let appBundle: String?
     /// USB(iproxy)で張るか。実機のみ参照(シミュレータはループバック共有)
     public let wired: Bool
-    /// inapp モードの実機で、相方(xcuitest)のトンネルのポート。in-app の establish がこれを消さないように残す
+    /// inapp-boost モードの実機で、相方(xcuitest)のトンネルのポート。in-app の establish がこれを消さないように残す
     public let keepPeerPort: UInt16?
 
     var stateDir: URL { repoRoot.appendingPathComponent(".fleetest") }
@@ -44,7 +44,7 @@ public struct InAppLauncher: Sendable {
     /// (BridgeLauncher の buildForTesting 相当)。
     /// **存在チェックだけにしてはいけない**: build/ は gitignore・手動ビルドなので、ブリッジの
     /// ソースを直しても注入されるのは古いバイナリのままになる。実害として、isChecked 追加と型の
-    /// 役割正規化(b8a408c)がビルドされず ios-inapp/ios-heal だけ「checked が取れない」
+    /// 役割正規化(b8a408c)がビルドされず ios-inapp-boost/ios-heal だけ「checked が取れない」
     /// 「switch 型が出ない」で落ち続けた(判明した実例)。SUT の再ビルド判定(Scripts/e2e.sh の
     /// needs_rebuild)・シナリオの BuildFingerprint と同じ考え方を、ここにも置く。
     public func buildIfNeeded() throws {

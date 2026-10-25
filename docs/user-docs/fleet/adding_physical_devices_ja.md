@@ -281,8 +281,8 @@ fleetest run --profile <実行プロファイル> --scenario <シナリオID>
   (プライバシーセパレータ)が切ってある必要があります。関係するのはランナー機の側の LAN で、手元の Mac は関係しません。
 - 実機を使うランナー機にも `brew install libimobiledevice` を入れてください。
 - サービス(compose.yaml)を使うアプリなら、ランナー機のマシン設定にも `services.publishForPhysicalDevices`(ランナー機の LAN アドレス)を書きます(run はランナー機のマシン設定を読みます)。
-- inapp モードで使うブリッジは、テストを送り出す側の Mac がアプリの証明書で署名して一緒に送ります。
-  ランナー機のキーチェーンにアプリの署名の鍵が無くても in-app で動きます(上の3は XCUITest のブリッジのビルドに要ります)。
+- inapp-boost モードでアプリへ注入する in-app ブリッジは、テストを送り出す側の Mac がアプリの証明書で署名して一緒に送ります。
+  ランナー機のキーチェーンにアプリの署名の鍵が無くても inapp-boost モードで動きます(上の3は XCUITest ブリッジのビルドに要ります)。
 
 ## 実機で違うこと
 
@@ -291,7 +291,7 @@ fleetest run --profile <実行プロファイル> --scenario <シナリオID>
 | 写真・動画を入れる(`addMedia`) | できません。Simulator で実行するか、端末へ手で入れます | できます |
 | アプリのデータを消す(`clearAppData`) | アプリを入れ直して消します。許可した権限も消えます。`appPathPhysical` が要ります | できます |
 | 録画 | 操作の前後に撮った画面のコマ送りになります(撮影1回に約 50ms) | ふつうに録画します |
-| モード | アプリが開発署名(Xcode からビルドして入れたもの)なら inapp モードを使えます。注入するブリッジは fleetest がアプリと同じ証明書で署名します。TestFlight・App Store 版のように使えないアプリは xcuitest モードで走り、run の終わりの `⚠️ … ran in xcuitest mode instead of inapp mode — <理由>` の行で分かります | — |
+| モード | アプリが開発署名(Xcode からビルドして入れたもの)なら inapp-boost モードを使えます。注入するブリッジは fleetest がアプリと同じ証明書で署名します。TestFlight・App Store 版のように使えないアプリは xcuitest モードで走り、run の終わりの `⚠️ … ran in xcuitest mode instead of inapp-boost mode — <理由>` の行で分かります | — |
 | 端末の設定 | 自動ロックを「なし」にします | 画面ロックを「なし」に。fleetest が変えた設定は残ります |
 | 押すボタンの無いシステムアラート | 残ることがあります(Simulator のように起こし直せません) | — |
 | Safari の中の要素を読む | 端末で 設定 → Safari → 詳細 → Web インスペクタ を ON にします | — |

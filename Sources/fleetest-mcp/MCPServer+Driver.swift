@@ -81,7 +81,7 @@ extension MCPServer {
             // 「profile を使う利用者にだけ穴が残る」形になる
             if let cached = drivers[key] {
                 if let moved = await deviceIdentityChanged(key, args: args) { throw MCPError(moved) }
-                // **MN-51.10**: モード(xcuitest/inapp)が同じ機のまま入れ替わっていないかも
+                // **MN-51.10**: モード(xcuitest/inapp-boost)が同じ機のまま入れ替わっていないかも
                 // 確かめる(udid だけでは捕まらない・ref を使わない呼び出しでも効かせる)。
                 // 食い違っていれば `.refuse`(記憶に依る呼び出し)か `.rebuildSilently`
                 // (依らない呼び出し。下の生成へそのまま落ちる)のどちらか
@@ -91,7 +91,7 @@ extension MCPServer {
                 case .rebuildSilently:
                     break
                 case .unchanged:
-                    // **inapp モードの fallback(XCUITest)ポートも本人確認する**(MN-51.2): 主(in-app)の udid が
+                    // **inapp-boost モードの fallback(XCUITest)ポートも本人確認する**(MN-51.2): 主(in-app)の udid が
                     // 変わっていなくても、`HybridFallbackDriver` の fallback は別ポートを握ったままで
                     // 起動し直しにより別の機へ移り得る。fallback には ref が乗らないので(primary と違い)
                     // 捨てるべきセッション記憶が無い —— キャッシュだけ落として下の生成へ通す
@@ -216,7 +216,7 @@ extension MCPServer {
             // —— 供給の判断とホストの期待がズレた回に、黙って旧ブリッジを操作させない
             try await enforceVersion(driver: created, key: key, args: args)
             // **プロファイルの autoInstall は MCP でも効かせる**: 供給がアプリを先に入れるのは in-app のときだけで、
-            // MCP は XCUITest で供給する(resolveProfileTarget)ので、ここで入れないと inapp モード / in-app のプロファイルで
+            // MCP は XCUITest で供給する(resolveProfileTarget)ので、ここで入れないと inapp-boost モード / in-app のプロファイルで
             // 「入っていない」と ft_launch が断る。**入っていないときだけ**入れる(入れ直しは動いているアプリを
             // 終了させる = 探索中の画面を失う。差分の入れ直しは run の installIfNeeded の役目)
             if case .ios(let provisioned, let iosApp) = target, let iosApp, iosApp.autoInstall,
@@ -258,7 +258,7 @@ extension MCPServer {
             case .rebuildSilently:
                 break
             case .unchanged:
-                // **inapp モードの fallback(XCUITest)ポートも本人確認する**(MN-51.2。profile 経路の
+                // **inapp-boost モードの fallback(XCUITest)ポートも本人確認する**(MN-51.2。profile 経路の
                 // 同じ確認と理由は同じ)。fallback には ref が乗らないのでキャッシュだけ落とし、
                 // 下の生成へ通す(セッション記憶は主の udid が変わっていないので保つ)
                 if await hybridFallbackDrifted(key) {
@@ -306,7 +306,7 @@ extension MCPServer {
             created = resolved.driver
             bridges[key] = resolved.bridge
             udids[key] = resolved.udid
-            hybridFallbackPorts[key] = nil   // MCP の iOS は XCUITest だけ(inapp モードの予備ポートは無い)
+            hybridFallbackPorts[key] = nil   // MCP の iOS は XCUITest だけ(inapp-boost モードの予備ポートは無い)
             // **宛先は port だけでなく udid まで書く**(実アプリ監査): ブリッジは
             // 落ちても monitor が別ポートで起動し直すので、**同じセッション中にポートが動く**
             // (実測: -03 が 8128→8126、-07 が 8136→8147)。port だけを覚えて使い回す読み手は、
@@ -1147,7 +1147,7 @@ extension MCPServer {
 
     /// **主ポートのブリッジが変わっていないか(MN-51.10)**: `deviceIdentityChanged` は
     /// udid しか見ず、しかも `usesRememberedDeviceState` で ref を使う呼び出しにしか効かない —— 同じ
-    /// udid のまま run のたびのブリッジの起動し直しでモードが xcuitest ⇄ inapp に入れ替わった形を
+    /// udid のまま run のたびのブリッジの起動し直しでモードが xcuitest ⇄ inapp-boost に入れ替わった形を
     /// 見逃す。**実測**: xcuitest でキャッシュ済みのドライバの port が in-app ブリッジへ化け、ref を
     /// 使わない `ft_terminate`(`usesRememberedDeviceState` のゲートを通らない)が
     /// 「in-app では未サポート」の 501 を返した(in-app には /terminate が無い)。逆向き
@@ -1245,7 +1245,7 @@ extension MCPServer {
             + " device is on which port now."
     }
 
-    /// **inapp モードのキャッシュ命中の fallback(XCUITest)ポートが別の機/別ブリッジへ移っていないか**
+    /// **inapp-boost モードのキャッシュ命中の fallback(XCUITest)ポートが別の機/別ブリッジへ移っていないか**
     /// (MN-51.2): `deviceIdentityChanged` は主(in-app・`connectedPorts`/`udids`)しか
     /// 見ないので、`HybridFallbackDriver` の fallback が握る `hybridFallbackPorts[key]` は
     /// ノーチェックのまま残っていた。ブリッジは run のたびに起動し直され**同じポート番号が
@@ -1255,7 +1255,7 @@ extension MCPServer {
     ///
     /// **`usesRememberedDeviceState` のゲートは流用しない**: あちらは ref が指す要素が
     /// 別物になる形だけを守る規律で、fallback は ref を一切受けない(HybridFallbackDriver の
-    /// doc「ref を使う操作は回さない」)ので ref の有無では判定できない。inapp モードのキャッシュ命中
+    /// doc「ref を使う操作は回さない」)ので ref の有無では判定できない。inapp-boost モードのキャッシュ命中
     /// でだけ効くので、コストは Android・xcuitest 単独・inapp 単独の呼び出しには掛からない。
     ///
     /// **I/O・判定とも `FTBridgeClient.HybridFallbackIdentity`(`FTCore.BridgeIdentityCheck`)の
@@ -1429,7 +1429,7 @@ extension MCPServer {
     ///
     /// 合成は実行側(ScenarioRunnerMain)と同じ形:
     ///   in-app(注入) → WebView 画面だけ XCUITest へ委譲 → 不可な操作だけ XCUITest へ回す
-    /// **inapp モードでないとき(inapp 単独・xcuitest・実機)は素の1本**にする
+    /// **inapp-boost モードでないとき(inapp 単独・xcuitest・実機)は素の1本**にする
     /// **`probePort` は「同一性を確かめに行ってよい loopback のポート」**。
     /// `provisioned.port` を外から使ってはいけない —— xcuitest 分岐は `XCUIBridgeResolver` が
     /// **接続先を振り替える**ことがあり、実機は loopback ですらない。誤ったポートを
@@ -1466,7 +1466,7 @@ extension MCPServer {
     /// (表と実測は docs/commands.md)、何も起きなかったときに原因が分からないと詰む。
     /// **Android には付けない**(この制限が無い。無関係な助言は誤誘導になる)。
     /// **MCP の iOS は常に XCUITest なので、in-app へ切り替える手は勧めない**(profile を渡しても XCUITest のまま =
-    /// 従っても何も変わらない助言になる)。確かめる場はシナリオ(実行の既定 inapp モードはこのジェスチャを届ける)。
+    /// 従っても何も変わらない助言になる)。確かめる場はシナリオ(実行の既定 inapp-boost モードはこのジェスチャを届ける)。
     /// **1文に圧縮**: UIKit アプリでも xcuitest モードなら毎回この助言が出ており、長文の苦情があった。
     /// **`frameworkKey` が判明していて一致しなければ黙る**(この助言は `framework` 1つに
     /// 固有の欠陥で、他のフレームワーク(判明した uikit や、もう一方の compose/flutter)には
@@ -1476,7 +1476,7 @@ extension MCPServer {
                       args: [String: Any]) -> String {
         guard bridges[Self.sessionKey(args)] == "xcuitest" else { return "" }
         let advice = " MCP drives iOS through XCUITest only, so this is not something to retry here;"
-            + " a scenario run in the default inapp mode delivers it — verify the gesture there."
+            + " a scenario run in the default inapp-boost mode delivers it — verify the gesture there."
         // 起動したアプリが分かっていて判定と別のアプリなら、判定は不明として扱う
         let key = Self.sessionKey(args)
         let hint = uiFrameworkHints[key].flatMap { hint in
@@ -1600,7 +1600,7 @@ extension MCPServer {
     /// handleLaunch が bundleID=com.apple.springboard を非破壊で特別扱いする)。
     /// 詰まる2つの応答 —— セッション不在の 409 と、背面アプリ照会の kAXErrorServerNotFound ——
     /// にだけ足す(フィードバック #6)。
-    /// **inapp モードには付けない**: in-app ブリッジは注入先アプリ専用で springboard を掴めない
+    /// **inapp-boost モードには付けない**: in-app ブリッジは注入先アプリ専用で springboard を掴めない
     static func springboardHint(_ error: Error, bridge: String?) -> String {
         guard bridge == nil || bridge == "xcuitest" else { return "" }
         guard case DriverError.badResponse(let status, let body) = error,
@@ -1852,7 +1852,7 @@ extension MCPServer {
     /// **`treeIsAppsOwn`**: 木の sessionBundleID がそのアプリのまま(XCUITest のセッションは背面化
     /// してもアプリに付いたままで、**アプリ自身の木**を返し続ける)なら「今の画面」とは言わない ——
     /// 実機 iPhone 13 では appSwitcher の直後に「the tree below is whatever is actually on screen」と
-    /// 言いながらアプリの木を返していた。inapp モードの背面化読み(SpringBoard を
+    /// 言いながらアプリの木を返していた。inapp-boost モードの背面化読み(SpringBoard を
     /// 参照 = sessionBundleID が springboard)のときだけ「今そこにあるもの」
     static func sentToBackgroundNote(_ sessionBundleID: String?, treeIsAppsOwn: Bool) -> String {
         let app = sessionBundleID.flatMap { $0 == "com.apple.springboard" ? nil : $0 } ?? "the app"

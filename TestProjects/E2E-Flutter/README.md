@@ -31,7 +31,7 @@ fleetest run --project E2E-Flutter --profile android
 | プロファイル | 結果 | 壁時計 |
 |---|---|---|
 | `ios-xcuitest`(iPhone 17 Pro/iOS 27.0 × 6) | ✅ 20/20 | 43.3s |
-| `ios-inapp`(同上・inapp モード) | ✅ 20/20 | — |
+| `ios-inapp-boost`(同上・inapp-boost モード) | ✅ 20/20 | — |
 | `android`(Pixel 9/Android 15 × 8) | ✅ 20/20 | 30.9s |
 
 ## シナリオ一覧
@@ -122,10 +122,10 @@ SUT の見た目を変えて避けるのは**検出器を潰す**行為なので
   「Flutter が起動直後にポインタ入力を取りこぼす」ための同期の1往復で、FM 直列化(約1回/秒)の
   コストだけが乗るため
 
-## inapp モード対応(2026-07-23 に2つの修正で解決)
+## inapp-boost モード対応(2026-07-23 に2つの修正で解決)
 
-かつては inapp モードで回すと **a11y ツリーが取れず要素が1つも見えなかった**。
-原因は2つあり、どちらも fleetest 側で解決済み(`ios-inapp` プロファイルで 20/20 グリーン):
+かつては inapp-boost モードで回すと **a11y ツリーが取れず要素が1つも見えなかった**。
+原因は2つあり、どちらも fleetest 側で解決済み(`ios-inapp-boost` プロファイルで 20/20 グリーン):
 
 1. **Flutter engine は `_AXSSetAutomationEnabled` を見ない**。platform 側の a11y ブリッジ
    (SemanticsObject 群)が生成されず `FlutterView.accessibilityElements` が空のままだった。
@@ -138,7 +138,7 @@ SUT の見た目を変えて避けるのは**検出器を潰す**行為なので
 
 in-app での注意: テキスト欄の型は `Other` になる(XCUITest の `TextField` と食い違う。
 Flutter のフィールドは UITextField ではないため)。`#id` 指定なら両ブリッジで同一に動く。
-ジェスチャ(swipe/press)は申告により XCUITest ブリッジへ自動フォールバックする(inapp モード)。
+ジェスチャ(swipe/press)は申告により XCUITest ブリッジへ自動フォールバックする(inapp-boost モード)。
 
 ## 注意(Flutter 特有。シナリオの書き方に直接効く)
 

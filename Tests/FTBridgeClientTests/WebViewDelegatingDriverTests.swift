@@ -1,5 +1,5 @@
 // WebView 画面だけを XCUITest へ委譲する切り替えの固定。
-// ここが壊れると inapp モード(利用者の既定)で WebView 画面が**要素ゼロ**に見えるか、
+// ここが壊れると inapp-boost モード(利用者の既定)で WebView 画面が**要素ゼロ**に見えるか、
 // 逆に通常画面まで XCUITest 経由になって全ステップが数百 ms 遅くなる。
 // 実機/シミュレータ無しで確かめられるのは「どちらのドライバへ流れたか」だけなので、そこを固める。
 
@@ -112,7 +112,7 @@ final class WebViewDelegatingDriverTests: XCTestCase {
     }
 
     /// offscreen ヒントはxcuitest モード限定(WebViewDelegatingDriver.swift の
-    /// snapshot(bypassingCache:) コメント参照)。inapp モードで乗ると計測済みの
+    /// snapshot(bypassingCache:) コメント参照)。inapp-boost モードで乗ると計測済みの
     /// contentOffset 短絡より StepExecutor の跳躍が優先され挙動が変わるため落とす
     func testWebViewScreenDropsOffscreenHintsFromDelegatedSnapshot() async throws {
         let primary = FakeDriver(snapshots: [snapshot([element(1, "WebView")])])

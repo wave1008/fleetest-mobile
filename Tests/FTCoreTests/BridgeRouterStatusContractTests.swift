@@ -155,7 +155,7 @@ final class BridgeRouterStatusContractTests: XCTestCase {
 
     /// **/pressEnter も焦点が無ければ 422 で断る**(/type・/clear と同じ)。ランナーは XCUI の失敗を記録しない
     /// (下のテスト)ので、焦点の無い `app.typeText("\n")` は何も起きていないのに 200 を返していた
-    /// = inapp モードの in-app 409 から回ってきた Enter が iOS でだけ黙って成功扱いになる
+    /// = inapp-boost モードの in-app 409 から回ってきた Enter が iOS でだけ黙って成功扱いになる
     func testPressEnterRefusesWithoutKeyboardFocus() throws {
         let body = try XCTUnwrap(handlerBody("handlePressEnter", in: try routerSource))
         XCTAssertTrue(body.contains("guard focused.exists else {") && body.contains("BridgeError(422,"),

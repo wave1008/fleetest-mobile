@@ -154,13 +154,13 @@ final class RemoteDispatcherScenarioTextsTests: XCTestCase {
     func testWriteLastResultsRecordsPerProfileFromRemoteScenarioJSON() {
         let texts: [(url: URL, text: String)] = [
             (tempDir.appendingPathComponent("a.json"),
-             "{\"scenarioID\": \"Login.S0010\", \"passed\": false, \"profile\": \"ios-inapp\"}"),
+             "{\"scenarioID\": \"Login.S0010\", \"passed\": false, \"profile\": \"ios-inapp-boost\"}"),
             (tempDir.appendingPathComponent("b.json"),
-             "{\"scenarioID\": \"Login.S0020\", \"passed\": true, \"profile\": \"ios-inapp\"}"),
+             "{\"scenarioID\": \"Login.S0020\", \"passed\": true, \"profile\": \"ios-inapp-boost\"}"),
         ]
         dispatcher.writeLastResults(texts: texts, project: project)
-        XCTAssertTrue(LastResultsStore.failedIDs(project: project, profile: "ios-inapp").contains("Login.S0010"))
-        XCTAssertFalse(LastResultsStore.failedIDs(project: project, profile: "ios-inapp").contains("Login.S0020"))
+        XCTAssertTrue(LastResultsStore.failedIDs(project: project, profile: "ios-inapp-boost").contains("Login.S0010"))
+        XCTAssertFalse(LastResultsStore.failedIDs(project: project, profile: "ios-inapp-boost").contains("Login.S0020"))
         // 別プロファイルのバケットは触っていない
         XCTAssertFalse(LastResultsStore.failedIDs(project: project, profile: "android").contains("Login.S0010"))
     }
@@ -180,14 +180,14 @@ final class RemoteDispatcherScenarioTextsTests: XCTestCase {
     func testWriteLastResultsSkipsNotApplicableButKeepsNotStartedAccidents() {
         let texts: [(url: URL, text: String)] = [
             (tempDir.appendingPathComponent("d.json"),
-             "{\"scenarioID\": \"Skip.NA\", \"passed\": false, \"profile\": \"ios-inapp\", \"skipKind\": \"notApplicable\"}"),
+             "{\"scenarioID\": \"Skip.NA\", \"passed\": false, \"profile\": \"ios-inapp-boost\", \"skipKind\": \"notApplicable\"}"),
             (tempDir.appendingPathComponent("e.json"),
-             "{\"scenarioID\": \"Skip.NoWorker\", \"passed\": false, \"profile\": \"ios-inapp\", \"skipKind\": \"noWorker\"}"),
+             "{\"scenarioID\": \"Skip.NoWorker\", \"passed\": false, \"profile\": \"ios-inapp-boost\", \"skipKind\": \"noWorker\"}"),
             (tempDir.appendingPathComponent("f.json"),
-             "{\"scenarioID\": \"Skip.Int\", \"passed\": false, \"profile\": \"ios-inapp\", \"skipKind\": \"interrupted\"}"),
+             "{\"scenarioID\": \"Skip.Int\", \"passed\": false, \"profile\": \"ios-inapp-boost\", \"skipKind\": \"interrupted\"}"),
         ]
         dispatcher.writeLastResults(texts: texts, project: project)
-        let failed = LastResultsStore.failedIDs(project: project, profile: "ios-inapp")
+        let failed = LastResultsStore.failedIDs(project: project, profile: "ios-inapp-boost")
         XCTAssertFalse(failed.contains("Skip.NA"))
         XCTAssertTrue(failed.contains("Skip.NoWorker"))
         XCTAssertTrue(failed.contains("Skip.Int"))

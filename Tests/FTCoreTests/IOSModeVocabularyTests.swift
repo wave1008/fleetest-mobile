@@ -1,6 +1,7 @@
-// iOS の構成の語彙: 利用者が選ぶのは**モード**(inapp / xcuitest)、部品は**ブリッジ**(in-app / XCUITest)。
-// 部品は「in-app ブリッジ」(ハイフン付き)。「inapp」はモードの値にだけ使う。
-// 「エンジン」と、モード名としての hybrid は使わない(inapp モードの構成の説明語「ハイブリッド構成」は可)。
+// iOS の構成の語彙: 利用者が選ぶのは**モード**(inapp-boost / xcuitest)、部品は**ブリッジ**(in-app / XCUITest)。
+// 部品は「in-app ブリッジ」(ハイフン付き)。裸の「inapp」はブリッジの種類の値(`bridge: "inapp"`・`.inapp` 台帳)にだけ残る。
+// 「エンジン」と、モード名としての hybrid は使わない(inapp-boost モードの構成の説明語「ハイブリッド構成」は可)。
+// 旧モード名(inapp モード・`ios-inapp`・`--ios-inapp`・`IOSMode.inapp`・`iosMode: "inapp"`)も落とす。
 // コンパイルでは落ちないので、典型的な書き方だけを走査で落とす。無関係な engine(Flutter engine・Neural Engine 等)と、
 // アプリプロファイルの `platform: "hybrid"`(iOS と Android の両方)は形が違うので当たらない。
 //
@@ -26,6 +27,11 @@ final class IOSModeVocabularyTests: XCTestCase {
         // 大文字小文字を区別する(InAppBridge/・inappBridges 等の識別子に当てない)
         #"(?-i)\binapp[ \t]+(ブリッジ|bridges?\b)"#,
         #"\biOS-hybrid\b"#,
+        #"(?-i)\binapp[ \t]*モード"#,
+        #"\binapp[ \t-]+mode\b"#,
+        #"\bios-inapp(?![-\w])"#,
+        #"\bIOSMode\.inapp\b"#,
+        #"\b(iosMode|mode)\b\W{0,6}inapp(?![-\w])"#,
     ]
 
     private static func isExcluded(_ relative: String) -> Bool {
@@ -67,7 +73,7 @@ final class IOSModeVocabularyTests: XCTestCase {
     }
 
     func testEngineVocabularyIsGone() throws {
-        XCTAssertEqual(try Self.scan().hits, [], "設定は「inapp / xcuitest モード」、部品は「in-app / XCUITest ブリッジ」と書く")
+        XCTAssertEqual(try Self.scan().hits, [], "設定は「inapp-boost / xcuitest モード」、部品は「in-app / XCUITest ブリッジ」と書く")
     }
 
     /// 走査が実際にファイルへ届いていること(対象を外す変更で常に空を返す形を落とす)
@@ -85,5 +91,30 @@ final class IOSModeVocabularyTests: XCTestCase {
         let regex = try NSRegularExpression(pattern: Self.bannedPatterns[0], options: [.caseInsensitive])
         let sample = "\"iosInappEngine\": true"
         XCTAssertNotNil(regex.firstMatch(in: sample, range: NSRange(sample.startIndex..., in: sample)))
+    }
+
+    /// 旧モード名の典型形は当たり、新モード名とブリッジの種類の値は当たらない
+    func testOldModeNamePatterns() throws {
+        let regexes = try Self.bannedPatterns.map { try NSRegularExpression(pattern: $0, options: [.caseInsensitive]) }
+        func hits(_ line: String) -> Bool {
+            regexes.contains { $0.firstMatch(in: line, range: NSRange(line.startIndex..., in: line)) != nil }
+        }
+        for old in ["既定の inapp モードで", "inappモード", "in inapp mode", "--profile ios-inapp --scenario",
+                    "Scripts/e2e.sh --ios-inapp", "mode == IOSMode.inapp {", #""iosMode": "inapp","#,
+                    #"DriverConnection(platform: "ios", port: 1, mode: "inapp")"#, "fields.iosMode === 'inapp'"] {
+            XCTAssertTrue(hits(old), "旧モード名を見逃した: \(old)")
+        }
+        for current in ["既定の inapp-boost モードで", "in inapp-boost mode", "--profile ios-inapp-boost",
+                        "Scripts/e2e.sh --ios-inapp-boost", "mode == IOSMode.inappBoost {", #""iosMode": "inapp-boost","#,
+                        #"status.bridge == "inapp""#, "bridge-8129.inapp", "in-app ブリッジ", ".fleetest/inapp-e2e-verified"] {
+            XCTAssertFalse(hits(current), "新モード名・ブリッジの値に当たった: \(current)")
+        }
+    }
+
+    /// モードの値はプロファイルに書かれる文字列そのもの = 変えると利用者のプロファイルが読めなくなる
+    func testModeValuesArePinned() {
+        XCTAssertEqual(IOSMode.inappBoost, "inapp-boost")
+        XCTAssertEqual(IOSMode.xcuitest, "xcuitest")
+        XCTAssertEqual(IOSMode.all, ["inapp-boost", "xcuitest"])
     }
 }

@@ -2,7 +2,7 @@
 // 実体と同期規律は Sources/FTCore/BridgeSourceSet.swift(一覧を2箇所に書かないための唯一の定義元)。
 //
 // 呼び出し側は `Scripts/e2e.sh` で、in-app ブリッジの入力が
-// 「最後に --ios-inapp を通した状態」から動いていないかを見るのに使う。
+// 「最後に --ios-inapp-boost を通した状態」から動いていないかを見るのに使う。
 // デバイスにもプロジェクトにも触らない。
 
 import ArgumentParser

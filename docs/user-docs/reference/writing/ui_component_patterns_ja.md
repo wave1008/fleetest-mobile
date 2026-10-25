@@ -9,7 +9,7 @@ Compose Multiplatform・Flutter・React Native・Android(Views/XML)・iOS(SwiftU
 
 - 確かめた環境: Compose Multiplatform 1.12.1(Material3 1.4 相当)・Flutter 3.47.7・React Native 0.87.1
   (New Architecture / Fabric)・Android Views + Material Components・SwiftUI。
-  iOS 27 Simulator(inapp モード / xcuitest モード)・Android 15 Emulator
+  iOS 27 Simulator(inapp-boost モード / xcuitest モード)・Android 15 Emulator
 - 各節の挙動は fleetest 同梱の検証アプリ群(`E2EXAppCMP/` / `E2EXAppFlutter/` / `E2EXAppRN/` /
   `E2EXAppAndroid/` / `E2EXAppIOS/`)と、そのシナリオ(`TestProjects/E2EX-{CMP,Flutter,RN,Android,iOS}/scenarios/`)
   で再現できます(同じ部品の書き方の実例として読めます)。5つのアプリは同じ画面構成・同じ `#id`・
@@ -52,7 +52,7 @@ select("#txt_state").textIs("drawerOpen=false")
 
 **現時点の制約**: **Flutter の iOS**は、画面にオーバーレイ(`Tooltip`・ダイアログ等)を一度出すと、
 **次の画面遷移までその画面の a11y の矩形を 1/画面倍率(iPhone では 1/3)に縮めて申告します**
-(Flutter 側の申告)。**既定の iOS モード(inapp)は自動で補正する**ので書き方は変わりません。
+(Flutter 側の申告)。**既定の iOS モード(inapp-boost)は自動で補正する**ので書き方は変わりません。
 **xcuitest モード**(`iosMode: "xcuitest"`)だけは補正できず、タップが狙った場所と違う位置に
 当たります。回避策(xcuitest モードのとき): オーバーレイを出した画面では、一度別の画面へ移って
 戻ってから次の操作をする。
@@ -564,7 +564,7 @@ select("#txt_focus_echo").textIs("focus=second")
 - **Android は一部の入力欄で `ACTION_SET_TEXT` を拒否します**(Material の `SearchView`・
   一部の Flutter の入力欄で確認)。回避策は無く、`type` は既定の打鍵で入力する(拒否されるのは
   a11y 経由の一括書き込みだけで、通常の `type` の打鍵は通る)
-- **React Native の iOS(inapp モード)で、欄の直下に出る候補を押せないことがあります**(調査中)。
+- **React Native の iOS(inapp-boost モード)で、欄の直下に出る候補を押せないことがあります**(調査中)。
   `pressEnter()` の後もキーボードが残り、その下の候補がキーボードに隠れたままになる。回避策: 候補が
   キーボードに隠れない位置に出る画面構成にするか、確定後の値をアプリ自身の echo で確かめる
 

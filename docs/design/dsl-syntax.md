@@ -280,7 +280,7 @@ DS-10 は2ファイルに分かれる。後半は dsl-execution.md。
   「見た目の次の入力欄」と食い違う。**方向セレクタで取れなかった実例が出てから**再検討する
 - **一致品質(exact/substring)は記法ではなく掴んだ要素で決まる**(`LocatorResolver.quality`)。
   `*ログイン*` が `"ログインに失敗しました"` を掴めば substring、`"ログイン"` を掴めば exact。
-  読み手は**inapp モードの tap アクションだけ**で、primary が substring 止まりなら fallback を照会し
+  読み手は**inapp-boost モードの tap アクションだけ**で、primary が substring 止まりなら fallback を照会し
   fallback の exact を優先する(§performance-tuning「フォールバック検証の誤検知」)
 - **inapp の tap は activate 不発時に「整定待ち→要素取り直し→再 activate」で粘る**。
   Compose iOS は**画面遷移直後、要素が AX ツリーに載っていても accessibilityActivate がまだ
@@ -359,7 +359,7 @@ DS-10 は2ファイルに分かれる。後半は dsl-execution.md。
   フレームワーク任せで OS 既定と揃わない(Compose は完全一致 `"\n"` だけアクション化、Flutter は握り潰す)。
   **`\n` を含まない入力は両経路で結果が同じ**なので、この振り分けは**モード間の観測可能な差を生まない**
   (モードはツール内部の最適化であり、シナリオから見えてはいけない)。判定は `typeDriver` の有無だけで
-  行い、プラットフォーム判定は書かない(`typeDriver` は iOS の inapp モードでしか設定されないため自動的に
+  行い、プラットフォーム判定は書かない(`typeDriver` は iOS の inapp-boost モードでしか設定されないため自動的に
   iOS 限定。条件を二重に持つと将来ずれる)。**ロケータ無しの `type`** も同じ規則で回るが、ref が無く
   attach 前だと 409 になるため `AppAttachDriver.type(ref: nil)` に activate 再試行を入れてある
   (ref 有りには入れない — activate が refFrames をクリアする)
@@ -379,7 +379,7 @@ DS-10 は2ファイルに分かれる。後半は dsl-execution.md。
   **React Native は `RCTUITextField`/`RCTUITextView` が UIKit 派生なのでこの UITextField/UITextView
   経路をそのまま通る**(新しい分岐は不要。2026-08-08 実測。E2EAppRN/docs/ui-contract.md)。
   **Flutter は engine の私有 API へアクションを配送する**: `insertText("\n")` は engine に
-  握り潰され(文字も入らずアクションも出ないのに 200 が返る最悪の形)、inapp モードの xcuitest
+  握り潰され(文字も入らずアクションも出ないのに 200 が返る最悪の形)、inapp-boost モードの xcuitest
   フォールバックも **in-app の合成タッチが立てたフォーカスに届かない**ため、in-app で完結させるしかない。
   `[view textInputDelegate]` → `flutterTextInputView:performAction:withClient:` を
   `returnKeyType`(UIKit の公開 enum)からの逆写像で呼ぶ。**私有 API なので各段で存在確認し、
@@ -490,8 +490,8 @@ DS-10 は2ファイルに分かれる。後半は dsl-execution.md。
   (右側=確定)。**素の部分一致にしてはいけない** —— 表示名は互いの部分文字列になり得る
   (`FT E2E` ⊂ `FT E2E RN`。iOS の4 SUT が同居する E2E シミュレータで実際に起き得る形)
 - **XCUITest ブリッジが無いとき(in-app ブリッジ単独)は自動了承できない**(in-app ブリッジの `/session` は自分の bundle
-  以外を 409 で拒否するため springboard を見られない)。inapp モードでは XCUITest ブリッジの接続が
-  受け持つ。4 SUT の `ios-inapp` プロファイル全緑で inapp モードの経路の動作を確認済み
+  以外を 409 で拒否するため springboard を見られない)。inapp-boost モードでは XCUITest ブリッジの接続が
+  受け持つ。4 SUT の `ios-inapp-boost` プロファイル全緑で inapp-boost モードの経路の動作を確認済み
 
 ### Shirates(Classic) 準拠の方針と承認済みの差分
 
@@ -533,7 +533,7 @@ DS-10 は2ファイルに分かれる。後半は dsl-execution.md。
 | `appIs` はニックネーム解決を持たず ID(iOS=bundle ID / Android=package)を直接書く | fleetest はアプリのニックネーム機構自体を持たない(既存方針。2026-08-03 承認) |
 | `packageIs` を持たない | 2026-08-03 ユーザー決定。ニックネームが無い fleetest では `appIs` が ID 直指定のため Android で完全に同じ検査になり、同じことを2通りで書ける語彙になる。**再提案しない** |
 | `tapAppIcon` が `auto` 相当のみ(method 切替・マクロ機構なし) | 対象は実質エミュレータ/シミュレータで `auto` の分岐だけで足りる。名前省略時の既定は installApp と同じ形で親が解決する(`--app-name` = プロファイルの `appName`。2026-08-03 決定。実行自体は子のまま — UI 操作は「1シナリオ=1プロセス=1ドライバ」の子の責務で、親が同じランナーを叩くと二重クライアントの事故型になる) |
-| `installApp` の実行主体がオーケストレータ(親プロセス)である | 2026-08-03 ユーザー決定。子(シナリオサブプロセス)は install の依頼だけを親へ送り(stdin/stdout RPC)、親が実行プロファイルの `appPath` を解決して実インストールする。パス解決の優先順は明示引数 > プロファイルの `appPath`(Shirates の `appPackageFile` 既定に一致)。オーケストレータ無しの単独実行だけ、子が直接 `driver.install` を呼ぶ経路にフォールバックする(パス解決は 明示引数 > `--app-path` > 明示エラー)。iOS の inapp モードではインストールで in-app ブリッジが道連れになるが、次の `launchApp()` が再注入する(注記は実行中の ℹ️ ログにのみ出る。保存レポートには残らない) |
+| `installApp` の実行主体がオーケストレータ(親プロセス)である | 2026-08-03 ユーザー決定。子(シナリオサブプロセス)は install の依頼だけを親へ送り(stdin/stdout RPC)、親が実行プロファイルの `appPath` を解決して実インストールする。パス解決の優先順は明示引数 > プロファイルの `appPath`(Shirates の `appPackageFile` 既定に一致)。オーケストレータ無しの単独実行だけ、子が直接 `driver.install` を呼ぶ経路にフォールバックする(パス解決は 明示引数 > `--app-path` > 明示エラー)。iOS の inapp-boost モードではインストールで in-app ブリッジが道連れになるが、次の `launchApp()` が再注入する(注記は実行中の ℹ️ ログにのみ出る。保存レポートには残らない) |
 | `enabledIs(expected:)`/`checkedIs(expected:)`(生文字列親形)を持たず、糖衣形 `enabledIsTrue/False`・`checkIsON/OFF` のみ | 生値比較は OS 依存(checked の iOS "1"/"")で、正規化済み Bool と衝突する。糖衣形は OS 差を吸収済みで fleetest の正規化と一致(2026-08-04 ユーザー決定。Is 後置の社内語彙とも揃う) |
 
 ### `clearInput` の受け口ごとの機構と Flutter の縮退
@@ -785,7 +785,7 @@ select("#btn_ok"); textIs("OK")                 // 暗黙(トップレベルの�
   **`scroll:` を渡す(または `withScroll*` ブロックに入れる)と意味が変わる**: その向きへ
   探索しながら探し、**見つかった時点で失敗**する(`exist(scroll:)` の裏返し)。
   見つからなければ現在のビューポートでの消滅待ちに進む。
-  inapp モードでは **不在を確定する側でだけ** `fallbackDriver` を1回照会する(pass 経路の固定費 1 回。
+  inapp-boost モードでは **不在を確定する側でだけ** `fallbackDriver` を1回照会する(pass 経路の固定費 1 回。
   システム UI のダイアログが primary の snapshot に映らないため。miss 毎に払う `exist` 側とは事情が逆)
 - **`checkIsON` / `checkIsOFF`**(セレクタの `checked=`・スナップショットの `checked`/`indeterminate` 表示も同じ源)は
   **`FTCore.CheckStateReading` だけが読む**(オン / オフ / indeterminate / 不明の4値)。ワイヤの `checked` は
@@ -1052,7 +1052,7 @@ select("#btn_ok"); textIs("OK")                 // 暗黙(トップレベルの�
   **未指定のときに容器を特定して座標化する案は採らない**(2度実装して2度撤回した。**3度目は無い**)。理由は2つ:
   狙いだった Compose の飛び越しに**効かない**(Compose の容器は xcuitest で `other` として出て
   `scrollable` を申告できず、そもそも対象に選べない)/ in-app では**到達距離が縮んで既定
-  `maxSwipes` に届かなくなる**(E2E-iOS/ios-inapp の `tap("#row_40")` が失敗)。
+  `maxSwipes` に届かなくなる**(E2E-iOS/ios-inapp-boost の `tap("#row_40")` が失敗)。
   判定コードは `StepExecutor.scrollContainer` に残り、**`scrollFrame` 未指定なら必ず nil を返す**。
   暗黙対象を選ぶ関数は置かない(規則と再検討条件は PT-3.19)。
   **未指定でも見切れ判定は容器基準で行う**: Compose は**容器の外に子(ghost)を報告する**ので、

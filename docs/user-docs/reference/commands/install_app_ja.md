@@ -16,7 +16,7 @@
 
 ```swift
 installApp()                       // アプリプロファイルの appPath から
-launchApp()                        // inapp モードの iOS では install の直後に呼ぶ
+launchApp()                        // inapp-boost モードの iOS では install の直後に呼ぶ
 installApp("/path/to/MyApp.app")
 clearAppData()                     // 初回起動相当の状態に戻す
 removeApp()
@@ -24,7 +24,7 @@ removeApp()
 
 ## 注意点
 
-- **iOS の既定(inapp モード)では、`installApp()` の直後に `launchApp()` を呼んでください。** インストールでアプリの中のブリッジが
+- **iOS の既定(inapp-boost モード)では、`installApp()` の直後に `launchApp()` を呼んでください。** インストールでアプリの中のブリッジが
   終了し、次の `launchApp()` が入れ直すまで `tap` などの操作が届きません(ステップに `the in-app bridge will be reinjected on the next
   launchApp()` の注記が出ます)。
 - **入れ直しても権限は戻りません。** iOS Simulator では、アプリを削除して再インストール

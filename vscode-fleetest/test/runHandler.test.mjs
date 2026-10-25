@@ -122,11 +122,11 @@ test("readAllResults: passed/failed 以外の内容のファイルはスキッ�
 test("readAllResults: 別プロファイルの状態を横断して集計する", () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "fleetest-last-results-multi-"));
   try {
-    fs.mkdirSync(path.join(dir, "ios-inapp"), { recursive: true });
+    fs.mkdirSync(path.join(dir, "ios-inapp-boost"), { recursive: true });
     fs.mkdirSync(path.join(dir, "android"), { recursive: true });
-    fs.writeFileSync(path.join(dir, "ios-inapp", "クラスA.両方緑"), "passed");
+    fs.writeFileSync(path.join(dir, "ios-inapp-boost", "クラスA.両方緑"), "passed");
     fs.writeFileSync(path.join(dir, "android", "クラスA.両方緑"), "passed");
-    fs.writeFileSync(path.join(dir, "ios-inapp", "クラスA.片方だけ赤"), "failed");
+    fs.writeFileSync(path.join(dir, "ios-inapp-boost", "クラスA.片方だけ赤"), "failed");
     fs.writeFileSync(path.join(dir, "android", "クラスA.片方だけ赤"), "passed");
     const results = readAllResults(dir);
     assert.equal(results.get("クラスA.両方緑"), "passed");

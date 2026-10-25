@@ -115,13 +115,13 @@ struct RunScenario: AsyncParsableCommand {
     @Option(help: "Android device serial (adb -s; defaults to the only connected device)")
     var serial: String?
 
-    @Option(help: "iOS mode: xcuitest (default) / inapp (in-app bridge first, XCUITest bridge via --xcui-port for the rest)")
+    @Option(help: "iOS mode: xcuitest (default) / inapp-boost (the XCUITest bridge plus the in-app bridge; pass the XCUITest bridge's port with --xcui-port)")
     var mode: String?
 
-    @Option(help: "iOS: simulator UDID (used to relaunch in inapp mode and for the xcuitest launch preflight)")
+    @Option(help: "iOS: simulator UDID (used to relaunch in inapp-boost mode and for the xcuitest launch preflight)")
     var udid: String?
 
-    @Option(name: .customLong("xcui-port"), help: "iOS: port of the XCUITest bridge that takes what the in-app bridge cannot do in inapp mode")
+    @Option(name: .customLong("xcui-port"), help: "iOS: port of the XCUITest bridge that takes what the in-app bridge cannot do in inapp-boost mode")
     var xcuiPort: UInt16?
 
     @Option(name: .customLong("inapp-app"),
@@ -340,15 +340,15 @@ struct RunScenario: AsyncParsableCommand {
         }
 
         // ドライバ構築(Fleetest.swift の DriverOptions と同じパターン)。
-        // inapp モード: primary=in-app ブリッジ、fallback=XCUITest ブリッジ(springboard 参照)を StepExecutor へ。
+        // inapp-boost モード: primary=in-app ブリッジ、fallback=XCUITest ブリッジ(springboard 参照)を StepExecutor へ。
         let driver: AppDriver
-        // 事前確認(下の F8b)で突き合わせるポート。inapp モードの別アプリの分岐は XCUITest ブリッジ(xcuiPort)を駆る
+        // 事前確認(下の F8b)で突き合わせるポート。inapp-boost モードの別アプリの分岐は XCUITest ブリッジ(xcuiPort)を駆る
         var preflightPort = port
         var fallbackDriver: AppDriver?
-        // inapp モードだけ true(主ドライバ = in-app の絵にキーボード・システムアラートが写らない)
+        // inapp-boost モードだけ true(主ドライバ = in-app の絵にキーボード・システムアラートが写らない)
         var primaryCaptureOmitsSystemUI = false
         // tapAppIcon 用(FTDriveCore.homeScreenDriver の①)。xcuitest 単独でだけ明示注入する
-        // (inapp モードは fallbackDriver が同役を担う。Android は主ドライバで足りる)
+        // (inapp-boost モードは fallbackDriver が同役を担う。Android は主ドライバで足りる)
         var homeScreenDriver: AppDriver?
         // typeDriver は常に渡す(409 安全網)。preferTypeDriver は probe の uiFramework 検出時のみ
         // (probe 不達なら false のまま=安全網頼み)。
@@ -370,9 +370,9 @@ struct RunScenario: AsyncParsableCommand {
         } else {
             switch runPlatform {
             case "ios":
-                if mode == IOSMode.inapp {
+                if mode == IOSMode.inappBoost {
                     guard let xcuiPort else {
-                        throw ValidationError("--mode inapp needs --xcui-port (the XCUITest bridge that takes"
+                        throw ValidationError("--mode inapp-boost needs --xcui-port (the XCUITest bridge that takes"
                             + " the operations the in-app bridge cannot do)")
                     }
                     // in-app は注入先アプリのプロセスしか駆動できない。シナリオの対象アプリが
@@ -462,7 +462,7 @@ struct RunScenario: AsyncParsableCommand {
                     // 誤認しやすい罠。素の XCUIApplication.launch() 経路に落とす)
                     let inner = FastLaunchDriver.wrapping(client, simulatorUDID: physical ? nil : udid)
                     // SessionRecoveryDriver は最外側(回復時の activate に LaunchPreflightDriver の
-                    // 未インストール検査を効かせるため)。inapp モードの経路には入れない
+                    // 未インストール検査を効かせるため)。inapp-boost モードの経路には入れない
                     // (InAppDriver は別プロトコルで 409 の意味が違う)。
                     let preflighted: AppDriver = physical
                         ? inner
@@ -513,10 +513,10 @@ struct RunScenario: AsyncParsableCommand {
                 // 同じ理由で見逃す。BridgeIdentityCheck の doc 参照)。Android には bridge/udid の
                 // 自己申告が無く判定材料が原理的に無いため iOS のみ
                 // ここに来る iOS のドライバは XCUITest ブリッジだけ(in-app ブリッジは上の条件で外れる)。
-                // mode を渡すと inapp モードの別アプリの分岐で、udid を名乗らない実機が「別のブリッジ」と誤判定される
+                // mode を渡すと inapp-boost モードの別アプリの分岐で、udid を名乗らない実機が「別のブリッジ」と誤判定される
                 if runPlatform == "ios" {
                     let expected = BridgeIdentityCheck.Expected(
-                        port: preflightPort, udid: udid, physical: physical, bridge: IOSMode.xcuitest,
+                        port: preflightPort, udid: udid, physical: physical, bridge: "xcuitest",
                         deviceName: deviceName)
                     if case .mismatch(let detail) = BridgeIdentityCheck.verdict(
                         expected: expected, status: preflightStatus,

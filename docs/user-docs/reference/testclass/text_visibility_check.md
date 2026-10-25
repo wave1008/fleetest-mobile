@@ -111,7 +111,7 @@ left. FM judges those. Where FM is unavailable, they pass unverified.
 - A short truncation that shows only the first few characters can fail: OCR may read `…` as a single
   dot, which does not count as an ellipsis.
 - A translucent overlay counts as visible as long as the text under it can be read.
-- In iOS's default mode (inapp), the check normally uses the picture the app draws itself (it is faster). That picture
+- In iOS's default mode (inapp-boost), the check normally uses the picture the app draws itself (it is faster). That picture
   shows neither the keyboard nor system alerts (permission requests and the like), so the whole screen is captured
   (through XCUITest) only when the element tree reports the keyboard, or when a system alert was in front the first time
   it was checked in that phase (`condition` / `action` / `expectation`; checked once per phase). Covers that are neither the keyboard nor

@@ -100,7 +100,7 @@ public func irregularHandler(_ detect: Sel, dismiss: Sel? = nil,
 /// **出たら押してほしい OS のシステムアラート**(権限ダイアログ・ATT 等)を1枚ぶん予告する。
 /// `irregularHandler`(アプリ内メッセージ用)の OS アラート版 —— あちらはアプリの木に載る
 /// ものを閉じるが、**OS のアラートは別プロセス(SpringBoard)でアプリの木に載らない**ので、
-/// XCUITest ランナー経由の別の監視(SystemUIGate)が要る。`iosMode` が inapp / xcuitest のどちらでも効く。
+/// XCUITest ランナー経由の別の監視(SystemUIGate)が要る。`iosMode` が inapp-boost / xcuitest のどちらでも効く。
 ///
 ///     iosAlertHandler(alert: "*写真ライブラリ*", button: "許可しない")
 ///     iosAlertHandler(alert: "*トラッキング*||*track your activity*",
@@ -292,7 +292,7 @@ func tapImpl(_ selector: FTSelector, holdSeconds: Double, maxGestureSeconds: Dou
 /// (注記 `hold-ended-before-block`。失敗にはしない)。**hold は入れ子にできない**
 /// (前の hold が離れる前に次の hold を送ると失敗する)。対象が解決できなければブロックは走らない
 /// (`select` と同じ書き方で ifCanSelect のような分岐は作れない —— hold は「押せる前提」のコマンド)。
-/// iOS の in-app ブリッジは座標での押下を持たないため、inapp モードではこの押下だけ XCUITest 側で行う
+/// iOS の in-app ブリッジは座標での押下を持たないため、inapp-boost モードではこの押下だけ XCUITest 側で行う
 /// (tap の長押しと同じフォールバック)
 @discardableResult
 public func hold(_ selector: String, holdSeconds: Double? = nil,

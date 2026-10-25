@@ -113,11 +113,11 @@ Shirates にはこの機能が無いので踏襲元は無い。利用者向け�
 - 実行時設定は `ScenarioExecutionSettings` に欄を足して運ぶ(`.claude/rules/executor.md`)。**専用フラグを足さないことでは `run` / `api run` の配線漏れは
   防げない**(`RunCommandFlagParityTests` が見るのはフラグの集合だけ)ので、両方の入口で有効化・拒否条件・結果の出力・モニターの停止を確かめるテストを置く
 - 有効なときの強制と検査(**「指定したが黙って効かない」を作らない** = 名前の付いたエラー。`ResponseMeasurementPolicy`):
-  - 設定の検査(`validateSettings`)は `ProfileResolver.resolve` の1箇所(`run` / `api run` 共有)。`enableAnimations: false`・`iosMode: inapp`・
+  - 設定の検査(`validateSettings`)は `ProfileResolver.resolve` の1箇所(`run` / `api run` 共有)。`enableAnimations: false`・`iosMode: inapp-boost`・
     `fmTextVisibilityCheck` / `ocrTextVisibilityCheck` / `screenLooksLike` / `record` の true との併用はエラー
   - デバイスの検査(`validateDevices`)は `--device` / `--runner local` で絞った**後**の台数に当てる(run / api run の入口 = ロックの前・機械へ配る前。
     機械をまたいで数える。マシン別のサブ実行の中だけで数えると、手元とリモートに 1 台ずつ配られて並行に測ってしまう)。**有効なデバイスが1台**・
-    `kind: physical`・Android か iOS・iOS は `mode: inapp` の明示を断る(解決が計測の run の既定を xcuitest に倒す)。実機が 2 台あるプロファイルでも 1 台に絞れば測れる
+    `kind: physical`・Android か iOS・iOS は `mode: inapp-boost` の明示を断る(解決が計測の run の既定を xcuitest に倒す)。実機が 2 台あるプロファイルでも 1 台に絞れば測れる
   - **並列なし**: レーンを 1 本にする。`--broadcast` / `--split` / `--fleet` との併用はエラー(`combinationRejection`)
   - アニメーション ON・FM/OCR/録画 OFF の強制値は `DeviceIndependentRunSettings.resolve` が持つ。ホスト負荷による減速も止める。
     モニターは run が pause して終わったら戻す(`e2e.sh --performance` と同じ持ち方。期限付きの `monitor pause` は run の間だけ期限なしに置き換えて終わりに戻す。
@@ -171,7 +171,7 @@ Shirates にはこの機能が無いので踏襲元は無い。利用者向け�
   ③操作の前に描画が止まっているのを待つ(Android = SF のフレームが出ていない / iOS = スクリーンショットの比較。XCTest の操作後の待ち
   `QuiescenceWait` は材料にしない: tap では既定で待ちを飛ばし、残す操作でも上限 6 秒で打ち切って続行し、差し替え自体が効かない環境もある)
 - 計測モードの経路は**リクエスト単位で適用して戻す**(例外のときも戻す)。計測の後の通常の操作へ待ち方が漏れない
-- **計測は XCUITest ランナーにしか無い**(in-app ブリッジは 501)。計測の run は iOS を xcuitest モードで走らせる(`iosMode` の既定が xcuitest に変わり、`inapp` を明示すると断る)
+- **計測は XCUITest ランナーにしか無い**(in-app ブリッジは 501)。計測の run は iOS を xcuitest モードで走らせる(`iosMode` の既定が xcuitest に変わり、`inapp-boost` を明示すると断る)
 - **iOS の最初のフレームは xctrace で取る**(`ResponseTracePolicy`・`ResponseTraceSession`・`ResponseTracePatch`): 計測モードの run の間だけ、iOS 実機 1 台のときに記録し、書き出すのは
   `displayed-surfaces-interval` / `potential-hangs` / `time-info` の3つの表だけ(全部書き出すと数分かかる)。注意:
   - `--all-processes` で録ると、記録中にアプリを1回起動しただけで保存に 72〜124 秒かかり、停止の上限で殺された。計測器を Display だけにして対象を名前で

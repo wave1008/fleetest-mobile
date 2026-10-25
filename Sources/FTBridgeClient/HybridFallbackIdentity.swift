@@ -1,6 +1,6 @@
-// inapp モード(in-app ブリッジ + XCUITest ブリッジ)が握る「主とは別ポート」の本人確認(MN-51.2)。
+// inapp-boost モード(in-app ブリッジ + XCUITest ブリッジ)が握る「主とは別ポート」の本人確認(MN-51.2)。
 //
-// キャッシュ/使い回すドライバが1本の port だけを確かめて安全だと思っていても、inapp モードの合成
+// キャッシュ/使い回すドライバが1本の port だけを確かめて安全だと思っていても、inapp-boost モードの合成
 // (HybridFallbackDriver / HybridDriverComposition)は home/appSwitcher/drag/座標 press/gesture/
 // pinch を fallback(XCUITest)側の別ポートへ回す。ブリッジは run のたびに起動し直され、
 // 同じポート番号が別デバイス(あるいは同じデバイスの別のブリッジ)に化け得るので、

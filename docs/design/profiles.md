@@ -126,14 +126,14 @@ targeting = bundletool にしか決められない。feature module を足した
   が受け付けるのは前者だけ。Identifier を書いても解決はする)。Android 実機の `serial` は
   `adb devices` の左列(WiFi 接続なら `192.168.1.23:5555` 形式)
 - 拡張のデバイスピッカー(「+既存から選択」)が接続中の実機を出すので、手書きしなくてよい
-- **iOS 実機も inapp モードに対応する**(開発署名のアプリのみ。ユーザー決定 2026-10-22)。供給が、注入する dylib を
+- **iOS 実機も inapp-boost モードに対応する**(開発署名のアプリのみ。ユーザー決定 2026-10-22)。供給が、注入する dylib を
   アプリと同じチームの証明書で署名(`InAppCodeSign`。leaf 証明書の SHA-1 で `codesign`)→ `devicectl` でアプリの
   データコンテナへ置き → `DYLD_INSERT_LIBRARIES` 付きで `devicectl process launch` → iproxy のトンネル(XCUITest 実機と同じ
   `IOSDeviceTransport`)で到達する。**開発署名(get-task-allow)でないアプリは注入できないので、供給がモードを
   `xcuitest` へ黙って縮退する**(`BridgeProvisioner`。`InAppCodeSign.inspect`)。サンドボックスのシナリオは codesign も iproxy も
   起こせないので、**署名・配置・トンネルは供給(親)でだけ**行い、シナリオの起こし直しは署名済み dylib の再コピー + `devicectl`
   起動だけにする(`clearAppData` = 実機では再インストール = データコンテナごと消えるため、起こし直しのたびに再コピーする)。
-  inapp モードの実機は in-app ブリッジと XCUITest ブリッジの2本のトンネルを同じデバイスに張る(`IOSDeviceTransport.establish` の `keepPeerPorts` で
+  inapp-boost モードの実機は in-app ブリッジと XCUITest ブリッジの2本のトンネルを同じデバイスに張る(`IOSDeviceTransport.establish` の `keepPeerPorts` で
   相方のトンネルを消さない)。実機の in-app ブリッジは `FT_BIND_ALL=1` で全インターフェースに bind しトークンを要求する
   (XCUITest 実機と同じ fail-closed)。**ディスパッチした実機**では、運ばれるアプリが発行側の証明書で署名されていて
   ランナー機に鍵が無いことがある。**発行側がステージングのときに同じ証明書で device 用 dylib に署名し、アプリの隣
@@ -388,11 +388,11 @@ attach したままの XCUITest セッションは、ランナーに問い合わ
 機構は非公開で特定できておらず、観測に立脚した防御。A/B と経緯は docs/verification/resolved.md「interop WebView」)。時間閾値にしないのは、短いギャップでも確率的に落ちる実測があり安全な
 境界を引けないため。false は `FT_PRE_ACTION_PING=0` として注入される(`FTCore.RunEnvironment`
 が唯一の定義元 —— ProfileRunner / ApiRunCommand の profile 有無2経路 / Fleetest.swift の
-profile 無し経路と、fleetest-mcp の resolveProfileTarget から呼ばれる)。**効くのは inapp モードの
+profile 無し経路と、fleetest-mcp の resolveProfileTarget から呼ばれる)。**効くのは inapp-boost モードの
 domInterop 経路だけ**(委譲モード・xcuitest
 モードは毎ステップ ランナーが働くので元から出ない)。コストは該当画面のイベント1回につき
 約 +0.4 秒で、スイート全体では並列に隠れて差が出ない(25周比較 88.9s vs 90.0s)。
-UI は実行プロファイル設定の iOS セクション(iOS のモードが inapp のときだけ表示)。
+UI は実行プロファイル設定の iOS セクション(iOS のモードが inapp-boost のときだけ表示)。
 
 `record`(既定 true。`--profile` を使わない実行だけは false)が true のとき、各ワーカー(デバイス)で run 全体を録画し続けつつ
 (iOS: `simctl io recordVideo` の .mov / Android: `screenrecord` の 180 秒セグメント群)、
@@ -521,7 +521,7 @@ DeviceBooter.defaultLocale(実行プロファイルの locale が届くのは wi
    BridgeLauncher(xctestrun FT_PORT 注入)で起動・waitUntilReady。シミュレータの新規作成はしない
    (同名複数の曖昧時は UDID 明記を推奨)。Android は AndroidDeviceCatalog で avd 照合。
    コールド起動は「プランニング(ポート採番、直列)→ 共有ビルド(dylib/xctestrun、直列)→
-   起動(デバイス単位で並列。inapp モードの 2 ブリッジはデバイス内直列)」(PT-3.2)。
+   起動(デバイス単位で並列。inapp-boost モードの 2 ブリッジはデバイス内直列)」(PT-3.2)。
    **run は終了時にブリッジを停止しない**(常駐を残すのが仕様。次の run が再利用する)
 4. **自動インストール**: `appPath` あり+`autoInstall`(**未指定の既定は appPath/appPathPhysical の有無**。
    `false` 明示で opt-out)→ オーケストレータ投入前に各ワーカーへ並行 install
@@ -787,7 +787,7 @@ observing なし)は受け付けない(画面が変わる最中)。まだ撃っ�
 
 **(a) 宛先の本人確認**: `XCUIBridgeResolver.resolve` が返した宛先は `FTCore.BridgeIdentityCheck`
 (F8b。run 側の `RunOrchestrator.bridgeUnreachable` 再プローブと同じ判定)で `--udid` と
-突き合わせる(inapp モードの in-app ブリッジ側は別ポート = 別ブリッジなので `composeDriver` がそちらも別に
+突き合わせる(inapp-boost モードの in-app ブリッジ側は別ポート = 別ブリッジなので `composeDriver` がそちらも別に
 確認する)。この確認が無いと(実地 2026-09-22): `api live serve
 --udid <デバイスA>` を `--port` なしで起こしたとき既定 8123 に居た**別のデバイスのブリッジ**を掴み、
 `actionResult.app` が別のデバイスで動いていたアプリを返した(操作もそちらへ飛んだ)。さらに
@@ -818,7 +818,7 @@ observing なし)は受け付けない(画面が変わる最中)。まだ撃っ�
   プロセス。読めない相手を根拠に宛先を変えない。畳んだままだと、別のデバイスのブリッジが居るポートを宛先に採り、その後の自動起動が
   そこへ自分のブリッジを立てて**占有者の生きたランナーを残骸として殺す**
   (実地 2026-09-23: 既定ポート 8123 で実機2台が殺し合った。MN-46.1/MN-46.3)。
-  `--port` 明示の宛先は素通し(利用者の指定を勝手に変えない)で、inapp モードの in-app ブリッジ側
+  `--port` 明示の宛先は素通し(利用者の指定を勝手に変えない)で、inapp-boost モードの in-app ブリッジ側
   (`composeDriver`)も素通し —— in-app は背面へ回ると答えないので、ここで断ると通常の遷移で
   serve が開けなくなる
 - `checkAndRestartIfStale`(DS-12.2 の自己修復と同系統だが、ライブ操作の宛先だけを見る)も
@@ -833,7 +833,7 @@ observing なし)は受け付けない(画面が変わる最中)。まだ撃っ�
 再起動時に健全なランナーまで掃除して起動し直しになった**(実地 2026-09-22。`XCUIApplication` は
 実在しない bundleID で返ってこない)。素通ししてよいのは Android と in-app ブリッジ(ランナーが
 死なない経路)だけで、`com.apple.springboard` は門の外 —— DS-13.2/MCP と同じ切り分け
-(`InstalledAppCheck.launchGuard`)。own app(inapp モードで in-app ブリッジが既に繋がっているアプリ)への
+(`InstalledAppCheck.launchGuard`)。own app(inapp-boost モードで in-app ブリッジが既に繋がっているアプリ)への
 launch/activate はライブ操作側で門より前に素通しする(in-app は XCUITest を経由しないので
 未導入検査そのものが要らない)。
 

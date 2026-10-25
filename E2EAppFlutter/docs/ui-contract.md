@@ -104,7 +104,7 @@ UIKit 除外にも当たらず、そのままでは 200 が返って**成功に�
 - **私有 API なので各段で存在確認し、1つでも欠けたら 409 に縮退する**(推測で続行しない)。
   Flutter 更新で壊れたらシナリオ 18 が赤くなる ―― それが唯一の検知手段
 
-**xcuitest フォールバックは inapp モードでは効かない**: in-app の合成タッチが立てたフォーカスに
+**xcuitest フォールバックは inapp-boost モードでは効かない**: in-app の合成タッチが立てたフォーカスに
 XCUITest から到達できない(`hasKeyboardFocus` の要素が見つからず `typeText("\n")` が無言 no-op)。
 だから in-app 側で完結させる必要がある。xcuitest モードなら最初から XCUITest が
 タップ・入力するので従来どおり発火する。
@@ -145,7 +145,7 @@ XCUITest から到達できない(`hasKeyboardFocus` の要素が見つからず
   `.webView` 型で指す)。
 - **iOS in-app では DOM 経路を使わない**。platform view が合成タッチと `insertText` を横取りし、
   読めても操作が届かないため(2026-07-29 実測: 入力が Web の input に入らない)。
-  inapp モードでは WebView 画面だけ XCUITest ブリッジへ委譲される。
+  inapp-boost モードでは WebView 画面だけ XCUITest ブリッジへ委譲される。
 
 ## ビルド
 

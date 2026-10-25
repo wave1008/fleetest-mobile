@@ -162,14 +162,14 @@ final class ProfileWriterTests: XCTestCase {
     /// 実体を指さないキーが増えても「実体なし」のまま(キー数で数えると false → true に化ける)
     func testNonBodyKeysDoNotCountAsADeviceBody() {
         XCTAssertFalse(ProfileWriter.hasDeviceBody(
-            ["platform": "ios", "machine": "local", "name": "simulator1", "mode": "inapp", "port": 8100]))
+            ["platform": "ios", "machine": "local", "name": "simulator1", "mode": "inapp-boost", "port": 8100]))
     }
 
     /// JSON 側(deviceBodyKeys)と型側(DeviceSpec.lacksConcreteTarget)は同じ集合を見る。
     /// 片方だけにキーを足すと、書くときは実体扱い・走るときは「実体なし」の警告(または逆)になる
     func testDeviceSpecAndBodyKeysAgree() {
         XCTAssertTrue(DeviceSpec(name: "d", machine: "local").lacksConcreteTarget)
-        XCTAssertTrue(DeviceSpec(name: "d", machine: "local", port: 8100, mode: "inapp")
+        XCTAssertTrue(DeviceSpec(name: "d", machine: "local", port: 8100, mode: "inapp-boost")
             .lacksConcreteTarget, "port/mode は実体ではない")
         let specs: [String: DeviceSpec] = [
             "osVersion": DeviceSpec(name: "d", osVersion: "iOS 27.0"),

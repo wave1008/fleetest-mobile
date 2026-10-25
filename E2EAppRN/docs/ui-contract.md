@@ -142,7 +142,7 @@ Flutter(in-app では `other`)とも違い、新しい型分岐をホスト側�
 - **iOS in-app は読みは DOM 経路で通るが、合成タッチが Web 側のハンドラに届かない**
   (2026-08-08 実測: リンクタップが無反応のまま成功に見える)。そのため RNCWebView は
   interop マーカー(`WebViewDOMSnapshot.isInteropHosted`・版59)に登録してあり、
-  **inapp モードでは WebView 画面ごと XCUITest ブリッジへ委譲される**(CMP/Flutter と同じ扱い)。
+  **inapp-boost モードでは WebView 画面ごと XCUITest ブリッジへ委譲される**(CMP/Flutter と同じ扱い)。
   利用者の書き分けは要らない
 - Android/iOS とも `#id` が効かない・`.link` と `.staticText` が分かれて出る等の**規約は
   `E2EAppCMP/docs/ui-contract.md` の WebView 節と共通**(RN 固有の追加規約は無い)
@@ -179,7 +179,7 @@ TextInput の testID が本体でなく親ラッパーに付く / #43648 = Text/
 欠落)。この SUT は RN のバージョンを上げるたびに**検知器として**使う:
 
 1. `package.json` の react-native を上げ、`npm install` → `cd ios && pod install` → 両 OS 再ビルド
-2. `Scripts/e2e.sh --rn` と `--rn --ios --ios-inapp` を回す
+2. `Scripts/e2e.sh --rn` と `--rn --ios --ios-inapp-boost` を回す
 3. **専用の検知器**: `03_テキスト入力.swift` の S0050(`.型#id` 複合セレクタ = testID が
    入力欄**本体**に付いていることを要求。#38709 型の退行で赤くなる)/ 04(型語彙)/
    18(pressEnter 経路)/ 09(ラベル露出 = #43648 型)

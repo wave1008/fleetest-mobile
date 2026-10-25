@@ -54,7 +54,7 @@ final class ApiRemoteCompatTests: XCTestCase {
                 return XCTFail("別の解決エラー: \(error)")
             }
             XCTAssertEqual(name, "no-such-profile-remote-compat")
-            XCTAssertTrue(available.contains("ios-inapp"), "実在するプロジェクトを読めていない: \(available)")
+            XCTAssertTrue(available.contains("ios-inapp-boost"), "実在するプロジェクトを読めていない: \(available)")
         }
     }
 }

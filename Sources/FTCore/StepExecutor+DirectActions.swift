@@ -313,7 +313,7 @@ extension StepExecutor {
                     try await Task.sleep(for: .milliseconds(Int(intervalSeconds * 1000)))
                     phase.waitMs += Self.ms(clock.now - waitStart)
                 }
-                // in-app の drag は自前描画だけ(それ以外は 501)ため、inapp モードでは
+                // in-app の drag は自前描画だけ(それ以外は 501)ため、inapp-boost モードでは
                 // typeDriver(XCUITest)へ回す(swipePointToPoint と同じ理由)
                 if try await dragWithFallback(path: path, durationSeconds: durationSeconds,
                                               phase: &phase) {
@@ -366,7 +366,7 @@ extension StepExecutor {
                 try await driver.tap(x: x, y: y)
             }
         } catch {
-            // in-app は座標ジェスチャを持たない(501)。inapp モードでは XCUITest へ回す
+            // in-app は座標ジェスチャを持たない(501)。inapp-boost モードでは XCUITest へ回す
             guard DriverError.isBridgeIncapable(error), let td = typeDriver else { throw error }
             if hold > 0 {
                 try await td.press(x: x, y: y, duration: hold)
@@ -385,7 +385,7 @@ extension StepExecutor {
     }
 
     /// 座標どうしのドラッグ(DSL の `swipePointToPoint` / ft_batch)。**撃つのは `dragWithFallback` だけ**
-    /// (in-app の drag は UIKit/SwiftUI で 501。直に `driver.drag` を呼ぶと inapp モードで XCUITest へ回らない)。
+    /// (in-app の drag は UIKit/SwiftUI で 501。直に `driver.drag` を呼ぶと inapp-boost モードで XCUITest へ回らない)。
     /// 押してから動かすまでは 0.05 秒固定(長押しから始まる並べ替えは `gesture` の `.hold` で書く)
     func executeDirectPointToPoint(step: FlowStep, phase: inout PhaseAccumulator) async throws -> StepOutcome {
         guard let x = step.x, let y = step.y, let toX = step.toX, let toY = step.toY else {

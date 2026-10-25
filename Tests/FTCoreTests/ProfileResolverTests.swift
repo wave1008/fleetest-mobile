@@ -69,7 +69,7 @@ final class ProfileResolverTests: XCTestCase {
         }
     }
 
-    /// 計測は XCUITest ランナーにしか無いので、計測の run の iOS は既定で xcuitest モード。inapp の明示は断る
+    /// 計測は XCUITest ランナーにしか無いので、計測の run の iOS は既定で xcuitest モード。inapp-boost の明示は断る
     func testMeasurementRunsIOSInXCUITestMode() throws {
         try write("""
         { "ios": { "appName": "サンプルアプリ", "app": "com.example.sampleapp" } }
@@ -83,7 +83,7 @@ final class ProfileResolverTests: XCTestCase {
         XCTAssertNoThrow(try ResponseMeasurementPolicy.validateDevices(resolved.devices, run: resolved.runName))
 
         try write("""
-        { "app": "sampleapp", "responseMeasurement": true, "iosMode": "inapp",
+        { "app": "sampleapp", "responseMeasurement": true, "iosMode": "inapp-boost",
           "devices": [ { "platform": "ios", "machine": "local", "name": "実機", "kind": "physical", "udid": "00008130-000A1B2C3D4E5678" } ] }
         """, to: project.runsDir, name: "profileInapp")
         XCTAssertThrowsError(try ProfileResolver.resolve(project: project, runName: "profileInapp")) {
@@ -92,7 +92,7 @@ final class ProfileResolverTests: XCTestCase {
 
         try write("""
         { "app": "sampleapp", "responseMeasurement": true,
-          "devices": [ { "platform": "ios", "machine": "local", "name": "実機", "kind": "physical", "udid": "00008130-000A1B2C3D4E5678", "mode": "inapp" } ] }
+          "devices": [ { "platform": "ios", "machine": "local", "name": "実機", "kind": "physical", "udid": "00008130-000A1B2C3D4E5678", "mode": "inapp-boost" } ] }
         """, to: project.runsDir, name: "deviceInapp")
         let device = try ProfileResolver.resolve(project: project, runName: "deviceInapp")
         XCTAssertThrowsError(try ResponseMeasurementPolicy.validateDevices(device.devices, run: device.runName)) {
@@ -545,11 +545,11 @@ final class ProfileResolverTests: XCTestCase {
     // MARK: - iosMode(iOS 実効モードの選択)
 
     func testIosModeDefaultsToInapp() throws {
-        // iosMode 未指定(既定 inapp)→ mode 未指定の iOS デバイスは inapp。Android は不変。
+        // iosMode 未指定(既定 inapp-boost)→ mode 未指定の iOS デバイスは inapp-boost。Android は不変。
         try writeStandardFixture()  // "all" は iosMode 未指定
         let resolved = try ProfileResolver.resolve(
             project: project, runName: "all")
-        XCTAssertEqual(resolved.iosDevices.map { $0.spec.mode }, ["inapp", "inapp"])
+        XCTAssertEqual(resolved.iosDevices.map { $0.spec.mode }, ["inapp-boost", "inapp-boost"])
         XCTAssertNil(resolved.androidDevices.first?.spec.mode, "Android には影響しないはず")
     }
 
@@ -569,14 +569,14 @@ final class ProfileResolverTests: XCTestCase {
         try write("""
         { "ios": { "app": "com.example.app" } }
         """, to: project.appsDir, name: "app4")
-        // iosMode が xcuitest でも mode 明示の "注入機" は inapp のまま、
+        // iosMode が xcuitest でも mode 明示の "注入機" は inapp-boost のまま、
         // 明示なしの "素機" はフラグどおり xcuitest。
         try write("""
-        { "app": "app4", "devices": [ { "platform": "ios", "machine": "local", "name": "注入機", "osVersion": "iOS 27.0", "mode": "inapp" }, { "platform": "ios", "machine": "local", "name": "素機", "osVersion": "iOS 27.0" } ],
+        { "app": "app4", "devices": [ { "platform": "ios", "machine": "local", "name": "注入機", "osVersion": "iOS 27.0", "mode": "inapp-boost" }, { "platform": "ios", "machine": "local", "name": "素機", "osVersion": "iOS 27.0" } ],
           "iosMode": "xcuitest" }
         """, to: project.runsDir, name: "r")
         let resolved = try ProfileResolver.resolve(project: project, runName: "r")
-        XCTAssertEqual(resolved.iosDevices.map { $0.spec.mode }, ["inapp", "xcuitest"])
+        XCTAssertEqual(resolved.iosDevices.map { $0.spec.mode }, ["inapp-boost", "xcuitest"])
         // フラグ明示 × デバイス mode 明示 → 「適用されません」警告(GUI チェックボックスの空振り検知)
         XCTAssertTrue(resolved.warnings.contains { $0.contains("注入機") && $0.contains("does not apply") },
                       "mode 明示デバイスへのフラグ空振り警告が出るはず: \(resolved.warnings)")
@@ -590,14 +590,14 @@ final class ProfileResolverTests: XCTestCase {
         { "ios": { "app": "com.example.app" } }
         """, to: project.appsDir, name: "app5")
         try write("""
-        { "app": "app5", "devices": [ { "platform": "ios", "machine": "local", "name": "注入機", "osVersion": "iOS 27.0", "mode": "inapp" } ] }
+        { "app": "app5", "devices": [ { "platform": "ios", "machine": "local", "name": "注入機", "osVersion": "iOS 27.0", "mode": "inapp-boost" } ] }
         """, to: project.runsDir, name: "r")
         let resolved = try ProfileResolver.resolve(project: project, runName: "r")
         XCTAssertFalse(resolved.warnings.contains { $0.contains("does not apply") },
                        "フラグ未指定では警告しないはず: \(resolved.warnings)")
     }
 
-    /// 値は inapp / xcuitest の2つだけ。それ以外(hybrid 等)は黙って既定へ倒さず断る
+    /// 値は inapp-boost / xcuitest の2つだけ。それ以外(hybrid 等)は黙って既定へ倒さず断る
     func testUnknownIosModeIsRefused() throws {
         try write("""
         { "ios": { "app": "com.example.app" } }
@@ -863,17 +863,17 @@ final class ProfileResolverTests: XCTestCase {
     }
 
     func testPhysicalIosDeviceGetsDefaultMode() throws {
-        // 実機も通常と同じ: iosMode の既定(inapp)。縮退は供給が注入可否で行う(実機の in-app 対応)
+        // 実機も通常と同じ: iosMode の既定(inapp-boost)。縮退は供給が注入可否で行う(実機の in-app 対応)
         try writePhysicalFixture()
         let resolved = try ProfileResolver.resolve(project: project, runName: "r")
-        XCTAssertEqual(resolved.iosDevices[0].spec.mode, "inapp")
+        XCTAssertEqual(resolved.iosDevices[0].spec.mode, "inapp-boost")
     }
 
     func testPhysicalIosDeviceAcceptsInappMode() throws {
-        // 実機の inapp は拒否しない(開発署名でなければ供給が XCUITest へ縮退する)
-        try writePhysicalFixture(iosMode: "inapp")
+        // 実機の inapp-boost は拒否しない(開発署名でなければ供給が XCUITest へ縮退する)
+        try writePhysicalFixture(iosMode: "inapp-boost")
         let resolved = try ProfileResolver.resolve(project: project, runName: "r")
-        XCTAssertEqual(resolved.iosDevices[0].spec.mode, "inapp")
+        XCTAssertEqual(resolved.iosDevices[0].spec.mode, "inapp-boost")
     }
 
     func testPhysicalDeviceWithoutIdentifierFails() throws {
@@ -1122,7 +1122,7 @@ final class ProfileResolverTests: XCTestCase {
     func testValidateRunReportsPhysicalErrorsOnlyForEnabledDevices() throws {
         let data = #"""
         { "app": "a", "devices": [
-          { "platform": "ios", "machine": "local", "name": "実機", "kind": "physical", "mode": "inapp" },
+          { "platform": "ios", "machine": "local", "name": "実機", "kind": "physical", "mode": "inapp-boost" },
           { "platform": "android", "machine": "local", "name": "実機A", "kind": "physical" },
           { "platform": "android", "machine": "local", "name": "無効の実機", "kind": "physical", "enabled": false } ] }
         """#.data(using: .utf8)!
@@ -1131,8 +1131,8 @@ final class ProfileResolverTests: XCTestCase {
         XCTAssertFalse(errors.contains { $0.contains("無効の実機") }, "\(errors)")
         XCTAssertTrue(errors.contains { $0.contains("実機") && $0.contains("udid") },
                       "iOS 実機の udid 欠落エラーが出るはず: \(errors)")
-        XCTAssertFalse(errors.contains { $0.contains("inapp") },
-                       "実機の inapp はエディタでも拒否しない(供給が縮退する): \(errors)")
+        XCTAssertFalse(errors.contains { $0.contains("inapp-boost") },
+                       "実機の inapp-boost はエディタでも拒否しない(供給が縮退する): \(errors)")
         XCTAssertTrue(errors.contains { $0.contains("実機A") && $0.contains("serial") },
                       "Android 実機の serial 欠落エラーが出るはず: \(errors)")
         XCTAssertFalse(warnings.contains { $0.contains("kind") || $0.contains("serial") },

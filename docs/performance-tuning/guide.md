@@ -26,7 +26,7 @@ Android の 2.18s への内訳: 固定 sleep の静穏検知置換で 3.27s(−3
 iOS の残り時間は XCUITest 経路のコストが支配する。**その内訳を「snapshot 約250ms」とした旧説は
 2026-07-30 の外形計測で否定済み**(素の snapshot は 29〜118ms。実体は操作直後に掛けていた
 固定 350ms の整定待ちで、PT-3.8 で収束判定へ置換した)。iOS の高速化の本線は in-app 常駐ブリッジで、
-既に既定(inapp モード)で動いている(PT-8 の 2〜4 は候補ではなく実装記録)。
+既に既定(inapp-boost モード)で動いている(PT-8 の 2〜4 は候補ではなく実装記録)。
 
 ## PT-2 設計原則(変更時も維持すること)
 
@@ -259,7 +259,7 @@ fleetest results insights --project <name>     # 🟡 unsettledSteps の行を�
 | `PollBackoff` | Sources/FTCore/PollBackoff.swift | 100→200→400→800→上限1000ms | exist/textIs/ロケータ解決リトライの共通バックオフ。5s timeout での snapshot 回数は旧5回→新8回(許容済み) |
 | `defaultTimeout` | FTRuntime(runs プロファイルで上書き可) | 5s | 検証系の待ち上限。失敗するテストの所要を支配 |
 | `waitSeconds:`(tap/type/select) | DSL 引数(FTDSL/Commands.swift・select は CommandsVerify.swift) | nil | アクションのロケータ解決待ち上限秒。nil=従来の3回リトライ(計700ms)、**0=リトライなし(出るか不定の要素を見るときの空振り ~750ms→数十msに短縮する opt-in ノブ)**。遅れて出る要素を拾えなくなるので `ifCanSelect` / `select` の空振り短縮以外では基本使わない |
-| fallback 照会の間引き | StepExecutor+Assert.swift(executeAssert) | primary 2回目以降・偶数回ミスのみ | inapp モードの SystemUIDriver 照会(springboard 再session+XCUITest snapshot=数百ms)の頻度。実在するシステムUI要素の検知遅れは最大バックオフ1段+1周期 |
+| fallback 照会の間引き | StepExecutor+Assert.swift(executeAssert) | primary 2回目以降・偶数回ミスのみ | inapp-boost モードの SystemUIDriver 照会(springboard 再session+XCUITest snapshot=数百ms)の頻度。実在するシステムUI要素の検知遅れは最大バックオフ1段+1周期 |
 | LPT 投入順 | `fleetest.lptScheduling` / `--no-lpt` | ON | 過去実績の長い順に投入する(PT-3.7)。OFF でシナリオ ID 順。レーン数とシナリオ長のばらつきが無いと効かない |
 | LPT の実績の読む件数 | `fleetest.lptHistoryRuns` / `--lpt-history-runs` | 5 | **シナリオ1本あたり**読み込む実績の観測数(新しい方から。`RunResultsStore.scanRecords(maxObservationsPerScenario:)`。PT-3.7)。増やすと代表値は安定するが毎 run の読み込みファイルが増える。実測で 1 プロジェクト 3,500〜4,500 件の結果 JSON があるため全件走査はしない |
 | 操作直後の整定(Android) | ブリッジ `/settle`(QuietWaiter) | QUIET_MS=200ms | ブリッジを経由しない経路(activate/home/appSwitcher/pressEnter フォールバック)の整定(PT-3.9)。旧実装は固定 800ms。ブリッジ不達時のみ 800ms へフォールバック |
@@ -364,7 +364,7 @@ window/transition/animator の `*_scale` はチューニングノブではなく
 - `UiAutomation.setOnAccessibilityEventListener` は**1 枠しかない**。QuietWaiter が
   使用中なので、別用途でリスナが必要になったら QuietWaiter 経由で多重化すること
 - 長時間ベンチ中の画面ロックに注意(GUI E2E 全般の既知問題)
-- **フォールバック検証の誤検知(緩和済み)**: inapp モードでシステム UI を tap するとき、セレクタの
+- **フォールバック検証の誤検知(緩和済み)**: inapp-boost モードでシステム UI を tap するとき、セレクタの
   label が in-app の要素 label の**部分文字列**だと primary(in-app)が `contains` で誤解決し得た。
   現在は tap アクション経路で **primary が部分一致(substring)止まりなら fallback を照会し、
   fallback に完全一致(exact)があれば fallback を優先**する(`StepExecutor` の resolveDetailed/
@@ -374,7 +374,7 @@ window/transition/animator の `*_scale` はチューニングノブではなく
   アサーション経路は従来どおり(部分一致の存在確認は許容)なので、確証が要るときは
   **同一シナリオを XCUITest ブリッジを持たない in-app ブリッジ単独(フォールバック無)でも走らせ当該 tap が失敗することを確認**
   (negative control)。
-- **inapp モードでも XCUITest へ回る type がある**: 改行を含む文字列(iOS の Return キーの既定の挙動に揃えるため。
+- **inapp-boost モードでも XCUITest へ回る type がある**: 改行を含む文字列(iOS の Return キーの既定の挙動に揃えるため。
   `StepExecutor` が typeDriver を優先する)と、in-app ブリッジが 409 等で打てなかったとき(ロケータ付きは `StepExecutor` が
   `DriverError.isTextInputFallback` で、ref なしは `HybridFallbackDriver.type` が退避する)。それ以外は Compose を含めて in-app で打つ
   (`ScenarioRunnerMain` の `preferTypeDriver` は常に false)。XCUITest 経路の type は in-app より数倍遅い
@@ -480,7 +480,7 @@ window/transition/animator の `*_scale` はチューニングノブではなく
   ready になり、次回の実行で「稼働中ブリッジを再利用」して成功する(=1回おきに成功・失敗が
   交互になったらこのパターン)。恒常的に3台以上の iOS 並列を使うなら供給タイムアウト延長か
   供給の直列化を検討(PT-8)。※この実測は供給が直列だった時代のもの。2026-07-15 の並列供給化
-  (PT-3.2)後は無負荷コールドの 3 台 inapp モード(6 ブリッジ)は成立を確認済みだが、負荷下の挙動は
+  (PT-3.2)後は無負荷コールドの 3 台 inapp-boost モード(6 ブリッジ)は成立を確認済みだが、負荷下の挙動は
   未再計測(悪化しうる方向なので交互パターンを見たらまずここを疑う)
 
 - **iOS ブリッジのウェッジ(接続は受けるが無応答)の診断手順**: ① `curl -s -m 2 -o /dev/null -w "%{http_code}" http://localhost:<port>/status` で 000 なら無応答(200 が健全。ポートは 8123〜)。② run が固まって見えるときは `lsof -p <run pid> | grep ESTAB` — ブリッジポートへの ESTABLISHED が動かないのは無応答待ち。③ `sample <pid> 2` で全スレッドが workq/mach_msg でパーク+CPU 0% なら「返らない await」(死活確認系は withDeadline 必須。DS-12.4)。復旧は `fleetest bridge down --port <N>` で該当だけ停止(次の供給が作り直す)。**このコマンドは自リポジトリの `.fleetest/` に記録があるブリッジしか止められない** — 別クローンが起動したものは「the bridge on port <N> is not managed by this repository」と出るので、起動元のクローンで止めるか `lsof -ti :<N>` のプロセスを止め、iOS は `xcrun simctl terminate <udid> com.example.ftrunner.uitests.xctrunner` まで行う。**残存ブリッジの一覧は `fleetest doctor`** が出す(版が古い/記録が無いものを報告。停止はしない)
@@ -489,8 +489,8 @@ window/transition/animator の `*_scale` はチューニングノブではなく
 - **Swift 構造化並行の罠: `withTaskGroup`+`cancelAll` はキャンセルに応答しない子タスクの完了を待つ**。ウェッジ機への URLSession(120s/リクエスト)を子に持つと、期限側が勝っても遅い方を待ち続けて run 全体が凍結する(実測: 全スレッドパークで5分以上)。死活確認の期限は「先着確定レース+遅い方は放置」(RunOrchestrator.withDeadline)にする
 - **孤児ブリッジ累積で連続 run が逓減する(根本原因と2修正・2026-07-25 確定)**: in-app ブリッジは
   対象アプリが背面化で suspend されると TCP 受理・HTTP 無応答になり `scanRunningBridges`(/status)に
-  映らない=再利用も stale 停止もされず、inapp run のたびに `.inapp` 状態ファイルが1デバイス1本ずつ
-  積もる(実測: xcuitest↔inapp 切替を繰り返すと 6→12→…)。さらに scan の /status プローブは
+  映らない=再利用も stale 停止もされず、inapp-boost モードの run のたびに `.inapp` 状態ファイルが1デバイス1本ずつ
+  積もる(実測: xcuitest↔inapp-boost 切替を繰り返すと 6→12→…)。さらに scan の /status プローブは
   引数なし `status()` が `sessionTimeout`(=Timeout.session=45s)を per-request の timeoutInterval に
   上書きするため、`BridgeClient(timeoutSeconds:2)` の 2s が効かず、**suspend ゾンビ1本で scan 全体が
   並列でも ~45s 待つ**(本数に依らず固定 ~45s。18本の合成でも 46s)。結果 iOS 壁時計が実行時間そのままに
@@ -511,7 +511,7 @@ window/transition/animator の `*_scale` はチューニングノブではなく
 ## PT-8 今後の改善候補(価値が出たら)
 
 **この節は候補と完了記録が混在している**。「iOS の XCUITest 税」の項(2〜4)は**実装済みの記録**で
-候補ではない(in-app 常駐ブリッジ・inapp モードは既定で動いている)。候補として読むのは各行の
+候補ではない(in-app 常駐ブリッジ・inapp-boost モードは既定で動いている)。候補として読むのは各行の
 ✅/❌/不採用の印が無いものだけ。
 
 - ✅ **SpringBoard の劣化を検知して起こし直す**(PT-3.36 で実装)。効果がどれだけ続くか(再劣化までの時間)は未計測 ——
@@ -540,7 +540,7 @@ window/transition/animator の `*_scale` はチューニングノブではなく
   `SnapshotResponse.offscreen` を供給していた)。ランナーが Android と同じ契約で供給するように
   変更(bridgeProtocolVersion 46)。実測(WebView シナリオ・アイドル3周 A/B・全3 SUT):
   scrollTo −22〜31%・scrollToTop CMP/Flutter −16%(SwiftUI 中立)・シナリオ全体 34.1→30.4s(−11%)。
-  **inapp モードには供給しない**(`WebViewDelegatingDriver` が落とす。contentOffset 短絡の方が速い)。
+  **inapp-boost モードには供給しない**(`WebViewDelegatingDriver` が落とす。contentOffset 短絡の方が速い)。
   残る床は `scrollToEdge` の毎周 `settledSignature`(WebView は snapshot 1枚 300〜500ms かかり、
   端確定に最低2周 = 減速中に比較すると早すぎる端判定になる実害由来で単純には外せない)と
   Web コンテンツの AX 活性化待ち(`exist` 3〜4s・ブリッジ差なし)。
@@ -549,7 +549,7 @@ window/transition/animator の `*_scale` はチューニングノブではなく
   形への保険**で、その代償として**端に着いてから捨てのスワイプを2回撃っていた**。
   `SnapshotResponse.offscreen` は「その方向にまだ内容があるか」の**肯定的な証拠**なので、
   ヒントを供給する画面(= WebView)でだけ**不変1回**に下げる(`StepExecutor.unchangedRoundsForEdge`)。
-  供給の無い画面(ネイティブ・旧ブリッジ・inapp モード)は `offscreen` が nil なので従来どおり。
+  供給の無い画面(ネイティブ・旧ブリッジ・inapp-boost モード)は `offscreen` が nil なので従来どおり。
   **同セッション A/B の実測**(E2E-CMP/ios-xcuitest・`WebViewの中身を操作できること.S0010` を
   交互ではなく連続で fix 5 周 / base 3 周):
 
@@ -563,7 +563,7 @@ window/transition/animator の `*_scale` はチューニングノブではなく
   **対照が動いていないこと**を同じ run から取っているのが判定の根拠(単独の壁時計では
   デバイス差・セッション鮮度に埋もれる)。
 - **AX 活性化待ち約3秒は iOS 側の床でブリッジ差なし**(2026-08-05 に `results/runs` 全数で確認):
-  `exist "WebView 見出し"` の中央値は **ios-xcuitest 2.96s(n=448)/ ios-inapp 3.04s(n=283)/
+  `exist "WebView 見出し"` の中央値は **ios-xcuitest 2.96s(n=448)/ ios-inapp-boost 3.04s(n=283)/
   android 0.24s(n=174)**。DOM 経路(in-app)でも同じだけ掛かるので **AX ではなく WKWebView が
   初回に中身を出すまでの時間**。ホスト側に削り代は無い(強いて言えば `PollBackoff` が
   100→200→400→800ms と粗く、実測が 2.85〜2.96s に密集しているのは**5回目のポーリング境界**に
@@ -652,7 +652,7 @@ window/transition/animator の `*_scale` はチューニングノブではなく
        (UIKeyInput 準拠・isFirstResponder)」が**別ウィンドウの別ビュー**で、従来の first responder
        捕捉が前者を拾って 409 になっていた。「insertText: に応答し かつ isFirstResponder のビュー」を
        最優先する探索に変更(InAppInput.m FTInsertTextIntoFirstResponder)し、type 実測 262〜299ms
-       (XCUITest attach 経路 1.0〜1.3s の約1/4)。inapp モードの Compose 検出時 attach 優先
+       (XCUITest attach 経路 1.0〜1.3s の約1/4)。inapp-boost モードの Compose 検出時 attach 優先
        (preferTypeDriver)は廃止し、409→attach フォールバックのみを安全網として残す。
        ログイン系シナリオ 18.9→15.3s(−19%)。
        **2026-07-28 追記**: `\n` を含む text だけは attach 経路(XCUITest)へ回す。改行の意味を
@@ -738,15 +738,15 @@ window/transition/animator の `*_scale` はチューニングノブではなく
        Simulator で確認済み。
      - screenshot: `drawHierarchy` → PNG、45ms。
      - **ホスト統合(モード選択+lifecycle)= 完成**: machine プロファイルのデバイスに
-       `mode`("xcuitest" / "inapp")を持たせ、`mode=inapp` のときサブプロセスが
+       `mode`("xcuitest" / "inapp-boost")を持たせ、`mode=inapp-boost` のときサブプロセスが
        `InAppDriver`(launch=simctl 再起動+dylib 注入、他は HTTP で `BridgeClient` へ委譲)を使う。
        provisioner は注入起動済みブリッジを /status スキャンで発見・再利用、不足分は
        `InAppLauncher`(注入起動)で起動。**ホスト実行系(`FTBridgeClient`/RunOrchestrator/
        ScenarioHost)は mode フィールドを通すだけで概ね無改変**。
-       **mode=inapp の新規ブリッジ起動には注入対象アプリの bundleID が要る**(run プロファイルの
+       **mode=inapp-boost の新規ブリッジ起動には注入対象アプリの bundleID が要る**(run プロファイルの
        apps.ios.app 経由でのみ得られる)。無い場合は XCUITest にフォールバックせず**明示エラー**
        (`inAppNeedsBundleID`。単一実装・フォールバックを作らない方針。device/live 等 bundleID を
-       渡さない経路は mode=inapp 非対応)。稼働中ブリッジ再利用時は launch しないので bundleID 不要。
+       渡さない経路は mode=inapp-boost 非対応)。稼働中ブリッジ再利用時は launch しないので bundleID 不要。
      **実シナリオ実証(ログイン画面.S0010、Simulator)**:
      - 単発(warm・状態リセット無し): step 合計 ~11.0s(XCUITest)→ **~3.0s(3.7倍速)**。
      - **プロファイル経由 3 イテレーション: 全 passed=True**(以前は 2 回目以降ログイン済みで失敗)。
@@ -766,7 +766,7 @@ window/transition/animator の `*_scale` はチューニングノブではなく
      空なら value=nil に修正(非空 SecureTextField は accessibilityValue のマスクを維持し実パスワードは
      晒さない)。(b) press → Simulator で確認済み(上記)。(c) 並列複数 in-app デバイス → シミュ1-inapp(8123)+
      シミュ2-inapp(8124)で 2 シナリオ並列全 passed(port/udid 配線が並列で正しい)。install 前注入起動の
-     順序は mode=inapp+autoInstall のとき注入起動が install より先に走る(現状はアプリ事前 install が
+     順序は mode=inapp-boost+autoInstall のとき注入起動が install より先に走る(現状はアプリ事前 install が
      必要=エラーメッセージで案内)。
      なお XCUITest の quiescence 自体を私有 API で無効化する案(WDA 方式)は、
      代替の整定信号がプロセス外から得られないため 2 とセットでない限り採らない
@@ -776,11 +776,11 @@ window/transition/animator の `*_scale` はチューニングノブではなく
      タップが遷移の途中に当たって吸われる(開く操作から約 0.5 秒。木はその時点で最終位置を出すので木の整定では見張れない。
      E2EX-iOS の 42_固有部品 S0010 が 10-20 から決まって赤)。実費は静かな画面 2〜5ms・遷移の直後 147ms・アニメーション中
      最大 815ms・Apple マップ 2〜844ms(Simulator)。操作の後の待ちは飛ばしたまま。`QuiescenceWait.waitBeforeTouch`)
-  4. **cross-app ハイブリッド(in-app 主 + XCUITest フォールバック)**: `mode=inapp` を指定すると in-app(主・高速)で駆動し、対象要素が
+  4. **cross-app ハイブリッド(in-app 主 + XCUITest フォールバック)**: `mode=inapp-boost` を指定すると in-app(主・高速)で駆動し、対象要素が
      in-app snapshot に無いとき **XCUITest(システム UI)へ自動フォールバック**する。in-app は
      同一プロセスしか見えない(=速さの源泉と表裏)ので、既に前面にあるシステム UI(権限ダイアログ等)
      だけ XCUITest に委ねる。「XCUITest が in-app を起動」案とは別(あちらは launch 4200-5400ms と遅い)。
-     - **配線経路(同期が必要)**: `BridgeProvisioner`(inapp モードは in-app + xcuitest の2ブリッジを起動、
+     - **配線経路(同期が必要)**: `BridgeProvisioner`(inapp-boost モードは in-app + xcuitest の2ブリッジを起動、
        `ProvisionedIOSDevice.xcuiPort`)→ `DriverConnection.xcuiPort` → `ScenarioHost` が `--xcui-port`
        で伝搬 → `ScenarioRunnerMain` が `SystemUIDriver(port:)` を構築 → `StepExecutor.fallbackDriver`。
      - **フォールバック解決**(`StepExecutor.executeAction`/`executeAssert`): 主 driver(in-app)の
@@ -789,20 +789,20 @@ window/transition/animator の `*_scale` はチューニングノブではなく
        遅延して出るダイアログはシナリオ側で `wait` を入れる(通知許可等は `.action` に `wait(2)`)。
      - **ブリッジ発見**: `/status` に `bridge`("inapp"/"xcuitest")を追加し、`scanRunningBridges` は
        (UDID, bridge) で照合(同一 UDID に2ブリッジが共存するため port→UDID だけでは reuse が非決定的)。
-       inapp モードのデバイスは2ポート消費(8123-8154 で最大16台並列)。旧ブリッジは bridge=nil→"xcuitest" 扱い。
+       inapp-boost モードのデバイスは2ポート消費(8123-8154 で最大16台並列)。旧ブリッジは bridge=nil→"xcuitest" 扱い。
      - **springboard 非破壊参照モード**(`BridgeRouter.handleLaunch`): bundleID=com.apple.springboard の
        とき `target.launch()` せず参照だけ張って snapshot/tap 可。**launch すると springboard がホームに
        飛びアラートを消す**ので不可。`SystemUIDriver.snapshot()` は毎回 springboard を再 session(refs を
        張り直す)が、tap/press は再 session しない(refs が消える)。
      - **Simulator での A/B 検証済み**: 通知許可ダイアログ(springboard 別プロセス、in-app 不可視)に対し
-       `tap("許可||Allow")` が **inapp モード=passed(fallback label=Allow で解決)/ in-app ブリッジ単独=failed(ロケータ
+       `tap("許可||Allow")` が **inapp-boost モード=passed(fallback label=Allow で解決)/ in-app ブリッジ単独=failed(ロケータ
        解決不可)**。同一アプリ・同一手順・唯一の差はフォールバック driver の有無 → フォールバック経路が
-       働いた確証。既存 `ログインテスト.S0010` も inapp モードで全 passed(通常シナリオに非回帰)。
+       働いた確証。既存 `ログインテスト.S0010` も inapp-boost モードで全 passed(通常シナリオに非回帰)。
        **アラート文言はロケール依存**(この個体は英語 "Allow"/"Don't Allow")。
      - **シナリオ単位の自動ルーティング**(ScenarioRunnerMain のドライバ構築): シナリオの対象アプリ
        (解決済みの既定アプリ。`FTCore.ScenarioAppResolution`)が in-app 注入先
        (in-app /status の sessionBundleID)と**異なる**とき、
-       inapp モードはそのシナリオを**丸ごと XCUITest ブリッジで駆動**(iOS設定アプリ等のシナリオが既定 ON でも
+       inapp-boost モードはそのシナリオを**丸ごと XCUITest ブリッジで駆動**(iOS設定アプリ等のシナリオが既定 ON でも
        動く)。XCUITest ブリッジを持たない in-app ブリッジ単独は明示エラー。**この分岐が無いと別アプリの注入起動がポート衝突で
        旧ブリッジの偽成功応答になり「裏のアプリを操作して失敗」する**(E2E で実際に発生)。
      - **suspend 時のルーティング(2026-07-15 修正。混在実行の必須対策)**: 上記ルーティングは in-app
@@ -818,15 +818,15 @@ window/transition/animator の `*_scale` はチューニングノブではなく
        (suspend でハングし、かつ冒頭 launchApp の注入 relaunch で bridge を必ず張り直すため不要)。
        混在させないなら `iosMode: "xcuitest"`(全 XCUITest)で回避もできる。
      - **未達**: リッチなサービス所有シート(iOS27 写真限定ライブラリ=com.apple.PhotosViewService)は
-       app.snapshot() の1アプリツリーモデルでは掴めない。**推奨運用**: 単純アラートは inapp モード、
+       app.snapshot() の1アプリツリーモデルでは掴めない。**推奨運用**: 単純アラートは inapp-boost モード、
        リッチシートや確実性重視は `simctl privacy grant`/`defaults write` でダイアログを最初から出さない
        方が安価・確実。**シナリオ途中の deliberate フルアプリ切替(sampleapp 操作中に設定アプリへ遷移等)
        は対象外**(フォールバックは「アプリ前面のまま出るシステム UI」向け。シナリオ丸ごと別アプリは
        上記ルーティングで XCUITest が担う)。
-     - 使い方(推奨): **run プロファイルの `iosMode`("inapp" 既定 / "xcuitest"。GUI の「iOS のモード」)で選ぶ**。
+     - 使い方(推奨): **run プロファイルの `iosMode`("inapp-boost" 既定 / "xcuitest"。GUI の「iOS のモード」)で選ぶ**。
        iOS デバイスの実効モードが決まる(`ProfileResolver.resolve`)。`devices[]` のその device に `mode` を
-       明示していればそちらが優先。inapp モードは bundleID 必須
-       (新規 in-app 起動に要る。`inAppNeedsBundleID`)。**既定が inapp なので mode 無指定の iOS デバイスは
-       inapp モードで走る**(従来 XCUITest だった `ios.json` 等も高速化。XCUITest ブリッジだけに戻すには `iosMode: "xcuitest"`)。
+       明示していればそちらが優先。inapp-boost モードは bundleID 必須
+       (新規 in-app 起動に要る。`inAppNeedsBundleID`)。**既定が inapp-boost なので mode 無指定の iOS デバイスは
+       inapp-boost モードで走る**(従来 XCUITest だった `ios.json` 等も高速化。XCUITest ブリッジだけに戻すには `iosMode: "xcuitest"`)。
 - **シナリオ設計の見直し**: 上記 iPhone Air フレークのようなデバイス依存アサーションの排除は、
   どんな高速化より成功率に効く

@@ -24,12 +24,12 @@ E2E と実機の検証を回すための手順。
 
 ## 1回の実行が見るのは iOS の2モードのうち片方だけ
 
-`Scripts/e2e.sh` の iOS は **既定が `ios-inapp` プロファイル**(2026-08-11 に xcuitest から反転)。
-**利用者の既定モードは inapp モード(in-app ブリッジ優先)**(`RunProfile` の `iosMode ?? "inapp"`)なので、
+`Scripts/e2e.sh` の iOS は **既定が `ios-inapp-boost` プロファイル**(2026-08-11 に xcuitest から反転)。
+**利用者の既定モードは inapp-boost モード(XCUITest ブリッジに in-app ブリッジを足した構成)**(`RunProfile` の `iosMode ?? (responseMeasurement ? xcuitest : inappBoost)`)なので、
 既定スイートが見るべきは in-app 側。**XCUITest ブリッジ**(ランナー・スナップショット・型写像・
 ジェスチャ申告)を触ったら、変更が通るシナリオを **xcuitest モードで** 追加で回すこと
 (`fleetest run --project <P> --profile ios-xcuitest --scenario <クラス>`)。
-全実施を頼まれたときのスイートは `Scripts/e2e.sh --ios-xcuitest`(iOS だけを xcuitest モードで)、inapp モードだけなら `--ios-inapp`。
+全実施を頼まれたときのスイートは `Scripts/e2e.sh --ios-xcuitest`(iOS だけを xcuitest モードで)、inapp-boost モードだけなら `--ios-inapp-boost`。
 
 **モード指定は iOS だけを回す**(2026-08-11)。Android にモードの選択肢は無く
 (`iosMode` は iOS 専用)、一緒に回すと既定スイートと1バイトも違わない実行をもう一度
@@ -250,8 +250,8 @@ Flutter と RN の実機用は **Release 構成**(Flutter の Debug は flutter 
 
 - SUT(`E2EAppCMP/` 他)の鮮度を見て必要なら再ビルドし、各プロファイルを順に回す。オプション:
   `--rebuild` / `--ios` / `--android` / `--cmp` / `--ios-native` / `--android-native` / `--flutter` / `--rn` /
-  `--ios-xcuitest`(iOS を xcuitest モードで回す。既定は inapp モード。上記「1回の実行が見るのは…」節) /
-  `--ios-inapp`(既定と同じモードで iOS のみ) /
+  `--ios-xcuitest`(iOS を xcuitest モードで回す。既定は inapp-boost モード。上記「1回の実行が見るのは…」節) /
+  `--ios-inapp-boost`(既定と同じモードで iOS のみ) /
   `--record`(録画パイプラインの整合チェック付き。詳細は下記「録画」節) /
   `--local`(各 run に `--runner local` = この Mac のデバイスだけ。E2EX を M1Ultra で同時に回すときの形) /
   `--performance`(性能計測モード。上記「モニターと E2E」) / `--negative`(最後に陽性対照スイートも回す) /
@@ -628,7 +628,7 @@ devicepoll の要点:
 
 ### WebView を触ったときの検証
 
-- **DOM 経路は in-app だけ**(`InAppWebViewDOM`)。利用者の既定モードは inapp モード = in-app ブリッジ優先で、
+- **DOM 経路は in-app だけ**(`InAppWebViewDOM`)。利用者の既定モードは inapp-boost モード(in-app ブリッジで撃てる操作はそちらで撃つ)で、
   既定の e2e.sh も iOS を in-app で回すので既定スイートに入る(2026-08-11 の反転前は
   xcuitest 既定で、この経路が丸ごと未検証のまま緑になっていた)。**`--ios-xcuitest` 側も回す** ——
   WebView は xcuitest では a11y 経路になるため、両方通さないと片側の退行が残る。

@@ -24,11 +24,11 @@ enum InstallHandlerFactory {
                 } catch {
                     return (false, "installApp: \(error.localizedDescription)")
                 }
-                // inapp モードは simctl install でアプリ内常駐ブリッジが道連れに終了するが、
+                // inapp-boost モードは simctl install でアプリ内常駐ブリッジが道連れに終了するが、
                 // 次の launchApp()(InAppDriver.launch)が simctl 再起動+dylib 再注入で必ず張り直す
-                // (installIfNeeded が inapp モードをスキップするのと対照的に、installApp() は
+                // (installIfNeeded が inapp-boost モードをスキップするのと対照的に、installApp() は
                 // 利用者の明示要求なので普通にインストールし、注記だけ返す)
-                if worker.platform == "ios", worker.connection.mode == IOSMode.inapp {
+                if worker.platform == "ios", worker.connection.mode == IOSMode.inappBoost {
                     let reinject = "the in-app bridge will be reinjected on the next launchApp()"
                     return (true, note.map { "\($0); \(reinject)" } ?? reinject)
                 }

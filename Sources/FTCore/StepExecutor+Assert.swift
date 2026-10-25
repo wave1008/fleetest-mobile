@@ -945,7 +945,7 @@ extension StepExecutor {
                 lastOcclusion = nil   // #5: 直近は未発見 → 過去の occlusion 失敗を無効化(消失時に stale を返さない)
                 primaryMisses += 1
                 // fallback(SystemUIDriver)の snapshot は SpringBoard の木1枚ぶん(約185ms)。
-                // inapp モードはさらに springboard の再 session が乗る(xcuitest モードは
+                // inapp-boost モードはさらに springboard の再 session が乗る(xcuitest モードは
                 // `/systemui/snapshot` なので乗らない)。primary(in-app ~0.05ms)ミス毎に払うと
                 // 通常のアプリ内要素待ちを支配するため間引く: 2・4・6…回目のミスでのみ照会。
                 // 実在するシステムUI要素の検知遅れは最大でバックオフ1段+1周期
@@ -1340,7 +1340,7 @@ extension StepExecutor {
                     passConfirmed = true
                     continue
                 }
-                // primary で不在 = pass だが、inapp モードではシステム UI(別プロセスのダイアログ)が
+                // primary で不在 = pass だが、inapp-boost モードではシステム UI(別プロセスのダイアログ)が
                 // primary の snapshot に映らない。不在を確定する側でだけ fallbackDriver を1回照会する
                 // (pass 経路の固定費 1 回のみ。miss 毎に払う exists 側の間引きとは事情が逆)
                 if let fb = fallbackDriver {

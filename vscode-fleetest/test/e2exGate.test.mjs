@@ -45,7 +45,7 @@ function runGate({ profile, failed, markers = {}, digest }) {
 }
 
 test('既定(in-app)の実行は xcuitest の印が無くても警告しない(既知の赤で鳴りっぱなしにしない)', () => {
-  const { out } = runGate({ profile: 'ios-inapp', failed: 0, digest: 'abc' })
+  const { out } = runGate({ profile: 'ios-inapp-boost', failed: 0, digest: 'abc' })
   assert.doesNotMatch(out, /⚠️/)
 })
 
@@ -70,7 +70,7 @@ test('E2E の印(-e2e-verified)は E2EX の印として数えない', () => {
 })
 
 test('全部成功したら回したモードの E2EX の印を書く', () => {
-  const { out, readMarker } = runGate({ profile: 'ios-inapp', failed: 0, digest: 'abc' })
+  const { out, readMarker } = runGate({ profile: 'ios-inapp-boost', failed: 0, digest: 'abc' })
   assert.equal(readMarker('inapp-e2ex-verified'), 'abc')
   assert.equal(readMarker('inapp-e2e-verified'), null, 'E2E の印を書いてはいけない')
   assert.equal(readMarker('xcuitest-e2ex-verified'), null, '回していない側の印を書いてはいけない')
@@ -78,6 +78,6 @@ test('全部成功したら回したモードの E2EX の印を書く', () => {
 })
 
 test('失敗があれば印を書かない', () => {
-  const { readMarker } = runGate({ profile: 'ios-inapp', failed: 1, digest: 'abc' })
+  const { readMarker } = runGate({ profile: 'ios-inapp-boost', failed: 1, digest: 'abc' })
   assert.equal(readMarker('inapp-e2ex-verified'), null)
 })

@@ -1,4 +1,4 @@
-// inapp モードで「in-app ブリッジが原理的に実行できない操作」だけを XCUITest ブリッジへ回すデコレータ。
+// inapp-boost モードで「in-app ブリッジが原理的に実行できない操作」だけを XCUITest ブリッジへ回すデコレータ。
 //
 // シナリオ実行では同じ判断を StepExecutor が持っている(driver → 501 なら typeDriver)。
 // **StepExecutor を通らない呼び出し口**(MCP の ft_*)にも同じ振る舞いを与えるのがこのクラスで、

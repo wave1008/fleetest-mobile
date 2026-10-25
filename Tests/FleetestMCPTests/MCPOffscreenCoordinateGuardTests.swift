@@ -217,7 +217,7 @@ final class MCPOffscreenCoordinateGuardTests: XCTestCase {
 
     // MARK: - Android は iOS 専用の概念を名指ししない
 
-    /// in-app ブリッジの hit-test の仕組みは iOS(inapp モード)だけの実態。Android の拒否に
+    /// in-app ブリッジの hit-test の仕組みは iOS(inapp-boost モード)だけの実態。Android の拒否に
     /// 混ざると、存在しない仕組みの説明になる
     func testAndroidOffscreenTapDoesNotMentionTheInAppBridge() async throws {
         _ = try await server.call(tool: "ft_snapshot", args: ["platform": "android"])

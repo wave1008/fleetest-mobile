@@ -354,7 +354,7 @@ extension StepExecutor {
     /// 署名の不変化を2回重ねる必要はない。
     /// 効くのは iOS xcuitest の WebView で、**端に着いた後に捨てのスワイプを2回撃っていた**
     /// (1スワイプ約2.5秒 = 実測 scrollToTop 中央値 12.1s の主成分。PT-8)。
-    /// 供給の無い画面(ネイティブ・旧ブリッジ・inapp モードの WebViewDelegatingDriver)は
+    /// 供給の無い画面(ネイティブ・旧ブリッジ・inapp-boost モードの WebViewDelegatingDriver)は
     /// `offscreen` が nil なので 2 のまま
     static func unchangedRoundsForEdge(snapshot: SnapshotResponse,
                                        remainingJump: Double?) -> Int {

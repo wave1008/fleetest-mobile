@@ -23,15 +23,15 @@ final class RunnerMidRunRecheckTests: XCTestCase {
         XCTAssertEqual(RunnerMidRunRecheck.target(of: connection)?.port, 8130)
     }
 
-    /// inapp モードはランナーを起動し直すと同じデバイスの in-app ブリッジも消えるので対象外
+    /// inapp-boost モードはランナーを起動し直すと同じデバイスの in-app ブリッジも消えるので対象外
     func testInappModeLaneIsNotTargeted() {
-        let connection = DriverConnection(platform: "ios", port: 8135, mode: "inapp",
+        let connection = DriverConnection(platform: "ios", port: 8135, mode: "inapp-boost",
                                           udid: "SIM-3", xcuiPort: 8136)
         XCTAssertNil(RunnerMidRunRecheck.target(of: connection))
     }
 
     func testInAppLaneIsNotTargeted() {
-        let connection = DriverConnection(platform: "ios", port: 8137, mode: "inapp", udid: "SIM-4")
+        let connection = DriverConnection(platform: "ios", port: 8137, mode: "inapp-boost", udid: "SIM-4")
         XCTAssertNil(RunnerMidRunRecheck.target(of: connection))
     }
 

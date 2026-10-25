@@ -198,7 +198,7 @@ public final class BridgeClient: AppDriver, Sendable {
 
     /// 短いタイムアウトでの /status プローブ。バックグラウンドで iOS に suspend された in-app
     /// アプリは TCP 接続は受理するが応答しないため、既定 sessionTimeout(45s)では無限待ちになる。
-    /// 呼び出し側は無応答を「不明」として扱う(inapp モードの注入先判定を参照)。
+    /// 呼び出し側は無応答を「不明」として扱う(inapp-boost モードの注入先判定を参照)。
     /// 確実に短時間で切るため config 側も短くした BridgeClient から呼ぶこと。
     public func status(timeout: TimeInterval) async throws -> StatusResponse {
         try await get("/status", timeout: timeout)
@@ -565,7 +565,7 @@ public final class BridgeClient: AppDriver, Sendable {
     /// 一度「開く」を押すと以後の openURL は無警告で配送される。そのため
     /// **(target, bundleID) ごとにプロセス内で1回だけ**試みる(OpenURLConsentAttemptCache)。
     /// 判定は springboard へ実際に attach できてから初めて「試行済み」にする ——
-    /// **先に記録すると in-app 接続の 409 が「試したことにされ」、inapp モードで本来なら XCUITest 側
+    /// **先に記録すると in-app 接続の 409 が「試したことにされ」、inapp-boost モードで本来なら XCUITest 側
     /// (springboard を見られる)がまだ試していないのに機会を失う**(このメソッドは in-app/xcuitest
     /// どちらの接続からも呼ばれ得る。WebViewDelegatingDriver.openURL 参照)。
     /// 確認アラートの出現待ち(合計約 1.2s)。**同意済みの端末では毎回この分を空振りする**ので、
@@ -1404,7 +1404,7 @@ public final class BridgeClient: AppDriver, Sendable {
                 + " with `fleetest bridge down --port \(port)` if it does not recover)"
         case .networkConnectionLost? where macSide == .connected:
             return " (the USB tunnel (iproxy) on port \(port) is up, but the device's end did not take the connection"
-                + " — the bridge on the device has stopped (in inapp mode it lives inside the app, in xcuitest mode it"
+                + " — the bridge on the device has stopped (in inapp-boost mode it lives inside the app, in xcuitest mode it"
                 + " is the XCUITest runner), or the device is no longer reachable over USB)"
         default:
             break

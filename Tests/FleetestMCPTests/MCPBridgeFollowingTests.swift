@@ -1,11 +1,11 @@
 // **MCP の iOS は、実行プロファイルの iOS のモードに関わらず XCUITest で組む**ことを固定する(ユーザー決定)。
 //
-// 以前はプロファイルの inapp モードに追従していたが、in-app の合成タッチは注入される前提で作られていない
+// 以前はプロファイルの inapp-boost モードに追従していたが、in-app の合成タッチは注入される前提で作られていない
 // アプリ(Apple マップの経路カード等)で効かないまま ok を返し、別アプリ・システムアラートの扱いでもブリッジの違いを
-// 意識させた。ここが静かに inapp モードへ戻ると、その形が再び起きる。
+// 意識させた。ここが静かに inapp-boost モードへ戻ると、その形が再び起きる。
 //
 // **実ブリッジに触らない**: iosDriver / ExploreDriverResolver は XCUIBridgeResolver でブリッジを探し、無ければ
-// 起動まで試みる(ユニットテストから手元のデバイスを動かしうる)。組み立てに inapp モードの構成を作る行が無いことを
+// 起動まで試みる(ユニットテストから手元のデバイスを動かしうる)。組み立てに inapp-boost モードの構成を作る行が無いことを
 // ソースで確かめ、判定は純粋関数で確かめる。
 
 import XCTest
@@ -29,18 +29,18 @@ final class MCPBridgeFollowingTests: XCTestCase {
             .joined(separator: "\n")
     }
 
-    /// **MCP の iOS の組み立てに inapp モードの構成を作る行が無い**(profile 経路の iosDriver と、直接ポート経路の
+    /// **MCP の iOS の組み立てに inapp-boost モードの構成を作る行が無い**(profile 経路の iosDriver と、直接ポート経路の
     /// ExploreDriverResolver の両方)。変異: どちらかに InAppDriver / ハイブリッド構成の合成を戻すと落ちる
     func testNoInappModeCompositionForMCP() throws {
         for path in ["Sources/fleetest-mcp/MCPServer+Driver.swift", "Sources/FTBridgeClient/ExploreDriverResolver.swift"] {
             let source = try code(path)
             for forbidden in ["InAppDriver(", "HybridFallbackDriver(", "HybridDriverComposition."] {
-                XCTAssertFalse(source.contains(forbidden), "\(path) が \(forbidden) で inapp モードの構成を組んでいる")
+                XCTAssertFalse(source.contains(forbidden), "\(path) が \(forbidden) で inapp-boost モードの構成を組んでいる")
             }
         }
     }
 
-    /// **profile 経路は XCUITest で供給する**(プロファイルが inapp モードでも、使わない注入付きの起動を走らせない)
+    /// **profile 経路は XCUITest で供給する**(プロファイルが inapp-boost モードでも、使わない注入付きの起動を走らせない)
     func testProfileProvisioningForcesTheXCUITestMode() throws {
         let source = try code("Sources/fleetest-mcp/MCPServer+Dispatch.swift")
         XCTAssertTrue(source.contains("spec.mode = \"xcuitest\""), "profile 経路が XCUITest で供給していない")

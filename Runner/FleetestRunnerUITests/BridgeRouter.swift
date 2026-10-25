@@ -778,7 +778,7 @@ final class BridgeRouter {
             return .json(OKResponse(note: QuiescenceWait.takeCapNote(), hitAreaMiss: moved))
         }
         // 非公開 API が無い Xcode では下の XCUICoordinate へ縮退する。
-        // **セッションが SpringBoard のタップは直接合成に乗せない** —— 相手がシステム UI そのもの(inapp モードの
+        // **セッションが SpringBoard のタップは直接合成に乗せない** —— 相手がシステム UI そのもの(inapp-boost モードの
         // SystemUIDriver が `/session springboard` で撃つアラートのボタン = iosAlertHandler・tap("許可しない"))なので、
         // 送る口の門(アラートが前面なら一律 422)に断られて押せない。下の `coordinate.tap()` は押せる
         if CoordinatePinch.isAvailable, sessionBundleID != "com.apple.springboard" {
@@ -811,7 +811,7 @@ final class BridgeRouter {
     /// アクションを駆動する唯一の経路。fleetest はキーボード要素を snapshot から除外しているため
     /// 実ソフトキー tap はできない)。
     ///
-    /// inapp モード(ios-inapp)では in-app 側が合成タッチでタップ・入力してフォーカスを立てているため、
+    /// inapp-boost モード(ios-inapp-boost)では in-app 側が合成タッチでタップ・入力してフォーカスを立てているため、
     /// 焦点の有無を確かめてから **app 全体へ** typeText する(/type の末尾改行と同じ形)。
     /// 焦点の要素へ向けた typeText は、確かめた後に焦点が動く・背面化すると要素スコープの XCUI 呼び出しが
     /// 失敗してランナーを落とし得る(確かめてから撃つまでの窓)。キーボードの入力先は最前のレスポンダなので app で届く。

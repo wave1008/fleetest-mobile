@@ -222,7 +222,7 @@ extension MCPServer {
             let iosApp = resolved.apps["ios"]
             // provision の進捗クロージャは @escaping のため inout の prologue を直接キャプチャできない
             var provisionLog: [String] = []
-            // **MCP の iOS は常に XCUITest**(ユーザー決定)。プロファイルが inapp モードでも XCUITest で供給する
+            // **MCP の iOS は常に XCUITest**(ユーザー決定)。プロファイルが inapp-boost モードでも XCUITest で供給する
             // (in-app で供給すると、使わない注入付きの起動し直しが走る)
             var spec = device.spec
             spec.mode = "xcuitest"

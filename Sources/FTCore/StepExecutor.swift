@@ -273,15 +273,15 @@ public final class StepExecutor {
     /// 解決を試す(アプリ上に載ったシステム UI=別プロセスのダイアログ等を XCUITest で拾う)。
     /// 解決に使った driver でそのまま act するので ref 名前空間の混同はない。
     public let fallbackDriver: AppDriver?
-    /// 主ドライバの絵にキーボード・システムアラートが写らない(inapp モードの in-app ブリッジ)。画像判定の絵の撮り分け
-    /// (`JudgmentCapture` / `judgmentScreenshot`)に使う。立てるのは ScenarioRunnerMain の inapp モードだけ
+    /// 主ドライバの絵にキーボード・システムアラートが写らない(inapp-boost モードの in-app ブリッジ)。画像判定の絵の撮り分け
+    /// (`JudgmentCapture` / `judgmentScreenshot`)に使う。立てるのは ScenarioRunnerMain の inapp-boost モードだけ
     /// (xcuitest 単独の fallbackDriver は主と同じランナー = 同じ絵なので立てない)
     public let primaryCaptureOmitsSystemUI: Bool
     /// このフェーズで SpringBoard に聞いた「アラートが前面にあるか」。nil = まだ聞いていない
     /// (`armUnregisteredSystemAlertProbe` が戻す)。画像判定の絵を XCUITest で撮るかを決める
     var judgmentAlertCovering: Bool?
     /// システム許可アラートの登録台帳(DSL の `iosAlertHandler` が登録する)。
-    /// 空 = 監視しない。**fallbackDriver がある(inapp モード)ときだけ効く**。
+    /// 空 = 監視しない。**fallbackDriver がある(inapp-boost モード)ときだけ効く**。
     /// 登録の形・発火で外れる規則は `SystemAlertRule` / `SystemAlertWatchlist` の doc
     public var systemAlertWatchlist = SystemAlertWatchlist()
     /// 現在のシナリオが動かしているアプリの表示名(`FTDriveCore.appDisplayName` から同期)。
@@ -398,7 +398,7 @@ public final class StepExecutor {
             + " as a scenario failure"
     }
 
-    /// inapp モード用: type アクションを XCUITest(アプリ attach)で実行する代替ドライバ。inapp が
+    /// inapp-boost モード用: type アクションを XCUITest(アプリ attach)で実行する代替ドライバ。inapp が
     /// UIKit 非依存アプリ(Compose 等)で type 不能(409)なときの経路。fallbackDriver(springboard
     /// 参照・システム UI 用)とは別物。
     public let typeDriver: AppDriver?

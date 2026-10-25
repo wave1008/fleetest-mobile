@@ -45,7 +45,7 @@ private final class OpenURLStatusStubServer {
         self.serverFD = fd
 
         let body = """
-        {"ready":true,"device":"no-such-simulator","osVersion":"iOS 27.0","mode":"inapp"}
+        {"ready":true,"device":"no-such-simulator","osVersion":"iOS 27.0"}
         """
         Thread.detachNewThread { [fd] in
             while true {

@@ -17,8 +17,8 @@ export const webviewMonitorBStrings = {
     en: "No run profiles. Create them with /fleetest-profiles, or add one with [+].",
   },
   "wvMonitor2.runProfile.iosModeUnknown": {
-    ja: "{value}(不明な値。inapp か xcuitest を選ぶまで run はエラーになります)",
-    en: "{value} (unknown value: runs fail until you pick inapp or xcuitest)",
+    ja: "{value}(不明な値。inapp-boost か xcuitest を選ぶまで run はエラーになります)",
+    en: "{value} (unknown value: runs fail until you pick inapp-boost or xcuitest)",
   },
   "wvMonitor2.runProfile.loadFailed": {
     ja: "実行プロファイルを読み込めませんでした。",

@@ -120,7 +120,7 @@ final class WaitForSettleWireTests: XCTestCase {
 
     // MARK: - 包むドライバの経路
 
-    /// inapp モード: in-app(primary)を試さず最初から XCUITest 側(fallback)へ。primary に本物のクライアントを
+    /// inapp-boost モード: in-app(primary)を試さず最初から XCUITest 側(fallback)へ。primary に本物のクライアントを
     /// 置くので、primary を先に試す実装なら primary のスタブに届いてしまう。attach 側は ensureAttached を挟まない
     func testHybridFallbackSendsStraightToTheXCUITestSide() async throws {
         let primaryStub = try RecordingStubServer(body: Self.settled)

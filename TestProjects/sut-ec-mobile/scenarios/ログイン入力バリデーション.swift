@@ -1,6 +1,6 @@
 // ログイン入力バリデーション.swift
 // testbase TC-130/131/132(SC-130/131/132): ログインの空欄・空白入力は失敗しエラー表示(isBlank 判定)。
-// type を伴う。iOS の inapp モード(all/ios プロファイル)は Compose 自動判定で type だけ XCUITest ブリッジに
+// type を伴う。iOS の inapp-boost モード(all/ios プロファイル)は Compose 自動判定で type だけ XCUITest ブリッジに
 // 切り替わるためそのまま通る(2026-07-20〜)。
 // in-app ブリッジ単独の構成にだけは載せない(type が 409)。
 // Android は type 可(ACTION_SET_TEXT・IME 不要)。

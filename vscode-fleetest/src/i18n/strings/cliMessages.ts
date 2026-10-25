@@ -20,8 +20,8 @@ export const cliMessagesStrings = {
     ja: "空きポートがありません (走査 {lower}-{upper})。ブリッジ用のポート範囲がすべて使われています (1台のデバイスは in-app と xcuitest の2つを持てます)。`fleetest bridge status` で一覧、`fleetest doctor` でブリッジの無い残骸を確認でき、`fleetest bridge down --port <n>` で1つ空けられます",
   },
   "cliMsg.provision.inAppNeedsBundleID": {
-    en: "starting the in-app bridge requires the app bundleID. Set ios.app in the apps profile (paths that do not pass a bundleID, such as device/live, do not support inapp mode)",
-    ja: "in-app ブリッジを起動するにはアプリの bundleID が必要です。アプリプロファイルに ios.app を設定してください (device/live のように bundleID を渡さない経路は inapp モードに対応していません)",
+    en: "starting the in-app bridge requires the app bundleID. Set ios.app in the apps profile (paths that do not pass a bundleID, such as device/live, do not support inapp-boost mode)",
+    ja: "in-app ブリッジを起動するにはアプリの bundleID が必要です。アプリプロファイルに ios.app を設定してください (device/live のように bundleID を渡さない経路は inapp-boost モードに対応していません)",
   },
   "cliMsg.provision.appNotInstalled": {
     en: "{bundleID} is not installed, so this device drops out (the in-app bridge requires it up front). Install it with `xcrun simctl install {udid} <app>`, or set appPath + autoInstall in the apps profile",

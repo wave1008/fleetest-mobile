@@ -154,6 +154,6 @@
   ],
   "defaultTimeout": 8,
   "heal": true,
-  "iosMode": "inapp",
+  "iosMode": "inapp-boost",
   "wipeDataOnBloat": true
 }

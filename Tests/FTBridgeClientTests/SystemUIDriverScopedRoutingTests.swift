@@ -193,7 +193,7 @@ final class SystemUIDriverScopedRoutingTests: XCTestCase {
         XCTAssertFalse(stub.received("POST /clear"))
     }
 
-    /// **inapp モード(ブリッジを共有していない)は従来どおり**: セッションを springboard へ移し、
+    /// **inapp-boost モード(ブリッジを共有していない)は従来どおり**: セッションを springboard へ移し、
     /// ref もジェスチャもアプリ側のルートで撃つ。scoped の判定を広げていないことの対照
     func testInappModeKeepsTheLegacySessionPath() async throws {
         let stub = try RoutingStubServer()

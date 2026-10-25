@@ -535,8 +535,8 @@ final class FTInAppBridge {
             // 下の topmostHitView はキーボードの窓を拾えず、下に隠れた要素を activate していた
             // (実測: キーボードの下へ押し上げられた #tab_home の枠内を撃つと遷移した)。
             // 枠は通知由来の keyboardFrameIfVisible(TextEffects 窓の frame は全画面のまま居残るので使わない)。
-            // **501(このブリッジにはできない)で返す**: 人の指はキーを押せるので、inapp モードではホストが XCUITest で撃つ
-            // (`StepExecutor` の `isBridgeIncapable`)。422 だと inapp モードでも失敗した。画面の外は人も押せないので 422 のまま
+            // **501(このブリッジにはできない)で返す**: 人の指はキーを押せるので、inapp-boost モードではホストが XCUITest で撃つ
+            // (`StepExecutor` の `isBridgeIncapable`)。422 だと inapp-boost モードでも失敗した。画面の外は人も押せないので 422 のまま
             if let keyboard = Self.keyboardFrameIfVisible(), keyboard.contains(p) {
                 throw InAppError(501, "the point (\(Int(p.x)), \(Int(p.y))) is on the software keyboard"
                     + " (\(Int(keyboard.minX)),\(Int(keyboard.minY)) \(Int(keyboard.width))x\(Int(keyboard.height)))"
@@ -624,7 +624,7 @@ final class FTInAppBridge {
             // FTSynthTap は成否を返さない。整定後に絵が1画素も変わらなかったことだけを事実として注記に足す
             // (throw はしない: 見た目を変えないタップ = 正常もあるので、誤った赤で正常系を壊す方が害が大きい)。
             // 反応しない場合は accessibilityIdentifier(testTag)を付けるか xcuitest モードを検討
-            // (inapp モードの XCUITest ブリッジへの回し先は springboard 参照でアプリ要素には効かない)。
+            // (inapp-boost モードの XCUITest ブリッジへの回し先は springboard 参照でアプリ要素には効かない)。
             note = "activate did not fire -> synthetic touch (if the element does not respond,"
                 + " consider adding a testTag or iosMode: \"xcuitest\")"
             let before: Int
@@ -725,7 +725,7 @@ final class FTInAppBridge {
             if AppUIFramework(rawValue: self.uiFramework)?.rejectsSyntheticTap(nodeIsView: node is UIView) == true {
                 thrown = InAppError(501, "activate did not fire on this SwiftUI element and a synthetic touch"
                     + " would be silently ignored (UIGestureRecognizer does not accept synthetic touches)."
-                    + " inapp mode hands it to the XCUITest bridge")
+                    + " inapp-boost mode hands it to the XCUITest bridge")
                 sem.signal()
                 return
             }
@@ -1009,8 +1009,8 @@ final class FTInAppBridge {
             }
         }
         guard inserted else {
-            // inapp モードの XCUITest ブリッジへの回し先(SystemUIDriver)は springboard 参照のシステム UI 専用で
-            // アプリの入力欄を解決できない(2026-07-20 実証)。ここで inapp モードの回し先を案内しないこと。
+            // inapp-boost モードの XCUITest ブリッジへの回し先(SystemUIDriver)は springboard 参照のシステム UI 専用で
+            // アプリの入力欄を解決できない(2026-07-20 実証)。ここで inapp-boost モードの回し先を案内しないこと。
             throw InAppError(409, "no focused input field — tap the target field first."
                 + " If it still fails on a focused field, the input is not UIKit-backed"
                 + " (Compose Multiplatform / Flutter) and the in-app bridge cannot attach a"
@@ -1073,7 +1073,7 @@ final class FTInAppBridge {
             // (Compose = insertText("\n") / UITextField = Return の再現 / Flutter = engine への
             // アクション配送)。ここへ来るのはフォーカスが無いか、Flutter の私有 API が
             // 版差で欠けた場合。xcuitest 経路は in-app が立てたフォーカスに届かないため、
-            // inapp モードでは救済されない(xcuitest モードを案内する)。
+            // inapp-boost モードでは救済されない(xcuitest モードを案内する)。
             // **モード切替を最初に勧めない**(2026-08-08 の監査): 実際に多いのは
             // 「フォーカスが無いだけ」で、それはどのブリッジでも Enter が意味を持たない ——
             // 先に「欄を tap/type しろ」を言い、切替は「フォーカス済みでも失敗する」場合に限る
@@ -1140,7 +1140,7 @@ final class FTInAppBridge {
                 guard let region = path.region else {
                     throw InAppError(501, "the in-app bridge cannot confine a scroll to a region on"
                         + " \(uiFramework) without the region's frame (self-rendered: neither hitTest nor"
-                        + " AX can narrow the area from two points). inapp mode hands it to the XCUITest bridge")
+                        + " AX can narrow the area from two points). inapp-boost mode hands it to the XCUITest bridge")
                 }
                 var outcome = RegionScroll.noMatch
                 try performSettlingIfMoved { window -> Bool in
@@ -1160,7 +1160,7 @@ final class FTInAppBridge {
                 case .noMatch:
                     throw InAppError(501, "no scrollable element on this screen has the frame of the"
                         + " requested region on \(uiFramework) (the in-app bridge only scrolls a region"
-                        + " that is itself a scroll container). inapp mode hands it to the XCUITest bridge")
+                        + " that is itself a scroll container). inapp-boost mode hands it to the XCUITest bridge")
                 }
             }
             var scrolled = false
@@ -1184,7 +1184,7 @@ final class FTInAppBridge {
                 // 不在等の一時的競合と同じコードのため、フォールバック判定に使うと取り違える。
                 throw InAppError(501, "nothing on this screen scrolls via the in-app bridge"
                     + " (no element accepts the UIAccessibility scroll action, and synthetic"
-                    + " drags are not accepted). inapp mode hands it to the XCUITest bridge")
+                    + " drags are not accepted). inapp-boost mode hands it to the XCUITest bridge")
             }
             return ok()
         }
@@ -1193,7 +1193,7 @@ final class FTInAppBridge {
             // 座標の決まったドラッグは handleDrag が受けるが、方向だけの swipe の撃ち方はここでは変えていない)
             throw InAppError(501, "gesture swipes do not work via the in-app bridge on \(uiFramework)"
                 + " (self-rendered without UIScrollView, and synthetic drags are not accepted)."
-                + " inapp mode hands it to the XCUITest bridge")
+                + " inapp-boost mode hands it to the XCUITest bridge")
         }
         try performSettlingIfMoved { window -> Bool in
             // UIKit/SwiftUI のスクロールは合成タッチでは駆動できない(ジェスチャ認識器が受理しない)ため、
@@ -1212,7 +1212,7 @@ final class FTInAppBridge {
             guard !scrollViews.isEmpty else {
                 throw InAppError(501, "no scroll view on this screen can be driven by the in-app bridge"
                     + " (synthetic drags are not accepted by gesture recognizers)."
-                    + " inapp mode hands it to the XCUITest bridge")
+                    + " inapp-boost mode hands it to the XCUITest bridge")
             }
             // **指の下が UIPageViewController のスクロールビューなら動かさず XCUITest へ回す**(余地の判定より先):
             // 中の _UIQueuingScrollView は contentOffset を直に書いてもページが切り替わらず、余地の計算も
@@ -1225,7 +1225,7 @@ final class FTInAppBridge {
             }) {
                 throw InAppError(501, "the scroll view under the finger belongs to a UIPageViewController, which"
                     + " the in-app bridge cannot page (setting contentOffset does not change the page)."
-                    + " inapp mode hands it to the XCUITest bridge")
+                    + " inapp-boost mode hands it to the XCUITest bridge")
             }
             // 余地なし = 端。no-op で 200 を返し、**動かしていないので整定も待たない**。
             // **端送りならその事実を返す**(ホストが署名の2回不変を待たずに切り上げられる)
@@ -1541,7 +1541,7 @@ final class FTInAppBridge {
         guard ["compose", "flutter"].contains(uiFramework) else {
             throw InAppError(501, "\(action) does not work via the in-app bridge on \(uiFramework)"
                 + " (UIGestureRecognizer does not accept synthetic touches)."
-                + " inapp mode hands it to the XCUITest bridge")
+                + " inapp-boost mode hands it to the XCUITest bridge")
         }
     }
 
@@ -1669,10 +1669,10 @@ final class FTInAppBridge {
     private func handleRotate(_ body: Data) throws -> InAppHTTPServer.Response {
         let req = try decode(RotateRequest.self, body)
         // iPad はアプリから自分の向きを変えられない(requestGeometryUpdate が効かず portrait のまま。
-        // iPad Pro 11 M5・Air 11 M4 / iOS 27.2 で実測)。501 = inapp モードは XCUITest ブリッジ(端末を回す)へ回す
+        // iPad Pro 11 M5・Air 11 M4 / iOS 27.2 で実測)。501 = inapp-boost モードは XCUITest ブリッジ(端末を回す)へ回す
         if mainSync({ UIDevice.current.userInterfaceIdiom == .pad }) {
             throw InAppError(501, "rotate does not work via the in-app bridge on iPad"
-                + " (the app cannot rotate its own scene). inapp mode hands it to the XCUITest bridge")
+                + " (the app cannot rotate its own scene). inapp-boost mode hands it to the XCUITest bridge")
         }
         let mask: UIInterfaceOrientationMask
         switch req.orientation {
@@ -1701,7 +1701,7 @@ final class FTInAppBridge {
     private func handlePress(_ body: Data) throws -> InAppHTTPServer.Response {
         throw InAppError(501, "press (long-press) does not work via the in-app bridge"
             + " (gesture recognizers do not accept a held synthetic touch)."
-            + " inapp mode hands it to the XCUITest bridge")
+            + " inapp-boost mode hands it to the XCUITest bridge")
     }
 
     private func handleScreenshot() throws -> InAppHTTPServer.Response {

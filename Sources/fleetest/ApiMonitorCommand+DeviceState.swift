@@ -508,7 +508,7 @@ extension ApiMonitorCommand {
                                       wired: sim.wired)
         }
         // /status には UDID が無いため、ブリッジの帰属はデバイス名でしか判定できない。
-        // inapp モードは同一シミュレータに inapp+xcuitest の2ブリッジが並ぶため、複数一致でも
+        // inapp-boost モードは同一シミュレータに inapp+xcuitest の2ブリッジが並ぶため、複数一致でも
         // 同名の起動中シミュレータが1台なら全ブリッジがそのシミュレータ帰属と確定できる。
         // その場合は全画面スクショが取れる xcuitest を優先する(in-app はアプリ外を撮れず、
         // アプリ終了で消える)。同名の起動中シミュレータが複数のときは特定不能 = connected にしない

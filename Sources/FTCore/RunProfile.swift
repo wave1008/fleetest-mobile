@@ -127,7 +127,7 @@ public struct DeviceSpec: Codable, Sendable, Hashable {
     public var udid: String?
     /// iOS: ブリッジポートの固定(省略時は自動採番)
     public var port: UInt16?
-    /// iOS: モード("inapp" / "xcuitest" = `IOSMode`)。省略時は実行プロファイルの iosMode
+    /// iOS: モード("inapp-boost" / "xcuitest" = `IOSMode`)。省略時は実行プロファイルの iosMode
     public var mode: String?
     /// Android: AVD(ID または表示名。起動中エミュレータとの照合で adb シリアルに解決)
     public var avd: String?
@@ -389,7 +389,7 @@ public struct RunProfileDocument: Codable, Sendable, Equatable {
     /// シナリオ単位の壁時計タイムアウト秒(ホスト側 watchdog。子には渡さない。省略時 600 = `ScenarioHost.defaultScenarioTimeout`)。
     /// defaultTimeout(子内部の検証待ち)とは別物
     public var scenarioTimeout: Int?
-    /// iOS のモード("inapp" / "xcuitest" = `IOSMode`。省略時 "inapp")。devices[] で mode を明示した
+    /// iOS のモード("inapp-boost" / "xcuitest" = `IOSMode`。省略時 "inapp-boost")。devices[] で mode を明示した
     /// デバイスはそちらが優先(resolve 参照)。Android には影響しない。
     public var iosMode: String?
     /// 実行開始時に Android AVD の肥大化(wipe 対象ファイル合計サイズ)を検査し超過分を
@@ -419,7 +419,7 @@ public struct RunProfileDocument: Codable, Sendable, Equatable {
     /// attach したままの XCUITest セッションは放置後の座標イベントを 200 のまま届け損なう
     /// (実測 ~13% → 接続確認で 0/50。A/B は docs/verification/resolved.md「interop WebView」)。false で
     /// FT_PRE_ACTION_PING=0 を注入し接続確認を止める(WebViewDelegatingDriver が受ける)。
-    /// 効くのは inapp モードの domInterop 経路だけ(xcuitest モードには元から不要)
+    /// 効くのは inapp-boost モードの domInterop 経路だけ(xcuitest モードには元から不要)
     public var iosPreActionPing: Bool?
     /// **容器の推測に依存する補正**を行うか(既定 true)。false にすると見切れ判定・掴み直し・
     /// 救済ドラッグ・見えている部分を撃つ座標補正・壊れた座標の候補除外が止まり、
@@ -1157,7 +1157,7 @@ public enum ProfileError: Error, LocalizedError {
     case invalidIOSMode(run: String, device: String?, value: String)
     /// kind=physical なのに同定に必要な識別子(iOS=udid / Android=serial)が無い
     case physicalDeviceMissingIdentifier(name: String, platform: String, run: String)
-    /// kind=physical に inapp モードが指定された(実機は注入不可)
+    /// kind=physical に inapp-boost モードが指定された(実機は注入不可)
     /// アプリプロファイルの platform が対象外にした結果、走らせるデバイスが 0 台
     case noDevicesForAppPlatform(run: String, app: String, scope: AppPlatformScope, ignored: Int)
     /// responseMeasurement なのに有効なデバイスが 1 台でない
@@ -1203,7 +1203,7 @@ public enum ProfileError: Error, LocalizedError {
             return "locale in run profile \(run) must look like ja_JP"
         case .invalidIOSMode(let run, let device, let value):
             let key = device.map { "mode of device \"\($0)\"" } ?? "iosMode"
-            return "\(key) in run profile \(run) is \"\(value)\" — use \"inapp\" or \"xcuitest\""
+            return "\(key) in run profile \(run) is \"\(value)\" — use \"inapp-boost\" or \"xcuitest\""
         case .physicalDeviceMissingIdentifier(let name, let platform, let run):
             let field = platform == "ios" ? "udid" : "serial"
             let how = platform == "ios"
@@ -1473,12 +1473,12 @@ public enum ProfileResolver {
             try ResponseMeasurementPolicy.validateRepeatScope(runDoc, run: runName)
         }
 
-        // 4. iOS のモード: 実行プロファイルの iosMode(既定 inapp。レスポンス計測の run は xcuitest = 計測は XCUITest ランナーにしか無い)。
+        // 4. iOS のモード: 実行プロファイルの iosMode(既定 inapp-boost。レスポンス計測の run は xcuitest = 計測は XCUITest ランナーにしか無い)。
         // デバイスに mode を明示していればそちらが優先(上書きしない)
         if let value = runDoc.iosMode, !IOSMode.all.contains(value) {
             throw ProfileError.invalidIOSMode(run: runName, device: nil, value: value)
         }
-        let iosMode = runDoc.iosMode ?? (runDoc.responseMeasurement == true ? IOSMode.xcuitest : IOSMode.inapp)
+        let iosMode = runDoc.iosMode ?? (runDoc.responseMeasurement == true ? IOSMode.xcuitest : IOSMode.inappBoost)
         var devices: [ResolvedDevice] = []
         for entry in enabledEntries {
             // 実体の無い登録は走る前に言う(iOS は既定名へ落ちて別のデバイスで黙って走る)。
@@ -1496,7 +1496,7 @@ public enum ProfileResolver {
                 throw ProfileError.invalidIOSMode(run: runName, device: entry.name, value: value)
             }
             // 実機 iOS も同じ解決(明示 > iosMode の既定)。
-            // 実機の inapp モードは、アプリが開発署名でなければ供給が xcuitest モードへ黙って縮退する(BridgeProvisioner)
+            // 実機の inapp-boost モードは、アプリが開発署名でなければ供給が xcuitest モードへ黙って縮退する(BridgeProvisioner)
             if device.platform == "ios", device.spec.mode == nil {
                 var spec = device.spec
                 spec.mode = iosMode
@@ -1681,7 +1681,7 @@ public enum ProfileResolver {
             throw ProfileError.physicalDeviceMissingIdentifier(
                 name: device.name, platform: device.platform, run: run)
         }
-        // 実機の inapp モードは、アプリが開発署名でなければ供給が xcuitest モードへ黙って縮退する(ユーザー決定)。
+        // 実機の inapp-boost モードは、アプリが開発署名でなければ供給が xcuitest モードへ黙って縮退する(ユーザー決定)。
         // ここでは mode を拒否しない —— 縮退は供給時に注入可否を実機のアプリから判定する(BridgeProvisioner)
     }
 
@@ -1803,7 +1803,7 @@ public enum ProfileResolver {
         if (identifier?.trimmingCharacters(in: .whitespaces) ?? "").isEmpty {
             errors.append("device \"\(spec.name)\" is kind=physical but has no \"\(field)\"")
         }
-        // 実機の inapp モードはエディタでは許す(開発署名でなければ供給が xcuitest モードへ縮退する。BridgeProvisioner)
+        // 実機の inapp-boost モードはエディタでは許す(開発署名でなければ供給が xcuitest モードへ縮退する。BridgeProvisioner)
         return errors
     }
 

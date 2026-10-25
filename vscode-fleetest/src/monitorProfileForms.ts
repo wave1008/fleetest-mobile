@@ -53,7 +53,7 @@ export function buildRunProfileTemplate(appNames: readonly string[]): string {
   template.ocrTextVisibilityCheck = true;
   template.preferCheckStateClassifier = true;
   template.screenLooksLike = true;
-  // iosMode は書かない(未指定 = inapp。レスポンス計測の run では解決側が xcuitest に倒す)
+  // iosMode は書かない(未指定 = inapp-boost。レスポンス計測の run では解決側が xcuitest に倒す)
   template.updateWebView = true;   // 既定 ON(WebView の版差でシナリオが端末ごとに落ちるため)
   template.wipeDataOnBloat = true;
   // reportDir は書かない(未指定 = 既定の reports。フォームは placeholder で既定を見せる)
@@ -161,7 +161,7 @@ export interface RunProfileFormFields {
    * a11y より優先するか(**既定 true**。false なら a11y が状態を報告しない要素にだけ使う)。
    * Swift 側は RunProfileDocument.preferCheckStateClassifier */
   readonly preferCheckStateClassifier: boolean;
-  /** iOS のモード。省略 = "inapp"(in-app ブリッジ + XCUITest ブリッジ)。"xcuitest" = XCUITest ブリッジだけ */
+  /** iOS のモード。省略 = "inapp-boost"(XCUITest ブリッジ + in-app ブリッジ)。"xcuitest" = XCUITest ブリッジだけ */
   readonly iosMode: string;
   /// **既定 true**。domInterop の委譲イベント直前にランナーへ1回問い合わせてから撃つ
   /// (attach セッションの静かなイベント欠落の防御。Swift 側は iosPreActionPing → FT_PRE_ACTION_PING)
@@ -224,8 +224,8 @@ export function parseRunProfileForForm(profileObject: unknown): RunProfileFormFi
     typeof source.preferCheckStateClassifier === "boolean" ? source.preferCheckStateClassifier : true;
   const screenLooksLike = typeof source.screenLooksLike === "boolean" ? source.screenLooksLike : true;
   const containerInference = typeof source.containerInference === "boolean" ? source.containerInference : true;
-  // inapp / xcuitest 以外の文字列もそのまま持つ(黙って "inapp" へ書き換えない。CLI が値を名指しで断る)
-  const iosMode = typeof source.iosMode === "string" && source.iosMode.length > 0 ? source.iosMode : "inapp";
+  // inapp-boost / xcuitest 以外の文字列もそのまま持つ(黙って "inapp-boost" へ書き換えない。CLI が値を名指しで断る)
+  const iosMode = typeof source.iosMode === "string" && source.iosMode.length > 0 ? source.iosMode : "inapp-boost";
   const iosPreActionPing = typeof source.iosPreActionPing === "boolean" ? source.iosPreActionPing : true;
   const homeOnStart = typeof source.homeOnStart === "boolean" ? source.homeOnStart : true;
   const playProtectBypass = typeof source.playProtectBypass === "boolean" ? source.playProtectBypass : true;
@@ -362,8 +362,8 @@ export function updateRunProfileInObject(
   result.containerInference = fields.containerInference;
   result.ocrTextVisibilityCheck = fields.ocrTextVisibilityCheck;  // 同上(既定 true 側。containerInference と同じ理由で常に書く)
   result.preferCheckStateClassifier = fields.preferCheckStateClassifier;  // 同上(既定 true 側)
-  // inapp は書かない(未指定 = inapp)。明示すると、レスポンス計測の run で解決側の既定(xcuitest)が効かず断られる
-  if (fields.iosMode === "inapp") {
+  // inapp-boost は書かない(未指定 = inapp-boost)。明示すると、レスポンス計測の run で解決側の既定(xcuitest)が効かず断られる
+  if (fields.iosMode === "inapp-boost") {
     delete result.iosMode;
   } else {
     result.iosMode = fields.iosMode;

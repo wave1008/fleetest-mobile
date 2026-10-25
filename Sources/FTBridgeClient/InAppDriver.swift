@@ -229,7 +229,7 @@ public final class InAppDriver: AppDriver {
     /// in-app には「対象アプリ全体」を掴む要素ピンチの縮退先が無い(XCUITest の
     /// `XCUIElement.pinch` はプロセス外の合成ジェスチャで、in-app の合成タッチは自プロセス内の
     /// 座標にしか撃てない)ので、**`frame` が無ければ 501 で断る**(指の置き方
-    /// `FTCore.PinchGesture.ios` は領域が要る)。inapp モードでは StepExecutor が XCUITest ブリッジへ回す
+    /// `FTCore.PinchGesture.ios` は領域が要る)。inapp-boost モードでは StepExecutor が XCUITest ブリッジへ回す
     public func pinch(frame: FTRect?, identifier: String?, scale: Double,
                       durationSeconds: Double) async throws {
         guard let frame else {
@@ -251,7 +251,7 @@ public final class InAppDriver: AppDriver {
     public func restoreOrientationIfNeeded() async throws {
         try await withCrashContext { try await client.restoreOrientationIfNeeded() }
     }
-    // in-app では原理的に実行できない操作(自プロセス外・座標ジェスチャ)。inapp モードでは StepExecutor /
+    // in-app では原理的に実行できない操作(自プロセス外・座標ジェスチャ)。inapp-boost モードでは StepExecutor /
     // FTDriveCore が XCUITest ブリッジへ回すのでここへは来ない。XCUITest ブリッジが無いとき(ライブ操作・MCP の縮退)
     // だけがここに到達するため、既定実装の汎用メッセージではなく直し方を示す(501 = このブリッジでは未対応)
     public func home() async throws { throw Self.inappOnly("home") }
@@ -260,7 +260,7 @@ public final class InAppDriver: AppDriver {
     public func openAppSwitcher() async throws { throw Self.inappOnly("appSwitcher") }
     public func drag(fromX: Double, fromY: Double, toX: Double, toY: Double,
                      pressSeconds: Double, durationSeconds: Double) async throws {
-        // 自前描画だけ in-app が受ける(それ以外は 501 → inapp モードは XCUITest ブリッジへ)
+        // 自前描画だけ in-app が受ける(それ以外は 501 → inapp-boost モードは XCUITest ブリッジへ)
         try await withCrashContext {
             try await client.drag(fromX: fromX, fromY: fromY, toX: toX, toY: toY,
                                   pressSeconds: pressSeconds, durationSeconds: durationSeconds)
@@ -361,7 +361,7 @@ public final class InAppDriver: AppDriver {
         case false, nil:
             return detail + " / no recent crash report found"
                 + " (no .ips appeared within 4s — possibly killed by the OS, memory pressure or a voluntary exit. "
-                + "In inapp mode the backgrounded app can be suspended or terminated)"
+                + "In inapp-boost mode the backgrounded app can be suspended or terminated)"
         }
     }
 

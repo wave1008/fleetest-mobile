@@ -1,5 +1,5 @@
 // `launchApp(url:)` の配送前の待ち(LaunchURLReadiness / StepExecutor.awaitInteractiveUI)。
-// witness: E2E-RN ios-inapp の `ディープリンクで意図した画面に遷移すること.S0010` が M1Max で「ホーム」のまま
+// witness: E2E-RN ios-inapp-boost の `ディープリンクで意図した画面に遷移すること.S0010` が M1Max で「ホーム」のまま
 // (JS が listener を登録する前に simctl openurl が届いて捨てられた)。期待値はリテラル。
 
 import XCTest

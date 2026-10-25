@@ -329,14 +329,14 @@ function applyRunProfilePlatformScope() {
 }
 runProfileApp.addEventListener('change', applyRunProfilePlatformScope);
 
-// inapp モードのときだけ配下のサブオプション(iosPreActionPing)を表示する
-// (直前の接続確認は inapp モードの domInterop 経路にしか無い = xcuitest モードでは効果が無いため。
+// inapp-boost モードのときだけ配下のサブオプション(iosPreActionPing)を表示する
+// (直前の接続確認は inapp-boost モードの domInterop 経路にしか無い = xcuitest モードでは効果が無いため。
 //  値そのものはモードに関わらず保持・保存する)。
-// プロファイルに inapp / xcuitest 以外が書かれていたら、その値を選択肢に足して選んだまま見せる
+// プロファイルに inapp-boost / xcuitest 以外が書かれていたら、その値を選択肢に足して選んだまま見せる
 // (選択肢に無い値を select に入れると空になり、保存で黙って別の値に書き換わる)
 function setIosModeSelect(value) {
   for (const option of runProfileIosMode.querySelectorAll('option[data-unknown]')) option.remove();
-  if (value !== 'inapp' && value !== 'xcuitest') {
+  if (value !== 'inapp-boost' && value !== 'xcuitest') {
     const option = document.createElement('option');
     option.value = value;
     option.dataset.unknown = '1';
@@ -347,7 +347,7 @@ function setIosModeSelect(value) {
 }
 
 function updateInappOptionsVisibility() {
-  runProfileInappOptions.style.display = runProfileIosMode.value === 'inapp' ? '' : 'none';
+  runProfileInappOptions.style.display = runProfileIosMode.value === 'inapp-boost' ? '' : 'none';
 }
 runProfileIosMode.addEventListener('change', () => {
   // 選び直したら不明な値の選択肢は消す(自動保存の後、値が画面と同じならフォームは描き直されない)

@@ -167,9 +167,9 @@ final class RunnerAccessibilityHealthTests: XCTestCase {
 
     // MARK: - 1 台のブリッジの実行順(BridgeProvisioner.executionOrder)
 
-    /// inapp モードは plan が in-app → xcuitest の順でも、実行は xcuitest → in-app
+    /// inapp-boost モードは plan が in-app → xcuitest の順でも、実行は xcuitest → in-app
     func testXCUITestRunsBeforeInApp() {
-        XCTAssertEqual(BridgeProvisioner.executionOrder(of: ["inapp", "xcuitest"]), [1, 0])
+        XCTAssertEqual(BridgeProvisioner.executionOrder(of: ["inapp-boost", "xcuitest"]), [1, 0])
         XCTAssertEqual(BridgeProvisioner.executionOrder(of: ["xcuitest", "inapp"]), [0, 1])
     }
 

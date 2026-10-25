@@ -271,7 +271,7 @@ extension StepExecutor {
         //  - 狙いだった Compose の飛び越しには**効かない**。Compose の容器は xcuitest で
         //    `other` として出て `scrollable` を申告できず、そもそも対象に選べない
         //  - in-app では**到達距離が縮んで既定 maxSwipes(8)で届かなくなる**(実測:
-        //    E2E-iOS/ios-inapp の `tap("#row_40")` が失敗)。in-app の 0.85 ページ送りは
+        //    E2E-iOS/ios-inapp-boost の `tap("#row_40")` が失敗)。in-app の 0.85 ページ送りは
         //    ブリッジ既定として維持する、という決定にも反する
         // 領域を絞りたい利用者は `scrollFrame` を書く(そこでは価値が出ている)
         //

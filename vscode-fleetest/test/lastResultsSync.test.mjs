@@ -118,13 +118,13 @@ test("reconfigure: プロジェクト切替後は新プロジェクトの last-r
   });
   try {
     // last-results/<project>/ の直下はプロファイルごとのサブディレクトリ
-    writeResult(root, "ProjA", "ios-inapp", "Login.S0010", "passed");
+    writeResult(root, "ProjA", "ios-inapp-boost", "Login.S0010", "passed");
     await sleep(DEBOUNCE_WAIT_MS);
     assert.equal(applied, 1, "切替前: ProjA への書き込みが反映される(実験系の陽性対照)");
 
     config.project = "ProjB";
     sync.reconfigure();
-    writeResult(root, "ProjB", "ios-inapp", "Login.S0010", "failed");
+    writeResult(root, "ProjB", "ios-inapp-boost", "Login.S0010", "failed");
     await sleep(DEBOUNCE_WAIT_MS);
     assert.equal(applied, 2, "切替後: ProjB への書き込みが反映されない(監視先が旧プロジェクトのまま)");
   } finally {
@@ -148,13 +148,13 @@ test("reconfigure: スナップショットを捨てるので、同じ id・同�
     onResultsApplied: () => { applied += 1; },
   });
   try {
-    writeResult(root, "ProjA", "ios-inapp", "Login.S0010", "passed");
+    writeResult(root, "ProjA", "ios-inapp-boost", "Login.S0010", "passed");
     await sleep(DEBOUNCE_WAIT_MS);
     assert.equal(applied, 1);
 
     config.project = "ProjB";
     sync.reconfigure();
-    writeResult(root, "ProjB", "ios-inapp", "Login.S0010", "passed");
+    writeResult(root, "ProjB", "ios-inapp-boost", "Login.S0010", "passed");
     await sleep(DEBOUNCE_WAIT_MS);
     assert.equal(applied, 2);
   } finally {
@@ -176,7 +176,7 @@ test("dispose 後は書き込みが反映されない(watch と timer が閉じ�
   });
   sync.dispose();
   try {
-    writeResult(root, "ProjA", "ios-inapp", "Login.S0010", "passed");
+    writeResult(root, "ProjA", "ios-inapp-boost", "Login.S0010", "passed");
     await sleep(DEBOUNCE_WAIT_MS);
     assert.equal(applied, 0);
   } finally {

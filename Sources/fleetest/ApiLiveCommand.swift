@@ -260,10 +260,10 @@ struct ApiLiveServe: AsyncParsableCommand {
             // **port の本人確認(udid + ブリッジ)を毎コマンド撃つ**(MN-51.2・MN-51.10 と同型の穴):
             // makeLiveDriver は起動時に1回組むきりで、フリートが run のたびにブリッジを
             // 起動し直すと port が別デバイス、あるいは**同じデバイスの別ブリッジ**へ移り得る ——
-            // inapp モードなら home/appSwitcher/drag/座標 press/gesture/pinch(fallback 経由)が、
+            // inapp-boost モードなら home/appSwitcher/drag/座標 press/gesture/pinch(fallback 経由)が、
             // xcuitest モードならすべての呼び出しが黙って別物(別デバイス、または in-app ⇄ xcuitest で
             // ref 体系・サポート操作が別)へ届く。primaryBridge(composeDriver が決める。
-            // inapp/xcuitest モードは "xcuitest"、in-app ブリッジ単独は "inapp")を期待値にするので、
+            // inapp-boost/xcuitest モードは "xcuitest"、in-app ブリッジ単独は "inapp")を期待値にするので、
             // in-app 単独の構成を xcuitest 期待で誤検知しない。
             // **frame(自動更新)には掛けない**(継続的に飛ぶので絶え間ない probe になる。
             // ライブ操作は人の操作1つに1回なのでコマンドごとの probe は許容できる)。
@@ -353,8 +353,8 @@ struct ApiLiveServe: AsyncParsableCommand {
     ///
     /// in-app が居ない(指定ポートが XCUITest・Android)ときは単独で使う。
     /// 戻り値のポートは以後の自動起動・再起動が同じ宛先を見るために返す。3つ目の戻り値は
-    /// inapp モードのとき in-app が住んでいる own app の bundleID(launchGuard が own app への
-    /// launch/activate を素通しするのに使う。inapp モードでなければ nil)
+    /// inapp-boost モードのとき in-app が住んでいる own app の bundleID(launchGuard が own app への
+    /// launch/activate を素通しするのに使う。inapp-boost モードでなければ nil)
     ///
     /// **resolve が返した宛先は udid で本人確認する**(FTCore.BridgeIdentityCheck。実地 L1:
     /// 既定ポートに別デバイスの生きたブリッジが居るのを見逃し、操作を撃ち・版差を理由に止めて
@@ -379,7 +379,7 @@ struct ApiLiveServe: AsyncParsableCommand {
         let repoRoot = try? RepoRoot.find()
         // **autoStart:false**(= 走査までで止める)。serve は常駐で、拡張は応答が無いと
         // kill→respawn するため、起動時に build-for-testing(分単位)でブロックしてはいけない。
-        // inapp モードは in-app と XCUITest を両方張るので走査だけで必ず見つかる。
+        // inapp-boost モードは in-app と XCUITest を両方張るので走査だけで必ず見つかる。
         // 見つからないのは XCUITest ブリッジが無いときで、そのときは理由を stderr に出して素通しする
         let resolution = await XCUIBridgeResolver.resolve(
             preferred: driverOptions.resolvedPort, repoRoot: repoRoot, autoStart: false,
@@ -520,9 +520,9 @@ struct ApiLiveServe: AsyncParsableCommand {
     }
 
     /// resolve(または乗り換え後の resolve)の結果から実際に使うドライバを組み立てる。
-    /// inapp モードの in-app 側(別ポート)はここで初めて本人確認する——xcuitest 側だけでは検分できない。
+    /// inapp-boost モードの in-app 側(別ポート)はここで初めて本人確認する——xcuitest 側だけでは検分できない。
     /// **4つ目の戻り値**は、以後の毎コマンドの本人確認(run() の drift チェック・MN-51.10)が
-    /// `port` へ probe を撃つときの期待ブリッジ —— inapp/xcuitest モードは `"xcuitest"`、
+    /// `port` へ probe を撃つときの期待ブリッジ —— inapp-boost/xcuitest モードは `"xcuitest"`、
     /// XCUITest が見つからず in-app 単独に落ちたときだけ `"inapp"`(`port` がそのまま
     /// in-app ポートを指すため)。ここを固定にすると in-app 単独の構成を xcuitest 期待で
     /// probe してしまい、毎コマンド誤検知で作り直しを繰り返す
@@ -537,12 +537,12 @@ struct ApiLiveServe: AsyncParsableCommand {
               let repoRoot, let udid else {
             // **in-app 単独の判定は「inApp があり、かつそのポートが resolution.endpoint と同じ」
             // だけ**(makeLiveDriver の isInAppOnly と同じ式)。inApp はあるがポートが違う
-            // (inapp モードになり得たのに repoRoot/udid が無くて諦めた)回は resolution.endpoint が
+            // (inapp-boost モードになり得たのに repoRoot/udid が無くて諦めた)回は resolution.endpoint が
             // xcuitest 側なので、ここで inApp の有無だけで判定すると誤る
             let isInAppOnly = resolution.inApp.map { $0.endpoint.port == resolution.endpoint.port } ?? false
             return (xcui, resolution.endpoint.port, nil, isInAppOnly ? "inapp" : "xcuitest")
         }
-        // inapp モードの in-app 側は別ポート(=別ブリッジ)なので、呼び出し元の確認はこちらを検分していない。
+        // inapp-boost モードの in-app 側は別ポート(=別ブリッジ)なので、呼び出し元の確認はこちらを検分していない。
         // 無応答(.silent)は素通しする —— in-app は背面へ回ると答えないので、ここで断ると
         // 通常の遷移で serve が開けなくなる
         if case .mismatch(let detail) = await Self.portIdentity(
@@ -953,7 +953,7 @@ struct ApiLiveServe: AsyncParsableCommand {
     /// launch/activate の前に確かめる(門は InstalledAppCheck.launchGuard の1箇所。MCP の
     /// ft_launch と同じ判定・文言だけ呼び手ごと)。未インストールのまま
     /// `XCUIApplication.launch()` を撃つとランナーが約60秒でハングして自壊する(実測 L2)。
-    /// own app(inapp モードで in-app が既に繋がっているアプリ)への launch/activate は素通しする ——
+    /// own app(inapp-boost モードで in-app が既に繋がっているアプリ)への launch/activate は素通しする ——
     /// in-app は XCUITest を経由せず、繋がっている時点でインストール済みが確定している
     /// iOS の hideKeyboard はライブ操作では撃たない(ユーザー決定)。iOS にはキーボードだけを閉じるキーが無く、DSL・MCP の
     /// hideKeyboard は「キーボードの上の空きを叩く(DSL はさらに Enter)」= 人が画面を見て自分でできる操作。ブリッジの 501 の

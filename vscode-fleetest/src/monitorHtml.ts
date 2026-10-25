@@ -607,7 +607,7 @@ function renderRunProfileSection(): string {
             <div class="modal-row">
               <label for="run-profile-ios-mode">${t("panels.runProfile.iosModeLabel")}</label>
               <select id="run-profile-ios-mode">
-                <option value="inapp">${t("panels.runProfile.iosModeInapp")}</option>
+                <option value="inapp-boost">${t("panels.runProfile.iosModeInapp")}</option>
                 <option value="xcuitest">${t("panels.runProfile.iosModeXcuitest")}</option>
               </select>
             </div>

@@ -45,13 +45,13 @@ public struct DriverConnection: Sendable, Hashable {
     public let platform: String
     public let port: UInt16?
     public let serial: String?
-    /// iOS のモード(`IOSMode`。"inapp" のときサブプロセスは in-app ブリッジ主 + XCUITest ブリッジの合成を使う。nil = xcuitest)
+    /// iOS のモード(`IOSMode`。"inapp-boost" のときサブプロセスは XCUITest ブリッジに in-app ブリッジを足した合成を使う。nil = xcuitest)
     public let mode: String?
     /// iOS: in-app の simctl 再起動に使うシミュレータ UDID
     public let udid: String?
-    /// iOS: inapp モードで撃てない操作を回す XCUITest ブリッジのポート
+    /// iOS: inapp-boost モードで撃てない操作を回す XCUITest ブリッジのポート
     public let xcuiPort: UInt16?
-    /// iOS: provision 時に in-app ブリッジを注入したアプリの bundleID(inapp モードのみ)。
+    /// iOS: provision 時に in-app ブリッジを注入したアプリの bundleID(inapp-boost モードのみ)。
     /// アプリが suspend され /status プローブが無応答のとき、注入先を特定して inapp/XCUITest の
     /// ルーティングを正しく決めるために使う(サブプロセスの mismatch 判定を参照)。
     public let inappBundleID: String?
@@ -62,7 +62,7 @@ public struct DriverConnection: Sendable, Hashable {
     /// サブプロセスへは --physical で渡る(iOS の FastLaunchDriver 抑止に必要)
     public let physical: Bool
     /// 結果の記録(`ScenarioRunRecord.mode`)に書く実効モード。iOS は mode が nil なら xcuitest
-    /// (`ProfileWorkerFactory.iosConnection` は inapp のときだけ mode を入れる)。Android は nil(モードは無い)
+    /// (`ProfileWorkerFactory.iosConnection` は inapp-boost のときだけ mode を入れる)。Android は nil(モードは無い)
     public var recordedMode: String? {
         platform == "ios" ? (mode ?? "xcuitest") : nil
     }

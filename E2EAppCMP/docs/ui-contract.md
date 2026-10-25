@@ -309,7 +309,7 @@ Android(`BridgeRouter.handleSwipe`)は縦 0.3h↔0.7h・横 0.2w↔0.8w(y=0.5h)�
   ジェスチャ画面と同じ規律(幅 45% 以内・上下の端)に置く
 
 **iOS でモードにより成否が分かれるのは Compose のダブルタップだけ**(2026-09-24 実測。表と機構は
-docs/commands.md)。既定の inapp モードでは増えるが、`ios-xcuitest` プロファイルでは
+docs/commands.md)。既定の inapp-boost モードでは増えるが、`ios-xcuitest` プロファイルでは
 `#txt_double_count` が増えない —— Compose は XCTest の合成タッチをダブルタップとして数えない
 (SUT 側の作りの問題ではないので直そうとしないこと)。E2E のシナリオは**両モードで走る**ため、
 E2E-CMP のこの scene は `android { }` に閉じてある。ピンチ(全 SUT)と Flutter のダブルタップは両モードで動く。

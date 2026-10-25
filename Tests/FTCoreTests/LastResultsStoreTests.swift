@@ -60,10 +60,10 @@ final class LastResultsStoreTests: XCTestCase {
     /// (以前は project 単位の1ファイルだけで、後勝ちの上書きが起きていた)
     func testDifferentProfilesDoNotOverwriteEachOther() throws {
         let project = try makeProject()
-        LastResultsStore.record(project: project, scenarioID: "S.one", passed: false, profile: "ios-inapp")
+        LastResultsStore.record(project: project, scenarioID: "S.one", passed: false, profile: "ios-inapp-boost")
         LastResultsStore.record(project: project, scenarioID: "S.one", passed: true, profile: "android")
-        XCTAssertTrue(LastResultsStore.failedIDs(project: project, profile: "ios-inapp").contains("S.one"),
-                      "ios-inapp の赤が android の緑に上書きされてはいけない")
+        XCTAssertTrue(LastResultsStore.failedIDs(project: project, profile: "ios-inapp-boost").contains("S.one"),
+                      "ios-inapp-boost の赤が android の緑に上書きされてはいけない")
         XCTAssertFalse(LastResultsStore.failedIDs(project: project, profile: "android").contains("S.one"))
     }
 
@@ -72,7 +72,7 @@ final class LastResultsStoreTests: XCTestCase {
         let project = try makeProject()
         LastResultsStore.record(project: project, scenarioID: "S.two", passed: false, profile: nil)
         XCTAssertTrue(LastResultsStore.failedIDs(project: project, profile: nil).contains("S.two"))
-        XCTAssertFalse(LastResultsStore.failedIDs(project: project, profile: "ios-inapp").contains("S.two"))
+        XCTAssertFalse(LastResultsStore.failedIDs(project: project, profile: "ios-inapp-boost").contains("S.two"))
         XCTAssertTrue(LastResultsStore.stateDir(project: project, profile: nil).path
             .hasSuffix("/\(LastResultsStore.noProfileKey)"))
     }

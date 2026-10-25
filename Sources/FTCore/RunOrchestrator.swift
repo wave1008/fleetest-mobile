@@ -861,7 +861,7 @@ public final class RunOrchestrator: Sendable {
     /// (in-app ブリッジのようにホスト側にプロセスが無い形)。BridgeLiveness.decide の材料
     private let runnerProcessAlive: (@Sendable (RunWorker) -> Bool?)?
     /// 失敗後チェックの /status プローブ 1 回分。isDeviceFrozen と同じ理由で注入(BridgeClient は
-    /// FTBridgeClient)。inapp モードは主ポート(in-app)が別アプリのシナリオ中サスペンドされ
+    /// FTBridgeClient)。inapp-boost モードは主ポート(in-app)が別アプリのシナリオ中サスペンドされ
     /// 「TCP 受理・HTTP 無応答」になるため、注入側で xcuitest 側ポートを叩く(DS-8.8)。
     /// 未注入時は worker.driver への素朴なプローブにフォールバック
     private let probeBridge: (@Sendable (RunWorker) async -> BridgeProbeOutcome)?
@@ -1139,7 +1139,7 @@ public final class RunOrchestrator: Sendable {
     }
 
     /// /status 1回分(5s 期限)。refused=ポート LISTEN なし(プロセス死亡)、silent=期限内無応答。
-    /// probeBridge(注入)があればそちら(inapp モードの suspend 回避で xcuitest 側ポートを叩く)。
+    /// probeBridge(注入)があればそちら(inapp-boost モードの suspend 回避で xcuitest 側ポートを叩く)。
     /// 未注入時は worker.driver に対する素朴なプローブ
     private func probeBridgeOnce(_ worker: RunWorker) async -> BridgeProbeOutcome {
         if let probeBridge { return await probeBridge(worker) }

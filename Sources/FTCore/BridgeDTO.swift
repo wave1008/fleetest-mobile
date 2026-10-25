@@ -44,7 +44,7 @@ public enum BridgeAPI {
     /// - ソースの分割・コメントだけの変更は指紋の貼り替えだけでよい(版は据え置き)
     /// - **撤去した版の番号は再利用しない**(37・48 は欠番): その版が稼働中の環境を確実に入れ替えるため
     /// 各版で何を変えたかは `git log -L '/bridgeProtocolVersion =/,+1:Sources/FTCore/BridgeDTO.swift'` で引く
-    public static let bridgeProtocolVersion = 214
+    public static let bridgeProtocolVersion = 215
 
     /// `ErrorResponse.reason` の値: ref が指していた要素が、撃つ時点でもう同じ場所に居ない(古い ref)。
     /// **何も撃たずに断った**ことを保証する(422)。ホストは新しい木から引き直して撃ち直してよい。
@@ -697,7 +697,7 @@ public struct StatusResponse: Codable, Sendable {
     public var device: String
     public var osVersion: String
     public var sessionBundleID: String?
-    /// ブリッジの種類("inapp" / "xcuitest")。inapp モードでは同一デバイス(UDID)に2本のブリッジが
+    /// ブリッジの種類("inapp" / "xcuitest")。inapp-boost モードでは同一デバイス(UDID)に2本のブリッジが
     /// 共存するので、ホストがどちらかを /status で区別するために使う。nil = 不明。
     public var bridge: String?
     /// BridgeAPI.bridgeProtocolVersion。旧ブリッジは返さない → nil 許容(=旧版扱い)。
@@ -1144,7 +1144,7 @@ public struct TypeRequest: Codable {
 /// POST /clear(入力欄のクリア。DSL の clearInput)。3ブリッジ共通。
 /// ref あり = その要素へフォーカスを立ててからクリア(/type の ref 経路と同じ点解決)。
 /// ref なし = フォーカス中の入力欄をクリア。対象が無ければ 409(/type の 409 と同じ扱い)。
-/// **409 でフォールバックできるのは typeDriver を持つ iOS の inapp モードだけ** ——
+/// **409 でフォールバックできるのは typeDriver を持つ iOS の inapp-boost モードだけ** ——
 /// Android は ScenarioRunnerMain が typeDriver を渡さないので、409 はそのまま失敗になる
 public struct ClearRequest: Codable {
     public var ref: Int?
@@ -1363,7 +1363,7 @@ public enum ScrollPointReach {
 }
 
 /// `POST /waitForSettle`(DSL の waitForSettle。XCUITest ランナー v174〜・Android v100〜。**in-app は持たない** = 501。
-/// inapp モードは最初から XCUITest 側へ送る)。ブリッジの中でスクリーンショットを撮り続け、比べる範囲の画素が `quietMs` の間
+/// inapp-boost モードは最初から XCUITest 側へ送る)。ブリッジの中でスクリーンショットを撮り続け、比べる範囲の画素が `quietMs` の間
 /// 1 度も変わらなくなったら返す。**画像はホストへ出さない**(判定はブリッジの中で完結)。上限は最初の撮影から数える
 public struct WaitForSettleRequest: Codable, Sendable, Equatable {
     /// 比べる範囲(snapshot と同じ座標系 = iOS pt / Android px)。nil = 画面全体。

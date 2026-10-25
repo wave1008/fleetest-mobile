@@ -141,7 +141,7 @@ sleep/wake の分岐にしか無く、guest restart で戻った機は run が�
   一斉に force-stop/launch した直後に黒かった5台は、本物が1台で残り4台は HOME を押した瞬間に 15KB → 1.4MB へ戻った
 - **プローブの副作用**: iOS は「別アプリを前面に出す」ため SUT が背面化し、in-app ブリッジが suspend してワーカーが離脱する(フル E2E で10件。うち9件は Flutter iOS)。
   **撃ったら SUT を前面へ戻す**
-- 効果(フルスイート): 997.6s → 585.1s(−41%)・211/214 → 214/214。Flutter/ios-inapp 単体は 387.0s → 98.9s
+- 効果(フルスイート): 997.6s → 585.1s(−41%)・211/214 → 214/214。Flutter/ios-inapp-boost 単体は 387.0s → 98.9s
 
 ## 検知の「誤検知0」は、常に false を返す検出器と区別できない
 
@@ -752,7 +752,7 @@ UIKit/SwiftUI では正しいが、Compose と Flutter は生タッチを自分�
 | XCUITest | ダブルタップ ✅ / ピンチ ✅ | ダブルタップ ❌ / ピンチ ✅ | ダブルタップ ✅ / ピンチ ❌ | 未実測(想定: uikit 経路 = SwiftUI/UIKit と同じ ✅/✅) |
 | in-app | 両方 ❌(合成タッチを受理しない) | 両方 ✅ | 両方 ✅ | 未実測(想定: uikit 経路 = in-app 501 → xcuitest フォールバック) |
 
-- 両者を足すと全マスが埋まるので、inapp モード(既定)は 501 フォールバックで全部通る。MCP の iOS は XCUITest だけ。
+- 両者を足すと全マスが埋まるので、inapp-boost モード(既定)は 501 フォールバックで全部通る。MCP の iOS は XCUITest だけ。
   `HybridFallbackDriver` はライブ操作だけが使う。埋まらないマス(xcuitest 単独・実機)は docs/commands.md に明記
 - **受理しない側で 200 を返さない**(返すと「成功したのに何も起きない」= 最悪の失敗モード)。in-app 側は uiFramework で判定して 501 を返す
 

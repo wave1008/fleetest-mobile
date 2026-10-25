@@ -53,7 +53,7 @@ the start of the gesture until that finger touches down; default 0 — meant for
 It must be a finite value of 0 or more). An invalid spec (no fingers, an off-screen point,
 a non-positive duration, too long a gesture) fails the step without touching the device.
 
-**On iOS this command always runs through XCUITest, even in the default inapp mode.** Use cases: pattern lock,
+**On iOS this command always runs through XCUITest, even in the default inapp-boost mode.** Use cases: pattern lock,
 long-press-then-drag without lifting (e.g. reordering a list), a custom two-finger rotate,
 gestures needing 3+ fingers, drawing or signing. On an older Xcode without this API it cannot be sent and the step fails (unlike pinch, there is no alternative path).
 
@@ -74,7 +74,7 @@ before `holdSeconds` is up, `hold` waits for the release before returning. If th
 takes longer than `holdSeconds`, the finger is already up for the rest of it — this is noted but
 not treated as a failure. Holds cannot be nested (start a second one only after the first one's
 block has finished), and if the target cannot be resolved the block does not run at all. **On iOS
-in the default inapp mode, the press always runs through the XCUITest bridge** (same as
+in the default inapp-boost mode, the press always runs through the XCUITest bridge** (same as
 `tap`'s long press).
 
 ## Maps, image viewers, drawing canvases
@@ -94,17 +94,17 @@ keep in mind:
   element, narrowing the span if it has to, and pinches the whole screen only when no such spot
   exists.
 - **On iOS, only double tap can fail to register, depending on the framework and the mode.**
-  The default inapp mode (Simulator) runs every gesture on every framework. Android has no such
+  The default inapp-boost mode (Simulator) runs every gesture on every framework. Android has no such
   split — every gesture works everywhere:
 
   | iOS | SwiftUI / UIKit | Compose Multiplatform | Flutter | React Native |
   |---|---|---|---|---|
   | `swipeBy` (diagonal included) | ✅ | ✅ | ✅ | — |
-  | `doubleTap` | ✅ | ✅ **inapp only** | ✅ | △ |
+  | `doubleTap` | ✅ | ✅ **inapp-boost only** | ✅ | △ |
   | `pinchOut` / `pinchIn` | ✅ | ✅ | ✅ | ✅ |
   | `gesture` | ✅ | ✅ | ✅ | ✅ |
 
-  - **"inapp only"**: works only in the default inapp mode (Simulator). **With a
+  - **"inapp-boost only"**: works only in the default inapp-boost mode (Simulator). **With a
     profile set to `iosMode: "xcuitest"` (or a physical device whose app is not development-signed, which
     falls back to XCUITest), a Compose app does not recognize the double tap** (XCUITest cannot
     send a double tap Compose registers).
@@ -123,7 +123,7 @@ keep in mind:
   ```
 
   It is not a substitute when double tap does something other than zooming (a "like", for
-  example); check that on the Simulator (inapp mode) or on Android.
+  example); check that on the Simulator (inapp-boost mode) or on Android.
 - **The zoom scale you ask for is not always the scale you get.** Two fingers cannot move outside
   the region being pinched, so an extreme `scale` caps out at whatever that region's size allows.
   **Verify that zooming happened rather than the exact scale** — this holds up better across

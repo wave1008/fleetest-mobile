@@ -31,16 +31,16 @@
 | `reportDir` | string | `"reports"` | Markdown レポートの出力先(プロジェクトルート相対) |
 | `defaultTimeout` | number(秒) | `5` | `waitSeconds:` を取る DSL コマンドの既定タイムアウト |
 | `scenarioTimeout` | int(秒) | `600` | シナリオ単位のホスト側 watchdog(壁時計タイムアウト)。個々のコマンド待ちを縛る `defaultTimeout` とは別物。シナリオに `@Test(scenarioTimeout:)` を書くとそのシナリオだけこちらより優先される(短くする向きも効く)。別に、シナリオの出力が 240 秒(1 ステップの上限 120 秒の 2 倍)途切れたときもそこで打ち切る(遅いだけで進んでいるシナリオは止めない)。モニターのプロファイルタブ(実行プロファイルの「テスト実行」)の「シナリオの制限時間(秒)」でも設定できる |
-| `iosMode` | string | `"inapp"` | `"inapp"` → iOS デバイスは inapp モード(in-app ブリッジ主 + XCUITest ブリッジをフォールバック)で動く。`"xcuitest"` → XCUITest ブリッジのみ。他の値はエラー。`responseMeasurement` の run では既定が `"xcuitest"` になる(計測は XCUITest ブリッジにあるため)。`devices[]` のその要素自身に `mode` を明示していればそちらが優先。Android には影響しない |
+| `iosMode` | string | `"inapp-boost"` | `"inapp-boost"` → iOS デバイスは inapp-boost モード(XCUITest ブリッジに in-app ブリッジを足したハイブリッド構成。in-app ブリッジで実行できる操作はそちらで速く実行し、できない操作は XCUITest ブリッジで実行する)で動く。`"xcuitest"` → XCUITest ブリッジのみ。他の値はエラー。`responseMeasurement` の run では既定が `"xcuitest"` になる(計測は XCUITest ブリッジにあるため)。`devices[]` のその要素自身に `mode` を明示していればそちらが優先。Android には影響しない |
 | `wipeDataOnBloat` | bool | `true` | 実行開始時、Android AVD の wipe 対象ファイル(userdata/cache/snapshots)が `wipeDataThresholdGB` を超えていたら Wipe Data する。アプリのインストールが容量不足で失敗したときも、そのデバイスを Wipe Data して 1 回だけ入れ直す(`false` のときは Wipe せず、そのデバイスを実行から外す) |
 | `wipeDataThresholdGB` | number(GB) | `8` | `wipeDataOnBloat` のしきい値 |
 | `updateWebView` | bool | `true` | 実行開始時に端末上の WebView 版を揃える(同じシナリオが端末の WebView 版によって挙動が変わるのを防ぐ) |
 | `recoverCpuFallbackToGpu` | bool | `false` | 実行開始時、CPU 描画(swiftshader)へフォールバック済みの Android Emulator を GPU モードで起動し直す |
 | `locale` | string | `"ja_JP"` | Android Emulator のブート時に適用するロケール。iOS には影響しない |
-| `iosPreActionPing` | bool | `true` | interop WebView 画面(Compose/Flutter 等の埋め込み WebView)でタップ・入力の直前にランナーへ1回問い合わせてから撃つ。attach したままの XCUITest セッションは放置後の座標イベントを成功応答のまま届け損なうことがある。コストは該当画面のイベント1回につき約 +0.4 秒(読み取りと他の画面には掛からない)。inapp モードのときだけ効く |
+| `iosPreActionPing` | bool | `true` | interop WebView 画面(Compose/Flutter 等の埋め込み WebView)でタップ・入力の直前にランナーへ1回問い合わせてから撃つ。attach したままの XCUITest セッションは放置後の座標イベントを成功応答のまま届け損なうことがある。コストは該当画面のイベント1回につき約 +0.4 秒(読み取りと他の画面には掛からない)。inapp-boost モードのときだけ効く |
 | `containerInference` | bool | `true` | スクロール容器を幾何から推測する補正(端の見切れ・座標補正等)を有効にする。FM とは無関係 |
 | `enableAnimations` | bool | `false` | 実行のためにアプリのアニメーションを無効化せず残す |
-| `responseMeasurement` | bool | `false` | **Android か iOS の実機 1 台**を対象にしたレスポンス計測モード。使う有効なデバイス(`--device` で絞った後)が 1 台で、`kind: physical` でなければ run を断る。アプリのアニメーションを残し(`enableAnimations` を強制的に有効)、iOS は xcuitest モードで走らせ、`fmTextVisibilityCheck`・`ocrTextVisibilityCheck`・`screenLooksLike`・`record`・ホスト負荷による減速を止め、run が終わるまでデバイスモニターを止める。`enableAnimations: false` や、`iosMode`(またはデバイスの `mode`)を `inapp`、FM・OCR・`record` のキーを `true` にした併用はエラー。`--broadcast`・`--fleet`・`--split` とは併用できない。[レスポンス計測](../running/response_measurement_ja.md)参照 |
+| `responseMeasurement` | bool | `false` | **Android か iOS の実機 1 台**を対象にしたレスポンス計測モード。使う有効なデバイス(`--device` で絞った後)が 1 台で、`kind: physical` でなければ run を断る。アプリのアニメーションを残し(`enableAnimations` を強制的に有効)、iOS は xcuitest モードで走らせ、`fmTextVisibilityCheck`・`ocrTextVisibilityCheck`・`screenLooksLike`・`record`・ホスト負荷による減速を止め、run が終わるまでデバイスモニターを止める。`enableAnimations: false` や、`iosMode`(またはデバイスの `mode`)を `inapp-boost`、FM・OCR・`record` のキーを `true` にした併用はエラー。`--broadcast`・`--fleet`・`--split` とは併用できない。[レスポンス計測](../running/response_measurement_ja.md)参照 |
 | `responseRepeat` | int | `5` | `responseMeasurement: true` のときだけ指定できます(無しで指定するとエラー)。各シナリオをデバイス上で続けて回す回数で、`1` 〜 `50`。どの回も計測します。結果ファイルは `<id>`、`<id>~2`、`<id>~3`、… の名前で並びます |
 | `homeOnStart` | bool | `--profile` 実行は `true`・プロファイル無しの素の `fleetest run` は `false` | 実行開始時に各デバイスへ Home を1回撃つ(一斉起動直後に画面が黒いまま止まるのを防ぐ) |
 | `playProtectBypass` | bool | `true` | Android の `adb install` で Play Protect の照会(「アプリをセキュリティ確認のために送信しますか?」)を通さない。インストールの間だけ「USB 経由でアプリを確認」を切って元に戻す(アプリを Google へ送らない)。`false` はキルスイッチ: ツールは端末の設定に触らず、release 署名の APK は端末側のダイアログで止まったままになる(ツールはそのダイアログに答えない) |
@@ -72,11 +72,13 @@ ON**、プロファイルを使わない素の `fleetest run` は既定 OFF で�
 
 ## iOS のモード
 
-既定の実効モードは `inapp`(in-app ブリッジ主 + XCUITest ブリッジをフォールバックにするハイブリッド構成)です。`iosMode: "xcuitest"`
+既定の実効モードは `inapp-boost`(XCUITest ブリッジに in-app ブリッジを足したハイブリッド構成。in-app ブリッジで実行できる操作はそちらで速く実行し、できない操作は XCUITest ブリッジで実行する)です。`iosMode: "xcuitest"`
 にすると XCUITest ブリッジのみの実行に切り替わります。iOS の実機も、アプリが**開発署名(get-task-allow)**
-なら inapp モードを使えます(注入するブリッジはアプリと同じチームの証明書でツールが署名します)。
+なら inapp-boost モードを使えます(注入するブリッジはアプリと同じチームの証明書でツールが署名します)。
 開発署名でないアプリ(TestFlight / App Store)は自動で xcuitest モードに縮退します。ランナー機へディスパッチするときは、
 ディスパッチする側の Mac がアプリの証明書でブリッジに署名して一緒に送るので、ランナー機に署名の鍵は要りません。
+
+通常は既定の inapp-boost のままにしてください。xcuitest モードでは次が変わります: キーボードの「非表示」を確定できない([キーボード](../commands/keyboard_assertion_ja.md))・WebView の HTML の id を `#id` で使えない([WebView](../selector/webview_ja.md))・iOS の Compose アプリでダブルタップが効かない([ジェスチャ](../commands/gestures_ja.md))。
 
 ### Link
 - [index](../../index_ja.md)

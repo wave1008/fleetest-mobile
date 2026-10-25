@@ -32,7 +32,7 @@ fleetest CLI / MCP ──(サブプロセス)──▶ fleetest-scenarios-<proje
 ```
 
 - プラットフォーム境界は `AppDriver` プロトコルだけ。FM 呼び出しと再生器は iOS / Android で共通
-- iOS のモード(`inapp` / `xcuitest`)とブリッジの関係は design/
+- iOS のモード(`inapp-boost` / `xcuitest`)と主ポートのブリッジ(`inapp` / `xcuitest`)は別の語彙(写像は `IOSMode.primaryBridge(forMode:)`)。ブリッジ自体の設計は docs/design/bridge.md
 
 ## リポジトリ構成
 

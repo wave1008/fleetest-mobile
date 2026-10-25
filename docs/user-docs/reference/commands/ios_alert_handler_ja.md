@@ -29,8 +29,8 @@ iosAlertHandler(alert: "*トラッキング*||*wants to track*",
 
 | モード | 書き方 |
 |---|---|
-| **inapp**(実行プロファイルの既定) | 普通に書けます —— `tap("許可")` / `exist(...)` / `ifCanSelect(...)` は、アプリ側で解決できないセレクタを SpringBoard 側へ照会して掴みます。`iosAlertHandler` で登録しない限り、自動では何も閉じません。 |
-| **xcuitest** | inapp と同じく書けます。 |
+| **inapp-boost**(実行プロファイルの既定) | 普通に書けます —— `tap("許可")` / `exist(...)` / `ifCanSelect(...)` は、アプリ側で解決できないセレクタを SpringBoard 側へ照会して掴みます。`iosAlertHandler` で登録しない限り、自動では何も閉じません。 |
+| **xcuitest** | inapp-boost と同じく書けます。 |
 
 宣言なしで既定で自動的に閉じるのは、`openURL` の初回確認アラートだけです。
 
@@ -118,7 +118,7 @@ iosAlertHandler(alert: "*トラッキング*||*wants to track*",
   警告が出て、その端末で以降のシナリオが全部上記の失敗になります。
 - **残ったアラートは run を跨ぎます。** run 開始時に端末に既にアラートが残っていると警告が
   出ます。
-- **アラートが前面にある間、XCUITest を通る操作は届きません。** xcuitest モードと、inapp モードで
+- **アラートが前面にある間、XCUITest を通る操作は届きません。** xcuitest モードと、inapp-boost モードで
   in-app ブリッジが撃てない操作(ホーム・アプリスイッチャー・座標のドラッグや長押し)が対象です。
   ステップは `a system alert is in front of the app (title: …, buttons: …)` で失敗し、アラートは
   そのまま残ります —— ツールがアラートのボタンを自分で押すことも、操作を撃ち直すこともありません。

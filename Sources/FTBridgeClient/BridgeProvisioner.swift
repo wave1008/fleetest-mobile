@@ -11,11 +11,11 @@ public struct ProvisionedIOSDevice: Sendable {
     public let name: String
     public let udid: String
     public let simulatorName: String
-    /// 主ブリッジのポート。inapp モードでは in-app ブリッジのポート
+    /// 主ブリッジのポート。inapp-boost モードでは in-app ブリッジのポート
     public let port: UInt16
     /// モード(`IOSMode`)。DriverConnection 経由でサブプロセスへ伝える
     public let mode: String
-    /// inapp モードで撃てない操作を回す XCUITest ブリッジのポート(xcuitest モードは nil)
+    /// inapp-boost モードで撃てない操作を回す XCUITest ブリッジのポート(xcuitest モードは nil)
     public let xcuiPort: UInt16?
     /// 実機か(kind=physical)。simctl 依存の経路を止める分岐に使う
     public let physical: Bool
@@ -89,7 +89,7 @@ public enum BridgeProvisionerError: Error, LocalizedError {
         case .inAppNeedsBundleID(let name):
             return "\(name): starting the in-app bridge requires the app bundleID. "
                 + "Set ios.app in the apps profile"
-                + " (paths that do not pass a bundleID, such as device/live, do not support inapp mode)"
+                + " (paths that do not pass a bundleID, such as device/live, do not support inapp-boost mode)"
         case .appNotInstalled(_, let bundleID, let udid):
             // device 名は provision() の離脱ログが行頭に付けるためここには含めない
             return "\(bundleID) is not installed, so this device drops out (the in-app bridge requires it up front). "
@@ -406,7 +406,7 @@ public struct BridgeProvisioner: Sendable {
     /// run / api run の供給だけが渡す。名前は `devices[].name`(ランナーのビルドは端末に属さないので空文字)
     let supplyStage: SupplyStageReporter?
     /// この供給の中で起動を扱った Simulator の udid。`sim.booted` は計画を立てた時点の値なので、同じ端末の2つ目のブリッジ
-    /// (inapp モードの xcuitest → in-app)で古い「未起動」を見て、起動済みの端末に「起動中」を立て直さないため
+    /// (inapp-boost モードの xcuitest → in-app)で古い「未起動」を見て、起動済みの端末に「起動中」を立て直さないため
     private let bootHandled = LockedValue<Set<String>>([])
     /// assignPort が候補ポートを弾くための判定(lsof を伴うので production は
     /// `PortHolder.isHeldByAnotherDevice`。テストは注入して lsof を避ける)
@@ -415,7 +415,7 @@ public struct BridgeProvisioner: Sendable {
     /// 経路(run の供給・ワーカー復帰)だけ** —— 初期化で消えたアプリを戻す手が無い呼び手(MCP・デバイス起動・
     /// ライブ操作)から撃つと、アプリの無いデバイスができる。実際に初期化するかは `preinstallAppPath` の有無も見る
     let mayEraseSimulatorForRecovery: Bool
-    /// この供給の中で初期化したシミュレータの udid。同じ端末の in-app ブリッジ(inapp モード)は計画の時点で「アプリは最新」と読んでいるので、
+    /// この供給の中で初期化したシミュレータの udid。同じ端末の in-app ブリッジ(inapp-boost モード)は計画の時点で「アプリは最新」と読んでいるので、
     /// 初期化の後はインストールし直す
     private let erasedSimulators = LockedValue<Set<String>>([])
 
@@ -475,7 +475,7 @@ public struct BridgeProvisioner: Sendable {
         }
     }
 
-    /// 1 デバイス分のプラン。bridges は実行順(inapp モード: inapp → xcuitest の 2 要素、xcuitest モード: 1 要素)
+    /// 1 デバイス分のプラン。bridges は実行順(inapp-boost モード: inapp → xcuitest の 2 要素、xcuitest モード: 1 要素)
     struct DevicePlan: Sendable {
         /// 元のデバイス順(結果配列の並びの復元と「最初のエラー」の決定に使う)
         let index: Int
@@ -535,14 +535,14 @@ public struct BridgeProvisioner: Sendable {
         }
 
         // 2. 稼働中ブリッジのスキャン(ポート → (UDID, bridge)。同一 UDID に inapp/xcuitest が
-        // 共存する inapp モードのため、bridge まで見て正しいブリッジを再利用する)
+        // 共存する inapp-boost モードのため、bridge まで見て正しいブリッジを再利用する)
         let running = await scanRunningBridges(catalog: catalog)
         if !running.isEmpty {
             let summary = running.keys.sorted().map(String.init).joined(separator: ", ")
             safeLog("→ Running bridges: port \(summary)")
         }
 
-        // 3. inapp モードの autoInstall 差分判定(バンドル深比較で遅い)を並列に事前評価
+        // 3. inapp-boost モードの autoInstall 差分判定(バンドル深比較で遅い)を並列に事前評価
         // (プランニングが needsInstall の決定に使うため先に必要)
         let appIsCurrent = await checkInstalledAppCurrency(
             targets: targets, bundleID: bundleID, preinstallAppPath: preinstallAppPath)
@@ -580,9 +580,9 @@ public struct BridgeProvisioner: Sendable {
             var mode = target.spec.mode ?? IOSMode.xcuitest
             let requestedMode = mode
             var modeFallbackReason: String?
-            // 実機の inapp モードは、アプリが開発署名(get-task-allow)で、署名に使える証明書が手元にある
+            // 実機の inapp-boost モードは、アプリが開発署名(get-task-allow)で、署名に使える証明書が手元にある
             // ときだけ注入できる。満たさなければ xcuitest モードへ黙って縮退する(ユーザー決定。理由は1行ログに残す)
-            if target.sim.physical, mode == IOSMode.inapp {
+            if target.sim.physical, mode == IOSMode.inappBoost {
                 let verdict = InAppCodeSign.inspect(appBundle: preinstallAppPath ?? "", sourceDigest: inappSourceDigest)
                 if !verdict.injectable {
                     let reason = "in-app injection is not available (\(verdict.reason ?? "no app bundle to check"))"
@@ -596,7 +596,7 @@ public struct BridgeProvisioner: Sendable {
             }
             var bridges: [(kind: String, plan: BridgePlan)] = []
             do {
-                if mode == IOSMode.inapp {
+                if mode == IOSMode.inappBoost {
                     // in-app(主)+ XCUITest(撃てない操作の回し先)の2ブリッジ
                     bridges.append(("inapp", try planBridge(
                         bridge: "inapp", preferred: target.spec.port, name: target.name,
@@ -833,7 +833,7 @@ public struct BridgeProvisioner: Sendable {
         }
     }
 
-    /// autoInstall 付き inapp モードの「インストール済みアプリが最新か」を並列評価(UDID → 最新か)。
+    /// autoInstall 付き inapp-boost モードの「インストール済みアプリが最新か」を並列評価(UDID → 最新か)。
     /// InstalledAppCheck はバンドル全バイト深比較でアプリサイズ比例に遅い(installIfNeeded の
     /// 差分スキップと共用)。判定不能・マップ欠落は false 扱い=インストールする安全側
     private func checkInstalledAppCurrency(
@@ -841,7 +841,7 @@ public struct BridgeProvisioner: Sendable {
         bundleID: String?, preinstallAppPath: String?) async -> [String: Bool] {
         guard let bundleID, let preinstallAppPath else { return [:] }
         let udids = Set(targets.filter {
-            ($0.spec.mode ?? IOSMode.xcuitest) == IOSMode.inapp
+            ($0.spec.mode ?? IOSMode.xcuitest) == IOSMode.inappBoost
         }.map { $0.sim.udid })
         guard !udids.isEmpty else { return [:] }
         return await withTaskGroup(of: (String, Bool).self,
@@ -871,7 +871,7 @@ public struct BridgeProvisioner: Sendable {
                             usedPorts: inout Set<UInt16>) throws -> BridgePlan {
         // autoInstall(preinstallAppPath)付き inapp は「インストールファイルが更新されているとき
         // だけ」install+注入起動で差し替える(install は起動中アプリ=in-app ブリッジを終了させる
-        // ため、後段の installIfNeeded で入れ直す順序は不可=あちらは inapp モードをスキップする)。
+        // ため、後段の installIfNeeded で入れ直す順序は不可=あちらは inapp-boost モードをスキップする)。
         // 最新なら稼働中ブリッジを再利用して install も relaunch も省く。
         var inappNeedsInstall = false
         if bridge == "inapp", preinstallAppPath != nil, bundleID != nil {
@@ -1066,7 +1066,7 @@ public struct BridgeProvisioner: Sendable {
     }
 
     /// 1 デバイス分のプラン実行。デバイス間は並列だが、同一デバイス内のブリッジ
-    /// (inapp モードの inapp → xcuitest)は同一シミュレータへの simctl 競合を避けるため直列。
+    /// (inapp-boost モードの inapp → xcuitest)は同一シミュレータへの simctl 競合を避けるため直列。
     /// inapp が失敗したら xcuitest は実行しない(直列版と同じ)
     private func executeDevice(plan: DevicePlan, bundleID: String?, preinstallAppPath: String?,
                                claimBarrier: PortClaimBarrier,
@@ -1087,7 +1087,7 @@ public struct BridgeProvisioner: Sendable {
                     bridge: bridge.kind, plan: bridge.plan, name: plan.name, sim: plan.sim,
                     bundleID: bundleID, preinstallAppPath: preinstallAppPath,
                     claimed: { await claim.fire() }, log: log,
-                    // inapp モードの実機: in-app のトンネルが相方(先に起動する xcuitest)のトンネルを消さないよう残す
+                    // inapp-boost モードの実機: in-app のトンネルが相方(先に起動する xcuitest)のトンネルを消さないよう残す
                     keepPeerPort: bridge.kind == "inapp" ? portsByBridge["xcuitest"] : nil)
                 await claim.fire()
             } catch {
@@ -1097,7 +1097,7 @@ public struct BridgeProvisioner: Sendable {
             }
         }
         supplyStage?(plan.name, "ios", .ready)
-        // 主ブリッジは plan の先頭(inapp モード = in-app / xcuitest モード = xcuitest)。実行順とは無関係
+        // 主ブリッジは plan の先頭(inapp-boost モード = in-app / xcuitest モード = xcuitest)。実行順とは無関係
         let primary = portsByBridge[plan.bridges[0].kind]!
         return ProvisionedIOSDevice(
             name: plan.name, udid: plan.sim.udid, simulatorName: plan.sim.name,
@@ -1849,7 +1849,7 @@ public struct BridgeProvisioner: Sendable {
                     try? launcher.stop()
                     // **実機はポートを端末の上で握られている**(ランナーは端末の中で bind する)。ホストの持ち主探しでは
                     // 見えず、採番でも避けられない —— 実測(iPhone SE3)は前の run の in-app ブリッジが、背面に残った
-                    // 対象アプリの中で同じ番号を待ち受けていた(inapp モードは XCUITest を先に起動するので、in-app の
+                    // 対象アプリの中で同じ番号を待ち受けていた(inapp-boost モードは XCUITest を先に起動するので、in-app の
                     // 起こし直しがアプリを止めるより前に衝突する)。対象アプリを止めて、同じポートで1回だけ撃ち直す
                     if sim.physical {
                         let held = "a listener on the device itself (not on this Mac)"

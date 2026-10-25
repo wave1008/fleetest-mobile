@@ -49,7 +49,7 @@
           "kind": {
             "type": "string",
             "enum": ["virtual", "physical"],
-            "description": "デバイスの実体種別(省略時 virtual)。virtual = iOS シミュレータ / Android エミュレータ。physical = 実機(iOS は udid、Android は serial が必須。iOS 実機の inapp モードは開発署名のときだけ。使えなければ xcuitest モードへ縮退)。"
+            "description": "デバイスの実体種別(省略時 virtual)。virtual = iOS シミュレータ / Android エミュレータ。physical = 実機(iOS は udid、Android は serial が必須。iOS 実機の inapp-boost モードは開発署名のときだけ。使えなければ xcuitest モードへ縮退)。"
           },
           "osVersion": {
             "type": "string",
@@ -67,8 +67,8 @@
           },
           "mode": {
             "type": "string",
-            "enum": ["inapp", "xcuitest"],
-            "description": "iOS: このデバイスのモード。inapp = in-app ブリッジと XCUITest ブリッジのハイブリッド構成 / xcuitest = XCUITest ブリッジだけ。inapp は開発署名の実機でも使える(使えなければ xcuitest モードへ縮退)。省略時は実行プロファイルの iosMode。"
+            "enum": ["inapp-boost", "xcuitest"],
+            "description": "iOS: このデバイスのモード。inapp-boost = XCUITest ブリッジに in-app ブリッジを足したハイブリッド構成(in-app ブリッジで実行できる操作はそちらで速く実行し、できない操作は XCUITest ブリッジで実行する) / xcuitest = XCUITest ブリッジだけ。inapp-boost は開発署名の実機でも使える(使えなければ xcuitest モードへ縮退)。省略時は実行プロファイルの iosMode。"
           },
           "avd": {
             "type": "string",
@@ -127,9 +127,9 @@
     },
     "iosMode": {
       "type": "string",
-      "enum": ["inapp", "xcuitest"],
-      "description": "iOS のモード。inapp(既定)= in-app ブリッジと XCUITest ブリッジのハイブリッド構成(撃てない操作だけ XCUITest ブリッジへ回す)/ xcuitest = XCUITest ブリッジだけ。devices[] で mode を明示したデバイスはそちらが優先。responseMeasurement の run では既定が xcuitest(計測は XCUITest ブリッジにあるため)。Android には影響しない。",
-      "default": "inapp"
+      "enum": ["inapp-boost", "xcuitest"],
+      "description": "iOS のモード。inapp-boost(既定)= XCUITest ブリッジに in-app ブリッジを足したハイブリッド構成(in-app ブリッジで実行できる操作はそちらで速く実行し、できない操作は XCUITest ブリッジで実行する)/ xcuitest = XCUITest ブリッジだけ。devices[] で mode を明示したデバイスはそちらが優先。responseMeasurement の run では既定が xcuitest(計測は XCUITest ブリッジにあるため)。Android には影響しない。",
+      "default": "inapp-boost"
     },
     "wipeDataOnBloat": {
       "type": "boolean",

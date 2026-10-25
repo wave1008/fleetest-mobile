@@ -264,11 +264,11 @@ adb 接続は生きているがゲスト側が不健全(Wi-Fi 無効・ゲスト
     XCUITest ブリッジ側へ回して撃つと**退行する** —— home はアプリを背面へ送り、in-app ブリッジは
     **そのアプリの中に居る**ので無応答になり、供給が壊れたブリッジと見て停止・張り直しに入って
     **3機で13台がワーカーから脱落**する(結果は緑のままだが手元の run が 50s → 136s)。
-    よって inapp モードは対象外にし、撃てるデバイス(xcuitest モード・Android)だけ `systemUIClient` 経由で XCUITest ブリッジへ回す。
-    **判定はモードで行う**(inapp モードは xcuiPort も持つので、xcuiPort の有無で決めると同じ穴に落ちる)。
+    よって inapp-boost モードは対象外にし、撃てるデバイス(xcuitest モード・Android)だけ `systemUIClient` 経由で XCUITest ブリッジへ回す。
+    **判定はモードで行う**(inapp-boost モードは xcuiPort も持つので、xcuiPort の有無で決めると同じ穴に落ちる)。
     宛先の決定自体は `systemUIClient` の1箇所で、残存アラートの警告(`warnOnResidualSystemAlerts`)と共有。
-    **inapp モードで黒画面の予防を復活させるなら「home → アプリを再前面化」が要る**(未検証。
-    既定の inapp モードでは予防が効かないが、その実害の報告は無い)
+    **inapp-boost モードで黒画面の予防を復活させるなら「home → アプリを再前面化」が要る**(未検証。
+    既定の inapp-boost モードでは予防が効かないが、その実害の報告は無い)
   - **一括起動/停止の最中はブリッジ無応答を数えない**(`monitorBridgeWatchdog`): 供給中のデバイス
     (10 秒後に ready)へ「booted が5回連続したためブリッジ無応答とみなします」を出さない。
     **検知は誤検知0が条件**なので `inRun` と同じく streak ごと 0 に戻す

@@ -111,8 +111,8 @@ FM がアプリを自律探索してシナリオを生成する explore モー�
   **reap** し、直後の `waitUntilExit()` が終了通知を取りこぼして**永久ハング**する(SIGTERM を
   無視した子で実測: ワーカー全体が `waitUntilExit` で停止)。**生存確認は reap しない `kill(pid, 0)`**
   を使うこと(`process.isRunning` は使わない)。この凍結は scenarioTimeout(当時の既定 90s)を超えるシナリオでのみ
-  顕在化する潜在バグで、inapp モードの suspend 誤ルーティング(PT-8)が引き金だった。
-- **inapp モードの in-app suspend**: system-UI シナリオと in-app シナリオを混在実行すると、背面の
+  顕在化する潜在バグで、inapp-boost モードの suspend 誤ルーティング(PT-8)が引き金だった。
+- **inapp-boost モードの in-app suspend**: system-UI シナリオと in-app シナリオを混在実行すると、背面の
   注入先アプリが iOS に suspend され in-app ブリッジが無応答になる。ドライバ選択は provision 時の
   注入先 bundleID で分岐する(詳細と対策は PT-8「suspend 時のルーティング」)。
 - **規模並列(20台級)は timeout flaky を生む**: 競合で画面ロードが遅れ、本来通る `exist` が既定
@@ -166,7 +166,7 @@ FM がアプリを自律探索してシナリオを生成する explore モー�
 - **`.macro` ターゲットには Package.swift 冒頭の `import CompilerPluginSupport` が必要**
 - iOS 27 のパスワード保存シートはタップ時にアニメーション中で座標がずれることがある →
   シナリオ側で `wait(1)` を挟むのが確実(コードで書けるようになった利点)
-- **MCP(`ft_*`)の iOS の構成**(経緯: 2026-08-04 に「実行プロファイルのモードに追従する」= inapp モードも
+- **MCP(`ft_*`)の iOS の構成**(経緯: 2026-08-04 に「実行プロファイルのモードに追従する」= inapp-boost モードも
   使う形にしたが、利用者の決定で取り消した。in-app を主にした合成 `HybridFallbackDriver` は今はライブ操作だけが使う)
   - **繋いだブリッジの版を照合し、ズレは既定で拒否する**(`MCPServer+Driver.swift` の
     `enforceVersion` / `bridgeVersionSkew`。2026-08-06 導入・2026-08-09 に警告から拒否へ反転)。

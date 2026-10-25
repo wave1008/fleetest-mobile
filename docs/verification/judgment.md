@@ -119,7 +119,7 @@
 制約を外す(穴を塞ぐ)変更を入れたら、その制約を理由にした決定が残っていないかを洗う。
 MCP(`ft_*`)は profile 無しだと in-app ブリッジを掴んでも XCUITest へ振り替えていた。根拠は
 「in-app は home/appSwitcher/drag/座標 press を実装できず、`ft_*` は StepExecutor を通らないのでフォールバックが効かない」
-だったが、その穴は `HybridFallbackDriver` で埋まったのに振り替えの決定が残り、探索が利用者の実行既定(inapp モード)と
+だったが、その穴は `HybridFallbackDriver` で埋まったのに振り替えの決定が残り、探索が利用者の実行既定(inapp-boost モード)と
 別のブリッジで走り続けた(Compose のダブルタップと Flutter のピンチが「MCP では無反応・シナリオでは通る」)。
 (MCP の iOS はその後常に XCUITest へ戻した。この節の「振り替えをやめた」判断自体は取り消したが、棚卸しの規律は変わらない。)
 
@@ -367,7 +367,7 @@ NSUserDefaults は cfprefsd がドメインを抱えており、次の起動で�
 ### 「遅くなった」は同一プロセスの2回目で測る
 
 **初回費用と1回あたりの費用を分けて測る**(分けないと、消せない固定費を毎回の費用と誤認する)。
-MCP プロセスを毎回起動して外形時間を測ると、inapp モードの経路が xcuitest モードの経路より +0.5s に見えた。
+MCP プロセスを毎回起動して外形時間を測ると、inapp-boost モードの経路が xcuitest モードの経路より +0.5s に見えた。
 内訳は home の費用ではなくフォールバック先ブリッジを探すポートスキャンで、セッションに1回だけ。
 同一プロセスで2回撃つと 1.02s → 0.475s(= xcuitest 直と同値)で、空振りの 501/404 は 1.3ms。
 
@@ -540,7 +540,7 @@ Compose は**離した点が要素の矩形の中なら**クリックを成立�
 
 **修正: 終点を要素の矩形の外へ横に抜く**(`StepExecutor.emptyDragEndX`)。矩形の外で離せば
 クリックは取り消される。**縦に抜いてはいけない**(容器がスクロールとして消費して内容が動き、
-直後に「今ここにある」を確かめる assertion が壊れる。実測: `E2E-CMP/ios-inapp` の S0020 が
+直後に「今ここにある」を確かめる assertion が壊れる。実測: `E2E-CMP/ios-inapp-boost` の S0020 が
 3/3 → 0/3)。**止めるという選択肢も無い**(完全に外すと肩代わりが効かず S0080 が
 CMP/ios で落ちる)。切り分けは変種A(祖先 clip のみ)3/3 / 変種B(縦ドラッグのみ)0/3。
 
@@ -623,7 +623,7 @@ Pixel 4a で Android の v96 と v97 を比べたつもりが**両方 v97 で動
 `InAppSettle` は収束しても cap 打ち切りでも**同じ顔で返る**ので、常態的な張り付きは黙って
 性能だけを食う(実測: Compose iOS の launch 直後 1〜2 アクションが毎回 2,500ms)。疑う手順:
 
-1. `fleetest api run --project <P> --profile <inapp プロファイル> --scenario <1本>` の
+1. `fleetest api run --project <P> --profile <inapp-boost プロファイル> --scenario <1本>` の
    NDJSON で `actionMs` を見る。**cap 値(2500)に近い定数**なら張り付き。
    snapshotMs でも waitMs でもなく actionMs に出るのが目印
 2. `InAppBridge/Sources/InAppSettle.swift` の打ち切り分岐に一時 `NSLog("FTSETTLE ...")` を入れ、
@@ -665,7 +665,7 @@ Pixel 4a で Android の v96 と v97 を比べたつもりが**両方 v97 で動
   最大クラスの機構(容器の縁をまたぐ frame)が**同じ幾何で 11 件揃う**ことが分かった
 - ステップ 422,343 件 → `activate 不発 → 合成タッチ`(検証不能なタップ)が in-app タップの **8.4%**、
   `did not settle (poll limit)` が **1,834 件**(ios-xcuitest のスクロール系に集中)
-- 同 → `exist "WebView 見出し"` は **ios-xcuitest 2.96s / ios-inapp 3.04s / android 0.24s** =
+- 同 → `exist "WebView 見出し"` は **ios-xcuitest 2.96s / ios-inapp-boost 3.04s / android 0.24s** =
   「モード差なし・iOS 側の床」が確定(**レポートだけで見ると SUT 差に見えて誤読する**)
 
 **集計の注意**: レポートは1ディレクトリに数万件あるので `*.md` のグロブ展開は

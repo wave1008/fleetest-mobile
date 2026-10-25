@@ -65,7 +65,7 @@ A/B は端末の状態を揃えてから測る。
 `devicectl device process launch --environment-variables '{"DYLD_INSERT_LIBRARIES":"<コンテナの絶対パス>/tmp/<dylib>"}'`
 で起動すると、constructor が走ってマーカーを書いた(書いた pid = 動いているアプリの pid)。環境変数なしの起動では書かれない(陰性対照)。
 **アプリのビルドし直しも再署名も要らない**。コンテナの絶対パスは `device copy to --json-output` の `destination` から得られる。
-**本実装済み(2026-10-22・開発署名のアプリのみ)**: inapp モードを実機でも選べる(
+**本実装済み(2026-10-22・開発署名のアプリのみ)**: inapp-boost モードを実機でも選べる(
 docs/design/ の該当節)。署名は `InAppCodeSign`・配置と起動は `InAppLauncher` の physical 経路・到達は
 XCUITest 実機と同じ `IOSDeviceTransport`。プロセス内のタッチ合成も実機で効くことを SE3 で確認(タップ・ジェスチャ・型入力)。
 
@@ -106,25 +106,25 @@ Appium 比較 PoC 由来のドライバ改良(PR #1)が main 上で期待どお�
 
 ### 結果1: シナリオ全体(wall 中央値・秒)
 
-| シナリオ | inapp | xcuitest(改良on=既定) | xcuitest(改良off) | 改良効果 |
+| シナリオ | inapp-boost | xcuitest(改良on=既定) | xcuitest(改良off) | 改良効果 |
 | タブナビ | 7.5 | **11.5** | 13.3 | **−14%** |
 | カート追加 | 7.2 | **9.6** | 11.3 | **−15%** |
 | 検索絞り込み | 4.5 | **6.8** | 8.6 | **−21%** |
 | ログイン(launch×3) | 15.2 | **23.5** | 28.6 | **−18%** |
 
 - xcuitest の改良効果(fast launch)は同一バイナリ A/B で **−14〜21%** を再現
-- inapp モードのログイン 15.2s は改良前ベースライン(bench-6: 18.9s)比 **−20%**
+- inapp-boost モードのログイン 15.2s は改良前ベースライン(bench-6: 18.9s)比 **−20%**
   (inapp type の Compose 対応の効果。同一ランタイム・専用シミュレータ条件)
 
 ### 結果2: 操作単位(step 中央値・ms)
 
-| 操作 | inapp | xcuitest(改良on) | xcuitest(改良off) |
+| 操作 | inapp-boost | xcuitest(改良on) | xcuitest(改良off) |
 | launch(アプリ再起動) | 2,480 | **3,467** | 5,208(fast launch で −33%) |
 | type | **266**(in-app 直接挿入) | 1,176 | 1,172 |
 | tap | 126 | 406 | 416 |
 | exist | 6 | 36 | 36 |
 
-- **inapp モードの type 266ms** = inapp の Compose 対応が main で機能している実証
+- **inapp-boost モードの type 266ms** = inapp の Compose 対応が main で機能している実証
   (従来は XCUITest attach 経由で 1.0〜1.3s だった)
 - tap/exist は改良対象外のため on/off で一致(計測系の公平性の傍証)
 
@@ -143,7 +143,7 @@ Appium 比較 PoC 由来のドライバ改良(PR #1)が main 上で期待どお�
 ```bash
 # 専用シミュレータ+verify 用の実行プロファイル(runs/ios-verify-xcuitest.json 等)を用意して
 FT_EVENT_LOG_PATH=<file> fleetest run --project sut-ec-mobile \
-  --profile <ios-verify-xcuitest|ios-verify-inapp> --scenario <シナリオ> --skip-build
+  --profile <ios-verify-xcuitest|ios-verify-inapp-boost> --scenario <シナリオ> --skip-build
 # 改良オフ側: FT_NO_FAST_LAUNCH=1 を前置
 ```
 

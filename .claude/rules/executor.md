@@ -92,8 +92,8 @@ CLAUDE.md から移した規則(本文は移設前と同一)。この領域の�
   1回だけ聞く(ユーザー決定)。常時監視へ広げない。
   **画像判定の絵(可視性検証・findImage 系・分類器・screenLooksLike)は `StepExecutor.judgmentScreenshot` /
   `judgmentCapture` だけで撮る**(主ドライバの `screenshot()` を直に呼ばない = `JudgmentCaptureTests` の走査。
-  撮り分けは `FTCore.JudgmentCapture`: inapp モードでキーボード表示中かフェーズの照会でアラートが前面のときだけ XCUITest)。
-  **失敗時の証跡の絵は inapp モードなら XCUITest(`XCUIScreen`)で撮る**(`FTRuntime.handleFailure`。in-app の絵は
+  撮り分けは `FTCore.JudgmentCapture`: inapp-boost モードでキーボード表示中かフェーズの照会でアラートが前面のときだけ XCUITest)。
+  **失敗時の証跡の絵は inapp-boost モードなら XCUITest(`XCUIScreen`)で撮る**(`FTRuntime.handleFailure`。in-app の絵は
   アプリの window しか描かず OS のアラートが写らない)。**iOS の「飲まれたタップ」注記はアラートの可能性を
   併記する**(iOS の木はアプリのプロセスだけ = アラートを出したタップも無変化に見える)
 - **シナリオのサンドボックス(Seatbelt・常に有効)**: 全拒否が土台の Seatbelt でシナリオ実行バイナリを包む

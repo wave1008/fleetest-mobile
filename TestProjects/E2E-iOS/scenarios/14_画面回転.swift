@@ -3,7 +3,7 @@
 // で、デバイスがどう傾いているかではない(docs/commands.md)。左右の区別は語彙に無い。
 // SUT は iOS ネイティブ(SwiftUI+UIKit)の E2EAppIOS。**iOS は接続が使っているブリッジで回す**
 // (in-app = シーンの geometry / XCUITest = XCUIDevice)ので、この1本が両ブリッジの回帰を兼ねる
-// (--ios-inapp でも回すこと)。回した向きはシナリオ終了時に自動で戻る。
+// (--ios-inapp-boost でも回すこと)。回した向きはシナリオ終了時に自動で戻る。
 
 import FTDSL
 

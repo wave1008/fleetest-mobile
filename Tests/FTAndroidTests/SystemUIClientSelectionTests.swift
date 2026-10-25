@@ -1,8 +1,8 @@
 // run 開始時に SpringBoard を触る操作(home / 残存アラートの警告)がどのブリッジへ行くかの選別。
 //
 // **実害 2026-09-09**: `RunWorker.driver` は in-app ブリッジ宛の BridgeClient で、in-app には
-// `/home` のルートが無い。inapp モードでもそれを撃っていたため homeOnStart が 18 台すべてで 0/N=不発
-// だった(しかも「inapp 固定のデバイスだけができない」と誤って説明していた)。宛先の決定は
+// `/home` のルートが無い。inapp-boost モードでもそれを撃っていたため homeOnStart が 18 台すべてで 0/N=不発
+// だった(しかも「inapp-boost 固定のデバイスだけができない」と誤って説明していた)。宛先の決定は
 // `ProfileWorkerFactory.systemUIClient` の1箇所に寄せてある。
 
 import XCTest
@@ -16,13 +16,13 @@ final class SystemUIClientSelectionTests: XCTestCase {
 
     /// **in-app ブリッジを持つデバイスには撃たない**(実測 2026-09-09): home でアプリが背面に回ると
     /// in-app ブリッジが無応答になり、供給が壊れたブリッジと見て張り直す(3機で13台が脱落)。
-    /// inapp モードは xcuiPort も持つので、**xcuiPort の有無で判定してはいけない**。
+    /// inapp-boost モードは xcuiPort も持つので、**xcuiPort の有無で判定してはいけない**。
     func testInappModeIsSkippedWithOrWithoutXcuitestBridge() {
         let inappWithXcuitest = worker(platform: "ios",
-                            connection: DriverConnection(platform: "ios", port: 8131, mode: "inapp",
+                            connection: DriverConnection(platform: "ios", port: 8131, mode: "inapp-boost",
                                                          udid: "U1", xcuiPort: 8123))
         let inapp = worker(platform: "ios",
-                           connection: DriverConnection(platform: "ios", port: 8132, mode: "inapp",
+                           connection: DriverConnection(platform: "ios", port: 8132, mode: "inapp-boost",
                                                         udid: "U2"))
         let plan = ProfileWorkerFactory.homeOnStartPlan([inappWithXcuitest, inapp])
         XCTAssertTrue(plan.targets.isEmpty)
@@ -70,11 +70,11 @@ final class SystemUIClientSelectionTests: XCTestCase {
         RunWorker(label: "w", platform: platform, driver: NullDriver(), connection: connection)
     }
 
-    /// inapp モード(既定の iosMode)は in-app と XCUITest の両方を持つ。**XCUITest 側へ行く**
+    /// inapp-boost モード(既定の iosMode)は in-app と XCUITest の両方を持つ。**XCUITest 側へ行く**
     func testInappModeGoesToTheXcuitestBridgeNotTheInappOne() {
         let client = ProfileWorkerFactory.systemUIClient(for: worker(
             platform: "ios",
-            connection: DriverConnection(platform: "ios", port: 8131, mode: "inapp",
+            connection: DriverConnection(platform: "ios", port: 8131, mode: "inapp-boost",
                                          udid: "UDID-1", xcuiPort: 8123)))
         XCTAssertEqual(client?.port, 8123, "in-app ブリッジ(8131)には /home のルートが無い")
     }
@@ -91,7 +91,7 @@ final class SystemUIClientSelectionTests: XCTestCase {
     func testInappOnlyHasNoSystemUIClient() {
         let client = ProfileWorkerFactory.systemUIClient(for: worker(
             platform: "ios",
-            connection: DriverConnection(platform: "ios", port: 8131, mode: "inapp",
+            connection: DriverConnection(platform: "ios", port: 8131, mode: "inapp-boost",
                                          udid: "UDID-1")))
         XCTAssertNil(client)
     }

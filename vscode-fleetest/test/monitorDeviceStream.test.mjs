@@ -426,7 +426,7 @@ test("未登録のリモートの仮想デバイスは宛先(udid / serial)を�
   const { deps } = makeDeps(binaryPath);
   deps.getConfig = () => ({
     binaryPath, iosStreamEnabled: true, androidStreamEnabled: true,
-    streamCodec: "h264", liveFps: 12, monitorMaxWidth: 960, project: "demo", profile: "ios-inapp",
+    streamCodec: "h264", liveFps: 12, monitorMaxWidth: 960, project: "demo", profile: "ios-inapp-boost",
   });
   const controller = new MonitorDeviceStreamController(deps);
   try {

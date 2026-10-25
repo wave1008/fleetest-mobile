@@ -29,8 +29,8 @@ separate process — they never appear in the app's own accessibility tree, so
 
 | mode | how to handle alerts |
 |---|---|
-| **inapp** (run profile default) | Write them normally — `tap("Allow")`, `exist(...)`, `ifCanSelect(...)` all reach across to SpringBoard when the app itself cannot resolve the selector. Nothing closes automatically unless you register it with `iosAlertHandler`. |
-| **xcuitest** | Write them as with inapp. |
+| **inapp-boost** (run profile default) | Write them normally — `tap("Allow")`, `exist(...)`, `ifCanSelect(...)` all reach across to SpringBoard when the app itself cannot resolve the selector. Nothing closes automatically unless you register it with `iosAlertHandler`. |
+| **xcuitest** | Write them as with inapp-boost. |
 
 The only alert closed automatically without any declaration is `openURL`'s first-time
 confirmation.
@@ -131,7 +131,7 @@ the alert to clear (or be closed by a registered button), and fails with
 - **A leftover alert survives across runs, too.** A warning is printed at the start of a run if
   a device already has one on screen.
 - **An operation that goes through XCUITest is not delivered while an alert is in front.**
-  This covers xcuitest mode, and in inapp mode the operations the in-app bridge cannot perform
+  This covers xcuitest mode, and in inapp-boost mode the operations the in-app bridge cannot perform
   (home, the app switcher, coordinate drags and long presses). The step fails with
   `a system alert is in front of the app (title: …, buttons: …)` and the alert is left as it
   is — the tool never presses an alert button on its own, and never retries the operation.

@@ -58,7 +58,7 @@ function runGate({ profile, failed, markers = {}, digest }) {
 }
 
 test('既定(in-app)の実行は xcuitest の印が無ければ警告する', () => {
-  const { out } = runGate({ profile: 'ios-inapp', failed: 0, digest: 'abc' })
+  const { out } = runGate({ profile: 'ios-inapp-boost', failed: 0, digest: 'abc' })
   assert.match(out, /xcuitest/)
   assert.match(out, /--ios-xcuitest/)
 })
@@ -66,21 +66,21 @@ test('既定(in-app)の実行は xcuitest の印が無ければ警告する', ()
 test('--ios-xcuitest の実行は in-app の印が無ければ警告する(向きが逆でも同じ)', () => {
   const { out } = runGate({ profile: 'ios-xcuitest', failed: 0, digest: 'abc' })
   assert.match(out, /inapp/)
-  assert.match(out, /--ios-inapp/)
+  assert.match(out, /--ios-inapp-boost/)
 })
 
 test('印が現在の digest と一致していれば黙る(常時発火しないこと)', () => {
-  const { out } = runGate({ profile: 'ios-inapp', failed: 0, markers: { xcuitest: 'abc\n' }, digest: 'abc' })
+  const { out } = runGate({ profile: 'ios-inapp-boost', failed: 0, markers: { xcuitest: 'abc\n' }, digest: 'abc' })
   assert.doesNotMatch(out, /ブリッジの入力が/)
 })
 
 test('印が古ければ警告する', () => {
-  const { out } = runGate({ profile: 'ios-inapp', failed: 0, markers: { xcuitest: 'old\n' }, digest: 'abc' })
+  const { out } = runGate({ profile: 'ios-inapp-boost', failed: 0, markers: { xcuitest: 'old\n' }, digest: 'abc' })
   assert.match(out, /ブリッジの入力が/)
 })
 
 test('全部成功したら「回した側」の印を書く(既定 = in-app)', () => {
-  const { out, readMarker } = runGate({ profile: 'ios-inapp', failed: 0, digest: 'abc' })
+  const { out, readMarker } = runGate({ profile: 'ios-inapp-boost', failed: 0, digest: 'abc' })
   assert.equal(readMarker('inapp'), 'abc')
   assert.equal(readMarker('xcuitest'), null, '回していない側の印を書いてはいけない')
   assert.match(out, /検証済みとして記録/)
@@ -93,7 +93,7 @@ test('--ios-xcuitest が全部成功したら xcuitest の印を書く', () => {
 })
 
 test('失敗があれば印を書かない(失敗を検証済みにしない)', () => {
-  const { readMarker } = runGate({ profile: 'ios-inapp', failed: 1, digest: 'abc' })
+  const { readMarker } = runGate({ profile: 'ios-inapp-boost', failed: 1, digest: 'abc' })
   assert.equal(readMarker('inapp'), null)
 })
 

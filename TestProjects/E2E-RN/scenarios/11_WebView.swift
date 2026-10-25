@@ -7,7 +7,7 @@
 // Android = android.webkit.WebView を直接埋め込む(Flutter のような platform view 合成ではない)。
 // ネイティブ SUT と同じ経路になると予想される: iOS は WKWebView の a11y が別プロセスにあり
 // in-app からは見えないため、fleetest が DOM を JS で読む経路(InAppWebViewDOM)が主役になり
-// (`--ios-inapp` で回さないとこの経路は一切通らない)、Android は WebView の中身が a11y の
+// (`--ios-inapp-boost` で回さないとこの経路は一切通らない)、Android は WebView の中身が a11y の
 // 仮想ツリーとして降りてくるがリンクは chromeRole を見ないと型が食い違うはず(いずれも未検証)。
 
 import FTDSL

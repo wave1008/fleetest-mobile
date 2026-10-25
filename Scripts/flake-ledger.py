@@ -59,7 +59,7 @@ def main():
     ap.add_argument("--since", default=(datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=14)).strftime("%Y-%m-%d"),
                     help="startedAt(UTC・ISO8601 の前方一致比較)の下限")
     ap.add_argument("--until", default="9999")
-    ap.add_argument("--profiles", default="android,ios-inapp,ios-xcuitest")
+    ap.add_argument("--profiles", default="android,ios-inapp-boost,ios-xcuitest")
     ap.add_argument("--min-run-size", type=int, default=10, help="これ未満の run はデバッグ用とみなして除く")
     ap.add_argument("--by", default="host", help="内訳の軸: host / label(--runs-file)/ none")
     ap.add_argument("--runs-file", help="runID<TAB>ラベル の行。指定すると対象をその run に絞り、--since と --min-run-size は効かない")

@@ -1,4 +1,4 @@
-// `bridge down --port` が inapp モードの片割れ(XCUITest ランナー)を残したときの知らせ。
+// `bridge down --port` が inapp-boost モードの片割れ(XCUITest ランナー)を残したときの知らせ。
 // 残ったランナーは Simulator を止めた直後に起こし直す(Bridge.Down.remainingRunnerNotice の doc)。
 
 import XCTest

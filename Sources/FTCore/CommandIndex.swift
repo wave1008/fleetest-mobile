@@ -142,7 +142,7 @@ public enum DSLCommandIndex {
                 + "holdSeconds after it went down (the response does not wait for that); if the block "
                 + "runs longer than holdSeconds, the finger is already up for the rest of it (noted: "
                 + "hold-ended-before-block). Holds cannot be nested. If the target cannot be resolved "
-                + "the block does not run. On iOS in inapp mode the press runs through the "
+                + "the block does not run. On iOS in inapp-boost mode the press runs through the "
                 + "XCUITest bridge instead (same fallback as tap's long press)."),
         .init("select", "operation", "select(selector, requireVisible:, waitSeconds:, scroll:, maxSwipes:)",
               "Grabs an element without touching the device. Returns an empty element instead of failing."

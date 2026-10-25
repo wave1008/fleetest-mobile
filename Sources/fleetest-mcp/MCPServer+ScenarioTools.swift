@@ -33,10 +33,10 @@ extension MCPServer {
         + " to use them"
 
     /// iOS で走らせた ft_run_scenario の応答に必ず添える。**MCP の iOS は常に XCUITest**(ユーザー決定)なのに、
-    /// `fleetest run` / ft_start_run はプロファイルのモード(既定 inapp = in-app ブリッジ優先)で走る。黙ると、
+    /// `fleetest run` / ft_start_run はプロファイルのモード(既定 inapp-boost)で走る。黙ると、
     /// モードで割れる挙動(Compose の doubleTap・in-app に無い慣性)の結果を本番の結果と読まれる
     static let iosXCUITestBridgeNote = "ℹ️ ran on the XCUITest bridge (MCP drives iOS through XCUITest only)."
-        + " fleetest run and ft_start_run use the run profile's iOS mode (inapp by default = in-app bridge first), so a step"
+        + " fleetest run and ft_start_run use the run profile's iOS mode (inapp-boost by default), so a step"
         + " whose result depends on the bridge (a Compose doubleTap, scroll inertia) can differ there"
 }
 

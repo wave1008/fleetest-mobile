@@ -1,7 +1,7 @@
 // ft_launch resume: true(activate without terminating)。
 //
 // AppDriver.activate(bundleID:) は実装済み(BridgeClient → POST /session LaunchRequest(activate:
-// true)・ランナー・Android も)だったが MCP は一度も呼んでいなかった。inapp モード(in-app ブリッジ)は
+// true)・ランナー・Android も)だったが MCP は一度も呼んでいなかった。inapp-boost モード(in-app ブリッジ)は
 // activate に override が無く AppDriver の既定実装(= launch)へ落ちるので、そのまま resume を
 // 通すと「resumed」と嘘をついて実際には毎回終了→起動する — その構成だけ拒否する。
 

@@ -65,7 +65,7 @@ fleetest run --profile <name> --set responseMeasurement=true --set responseRepea
   - デバイスモニターの観測・配信を、run の間だけ止めます(run の終わりに戻します。自分で期限なしの `fleetest monitor pause` をしている場合は
     そのままにします。`--for` で期限付きにしている場合は run の間だけ期限なしに置き換え、終わりにまだ期限前なら元の停止に戻します)。
 - 次の指定と一緒には使えません(名前付きのエラーで止まります): `enableAnimations: false`、`fmTextVisibilityCheck` /
-  `ocrTextVisibilityCheck` / `screenLooksLike` / `record` を `true`、`iosMode` かデバイスの `mode` を `inapp`、`--broadcast`・`--fleet`・`--split`。
+  `ocrTextVisibilityCheck` / `screenLooksLike` / `record` を `true`、`iosMode` かデバイスの `mode` を `inapp-boost`、`--broadcast`・`--fleet`・`--split`。
   これらのキーを書いていなければ計測モードが自動で止めます。`true` と明示してあるプロファイルは断られるので、`false` にするかキーを消してください。
 
 計測モードでは、操作の前に毎回「アプリの描画が止まる」のを待つので(最長 10 秒)、通常の実行より時間がかかります。

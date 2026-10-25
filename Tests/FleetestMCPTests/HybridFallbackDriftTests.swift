@@ -1,4 +1,4 @@
-// MN-51.2(2026-09-25): inapp モード(in-app ブリッジ + XCUITest ブリッジ)のキャッシュ命中は主(in-app)の udid だけを確かめており、
+// MN-51.2(2026-09-25): inapp-boost モード(in-app ブリッジ + XCUITest ブリッジ)のキャッシュ命中は主(in-app)の udid だけを確かめており、
 // `HybridFallbackDriver` の fallback(AppAttachDriver)が握る XCUITest ポートは無検査のまま
 // キャッシュから返っていた。ブリッジは run のたびに起動し直されるので、そのポートは別デバイスへ
 // (あるいは同じデバイスの in-app ブリッジへ)移り得る —— home/drag/座標 press/gesture/pinch は
@@ -26,7 +26,7 @@ final class HybridFallbackDriftTests: XCTestCase {
 
     // MARK: - I/O 込みの入口。材料が欠けていれば撃たずに false(不明を「変わった」と読まない)
 
-    /// fallback ポートを覚えていない(inapp モードではない、または未記録)ときは撃たずに false
+    /// fallback ポートを覚えていない(inapp-boost モードではない、または未記録)ときは撃たずに false
     func testHybridFallbackDriftedIsNoOpWithoutARecordedFallbackPort() async {
         let server = MCPServer()
         server.udids[key] = "SIM-1"
@@ -36,7 +36,7 @@ final class HybridFallbackDriftTests: XCTestCase {
         XCTAssertFalse(drifted, "材料が無いのに判定を撃った")
     }
 
-    /// 主の udid を覚えていない(inapp モードでない経路の使い回しキー等)ときも撃たずに false
+    /// 主の udid を覚えていない(inapp-boost モードでない経路の使い回しキー等)ときも撃たずに false
     func testHybridFallbackDriftedIsNoOpWithoutARecordedUDID() async {
         let server = MCPServer()
         server.hybridFallbackPorts[key] = 8129
@@ -164,7 +164,7 @@ final class HybridFallbackDriftTests: XCTestCase {
                           "\(index + 1) 行目のキャッシュ命中がブリッジの入れ替わりを"
                           + "確かめていない —— MN-51.10 と同じ穴(udid だけ・ref を使う呼び出しだけ)が残る")
             XCTAssertTrue(window.contains("hybridFallbackDrifted"),
-                          "\(index + 1) 行目のキャッシュ命中が inapp モードの fallback ポートを"
+                          "\(index + 1) 行目のキャッシュ命中が inapp-boost モードの fallback ポートを"
                           + "確かめていない —— MN-51.2 と同じ穴(fallback だけ無検査)が残る")
         }
         XCTAssertEqual(hits, 2, "キャッシュ命中の箇所数が変わった(実測 \(hits))。増えたなら確認も入れる")
@@ -176,9 +176,9 @@ final class HybridFallbackDriftTests: XCTestCase {
         let source = try String(contentsOf: Self.driverSourceURL(), encoding: .utf8)
         // MCP の iOS は XCUITest だけなので、両経路とも予備ポートを消す(前の機の値を残さない)
         XCTAssertTrue(source.contains("hybridFallbackPorts[key] = nil   // MCP の iOS は XCUITest だけ(前の機の予備ポートを残さない)"),
-                      "profile 経路が inapp モードの予備ポートを消していない")
-        XCTAssertTrue(source.contains("hybridFallbackPorts[key] = nil   // MCP の iOS は XCUITest だけ(inapp モードの予備ポートは無い)"),
-                      "直接ポート経路が inapp モードの予備ポートを消していない")
+                      "profile 経路が inapp-boost モードの予備ポートを消していない")
+        XCTAssertTrue(source.contains("hybridFallbackPorts[key] = nil   // MCP の iOS は XCUITest だけ(inapp-boost モードの予備ポートは無い)"),
+                      "直接ポート経路が inapp-boost モードの予備ポートを消していない")
     }
 
     private static func driverSourceURL() -> URL {

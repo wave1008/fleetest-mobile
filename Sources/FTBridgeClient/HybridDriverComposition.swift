@@ -1,6 +1,6 @@
 // in-app と XCUITest を組み合わせたドライバの**組み立て方を1箇所に置く**。
 //
-// 呼び手は**ライブ操作**(`ApiLiveCommand`)だけ。StepExecutor を通らない直接の操作口で、実行(inapp モード)と
+// 呼び手は**ライブ操作**(`ApiLiveCommand`)だけ。StepExecutor を通らない直接の操作口で、実行(inapp-boost モード)と
 // 同じ形でなければならない —— 合成を別に書くと、層が抜けても緑のまま通る。
 // **MCP(ft_*)はここを通らない**(MCP の iOS は常に XCUITest = ユーザー決定。`MCPBridgeFollowingTests` が固定)。
 //

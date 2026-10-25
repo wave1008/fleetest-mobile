@@ -949,7 +949,7 @@ extension MCPServer {
     ///
     /// **呼び出し元が2つ**: `snapshotBody` は `systemAlertProbePending` が立っているときだけ
     /// (launch 直後の1回)、ref 操作の経路は `systemAlertGate` として毎回
-    /// (費用は MCP の ref 操作だけ)。答えられない(旧ブリッジ・Android。inapp モードは XCUITest ブリッジ側へ
+    /// (費用は MCP の ref 操作だけ)。答えられない(旧ブリッジ・Android。inapp-boost モードは XCUITest ブリッジ側へ
     /// 聞く)/ 出ていないときは黙る
     static func systemAlertNote(driver: AppDriver) async -> String {
         guard let what = await frontSystemAlert(driver: driver) else { return "" }

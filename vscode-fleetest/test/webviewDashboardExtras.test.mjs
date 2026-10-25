@@ -50,7 +50,7 @@ function createWebview() {
 }
 
 const RUN = {
-  schemaVersion: 1, runID: "20260901-000000Z-abcd1234", project: "P", profile: "ios-inapp",
+  schemaVersion: 1, runID: "20260901-000000Z-abcd1234", project: "P", profile: "ios-inapp-boost",
   host: "H", trigger: "cli", startedAt: "2026-09-01T00:00:00Z", finishedAt: "2026-09-01T00:01:00Z",
   total: 3, passed: 2, failed: 1,
 };
@@ -942,7 +942,7 @@ test("直近の実行: パフォーマンス計測のみは performance.runs を
   const [allBtn, perfBtn] = doc.querySelectorAll("#runs-filter button");
 
   assert.equal(allBtn.getAttribute("aria-pressed"), "true");
-  assert.equal(rows()[0].children[3].textContent, "ios-inapp", "既定は payload.runs");
+  assert.equal(rows()[0].children[3].textContent, "ios-inapp-boost", "既定は payload.runs");
 
   perfBtn.click();
   assert.equal(perfBtn.getAttribute("aria-pressed"), "true");
@@ -958,7 +958,7 @@ test("直近の実行: パフォーマンス計測のみは performance.runs を
     "詳細は新しい順(すべての行と同じ並び)");
 
   allBtn.click();
-  assert.equal(rows()[0].children[3].textContent, "ios-inapp");
+  assert.equal(rows()[0].children[3].textContent, "ios-inapp-boost");
   assert.equal(doc.querySelectorAll("#perf-summary .perf-summary-note").length, 0);
 });
 

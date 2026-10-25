@@ -71,7 +71,7 @@ public enum ProfileWorkerFactory {
     /// **in-app ブリッジを持つデバイスには撃たない**(実測、3機18台)。`home` はアプリを背面へ
     /// 送るが、**in-app ブリッジはそのアプリの中に居る**ので背面に回った瞬間に無応答になる ——
     /// 供給が「壊れたブリッジ」と見て停止・張り直しに入り、3機で13台がワーカーから脱落した
-    /// (シナリオの結果は緑のままだが手元の run が 50s → 136s)。inapp モードは黙って飛ばす。
+    /// (シナリオの結果は緑のままだが手元の run が 50s → 136s)。inapp-boost モードは黙って飛ばす。
     ///
     /// 撃てるデバイス(xcuitest 単独の iOS・Android)は `systemUIClient` 経由で XCUITest ブリッジへ回す
     /// —— `RunWorker.driver` は in-app ブリッジ宛のことがあり、in-app に `/home` のルートは無い。
@@ -109,14 +109,14 @@ public enum ProfileWorkerFactory {
 
     /// `pressHomeOnStart` の対象と除外。**デバイス不要の純粋関数**(規則はここだけ・テストが直接叩く)。
     /// 除外は「in-app ブリッジを持つデバイス」だけ —— 判定は mode で行い、xcuiPort の有無では**決めない**
-    /// (inapp モードは両方のブリッジを持つので、xcuiPort があっても撃つとアプリが背面に落ちる)。
+    /// (inapp-boost モードは両方のブリッジを持つので、xcuiPort があっても撃つとアプリが背面に落ちる)。
     static func homeOnStartPlan(
         _ workers: [RunWorker]
     ) -> (targets: [RunWorker], skipped: [RunWorker]) {
         var targets: [RunWorker] = []
         var skipped: [RunWorker] = []
         for worker in workers {
-            if worker.connection.mode == IOSMode.inapp {
+            if worker.connection.mode == IOSMode.inappBoost {
                 skipped.append(worker)
             } else {
                 targets.append(worker)
@@ -215,9 +215,9 @@ public enum ProfileWorkerFactory {
     /// 固定費は iOS ワーカーあたり snapshot 1枚で、全台並行に撃つ。
     /// **失敗は握りつぶす** —— これは診断であって run を止める理由にはしない
     /// **アプリの外(SpringBoard)を触れる driver**。in-app ブリッジは注入先アプリしか見えず
-    /// `/home` のルートも持たないので、inapp モードでも必ず XCUITest ブリッジ側へ回す
+    /// `/home` のルートも持たないので、inapp-boost モードでも必ず XCUITest ブリッジ側へ回す
     /// (`RunWorker.driver` は in-app ブリッジ宛なので、そのまま使うと 0/N になる。実害:
-    /// homeOnStart が inapp モードの全台で不発だったのに「in-app ブリッジだけのデバイスができない」と誤って説明していた)。
+    /// homeOnStart が inapp-boost モードの全台で不発だったのに「in-app ブリッジだけのデバイスができない」と誤って説明していた)。
     /// iOS 以外・XCUITest ブリッジを持たないデバイスは nil(呼び手は黙って飛ばす)。
     /// 使い手は pressHomeOnStart と warnOnResidualSystemAlerts の2つ。
     static func systemUIClient(for worker: RunWorker) -> BridgeClient? {
@@ -1065,13 +1065,13 @@ public enum ProfileWorkerFactory {
             logicalName: device.name)
     }
 
-    /// inapp モードのときサブプロセスは InAppDriver(+ XCUITest ブリッジへの回し先)を
+    /// inapp-boost モードのときサブプロセスは InAppDriver(+ XCUITest ブリッジへの回し先)を
     /// 使う。suspend された in-app アプリは /status が無応答になるため、注入先アプリの bundleID を
-    /// 明示的に渡してサブプロセスの inapp/XCUITest ルーティングを確定させる(inapp モードのみ)。
+    /// 明示的に渡してサブプロセスの inapp/XCUITest ルーティングを確定させる(inapp-boost モードのみ)。
     /// CLI(makeIOSWorker)と MCP(MCPServer.runScenario)のプロファイル経路で共有する。
     public static func iosConnection(device: ProvisionedIOSDevice,
                                      iosApp: ResolvedAppTarget?) -> DriverConnection {
-        let mode = device.mode == IOSMode.inapp ? device.mode : nil
+        let mode = device.mode == IOSMode.inappBoost ? device.mode : nil
         return DriverConnection(platform: "ios", port: device.port,
                                 mode: mode, udid: device.udid,
                                 xcuiPort: device.xcuiPort,
@@ -1212,9 +1212,9 @@ public enum ProfileWorkerFactory {
         var candidates: [(index: Int, worker: RunWorker, app: ResolvedAppTarget, appPath: String)] = []
         var passthrough: [(index: Int, worker: RunWorker)] = []
         for (index, worker) in workers.enumerated() {
-            // inapp モードの iOS はプロビジョニング時にインストール済み。ここで入れ直すと
+            // inapp-boost モードの iOS はプロビジョニング時にインストール済み。ここで入れ直すと
             // 起動中の in-app ブリッジ(アプリ内常駐)が simctl install で終了してしまうため必ずスキップ
-            if worker.platform == "ios", worker.connection.mode == IOSMode.inapp {
+            if worker.platform == "ios", worker.connection.mode == IOSMode.inappBoost {
                 passthrough.append((index, worker))
                 continue
             }

@@ -29,32 +29,32 @@ final class MCPProfileExplicitTargetRefusalTests: XCTestCase {
             let message = (error as? MCPError)?.message ?? "\(error)"
             XCTAssertTrue(message.contains("cannot be combined with udid/port/serial"), message,
                           file: file, line: line)
-            XCTAssertTrue(message.contains("\"ios-inapp\""), message, file: file, line: line)
+            XCTAssertTrue(message.contains("\"ios-inapp-boost\""), message, file: file, line: line)
         }
         XCTAssertEqual(driverResolved, 0, "no device may be resolved (or driven) before refusing",
                        file: file, line: line)
     }
 
     func testProfileWithUDIDIsRefused() async {
-        await assertRefusedBeforeDriving(["profile": "ios-inapp", "udid": "257324AF-0000"])
+        await assertRefusedBeforeDriving(["profile": "ios-inapp-boost", "udid": "257324AF-0000"])
     }
 
     func testProfileWithPortIsRefused() async {
-        await assertRefusedBeforeDriving(["profile": "ios-inapp", "port": 8130])
+        await assertRefusedBeforeDriving(["profile": "ios-inapp-boost", "port": 8130])
     }
 
     func testProfileWithSerialIsRefused() async {
-        await assertRefusedBeforeDriving(["profile": "ios-inapp", "serial": "emulator-5554"])
+        await assertRefusedBeforeDriving(["profile": "ios-inapp-boost", "serial": "emulator-5554"])
     }
 
     /// platform はプロファイル内の OS を選ぶだけなので断らない
     func testProfileWithPlatformOnlyIsNotRefused() {
-        XCTAssertNil(MCPServer.profileWithExplicitTargetRefusal(["profile": "ios-inapp", "platform": "ios"]))
+        XCTAssertNil(MCPServer.profileWithExplicitTargetRefusal(["profile": "ios-inapp-boost", "platform": "ios"]))
     }
 
     /// 空の udid/serial は「指定なし」(argsGaveIOSTarget と同じ読み)
     func testEmptyTargetsDoNotCountAsExplicit() {
-        XCTAssertNil(MCPServer.profileWithExplicitTargetRefusal(["profile": "ios-inapp", "udid": "", "serial": ""]))
+        XCTAssertNil(MCPServer.profileWithExplicitTargetRefusal(["profile": "ios-inapp-boost", "udid": "", "serial": ""]))
     }
 
     func testExplicitTargetWithoutProfileIsNotRefused() {

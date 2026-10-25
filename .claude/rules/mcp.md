@@ -107,9 +107,9 @@ CLAUDE.md から移した規則(本文は移設前と同一)。この領域の�
   `outsideTheAppTree: true`(既定値を置かない = 呼び手に決めさせる)。`looksUnchanged` はキーボードの出入りも変化に数える
   (キーボードもアプリの木の外)。⑤**DSL が操作の前後で待っているもの**(type の後のキーボードの出現 = `KeyboardWait.shouldAwaitAppearance`
   等)は、MCP では次の ref 操作の撮り直し(`verifiedRef`)で払う(読みを足さない)
-- **MCP の iOS は常に XCUITest**(ユーザー決定。inapp モードを組まない = `MCPBridgeFollowingTests` がソースで固定)。
-  下の inapp モードの予備ポートの規律は**ライブ操作の話**(MCP の経路にも照合の呼び出しは残るが、予備ポートを持たないので働かない)。
-- **inapp モードの予備(XCUITest ブリッジ)ポートも使うたびに本人確認する**(`FTBridgeClient.HybridFallbackIdentity` を
+- **MCP の iOS は常に XCUITest**(ユーザー決定。inapp-boost モードを組まない = `MCPBridgeFollowingTests` がソースで固定)。
+  下の inapp-boost モードの予備ポートの規律は**ライブ操作の話**(MCP の経路にも照合の呼び出しは残るが、予備ポートを持たないので働かない)。
+- **inapp-boost モードの予備(XCUITest ブリッジ)ポートも使うたびに本人確認する**(`FTBridgeClient.HybridFallbackIdentity` を
   MCP のキャッシュ命中とライブ操作の命令ごとが共有。主の udid だけ見ると、起動し直しで予備ポートが別のデバイス・
   in-app に化けても home/drag を撃ち続ける。**`BridgeIdentityCheck.verdict` は udid が両側にあるとブリッジの種別を
   見ない**ので、種別の決まった片側は `hybridFallbackDrift` で先に見る)。**ずれは3値で扱う** (`BridgeIdentityCheck.HybridFallbackDrift`: none / sameDeviceBridgeChanged / differentDevice)—— **別のデバイス(differentDevice)は ref の有無を問わず断り、記憶を捨てない**(捨てると次の同じ呼び出しが `keyChangedDevice` の previous=nil を通って黙って別のデバイスに固定される。抜けるのは呼び手が `udid` を明示したとき)。ライブ操作も別のデバイスなら同じポートで作り直さず、そのコマンドを撃たずに失敗を返す。**udid の診断が予算切れなら
