@@ -8,7 +8,7 @@ an API or to check server-side state (fleetest's own command).
 Scenarios run inside the [sandbox](../../security/sandbox.md), so **the destination must be listed in `allowedDomains`**
 (how to write it and what to check when it does not connect: [Network access from scenarios](../writing/network_access.md)).
 
-## Function
+## Functions
 
 | function | description |
 |---|---|
@@ -38,6 +38,8 @@ httpRequest(_ url: String, method: String = "GET", headers: [String: String] = [
 | `data: Data` | The body |
 | `text: String` | The body read as UTF-8 (`""` if it cannot be read) |
 | `json: Any?` | The body read as JSON (`nil` if it cannot be read) |
+
+## Example
 
 ```swift
 let response = httpRequest("https://api.example.com/orders", method: "POST",

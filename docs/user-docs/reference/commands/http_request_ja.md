@@ -39,6 +39,8 @@ httpRequest(_ url: String, method: String = "GET", headers: [String: String] = [
 | `text: String` | 本文を UTF-8 として読んだ文字列(読めなければ `""`) |
 | `json: Any?` | 本文を JSON として読んだもの(読めなければ `nil`) |
 
+## 例
+
 ```swift
 let response = httpRequest("https://api.example.com/orders", method: "POST",
                            headers: ["Content-Type": "application/json", "Authorization": "Bearer \(account("[api].token"))"],

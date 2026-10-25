@@ -5,7 +5,7 @@
 How to read a grabbed element's own data — its label, value, and identifier — instead of just
 asserting against it.
 
-## What you can read
+## Properties
 
 | property | description |
 |---|---|
@@ -14,6 +14,14 @@ asserting against it.
 | `.id` | The grabbed element's identifier. `String?` |
 | `.isEmpty` / `.isNotEmpty` | Whether the element was not grabbed / was grabbed |
 | `lastElement` | The element grabbed last (next section) |
+
+## Example
+
+```swift
+orderNumber = exist("#order_id").text   // read the displayed text
+let e = select("#total")
+if e.isNotEmpty { total = e.text }      // check the grab with .isNotEmpty
+```
 
 ## Grabbing an element's value (`.text` / `.value` / `.id`)
 

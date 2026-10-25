@@ -15,14 +15,16 @@ Read accounts and test data from JSON files instead of writing them into the sce
 A key is `[datasetName].attributeName` and is **split at the last `.`** (`[a.b].x` is attribute `x` of dataset
 `[a.b]`). The value can be passed straight to other commands.
 
+A successful call records no step (it only returns a value).
+
+## Example
+
 ```swift
 action {
     type("#login_id", account("[account1].id"))
     type("#login_password", account("[account1].password"))
 }
 ```
-
-A successful call records no step (it only returns a value).
 
 ## Where the files go, and overriding
 

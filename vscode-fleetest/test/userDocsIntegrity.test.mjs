@@ -255,3 +255,59 @@ test("折りたたみの直後に本文が続くときは <br> で1行あける"
   assert.ok(checked > 0, "</details> が1件も見つからない(走査の形が変わった)");
   assert.deepEqual(problems, []);
 });
+
+// コマンドのページ(reference/commands/)の節の型。規則の本文は .claude/rules/dsl-commands.md。
+// 人は見出しで飛べ、シナリオを書く AI は同じ位置に同じ情報がある前提で読める(崩れると黙って読み落とす)。
+const COMMAND_SECTIONS = {
+  en: { functions: /^## (Functions|Properties)$/, example: /^## Example$/, notes: /^## Notes$/ },
+  ja: { functions: /^## (関数|プロパティ)$/, example: /^## 例$/, notes: /^## 注意点$/ },
+};
+
+/** 標準の節(functions / example / notes)を、本文に出てくる順に返す。 */
+export function commandSections(source, lang) {
+  const body = source.replace(/```[\s\S]*?```/g, "");
+  const kinds = [];
+  for (const line of body.split("\n")) {
+    for (const [kind, re] of Object.entries(COMMAND_SECTIONS[lang])) {
+      if (re.test(line.trim())) kinds.push(kind);
+    }
+  }
+  return kinds;
+}
+
+/** 型からの外れ(関数と例は必須・順序は関数 → 例 → 注意点・最初の ## は関数)。 */
+export function commandSectionProblems(source, lang) {
+  const kinds = commandSections(source, lang);
+  const problems = [];
+  if (!kinds.includes("functions")) problems.push("関数(またはプロパティ)の節が無い");
+  if (!kinds.includes("example")) problems.push("例の節が無い");
+  const order = ["functions", "example", "notes"];
+  if (kinds.join() !== order.filter((k) => kinds.includes(k)).join()) problems.push(`順序が ${kinds.join(" → ")}`);
+  const firstH2 = source.replace(/```[\s\S]*?```/g, "").split("\n").find((l) => l.startsWith("## "));
+  if (firstH2 && !COMMAND_SECTIONS[lang].functions.test(firstH2.trim())) problems.push(`最初の節が「${firstH2}」`);
+  return problems;
+}
+
+test("コマンドのページは 関数 → 例 → (注意点) の型を守り、英日で節がそろう", () => {
+  const commandPages = pages.filter((p) => p.startsWith("reference/commands/"));
+  assert.ok(commandPages.length > 40, `コマンドのページが読めない: ${commandPages.length}`);
+  const problems = [];
+  for (const page of commandPages) {
+    const lang = isJa(page) ? "ja" : "en";
+    for (const p of commandSectionProblems(readPage(page), lang)) problems.push(`${page}: ${p}`);
+    if (!isJa(page)) {
+      const en = commandSections(readPage(page), "en").join();
+      const ja = commandSections(readPage(twinOf(page)), "ja").join();
+      if (en !== ja) problems.push(`${page}: 英日で標準の節が違う(en: ${en} / ja: ${ja})`);
+    }
+  }
+  assert.deepEqual(problems, []);
+});
+
+test("コマンドのページの型の検出器は崩れを拾う", () => {
+  const ok = "# T\n\n## Functions\n\n|a|\n\n## Example\n\n```swift\n## Notes\n```\n\n## Notes\n\n## Extra\n";
+  assert.deepEqual(commandSectionProblems(ok, "en"), []);
+  assert.deepEqual(commandSectionProblems("# T\n\n## Example\n\n## Functions\n", "en"),
+    ["順序が example → functions", "最初の節が「## Example」"]);
+  assert.deepEqual(commandSectionProblems("# T\n\n## 関数\n", "ja"), ["例の節が無い"]);
+});

@@ -23,6 +23,16 @@
 ブロックの向きに従います(ブロックの外なら現在画面だけ)。`tapWithScrollDown` や `existWithoutScroll` のように
 関数名で指定する別名はありません(書くと、コンパイルエラーが `scroll:` を使った書き方を示します)。
 
+## 例
+
+```swift
+tap("設定", scroll: .down)          // 折り返しの下にある項目を探索してからタップ
+withScrollDown {
+    tap("#row_40")                  // 書かなくても探索される
+    exist("#header", scroll: .noScroll)   // 固定ヘッダは現在画面で確認
+}
+```
+
 ## スクロールさせたい領域: `scrollFrame:`
 
 `scrollFrame:`(および `startMarginRatio:` / `endMarginRatio:`)は `scroll*` / `scrollToBottom`
@@ -64,16 +74,6 @@ Compose / Flutter では1回の送りが約1ページぶんなので、長い画
 (既定の `maxSwipes: 50` では届かない文書もあります)。iOS の in-app ブリッジの UIKit / SwiftUI・WebView と Android の WebView は
 端へ一度に寄せるので、文書の長さに依存しません。`flick*` を並べて速くしようとするのは代用になりません ——
 flick は端に着いたかどうかを判定しないため([flick](./flick_ja.md) 参照)。
-
-## 例
-
-```swift
-tap("設定", scroll: .down)          // 折り返しの下にある項目を探索してからタップ
-withScrollDown {
-    tap("#row_40")                  // 書かなくても探索される
-    exist("#header", scroll: .noScroll)   // 固定ヘッダは現在画面で確認
-}
-```
 
 ## 端から少しだけ出た要素
 

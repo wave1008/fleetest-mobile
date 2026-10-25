@@ -129,7 +129,7 @@ grep やシェル(`cat`)で見るだけのとき・新しいファイルを読�
   (bridge-provision.md)
 - 実行時設定を足す → `ScenarioExecutionSettings` の1箇所(executor.md)
 - DSL コマンドを足す・改名する → 索引 `CommandIndex`(`CommandIndexSyncTests`)・docs/commands.md と
-  user-docs・docs/shirates-parity.md・`ft_batch` のキー・引数名は `waitSeconds:` 等の規律(dsl-commands.md)
+  user-docs の両方(`CommandDocsCoverageTests`)・docs/shirates-parity.md・`ft_batch` のキー・引数名は `waitSeconds:` 等の規律(dsl-commands.md)
 - 受け手のフロー(install.sh・スキル)を変える → SKILL.md のステップ番号と 1:1(`installStepSync.test.mjs`)・
   受け手のファイルを書くのはステップ7.6 の入口だけ(installer-agents.md)
 - シナリオ実行バイナリを起こす経路・子が書く場所・子からの `simctl` / `devicectl` / `adb` の呼び出しを足す → サンドボックスの

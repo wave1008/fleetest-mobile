@@ -4,7 +4,7 @@
 
 掴んだ要素に対して検証するだけでなく、その要素自身の値(ラベル・値・identifier)を読み取る方法です。
 
-## 読み出せるもの
+## プロパティ
 
 | プロパティ | 説明 |
 |---|---|
@@ -13,6 +13,14 @@
 | `.id` | 掴んだ要素の identifier。`String?` |
 | `.isEmpty` / `.isNotEmpty` | 要素を掴めていないか / 掴めているか |
 | `lastElement` | 直前に掴んだ要素(下の節) |
+
+## 例
+
+```swift
+orderNumber = exist("#order_id").text   // 表示テキストを読む
+let e = select("#total")
+if e.isNotEmpty { total = e.text }      // 掴めたかは .isNotEmpty で見る
+```
 
 ## 掴んだ要素の値を読む(`.text` / `.value` / `.id`)
 

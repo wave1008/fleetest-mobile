@@ -24,6 +24,16 @@ searches while scrolling that way, and `.noScroll` never scrolls, even inside a 
 the direction of the enclosing block (outside a block: the current screen only). There are no function-name aliases such as
 `tapWithScrollDown` or `existWithoutScroll` (writing one gives a compile error that shows the `scroll:` form).
 
+## Example
+
+```swift
+tap("Settings", scroll: .down)      // scroll to find the item behind a fold, then tap it
+withScrollDown {
+    tap("#row_40")                  // searched for even though not written explicitly
+    exist("#header", scroll: .noScroll)   // a fixed header, checked on the current screen only
+}
+```
+
 ## The scrollable region: `scrollFrame:`
 
 `scrollFrame:` (also `startMarginRatio:` / `endMarginRatio:`) is an argument on `scroll*` /
@@ -67,16 +77,6 @@ xcuitest mode or Compose / Flutter, one step covers about one page, so raise `ma
 `maxSwipes: 50` may not reach very long documents). iOS UIKit / SwiftUI and WebView with the in-app bridge, and the Android WebView, jump straight to
 the edge, so they do not depend on document length. Chaining several `flick*` calls to go faster is not a substitute —
 flick has no notion of having reached the edge; see [flick](./flick.md).
-
-## Example
-
-```swift
-tap("Settings", scroll: .down)      // scroll to find the item behind a fold, then tap it
-withScrollDown {
-    tap("#row_40")                  // searched for even though not written explicitly
-    exist("#header", scroll: .noScroll)   // a fixed header, checked on the current screen only
-}
-```
 
 ## Elements that only just peek in at the edge
 

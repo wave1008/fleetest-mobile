@@ -70,3 +70,8 @@ CLAUDE.md から移した規則(本文は移設前と同一)。この領域の�
   (`= FlowStep.defaultXxx` を既定引数に焼き込まない。焼き込むと実行時の既定に追随しない。
   `RunTunablesWiringTests.testDSLNeverBakesInTheFixedDefaults`)。新しい既定は `RunTunables` に欄を足す
   (executor.md)。意味を表す既定(`holdSeconds: 0` = 通常タップ・`scale`・安全網の上限)は値のまま
+- **user-docs のコマンドのページ(`docs/user-docs/reference/commands/`)の節の型**: `## 関数`(プロパティのページは `## プロパティ`)
+  → `## 例` → `## 注意点`(任意)→ ページ固有の節 → `### Link`。英語は `Functions`(`Properties`)/ `Example` / `Notes`。
+  関数と例は必須・英日で標準の節の有無と順序をそろえる(`userDocsIntegrity.test.mjs`)。**索引の全コマンドは commands.md と
+  user-docs(英・日)の両方に載せる**(`CommandDocsCoverageTests`。`flickCenterToTop/Bottom`・`thisContains(Not)`・
+  `element.memoTextAs(key)` の書き方は展開して数える)

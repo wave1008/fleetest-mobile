@@ -16,15 +16,6 @@ Returns the folders to use when a scenario writes files. Scenarios run inside a 
 
 Each folder is created the first time it is read.
 
-## What is kept and what is deleted
-
-- Files in `directoryForLog` are kept like the reports and are subject to the retention cleanup (oldest days first).
-  When a run is executed on another Mac (`--runner`), they are collected back together with the reports.
-- `directoryForTemp` is deleted with its contents at the end of the scenario. Write anything you want to keep to
-  `directoryForLog`.
-- Scenario code runs in a dry run too, so both are available there (a dry run's output folder is thrown away).
-- They are not available outside a scenario (for example in MCP's `ft_batch`).
-
 ## Example
 
 ```swift
@@ -43,6 +34,15 @@ func S0010() {
     }
 }
 ```
+
+## What is kept and what is deleted
+
+- Files in `directoryForLog` are kept like the reports and are subject to the retention cleanup (oldest days first).
+  When a run is executed on another Mac (`--runner`), they are collected back together with the reports.
+- `directoryForTemp` is deleted with its contents at the end of the scenario. Write anything you want to keep to
+  `directoryForLog`.
+- Scenario code runs in a dry run too, so both are available there (a dry run's output folder is thrown away).
+- They are not available outside a scenario (for example in MCP's `ft_batch`).
 
 ### Link
 - [index](../../index.md)
