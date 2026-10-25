@@ -24,18 +24,18 @@ WebView の中身をどの経路で読むかの設計。
 **iOS in-app が DOM なのは別の事情**: あちらは in-app ブリッジから WKWebView の a11y ツリーが
 そもそも見えない(別プロセス提供)。
 
-**Android の自作アプリが DOM なのは版差**(2026-08-15。詳細は次節「Android の自作アプリも
-DOM から読む」)。一度は「a11y で読めるなら +147ms を払う理由が無い」として撤回したが、
-**読めることと、どの端末でも同じ属性で読めることは別**だった。
+**Android の自作アプリが DOM なのは版差**(詳細は次節「Android の自作アプリも
+DOM から読む」)。「a11y で読めるなら +147ms を払う理由が無い」とはしない ——
+**読めることと、どの端末でも同じ属性で読めることは別**。
 
 **どちらの木を見ているかの判別**: 要素の `web: true` が DOM 由来の印。ブラウザなのに
 DOM 由来が1件も無ければ `browserA11yFallbackNote` が「a11y から来ている」と言う
-(2026-08-14 の監査 ⒝。**粒度と命名を揃えたので中身では見分けられない**)。
+(**粒度と命名を揃えてあるので中身では見分けられない**)。
 
-**Android の自作アプリで DOM が読めなかったときは黙らない**(2026-09-03): `route` が `.appWebView`
+**Android の自作アプリで DOM が読めなかったときは黙らない**: `route` が `.appWebView`
 なのに `AndroidWebViewDOM.read` が nil のとき、`WebViewDOMFallback` が stderr へ理由を言う
 (`warnBlankCaptureOnce` と同じく判定・文言は純粋関数、メモは static)。
-**stderr の警告は 1 回でも、木には毎回申告する**(2026-09-14・F25): 結論の理由を (serial, package) ごとに控え、
+**stderr の警告は 1 回でも、木には毎回申告する**: 結論の理由を (serial, package) ごとに控え、
 以後の snapshot に iOS in-app と同じ `webViewPath = dom-unread` + `note`(短い理由)を載せる。DSL は注記
 `webview-unread` と失敗文言(申告の note を引く)、MCP は目録の `webViewUnreadNote` で引用する —— stderr だけだと
 MCP の応答にも結果 JSON にも残らない。
@@ -54,7 +54,7 @@ miss で引き直す。追加コストは miss 経路の adb 1往復(構造的�
 3つ目の口**に必ず触れる —— 「2つのフラグだけで決まる」と断定すると、その呼び出しを持つ受け手に
 誤った直し方を指す(`WebViewDOMFallbackTests` が断定文言を否定で固定)。**挙動は変えない**
 (警告だけ)。子の stderr を中継する `ScenarioHost` は、ドライバが自分で `⚠️` を付けた行に
-重ねない(`fleetest run` で `⚠️ ⚠️` になっていた)。受け手向けの説明は
+重ねない(重ねると `⚠️ ⚠️` になる)。受け手向けの説明は
 docs/user-docs/reference/selector/webview(.md/_ja.md)。
 
 ## DS-20 ブラウザの中身は DOM から読む
@@ -62,22 +62,20 @@ docs/user-docs/reference/selector/webview(.md/_ja.md)。
 殺しスイッチは `FT_BROWSER_DOM=off`(自作アプリ側の `FT_WEBVIEW_DOM=off` とは別の口)。
 **自作アプリの WebView は別の理由で別の門**(次節)。
 
-### なぜ(当初の根拠は誤診だったので、置き換わっている)
+### なぜ
 
-最初は「`android.webkit.WebView` は `<table>` のセルを a11y へ1つも公開しない」を根拠に
-アプリ内 WebView 向けに作った。**これは誤診**で、実際はセルは a11y に在り
-`SnapshotBuilder.mappedType` の葉テキスト救済が取りこぼしていた(ブリッジ版 61 で修正)。
-**4 SUT で揃って再現したのは WebView の性質ではなく共通のフィルタだった**
-(教訓は docs/verification/)。
+「`android.webkit.WebView` は `<table>` のセルを a11y へ1つも公開しない」は根拠にならない
+(セルは a11y に在る。取りこぼしは `SnapshotBuilder.mappedType` の葉テキスト救済の側にあった。
+4 SUT で揃って再現したのは WebView の性質ではなく共通のフィルタ。教訓は docs/verification/)。
 
-残った本物の根拠は**ブラウザ本体**。あちらは実際にページを部分的にしか a11y へ出さない
+本物の根拠は**ブラウザ本体**。あちらは実際にページを部分的にしか a11y へ出さない
 (監査22/23/25 の実 web ページ。Android Chrome が本文を1要素も公開しない形が2サイトで再現)。
 a11y からは埋めようがないので DOM を直接読む。
 
 ### 既定は a11y。足りないときだけ DOM
 
-**当初は「ブラウザでは常に DOM」だった。** 根拠は「ページごとに a11y の充実度が変わるので、
-条件で切り替えると**このページでは通るが別のページでは落ちる**」。**この前提が実測で崩れた**:
+**「ブラウザでは常に DOM」にはしない。** 「ページごとに a11y の充実度が変わるので条件で切り替えると
+**このページでは通るが別のページでは落ちる**」という前提が実測で崩れたため:
 
 - 充実度が変わって見えた正体は **a11y サービス接続から木が出来るまでの数秒の窓**で、
   ページの性質ではなかった(§実機だけの罠 の ⑵ と同じ現象)
@@ -100,7 +98,7 @@ dylib に無駄なコードが入り `BridgeContractTests` の指紋が鳴る。
 
 | 相手 | 口 | 備考 |
 |---|---|---|
-| iOS 自作アプリの WKWebView | in-app ブリッジから直に JS | 既存(`InAppWebViewDOM`) |
+| iOS 自作アプリの WKWebView | in-app ブリッジから直に JS | `InAppWebViewDOM` |
 | Android Chrome | CDP。`adb forward localabstract:chrome_devtools_remote` | **pid が付かない**ので WebView の pid 一致規則とは別規則 |
 | iOS Safari(シミュレータ) | `webinspectord_sim` の unix ソケット | 根が `/private/var/tmp` と `/private/tmp` の**2つ**ある |
 
@@ -124,7 +122,7 @@ dylib に無駄なコードが入り `BridgeContractTests` の指紋が鳴る。
 
 ### DOM は a11y の粒度・命名へ揃える
 
-同じ画面を a11y と DOM で読んで**セレクタの書き方が変わらない**ようにする(ブリッジ版 66)。
+同じ画面を a11y と DOM で読んで**セレクタの書き方が変わらない**ようにする。
 
 - **子孫が全部インラインのテキストなら1ノードへ畳む**。Chromium の accname は
   `<td><span>19</span> / <span>24</span></td>` を「19 / 24」1件で出すが、素の DOM 走査は
@@ -132,9 +130,8 @@ dylib に無駄なコードが入り `BridgeContractTests` の指紋が鳴る。
 - **`alt` の無い画像は `src` のファイル名を名前にする**(`logo_small.svg` → `logo_small`)。
   Chromium がそうしており、揃えないと置き換えた瞬間に名前が消える
 
-**揃えた副作用**: ラベルだけでは a11y と DOM を見分けられなくなる。**検証は木の構造で行う**
-(ブラウザ chrome の後に id 無しノードが続くか)。ここを怠って一度、a11y の木を
-「DOM が効いている」と誤読した。
+**揃えた副作用**: ラベルだけでは a11y と DOM を見分けられない。**検証は木の構造で行う**
+(ブラウザ chrome の後に id 無しノードが続くか。ラベルで見ると a11y の木を「DOM が効いている」と誤読する)。
 
 ### 実機(iOS)は口が違う
 
@@ -207,7 +204,7 @@ iOS 17 以降 RemoteXPC/RSD へ移ったサービスもあるが、`com.apple.we
 | Chrome | `@chrome_devtools_remote`(**pid なし**) | パッケージ名 → 固定名 |
 | 自作アプリの WebView | `@webview_devtools_remote_<pid>` | `pidof <package>` の**アプリ自身の pid** |
 
-**成立条件は debuggable だけ**(2026-08-15 に emulator-5554 / `com.ftester.e2e` で実測)。
+**成立条件は debuggable だけ**(emulator-5554 / `com.ftester.e2e` で実測)。
 **アプリが `setWebContentsDebuggingEnabled(true)` を呼ぶ必要は無い** —— debuggable なら
 WebView が1つでも生成された時点でソケットが開く(確認した版は Chrome/150.0.7871.181)。
 **アプリの協力を要る退化は足さない**(release ビルドは id を難読化するので、id で指すテスト自体が

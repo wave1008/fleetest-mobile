@@ -23,16 +23,16 @@ fleetest の Swift DSL は **Shirates(Classic)に準拠**している(コマン�
 | ⏳ | **未実装だが足す価値があると判定済み**(着手が保留。各行に**足す条件**を書く) |
 | 🟢 | fleetest 独自(Shirates に無い) |
 
-**⏳ に「まだ検討していない」を置かない**(2026-08-21)。この印は以前 ❌ で、「検討して
-見送った」と「見ていない」が混ざっていた。`disableHandler` は**理由が1行も無い**まま置かれて
-いて、実際には**CAE を跨ぐ制御に必要**だった(ユーザー指摘で採用)。**判定していない行を作らない**
+**⏳ に「まだ検討していない」を置かない**(2026-08-21)。「検討して
+見送った」と「見ていない」を混ぜない(`disableHandler` は理由が無いまま置かれていて、実際には
+**CAE を跨ぐ制御に必要**だった = ユーザー指摘で採用)。**判定していない行を作らない**
 のがこの表の役目 —— 見送るなら ➖ に理由を、足すなら ⏳ に条件を書く。
 
 **印は ❌ ではなく ⏳**(2026-08-21)。❌ はこのリポジトリでは**ステップの失敗**
-(`runReducer.ts` / lane / ダッシュボード)なので、同じ記号が製品の出力と表で別の意味を持って
-いた。⏳ は待機ログで既に「順番待ち」の意味で使っている。**⏸ を選ばなかった理由**は、幅が
+(`runReducer.ts` / lane / ダッシュボード)なので、同じ記号が製品の出力と表で別の意味を持つ
+ため。⏳ は待機ログで既に「順番待ち」の意味で使っている。**⏸ を選ばなかった理由**は、幅が
 1文字(East Asian Width = N)で表の桁が崩れることと、実行の「一時停止」と衝突すること。
-下の「残る穴」表で ⏸ **保留** としていた行も ⏳ に寄せた(同じ状態を2つの印で書かない)。
+同じ状態を2つの印で書かない(「残る穴」表の保留も ⏳)。
 
 ## 何を足すかの判断基準
 
@@ -127,7 +127,7 @@ fleetest の Swift DSL は **Shirates(Classic)に準拠**している(コマン�
 | `existWithoutScroll` | `exist(sel, scroll: .noScroll)` | 🟡 関数は置かない(`tapWithoutScroll` と同じ) |
 | `dontExist` | `notExist(sel, waitSeconds:scroll:maxSwipes:)` | 🟡 **名前が違う** |
 | `dontExistWithScrollDown/Up` / `dontExistWithoutScroll` | `notExist(scroll:)` に集約 | 🟡 別名は無い |
-| `screenIs` / `screenIsOf` / `isScreen(Of)` / `waitScreen(Of)` / `switchScreen` | — | ➖ 画面ニックネーム機構を持たない。**`screenIs` は `UnavailableCommands` が受け止める**(同名だった FM の視覚照合は 2026-08-21 に `screenLooksLike` へ改名した) |
+| `screenIs` / `screenIsOf` / `isScreen(Of)` / `waitScreen(Of)` / `switchScreen` | — | ➖ 画面ニックネーム機構を持たない。**`screenIs` は `UnavailableCommands` が受け止める**(FM の視覚照合は `screenLooksLike`) |
 | — | `screenLooksLike(説明文)` | 🟢 FM の視覚照合(スクリーンショットと自然文の照合)。Shirates に対応物は無い |
 | `cell` / `cellOf` / `getCell` | セレクタのスコープ `>>` | 🟡 |
 | `appIs` | `appIs(id, waitSeconds: 15)` | ✅ 2026-08-03 **ニックネーム機構が無く ID を直接書く**(Shirates はニックネーム解決込み)。Android は失敗時 actual を付ける |
@@ -148,8 +148,8 @@ fleetest の Swift DSL は **Shirates(Classic)に準拠**している(コマン�
 | `valueIs…` 一式(同10種) | 全て同名 | ✅ 全対称(対象の扱いは `textIs` と同じ) |
 | `idIs` | 同名(チェーン / 暗黙形の両方) | ✅ 2026-08-04 に自由関数版(`select("#x"); idIs("x")`)も追加 |
 | `accessIs…` 一式 | `#id` に統合 | 🟡 |
-| `enabledIsTrue/False` | `enabledIsTrue()` / `enabledIsFalse()` | ✅ 2026-08-04 糖衣形を同名で踏襲(旧 `isEnabled`/`isDisabled` から改名)。**生文字列の親形 `enabledIs(expected:)` は持たない**(下記 ➖) |
-| `checkIsON` / `checkIsOFF` | `checkIsON()` / `checkIsOFF()` | ✅ 2026-08-04 同名で踏襲(旧 `isChecked`/`isNotChecked` から改名) |
+| `enabledIsTrue/False` | `enabledIsTrue()` / `enabledIsFalse()` | ✅ 2026-08-04 糖衣形を同名で踏襲。**生文字列の親形 `enabledIs(expected:)` は持たない**(下記 ➖) |
+| `checkIsON` / `checkIsOFF` | `checkIsON()` / `checkIsOFF()` | ✅ 2026-08-04 同名で踏襲 |
 | Vision 版の `checkIsON` / `checkIsOFF`(`CheckStateClassifier`) | 同じ置き場所(`vision/classifiers/CheckStateClassifier/[ON]`・`[OFF]`)の見本画像があれば使う | 🟡 2026-09-18 移植(`Sources/FTCore/VisionClassifier.swift`)。学習(Create ML・ScenePrint・`options=`/`imageFilter=binary`)とラベルの読み方(`[ON]`/`[OFF]` を含むか)は同じ。**違い**: 部品の切り出しは Shirates の画像区分け(SegmentContainer)ではなく a11y の枠 / a11y が状態を報告する要素と両方あるときの優先は実行プロファイルの `preferCheckStateClassifier`(既定 true = 分類器を優先)と、1コマンドだけ上書きする引数 `prefer:` / Shirates の `classifierName` 等の引数は持たない / **`[INDETERMINATE]` のラベル(fleetest 独自)** で indeterminate を判定する(Shirates ではどちらにも当たらず両方落ちる = 結果は同じ) |
 | `enabledIs(expected:)` / `checkedIs(expected:)`(生文字列の親形) | — | ➖ **持たない**。生値比較は OS 依存(checked は Android "true"/"false"・iOS "1"/"")で、fleetest が持つ正規化済み Bool と衝突する。糖衣形(`enabledIsTrue/False`・`checkIsON/OFF`)は OS 差を吸収済みで正規化と一致する。Shirates 自身も `checkIsON/OFF` の中でこの OS 差を吸収している。**再提案しない** |
 | `selectedIs(True/False)` | — | ➖ iOS の selected trait は `checked` に写像している |
@@ -194,7 +194,7 @@ fleetest の Swift DSL は **Shirates(Classic)に準拠**している(コマン�
 | `waitForDisplay` | `waitForDisplay(sel, waitSeconds: 15)` | ✅ 2026-08-03 スクロールしない・戻り値 `FTElement`。Shirates の `throwsException` に相当する引数は持たない(常に失敗として記録する) |
 | `waitForClose` | `waitForClose(sel, waitSeconds: 15)` | ✅ 2026-08-03 **`expression` 省略不可**(Shirates の直前セレクタ再利用の省略形は不採用。`lastElement` は 2026-08-04 に実装済みだが、待ち対象がソース上で読めなくなるため待ち系には省略形を置かない) |
 | — | `waitForSettle(sel?, quietSeconds:, throwsException: true, waitSeconds: 15)` | 🟢 **Shirates に対応物は無い**。画面(`sel` を渡せばその要素の枠。各辺 10% を除く)の画素が `quietSeconds` のあいだ変わらなくなり、さらにアクセシビリティの木が追いつくまで待つ。画像の判定・画素単位の操作・レポート用のスクリーンショットの直前に、スクロールやフリックの慣性が止まるのを待つ**明示のコマンド**(通常の操作は待たない)。**`throwsException`(Shirates の引数名)は、このコマンドの時間切れだけに効く** —— `false` なら失敗にせず注記 `settle-not-reached` を残して `false` を返す。**`sel` の要素が見つからないときは `throwsException` の値によらず常に失敗する**(下の「名前の相違」の `optional:` / `throwsException: false` の全廃は操作・検証について据え置き。時間切れだけが文書化された例外)。他ツールの名前 `waitForAnimationToEnd` は `UnavailableCommands` が受け止め、`waitForSettle()` を案内する。仕様は docs/commands.md「`waitForSettle`」・設計は DS-4.7 |
-| `usingWaitSeconds` | `waitSeconds:` 引数 / 実行プロファイル `defaultTimeout` | 🟡 **待つ上限の引数名は全コマンドで `waitSeconds:`**(Shirates と同名。ユーザー決定 2026-09-19。以前は操作・検証が `timeout:`、待機・分岐が `waitSeconds:` と割れていた。実行プロファイルのキー `defaultTimeout` / `scenarioTimeout` と MCP ツールの `timeout` は別物で据え置き) |
+| `usingWaitSeconds` | `waitSeconds:` 引数 / 実行プロファイル `defaultTimeout` | 🟡 **待つ上限の引数名は全コマンドで `waitSeconds:`**(Shirates と同名。ユーザー決定 2026-09-19。実行プロファイルのキー `defaultTimeout` / `scenarioTimeout` と MCP ツールの `timeout` は別物で据え置き) |
 | `waitScreen` / `waitScreenOf` | — | ➖ 画面ニックネーム機構を持たない |
 
 ## アプリ・OS 操作
@@ -202,7 +202,7 @@ fleetest の Swift DSL は **Shirates(Classic)に準拠**している(コマン�
 | Shirates | fleetest | |
 |---|---|---|
 | `launchApp` / `terminateApp` | 同名 | ✅ |
-| `restartApp` | 同名 | ✅ 旧名 `relaunchApp` から改名済み(2026-07-31。下記「名前の相違」) |
+| `restartApp` | 同名 | ✅ 下記「名前の相違」参照 |
 | `installApp` / `removeApp` | `installApp(path?)` / `removeApp(id?)` | ✅ 2026-08-03 DSL 化。`installApp` は実行をオーケストレータ(親プロセス)へ委譲し、パス省略時は実行プロファイルの `appPath` を解決する(Shirates の `appPackageFile` 既定に一致)。オーケストレータ無しの単独実行だけ引数必須(省略時は明示エラー)。`removeApp` は id 省略を実行中アプリの既定 bundleID/package に解決する |
 | `isAppInstalled` / `launchAppByShell` | CLI 側(`fleetest install`)。DSL には無い | ➖ **導入はシナリオの外**(2026-08-21 判定)。実行プロファイルの `appPath` + `autoInstall` が run の前に面倒を見るので、シナリオが導入状態を分岐に使う形は増やさない(`installApp` / `removeApp` は明示的に操作したいとき用に既にある) |
 | `goPreviousApp` | `appSwitcher()`(スイッチャーを開くだけ) | 🟡 |
@@ -281,7 +281,7 @@ fleetest の Swift DSL は **Shirates(Classic)に準拠**している(コマン�
 
 | fleetest | Shirates | |
 |---|---|---|
-| `restartApp` | `restartApp` | ✅ **揃えた**(旧名 `relaunchApp` から改名。2026-07-31) |
+| `restartApp` | `restartApp` | ✅ **揃えた**(2026-07-31) |
 | `notExist` | `dontExist` | ➖ **`notExist` を維持**(ユーザー決定 2026-07-31)。`notExist` は否定の意味が読み取りやすく、`exist` との対称も保てる。**再提案しない** |
 | `optional:` 引数なし | `throwsException: false` | ➖ **全廃**(ユーザー決定 2026-08-02)。空振りを許す引数が操作系にあると腐ったセレクタが緑で残る。代替は `irregularHandler` / `ifCanSelect`、値を読む用途は `select` の空要素。**再提案しない**。唯一の例外は `waitForSettle` の `throwsException`(効くのは時間切れだけ・要素が見つからなければ常に失敗。「同期」の表) |
 

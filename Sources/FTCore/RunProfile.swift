@@ -417,7 +417,7 @@ public struct RunProfileDocument: Codable, Sendable, Equatable {
     public var locale: String?
     /// **interop WebView 画面の委譲イベント直前にランナーへ1回接続確認(木を1回読ませる)するか**(既定 true)。
     /// attach したままの XCUITest セッションは放置後の座標イベントを 200 のまま届け損なう
-    /// (実測 ~13% → 接続確認で 0/50。A/B は docs/verification/triage.md「interop WebView」)。false で
+    /// (実測 ~13% → 接続確認で 0/50。A/B は docs/verification/resolved.md「interop WebView」)。false で
     /// FT_PRE_ACTION_PING=0 を注入し接続確認を止める(WebViewDelegatingDriver が受ける)。
     /// 効くのは inapp モードの domInterop 経路だけ(xcuitest モードには元から不要)
     public var iosPreActionPing: Bool?

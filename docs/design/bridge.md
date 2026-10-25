@@ -23,7 +23,7 @@ WebDriverAgent と同じ原理を最小構成で自作する(iOS)。Android に�
 - シミュレータはホストとネットワークスタックを共有するため、テスト内で
   `127.0.0.1:8123` に listen すればホストの `localhost:8123` から直接届く。
   ポート番号は CLI が空きポートを選んで環境変数で注入する。
-- **無通信 TTL(2026-07-30)**: 最終リクエストから `FT_BRIDGE_TTL` 秒(既定 7200・`0` で無効)
+- **無通信 TTL**: 最終リクエストから `FT_BRIDGE_TTL` 秒(既定 7200・`0` で無効)
   無通信のブリッジは自主終了する(iOS/Android 共通。忘れられたゾンビのデバイス占有防止)。
   心拍は**全リクエスト**(/status 含む)なので、モニターのポーリングが続く限り失効しない。
   既定値の定義は `BridgeAPI.bridgeTTLSecondsDefault`(Java 側と `AndroidBridgeVersionSyncTests`
@@ -35,31 +35,29 @@ WebDriverAgent と同じ原理を最小構成で自作する(iOS)。Android に�
   自動ロックされ、以後の launch が `denied by SBMainWorkspace ... reason: Locked` で拒否されて
   run ごと死ぬ。**ツールは起こさない** —— **設定 → 画面表示と明るさ → 自動ロック → なし**に
   しておくのが実機を使う前提。
-  **かつてはランナーが 25 秒ごとに `press(.home)` を撃っていた(版 81〜88)が、廃止した**:
+  **ランナーは入力を合成して画面を保たない**(`press(.home)` の定期送出は置かない):
   合成した入力は実機では本物の HID で、無害だという前提が OS の版で反転する
   (iOS 26.5.2 では SpringBoard に届かず、26.6 では届いて**対象アプリが run の途中で
   ホーム画面へ落ちた**)。端末の画面設定は端末の持ち主が決めるものなので、ツールが
-  入力を合成して覆すのをやめた。
+  入力を合成して覆さない。
   ホストから自動ロック設定を書き換える手段は無い(`devicectl device settings` は
   appearance/audio/biometrics/voiceover だけ)ので、**設定するのは人**。
   ロックされたまま起動しようとした場合は `IOSPhysicalDeviceLock` と
   `IOSDeviceTransport.blockingCondition` が名指しで止める。
   処理中(`inFlight > 0`)は撃たない(accept スレッドと XCUITest を同時に叩かないため)
-- **容器推定は scrollable 申告の祖先を優先する(2026-08-23)**: `ContainerGeometry.clippingContainer` は
+- **容器推定は scrollable 申告の祖先を優先する**: `ContainerGeometry.clippingContainer` は
   「同じ深さの子を2つ以上持つ直近の祖先」を容器とみなす規則(Compose iOS は xcuitest で scrollable を
   申告できないための近似)だが、申告のある木ではそれが**カード**を容器に選ぶ(カルーセル > カード >
   ラベル+バッジ)。クリップするのはカードではなくスクロール容器なので、祖先の連鎖に
   `scrollable == true` があれば最も近いそれを正とする(`nearestScrollableAncestor`)。申告の無い木は
   従来どおり。見切れ判定・回復ドラッグ・タップの座標補正・ghost 判定・MCP の RefGuard が同じ関数を
-  使うので、変えるときは 5 SUT のフル E2E で退行を見る(受け手の最小再現: 横カルーセルの右縁で
-  見切れた項目への `exist(scroll: .right)` がカードを viewport にして送れず not-found になっていた)。
-  **同じ最小再現で見つかった第2の穴**: 見切れ回復の `slowDrag` とヒント跳躍の `hintDrag` が
-  `driver.drag` を直に呼んでいて、in-app ブリッジは drag を実装しない(501)ので失敗扱い → 全画面
-  スワイプに落ちていた = **利用者の既定の inapp モードでは見切れ回復のドラッグが一度も出ていなかった**
-  (当時の MCP は inapp モードで `HybridFallbackDriver` が drag を転送していたので `ft_scroll_to` は同じ画面で通った。
-  run と MCP で結果が割れたらドライバ合成の差を疑う)。座標ドラッグは
-  `StepExecutor.dragWithFallback` が唯一の入口(501 → typeDriver へ latch。空打ち emptyDrag と同じ規律)
-- **起動前にポートの LISTEN 実体を確かめる(2026-08-23)**: `scanRunningBridges` は /status 応答で
+  使うので、変えるときは 5 SUT のフル E2E で退行を見る(カードを viewport に取ると、横カルーセルの右縁で
+  見切れた項目への `exist(scroll: .right)` が送れず not-found になる)。
+  **座標ドラッグは `StepExecutor.dragWithFallback` が唯一の入口**(501 → typeDriver へ latch。空打ち emptyDrag と同じ規律)。
+  見切れ回復の `slowDrag` とヒント跳躍の `hintDrag` が `driver.drag` を直に呼ぶと、in-app ブリッジは drag を実装しない(501)ので
+  失敗扱い → 全画面スワイプに落ち、inapp モードでは見切れ回復のドラッグが一度も出ない
+  (MCP は `HybridFallbackDriver` が drag を転送するので `ft_scroll_to` だけ通る。run と MCP で結果が割れたらドライバ合成の差を疑う)
+- **起動前にポートの LISTEN 実体を確かめる**: `scanRunningBridges` は /status 応答で
   稼働中を数えるが、in-app ブリッジは注入先アプリが背面だと TCP は受け付けて HTTP に答えない
   = ポートを掴んだまま「空き」に見える(全シミュレータはホストの loopback を共有するので
   ポートはデバイスを跨いで一意)。`executeBridge` は記録の有無に関わらず `PortHolder.stopIfOwnedBridge`
@@ -68,13 +66,12 @@ WebDriverAgent と同じ原理を最小構成で自作する(iOS)。Android に�
   `StaleBridgeStop.decide`(.inapp 記録 → simctl terminate / .pid → ランナー停止 / 記録無し →
   PortHolder)。`.inapp` の記録は ready 待ちの**前**に書く(中断で記録の無い残骸を作らない)。
   切り分けは docs/verification/triage.md「never joined」の節
-- **登録の無いシステムアラートも黙らない(2026-08-23)**: `SystemUIGate` の毎ステップ判定は
+- **登録の無いシステムアラートも黙らない**: `SystemUIGate` の毎ステップ判定は
   `iosAlertHandler` の登録がある間だけ(費用を登録した人だけが払う。0ec9b245)。登録漏れは
   人為ミスとして起こり続けるので、**launch 系の直後の最初の触る操作**と**ステップの失敗時**に
   限って1回 `GET /systemalert` を聞き、前面にあれば注記 `system-alert-present` と文言(題名・
   ボタン)を残す。止めない・閉じない(新しい検知は警告から。閉じるのはシナリオの責務)。
-  失敗文言に題名が出るので、時間切れの仕分けが「アラートだった」で即決まる。**MCP も同じ形**
-  (2026-08-31): `ft_launch` / `ft_open_url` / `ft_install` / `ft_clear_app_data` の直後の**最初の
+  失敗文言に題名が出るので、時間切れの仕分けが「アラートだった」で即決まる。**MCP も同じ形**: `ft_launch` / `ft_open_url` / `ft_install` / `ft_clear_app_data` の直後の**最初の
   `ft_snapshot` で1回**(出ていたら閉じるまで木を返す応答ごとに確かめ続ける)、**ref の操作(ft_tap / ft_type / ft_clear_input / ft_long_press / ft_batch の1手目)
   では毎回聞き、前面にあれば断る**。**アラートが前面にある間はアプリの木を出さない**(ユーザー決定 2026-10-11。
   背面の木は押せない要素の一覧で、読み手はそこから次の手を探す。木から決まる注記も出さない)。**アプリ内の alert**
@@ -83,13 +80,13 @@ WebDriverAgent と同じ原理を最小構成で自作する(iOS)。Android に�
   要素一覧(`FTRuntime.handleFailure` = システムアラートの下では一覧ごと伏せ、レポートが伏せた理由を1行言う)が共有する(題名・ボタンを名指しして SpringBoard へ attach する手順を出す。
   SpringBoard に attach 中は断らない)。**MCP だけ警告でなく拒否**なのは、どちらのブリッジでも操作が
   届くため —— in-app はアラートを残したまま背面のアプリが反応し、XCUITest は XCTest の割り込み処理が
-  アラートのボタンを押して権限を黙って変えていた(拒否側とは限らず「許可」も押し、遮られた操作を撃ち直した。2026-10-03 にランナーへ `InterruptionGuard` を置いて既定のハンドラを止めた = **遮られた操作は 422 で返り、アラートは押されない**。MCP の事前拒否は、7 秒待たずに題名とボタンを名指しする口として残す)。座標の操作は断らない(XCUITest では
+  アラートのボタンを押して権限を黙って変えていた(拒否側とは限らず「許可」も押し、遮られた操作を撃ち直した。ランナーの `InterruptionGuard` が既定のハンドラを止めるので、**遮られた操作は 422 で返り、アラートは押されない**。MCP の事前拒否は、7 秒待たずに題名とボタンを名指しする口として残す)。座標の操作は断らない(XCUITest では
   アラートそのものに当たる)。判定は `SystemUIGate` の1箇所
-- **失敗時の証跡の絵は画面全体を撮る(2026-09-20)**: in-app の `/screenshot` はアプリ自身の window を
+- **失敗時の証跡の絵は画面全体を撮る**: in-app の `/screenshot` はアプリ自身の window を
   描き直すだけで、SpringBoard のアラートは写らない。inapp モードは `fallbackDriver`(XCUITest =
   `XCUIScreen`)で撮り、撮れなければ主ドライバへ落ちる(`FTRuntime.handleFailure`。白フレームの
-  撮り直しも同じ撮り方)。DSL の `screenshot` も同じ撮り方(2026-10-20)。
-- **画像判定の絵は覆いがあると分かっているときだけ画面全体を撮る(2026-10-20)**: テキストの可視性検証・
+  撮り直しも同じ撮り方)。DSL の `screenshot` も同じ撮り方。
+- **画像判定の絵は覆いがあると分かっているときだけ画面全体を撮る**: テキストの可視性検証・
   findImage / existImage / imageIs・分類器(checkIsON / checkIsOFF)は、inapp モードでは in-app の絵を使い、**判定に使った木がキーボードを
   申告しているとき**と**そのフェーズの照会(`GET /systemalert`。フェーズごとに1回・触る操作の照会の答えも使う)で
   アラートが前面にあったとき**だけ `fallbackDriver` で撮る(`FTCore.JudgmentCapture` /
@@ -97,7 +94,7 @@ WebDriverAgent と同じ原理を最小構成で自作する(iOS)。Android に�
   毎回 XCUITest で撮らないのは、可視性検証が既定で有効で、検証のたびに数百 ms(in-app 約 45〜125ms)増えるため。
   画面全体の絵には in-app の絵の追いつき待ち(`InAppRenderCatchUp`)が効かないが、xcuitest モードと同じ条件で、
   可視性検証は見えないと判定した回に撮り直して待つ。見逃すもの: 通知バナー等の他の覆い・フェーズの途中で出たアラート
-- **起動元の自己申告と doctor の刈り取り(2026-07-30)**: 3ブリッジとも `/status` で起動元
+- **起動元の自己申告と doctor の刈り取り**: 3ブリッジとも `/status` で起動元
   (`ownerRepo`。iOS xcuitest はホスト上で停止できる `ownerPid` も)と直前の無通信秒数
   (`idleSeconds`)を申告する(注入経路: xctestrun 環境変数 / `-e owner` / SIMCTL_CHILD)。
   doctor は管理外ブリッジの処遇を `UnmanagedBridgeTriage`(唯一の判定者)で決める:
@@ -186,12 +183,11 @@ ref を引く表が2つあるので、**呼び手は直前に撮った木と同�
 素通しすると**両方の名前空間が 1 から採番される**ため、番号がアプリ側の `refFrames` で
 引き当たり、システム UI を操作したつもりで無関係なアプリの要素へ届く。
 
-**なぜ要るか**(2026-08-25): xcuitest モードは**ブリッジが1本しかなく、主ドライバと
-共有している**。旧経路はセッションを springboard へ移し ref 表を空にするので、権限アラートを
-閉じた次のステップが SpringBoard の木を読んで `cannot resolve the locator` で落ちた
+**なぜ要るか**: xcuitest モードは**ブリッジが1本しかなく、主ドライバと
+共有している**。`POST /session springboard` はセッションを springboard へ移し ref 表を空にするので、権限アラートを
+閉じた次のステップが SpringBoard の木を読んで `cannot resolve the locator` で落ちる
 (E2E-iOS の `16_システムアラート.swift` で実測)。inapp モードはフォールバックが別ブリッジなので
-巻き添えが無く、旧経路のままでも正しく動いていた —— **同じホストのコードが、モードによって
-壊れたり壊れなかったりしていた**。ホスト側で「見た後に張り直す」ことでも塞げるが、
+巻き添えが無い —— **同じホストのコードが、モードによって壊れたり壊れなかったりする**。ホスト側で「見た後に張り直す」ことでも塞げるが、
 戻し忘れが**次のステップで**沈黙して失敗する形になるため、ブリッジ側に不変条件を置いた。
 
 **アラートの有無で撮る/撮らないを分けない**: この口はホーム画面の走査(`tapAppIcon`)にも使う。
@@ -241,15 +237,14 @@ Android の整定判定は**スナップショットの画面サイズ**で行�
 **XCUITest ランナーは 409 を `requireApp()` の1箇所からしか投げてはいけない**(`SessionRecoveryDriver`
 がこの経路の 409 を無条件に「セッション消失」と読み、activate を撃つため)。同じ「今は無理」を
 表したいときは 422 を使う。in-app ブリッジは逆に 409 を一時的競合へ広く使ってよい
-(あちらは `SessionRecoveryDriver` で包まれない)。2026-07-31 に `handleClear` が 409 を足して
-この不変条件が破れ、clearInput の正当な失敗が「ランナーが再起動した可能性」と誤報告された
-(実害)。以後 `BridgeRouterStatusContractTests` が 409/503/501 の本数を数えて守る
+(あちらは `SessionRecoveryDriver` で包まれない)。破ると clearInput の正当な失敗が
+「ランナーが再起動した可能性」と誤報告される(`handleClear` が 409 を足して実害が出た)。
+`BridgeRouterStatusContractTests` が 409/503/501 の本数を数えて守る
 
-**in-app dylib は「古いまま注入される」事故が起きやすい**(2026-07-27 に実害):
+**in-app dylib は「古いまま注入される」事故が起きやすい**:
 `InAppBridge/build/` は gitignore・手動ビルドなので、ブリッジのソースを直しても
-再ビルドしなければ**古いバイナリが注入され続ける**。実際に isChecked 追加と型の役割正規化
-(b8a408c)が反映されず、ios-inapp / ios-heal だけ「checked が取れない」「switch 型が出ない」で
-落ち続けた。`InAppLauncher.buildIfNeeded` は**存在ではなく鮮度**(`InAppBridge/Sources/*` +
+再ビルドしなければ**古いバイナリが注入され続ける**(ios-inapp / ios-heal だけ
+「checked が取れない」「switch 型が出ない」で落ち続けた実害がある)。`InAppLauncher.buildIfNeeded` は**存在ではなく鮮度**(`InAppBridge/Sources/*` +
 `build.sh` + 共有 DTO の mtime)で判定する — 存在チェックに戻してはいけない。
 
 ### DS-4.4 スナップショットの圧縮(4K コンテキストへの最重要対策)
@@ -298,8 +293,7 @@ Android の整定判定は**スナップショットの画面サイズ**で行�
   送られていないだけの要素を「無い」と報告するのがこの欠陥そのもの)。
   探索中の打ち切り(上記)も同じ理由で `notExist(scroll:)` を通さない ——
   通り過ぎた画面の木はもう手元に無く、撮り直しでは救えないため。
-- **間引きは優先度順**(2026-08-07。ここは長く「hittable 優先」と書いてあったが、実装は
-  両 OS とも先着順だった)。低い帯から順に、**同じ帯の中では preorder の後ろから**捨てる。
+- **間引きは優先度順**(「hittable 優先」でも先着順でもない)。低い帯から順に、**同じ帯の中では preorder の後ろから**捨てる。
   **並べ替えはしない** —— `RefGuard.lineage` が preorder+depth でツリーを復元し、
   ref の大小を z-order の代理に使うため:
 
@@ -310,12 +304,12 @@ Android の整定判定は**スナップショットの画面サイズ**で行�
   | tier1 | ラベルか identifier を持つ | 3番目 |
   | tier0 | 操作可能(clickable/入力欄など)か scrollable な容器 | 最後 |
 
-  **tier2 を bulk より先に捨てる**(2026-08-08 に変更。旧順は bulk が最初だった)。
+  **tier2 を bulk より先に捨てる**。
   ラベル付き同一 identifier 群(bulk)は、ラベルも id も無い装飾(tier2)より本物のコンテンツ
   である見込みが高いので、超過時は装飾から削る。POI 洪水のような大群の捲れは、tier2 が
   少ない画面では次に bulk が捨てられるので従来どおり保たれる。
 
-  **bulk に「スクロール容器の外」という条件は置かない**(2026-08-08 に撤廃)。Apple マップの
+  **bulk に「スクロール容器の外」という条件は置かない**。Apple マップの
   地図 POI(`id=VKPointFeature` ×67〜77、画面により変動)は地図=スクロール容器の中に居るため
   旧条件では bulk を素通りしてラベル付き tier1 になり、**preorder 前方(地図は木の先頭)に
   居るため同 tier 内では最後まで残って**、後方のカード内容から先に落ち、経路画面で 84 件の
@@ -343,7 +337,7 @@ Android の整定判定は**スナップショットの画面サイズ**で行�
   - 誤検知の確認は**コーパス14本**(iOS/Android・2種の地図アプリ・4 SUT の実画面)で全数。
     発火は狙いの `VKPointFeature` ×90 の1件だけで、**Android は1画面も発火しなかった**
     (Google マップを含む)
-  - **打ち切りは「何件」ではなく「何が」落ちたかを申告する**(2026-08-09。
+  - **打ち切りは「何件」ではなく「何が」落ちたかを申告する**(
     `SnapshotResponse.truncatedTiers` / `BridgeSnapshotThinning.droppedByTier`。版60)。
     実測(Apple マップの経路プランナー): 候補 211 件のうち **91 件が脱落**し、残った 120 件の
     **56% が地図の POI** だった。ここで「間引きの方針が妥当か」を議論しようとしたが、
@@ -355,16 +349,15 @@ Android の整定判定は**スナップショットの画面サイズ**で行�
     `SnapshotBuilder` は tier3 を持たず語彙が揃わない。tier3 が iOS 限定なのと同じ理由)。
     ホストは `ft_snapshot` / `ft_scroll_to` の**先頭 note** で出す —— `(+91 elements truncated)`
     は 120 行の一覧のいちばん下にしか出ておらず、いちばん重い事実がいちばん読まれない位置にあった。
-    **捨てる順(tier)自体はまだ変えていない**: 上の 91 件が何だったかは、この申告が入った
-    ブリッジで採り直してから判断する(見積りで順序を触らない)
-  - **打ち切りに掛からなくても、大群は読む側の邪魔になる**(2026-08-09)。Apple マップの
+    **捨てる順(tier)は申告の実測なしに変えない**(見積りで順序を触らない)
+  - **打ち切りに掛からなくても、大群は読む側の邪魔になる**。Apple マップの
     1画面は `id=VKPointFeature` が 42〜67 件あり、**一覧の 47〜58% がこれ**で、本物の UI が
     毎回下半分へ押し込まれていた。そこで**描画側でも畳む**:
     `SnapshotRenderer.render(collapsingBulk:)` が「同一 id が `bulkGroupMinimum`(=20。
     ブリッジの bulk tier と同じ値)以上・すべて `other` の葉・非スクロール」群を
     **見出し1行 + 「ラベル[ref]」の索引**に畳む。**frame は落とすが ref は全件残す**
     —— 実測で `#VKPointFeature` の ref タップは場所カードを開くので、消してはいけない。
-    **印(⚠️scroll-leftover 等)が付いた要素も畳む**(2026-08-10): タップ時に RefGuard が
+    **印(⚠️scroll-leftover 等)が付いた要素も畳む**: タップ時に RefGuard が
     改めて警告するので、snapshot 時点の個別列挙は冗長 —— 地図 POI 231件中40件が印付きという
     だけで出力の半分を個別行が占めていた。見出しに旗ごとの件数を添える
     (`38 ⚠️scroll-leftover, 1 ⚠️offscreen among them`)。`ghostNote` の先頭注記も畳まれた ref を
@@ -373,7 +366,7 @@ Android の整定判定は**スナップショットの画面サイズ**で行�
     `ft_snapshot` は既定で畳み `expandBulk: true` で全行に戻す。`ft_scroll_to` は常に畳む
     (答えは「探した1つがどこに居るか」なので大群を並べる意味が無い)。**間引き(ブリッジ)と
     畳み(描画)は別物** —— 前者は配列から消し、後者は見せ方を変えるだけ
-  - **注記も同じ理由で畳む**(2026-08-12 の実アプリ監査)。減らすのは2形だけ:
+  - **注記も同じ理由で畳む**(実アプリ監査)。減らすのは2形だけ:
     ① **記号だけのラベルは曖昧ラベル一覧に出さない**(`MCPServer.isSymbolOnlyLabel`)——
     実測(Google マップの経路詳細)では区切りの `" · "` ×3 が代替セレクタ付きで注記の上位を
     占めていた。**飾り葉フィルタ(`isDecorativeLeaf`)を広げて対応しない** ——
@@ -384,7 +377,7 @@ Android の整定判定は**スナップショットの画面サイズ**で行�
     先頭行の子孫で、1つのはみ出しを 8 回読ませていた。子孫を撃つときは祖先も必ず同じ状態
     なので安全上の情報は減らず、**行そのものに付く ⚠️ 印は従来どおり全行に出る**
     (落とした件数は `(+N descendant row(s) of these, same flag)` で言う)
-  - **bulk 群は要素上限の勘定に入れない**(版 61。2026-08-09)。上限は「読み手が選ぶ対象」に
+  - **bulk 群は要素上限の勘定に入れない**(版 61)。上限は「読み手が選ぶ対象」に
     使い切らせるためのものなのに、実測(Apple マップの経路手順)では `#VKPointFeature` が
     保持 119 件中 87 件 = 73% を占め、操作可能要素とラベル持ち要素をその分だけ押し出していた。
     `BridgeSnapshotThinning.indicesToKeep` は **bulk を予算から外し**(`bulkExemptCeiling` = 400 の
@@ -393,7 +386,7 @@ Android の整定判定は**スナップショットの画面サイズ**で行�
     従来どおり効く。件数は `SnapshotResponse.bulkExemptCount` で申告し、ホストは
     「上限を超えているのは異常ではない」と言える(超えた一覧を見て木が壊れていると読ませない)。
     **iOS の2ブリッジだけ**(Android は tier3 を持たないので nil = 従来動作へ縮退)
-  - **「畳める群を先に捨てる」は却下**(2026-08-09 に実装して撤回)。動機は実測
+  - **「畳める群を先に捨てる」は却下**(実装して撤回)。動機は実測
     (Apple マップの経路手順で `#VKPointFeature` が **119 件中 87 件 = 73%**)だが、
     **同じ述語はリストの行にも当たる** —— 同一 id ×20 以上の行は普通にあり、群の尾を先に
     落とすと 30 行のリストの 21 行目以降が**無ラベル装飾より先に**消える。
@@ -432,8 +425,8 @@ Android の整定判定は**スナップショットの画面サイズ**で行�
   タブ・改行・NEL は分類上 `Cc` だが White_Space なので**消さずに寄せる**
   (順序を逆にすると `"A\tB"` が `"AB"` になる。2026-08-09 にテストで検出)。
   描画(`SnapshotRenderer`)は `.text` を通す —— 印字は「画面で見えているもの」を写すため。
-  **アサーション側は 2026-08-09 まで正規化ゼロだった**(素の `==`)ので、ゼロ幅1文字で
-  `textIs` が落ちるのに同じ文字列のセレクタは当たる、という経路ごとに答えの違う状態だった。
+  **アサーション側も同じ正規化を通す**(素の `==` だと、ゼロ幅1文字で
+  `textIs` が落ちるのに同じ文字列のセレクタは当たる、という経路ごとに答えの違う状態になる)。
   `strict: true` は DSL の引数 → `FlowStep.strictText` → `StepExecutor.textNormalization` で届く。
   **不一致の失敗文は「どちらの規則なら一致したか」を必ず出す**(`normalizationVerdict`) ——
   見えない差で落ちたのか本当に違う文字列なのかで、読み手の次の一手が変わる
@@ -507,9 +500,9 @@ Android の整定判定は**スナップショットの画面サイズ**で行�
   道連れ**になり、その文面が案内する `ft_list_devices` 自身が同じエラーを返す袋小路になっていた
   (MN-46.5。集合は `DeviceIndependentToolsIgnoreTargetTests` が等号で固定する)。
   **セッション内デバイス記憶も同じ入口で畳む**(`MCPServer.foldInRememberedDevice`。2026-08-12)——
-  当初 `driver(_:)` 内で適用していたが、キャッシュキーと `sessionKey` が生の引数を見るため
+  `driver(_:)` 内で適用すると、キャッシュキーと `sessionKey` が生の引数を見るため
   「明示切替後の省略呼び出しが旧デバイスのキャッシュ済みドライバを引く」
-  「明示 port で採った ref が省略呼び出しから見えない」の2症状を生んだ(上と同根)。
+  「明示 port で採った ref が省略呼び出しから見えない」の2症状を生む(上と同根)。
   適用条件は「udid/port/serial のどれも有効値で来ていない、かつ profile なし」で、
   判定は Android と同じ空文字規則(`argsGaveIOSTarget` / `argsGaveAndroidTarget`。
   `udid: ""` は省略扱い —— キー存在で見ると自動解決の結果を「利用者が選んだ」として記憶してしまう)。
@@ -524,24 +517,24 @@ Android の整定判定は**スナップショットの画面サイズ**で行�
   ブリッジへ省略呼び出しが永久に再ダイヤルする。Android の死亡判定は
   `AndroidSerialResolver.connectedSerials()` の再照会(`androidSerialVanished` = 純粋関数)。
   **曖昧なら適用せず拒否する**(2026-08-13。`isAmbiguousMemory` / `rememberedDeviceRefusal`)——
-  2026-08-12 は「2台以上なら毎回注記しつつ直近へ流す」だったが、**注記は事故を1件も止めなかった**。
+  「2台以上なら毎回注記しつつ直近へ流す」では**注記は事故を1件も止めない**。
   監査19(serial だけの呼び出しが黙って iOS へ)・監査20(キャッシュ命中で記憶が更新されない)・
   udid 2台の記憶混線は**3件とも「2台以上を触ったセッション」でだけ**起きており、逆に1台しか
   触っていないセッションは原理的に外しようがない。**記憶が安全なのは、それが一意なときちょうど**
-  なので、そこを境に警告から拒否へ格上げした(1台のセッションの手数は変わらない)。
+  なので、そこを境に拒否にする(1台のセッションの手数は変わらない)。
   拒否は候補を名指しする —— 断るだけだと読み手は総当たりで udid を試し、結局どれかの機を操作する
 - **キーが指す機が変わったら、そのキーの状態は全部捨てる**(`MCPServer.forgetDeviceState`。2026-08-13)。
   `sessionKey` は `direct:ios:<port>:<serial>` で、**iOS のポートはセッション中に動く**
   (監視が別ポートで起動し直す。実測: -03 が 8128→8126)ので、死んだポートは後で別のシミュレータに
-  再利用され得る。`forgetConnection` が `drivers`/`connections`/`connectedPorts` しか消して
-  いなかったため、`lastSnapshots` と `refGenerations` は**前の機の木**、`launchedBundleIDs` は
-  **前の機で起動したアプリ**のまま生き残っていた(古い ref が別の機の木を起点に解決され、
+  再利用され得る。`forgetConnection` が `drivers`/`connections`/`connectedPorts` しか消さないと、
+  `lastSnapshots` と `refGenerations` は**前の機の木**、`launchedBundleIDs` は
+  **前の機で起動したアプリ**のまま生き残る(古い ref が別の機の木を起点に解決され、
   `ft_open_url` が前の機のアプリへ配送する)。**出力がずれるだけの記憶と違い、これは操作が
   別物へ届く型**なので後始末を1箇所に固める。**`nextRefBase` だけは残す**(単調増加の不変条件。
   0 へ戻すと捨てた世代と同じ base が再配布され、世代管理が防いでいる「番号は同じだが別要素」を
   後始末の側から作る)。版ズレ拒否は `drivers[key]` だけを nil にするので、`driver(_:)` の
   iOS 生成側でも **udid の変化**(port ではなく機そのもの)を見て同じ後始末を撃つ
-- **版ズレは既定で拒否**(2026-08-09 に警告から格上げ)。MCP の出力はシナリオへ書く文字列を
+- **版ズレは既定で拒否**。MCP の出力はシナリオへ書く文字列を
   供給するためにあるので、**古いブリッジの出す古い注記から誤ったセレクタが書き込まれる**ほうが
   「セッションが止まる」より高くつく。ゲートは `driver(_:)` の1箇所(`enforceVersion`)なので
   デバイスを掴む全ツールに掛かり、`ft_status` は「失敗するが理由と直し方を返す」。
@@ -555,7 +548,7 @@ Android の整定判定は**スナップショットの画面サイズ**で行�
   固定待機は XCUITest が非同期遷移完了の event-driven な信号を出さないための妥協(要 private の
   quiescence API を使えば event-driven 化できるが未採用)。in-app ブリッジは tap 側の `InAppSettle`
   (アニメ整定をイベント駆動で待つ)が既に遷移を待つため対象外。
-  **2026-10-09 からタップ・ダブルタップ・長押しは XCTest の quiescence 待ちを既定で飛ばす**(`QuiescenceWait.around` の
+  **タップ・ダブルタップ・長押しは XCTest の quiescence 待ちを既定で飛ばす**(`QuiescenceWait.around` の
   `skipByDefault`)ので、タップ系の遷移の整定は操作直後の取得の `captureSettled`(2回続けて同じ木・予算で打ち切り)が
   単独で担う(4 SUT の A/B で退行無し。スワイプは待ちを残す。詳細は DS-11.2 の「DSL の `settle: false`」の段落と
   PT-8)
@@ -662,12 +655,11 @@ selfOrDescendant=true になってネイティブと区別が付かない。CMP 
 要素の形から推測すると、webView 型を出すが web フラグを持たない **Android が
 「XCUITest へ委譲」を名乗る**(2026-07-29 実害)。申告が無ければ何も足さない。
 
-**`#id` は WebView 内でも使える**(旧「確定仕様: 使えない」は 2026-08-14 に撤回。
-撤回の根拠と現在の供給源は §木はどこから来るか)。**意味は構成によらず id の完全一致**で、
+**`#id` は WebView 内でも使える**(供給源は §木はどこから来るか)。**意味は構成によらず id の完全一致**で、
 変わるのは意味ではなく**供給の有無**だけ。供給できるのは DOM に届く経路(iOS in-app /
 Android のアプリ内 WebView・ブラウザ)と、a11y が id を出す構成(Android WebView 150 以降)。
 
-**撤回前の根拠は2つとも誤りだった**(記録として残す。同じ誤診を繰り返さないため):
+**「`#id` は使えない」とする根拠は2つとも誤り**(同じ誤診を繰り返さないため):
 「Android は id を出さない」は **WebView 124 限定**の観測を一般則として書いたもので、
 150 は `viewIdResourceName` に出す(そのうえ 124 と 150 は **id と placeholder が入れ替わる**。
 `AndroidWebViewVersions.swift`)。「CDP は対象アプリの協力が要る」も誤りで、
@@ -690,7 +682,7 @@ Android のアプリ内 WebView・ブラウザ)と、a11y が id を出す構成
 —— css は DOM への問い合わせなので届く構成が `#id` よりさらに狭く(xcuitest と
 非 debuggable が外れる)、相乗りさせると `#id` の適用範囲まで狭く見える。
 
-**スクロールヒント(Android の WebView・2026-07-29 実装)**: Chromium は**全ドキュメントの
+**スクロールヒント(Android の WebView)**: Chromium は**全ドキュメントの
 ノードをツリーに載せる**(画面外は extras の `offscreen=true`・実座標は `unclippedTop/Bottom`。
 `isVisibleToUser` は true のままなので明示的に除外しないと通常要素に漏れる)。ブリッジはこれを
 `SnapshotResponse.offscreen`(実座標付き・ref=0)として返し、ホストのスクロール探索が
@@ -702,9 +694,9 @@ Android のアプリ内 WebView・ブラウザ)と、a11y が id を出す構成
 効果(scrollTo 中央値・android プロファイル): ネイティブ 10.2s→3.7s / CMP 8.7s→5.9s /
 Flutter は中立(9.5s。ドラッグ後の再計測サイクルが重く相殺。退行はない)。
 
-**iOS(XCUITest ランナー・2026-08-04 実装)**: XCUITest も WKWebView 配下は**全ドキュメントの
-ノードを実座標のまま**ツリーに載せる(旧記述「画面外ノードを出さない」は誤り —
-`BridgeRouter.shouldInclude` の画面交差ガードが落としていただけ。クランプも無い: 画面 402x874 に
+**iOS(XCUITest ランナー)**: XCUITest も WKWebView 配下は**全ドキュメントの
+ノードを実座標のまま**ツリーに載せる(画面外ノードを落とすのは
+`BridgeRouter.shouldInclude` の画面交差ガード。クランプも無い: 画面 402x874 に
 対し y=2784 や y=-1200 が取れ、スクロール量に追従する)。Android と同じ契約
 (ref=0・elements に混ぜない)で供給する。**inapp モードには流さない**: WebView 委譲中の snapshot は
 `WebViewDelegatingDriver` が offscreen を落とす(in-app の contentOffset 短絡 1.5s の方が速く、
@@ -742,9 +734,9 @@ iOS ブリッジと区別なく扱える。
 - **アニメーション自動無効化**: ブリッジ起動時に window/transition/animator の
   アニメーション倍率を 0 に固定し、静穏判定後に screenshot が古い絵を掴む問題を回避する
 - **報告する `screen` はディスプレイ全体・フィルタの基準はアクティブウィンドウの根**
-  (2026-08-06 に分離)。両方をウィンドウの根で兼ねていたため、**ダイアログが出ている間だけ
+  (両者を分ける)。ウィンドウの根で兼ねると、**ダイアログが出ている間だけ
   `screen` がダイアログの DecorView**(実測 1024x427 / 735x386)になり、同じ応答に入っている
-  要素座標(y=1342 等)がそれをはみ出す自己矛盾した木を返していた。実害はもう1つあり、
+  要素座標(y=1342 等)がそれをはみ出す自己矛盾した木を返す。もう1つの害として、
   `BridgeRouter` はこれを `lastScreen` として覚え**既定の全画面スワイプとピンチの座標を作る**
   ので、ダイアログを撮った直後の swipe が画面上部の狭い帯を払うことになる。
   ディスプレイは `Resources.getSystem()` の DisplayMetrics から採る(Context を持ち回らない。
@@ -842,9 +834,8 @@ adb へ自動フォールバックする(ユーザー決定 2026-07-25)。動機
 | 振り分け | `FTAndroid/EmulatorControl` | emulator なら gRPC・実機/失敗個体は adb。**失敗した pid は同一ブート中 adb 固定**(再ブートで自動復帰)。殺しスイッチ `FT_EMULATOR_CONTROL=adb` |
 
 **gRPC を話すのは Swift だけ**。拡張は自前の gRPC クライアントを持たず、画面凍結修復を
-`fleetest api repair-display`(`ApiRepairDisplayCommand`)へ委譲する(以前は `emulatorGrpc.ts` +
-`emulatorEndpoints.ts` に proto コピー・ディスカバリ・blank 判定の第二実装があり、閾値と手順を
-言語間で同期する必要があった)。proto は `third_party/emulator-proto/`(vendored・再生成手順は
+`fleetest api repair-display`(`ApiRepairDisplayCommand`)へ委譲する(第二実装を置くと、閾値と手順を
+言語間で同期する必要がある)。proto は `third_party/emulator-proto/`(vendored・再生成手順は
 同 README。Swift スタブは生成物をコミット)。
 
 ### DS-16.2 置き換え済みの操作と残存 adb
@@ -892,8 +883,8 @@ CoreSimulator.framework を直接叩き、`SimulatorCatalog.devices()` が直叩
 - ステップ実行(tap ~490ms)は XCUITest ブリッジ内部コストでこの施策の対象外。
   HID 注入バイパスは評価済み不採用(backboardd クラッシュ)・再提案しない
 
-**適用範囲は列挙だけではない**(2026-08-02 拡張)。シナリオ毎に1回走る simctl 往復2つも
-同じ作法で置き換えた(`CoreSimAppControl` が振り分け。殺しスイッチは同じ `FT_SIMULATOR_CONTROL=simctl`):
+**適用範囲は列挙だけではない**。シナリオ毎に1回走る simctl 往復2つも
+同じ作法で置き換えている(`CoreSimAppControl` が振り分け。殺しスイッチは同じ `FT_SIMULATOR_CONTROL=simctl`):
 
 | 置き換え | 旧 | 新(CoreSimulator) |
 |---|---|---|

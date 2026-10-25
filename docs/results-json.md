@@ -20,9 +20,8 @@ results/runs/<YYYY-MM>/<runID>/
 ```
 
 `runID` = `<yyyyMMdd-HHmmss(UTC)>Z-<乱数8hex>`(固定幅なので**辞書順 = 時系列順**)。
-2026-09-01 より前は `<yyyyMMdd-HHmmss(UTC)>Z-<マシン名>-<乱数4hex>`(ホスト名が表示へ漏れるため
-マシン名を撤去し、複数マシンの衝突回避は乱数の拡幅で担保。旧形式もそのまま読める ——
-どの機械の run かは `host` 欄が持つ)。
+マシン名は入れない(ホスト名が表示へ漏れるため。複数マシンの衝突回避は乱数の幅で担保し、
+どの機械の run かは `host` 欄が持つ)。2026-09-01 より前の記録は `<yyyyMMdd-HHmmss(UTC)>Z-<マシン名>-<乱数4hex>` で、そのまま読める。
 
 **後方互換の契約**: 欄はすべて後発追加が Optional。**古い run も読み続けられる**ように、
 新しい欄が無い = キーごと省略される(空配列・false は書かない)。rawValue(`failureKind` /
@@ -86,8 +85,7 @@ guarded だけで線を超えていても**消せるものは全部消す**(線�
 
 **`xcresult` は生きているブリッジの分を消せない**(guarded)。束の中身は XCTest が起動から継続して
 書き込む**セッションログ**(「終わらない UI テスト」の全操作 —— `XCTWaiter` / `XCTContext` の活動の
-生ログ)で、`BridgeLauncher.captureSettings`(動画・スクショを止める設定)の対象外(2026-09-20 に
-判明。実測: 実機ブリッジ1本を 75 分立てただけで 324 MB、8台規模の負荷試験では全体で 733 MB/時)。
+生ログ)で、`BridgeLauncher.captureSettings`(動画・スクショを止める設定)の対象外(実測: 実機ブリッジ1本を 75 分立てただけで 324 MB、8台規模の負荷試験では全体で 733 MB/時)。
 **このログを起動時の設定で絞れる手掛かりは調べて見つからなかった** —— xcodebuild の
 `-collect-test-diagnostics on-failure|never`(xctestrun の `DiagnosticCollectionPolicy`)は候補に
 見えたが、その説明(「失敗検知時の sysdiagnose 風の追加診断」)どおり失敗時専用の別診断を切り替える
@@ -342,7 +340,7 @@ Android の凍結事後判定(`AndroidHealthProbe.observeBlankAndRepair`)が試�
 「修復が効いたか」を別に運ぶ経路が無いため、**`recovered` に含めていない**
 (修復を試みたことは workerLog の1行にだけ残る)。iOS の run 前 blank 回復(simctl shutdown→boot)は
 `preRunRepaired` の側で表現する。run **中**にデバイスそのものを再起動するのは**シナリオの境目の表示の確認**
-(`DisplayFreezeWatch`・2026-10-18 より)だけで、それが `deviceRestart`。**撃った事実**であって効いたかは
+(`DisplayFreezeWatch`)だけで、それが `deviceRestart`。**撃った事実**であって効いたかは
 判定しない(効いたかは次のシナリオの合否と、次の境目の確認が答える)。
 
 ### appCrash(`AppCrashRecord`。`scenarios/*.json` のみ)
@@ -517,9 +515,9 @@ snapshot/action/wait のどれにも計上されない時間だった実測。
 近道(OCR)は撃たない**(撃つとステップごとに予算を捨てるだけで、判定は結局 FM が下す)③**諦めた読みが
 走っている間は積み増さない** ④載った後の劣化に備え OCR 段に予算
 (`RegionText.occlusionBudget` = 1.3 秒 = 置き換える相手である FM 照合の実測下限)を持たせ、
-超えたら FM へ落として注記 `ocr-budget-exhausted` を残す(設計は docs/design/ §Tier-2 の続き)。
+超えたら FM へ落として注記 `ocr-budget-exhausted` を残す(設計は docs/design/overview.md「Tier-2 は Vision OCR」の続き)。
 **`ocr-budget-exhausted` の率が上がったら Vision が劣化している**(モデルが載っていない・OS 側の不調)。
-**コンパイルが終わっていなければ、近道の直前で終わるまで待つ**(2026-09-15)。**2026-10-06 からは最初のシナリオを起こす前に
+**コンパイルが終わっていなければ、近道の直前で終わるまで待つ**。**最初のシナリオを起こす前に
 `compile-ocr` の完了を待つ**(run のログに `waited Ns for the OCR model` が出る。その秒数はシナリオの所要に入らない)ので、
 ステップ内の待ちは受け皿。待った回は `ocr-compile-waited`(待った時間は `ocrMs` と `guardMs` に入る。**ステップと
 シナリオの締め切りからは差し引かれる** = 待ちで赤にならない)、上限(120 秒。正当なコンパイルの実測最大 108 秒
@@ -535,7 +533,7 @@ OCR を実行プロファイルで切った run にはどれも付かない)。
 
 **occlusion-guard の撮り直し(`guard-retaken`)**: 1 回目のガード評価(FM の直列化待ち + 推論)がステップの
 timeout を跨いだまま「見えていない」と出たときだけ、締切を 1 度だけ延ばして**新しいスクリーンショット**で
-評価し直す。付くのは**撮り直しで見えていると分かって通った**ステップだけ(2 回目も見えなければ従来どおりの
+評価し直す。付くのは**撮り直しで見えていると分かって通った**ステップだけ(2 回目も見えなければ
 反転の失敗で、注記は付かない)。ガードの所要はアプリの応答ではなく FM の待ちなので、アサーションの待ち予算から
 引かない、という規則(描画が木の更新に数百 ms 遅れる WebView で、1 枚目の古い絵が反転を確定させていた)。
 **率が高いなら FM の直列化待ち(`fm.gateWait*`)が膨らんでいる**。timeout 0 のステップは延ばさない。

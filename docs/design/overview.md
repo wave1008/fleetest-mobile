@@ -5,8 +5,8 @@
 | 正典 | 方針・全体アーキテクチャ・リポジトリ構成・FM 呼び出し層・CLI UX・E2E の検証方法(DS-1〜3・5・6・9) | 全体の構成や方針を変える前 | ブリッジ(→ [bridge.md](bridge.md))・DSL(→ [dsl-syntax.md](dsl-syntax.md)) |
 
 Foundation Models framework(オンデバイス 3B モデル。macOS 26+、視覚検証は 27+)を最大限活用する、
-iOS / Android 両対応のアプリ E2E テストツール。iOS を先行実装し、Android は同じ
-`AppDriver` 抽象の上に後続実装した(経緯・時系列は DS-7, DS-8 参照)。
+iOS / Android 両対応のアプリ E2E テストツール。Android は iOS と同じ
+`AppDriver` 抽象の上に実装している(DS-7, DS-8 参照)。
 
 - ステータス: iOS / Android とも実装済み・運用中(GUI 入口は VSCode 拡張に一本化)
 - 決定事項: ハイブリッド型 / 自作 XCUITest ブリッジ+自作 Android ブリッジ / シミュレータ優先 / Swift + FoundationModels
@@ -36,19 +36,19 @@ iOS / Android 両対応のアプリ E2E テストツール。iOS を先行実装
 
 **FM 失敗は握りつぶされる**: occlusion-guard・screenLooksLike はいずれも FM 失敗時に nil を返して
 素通りする契約なので、FM が全滅してもテストは緑のまま**機能だけ無効**になる(自己修復は
-2026-09-15 に指紋照合のみとなり FM を呼ばないため、この契約の対象から外れた → MN-22)。
-**ただし黙らない**(2026-08-23): occlusion-guard(`exist` の既定 `requireVisible`)は **FM に訊いたのに
+指紋照合のみで FM を呼ばないため、この契約の対象外 → MN-22)。
+**ただし黙らない**: occlusion-guard(`exist` の既定 `requireVisible`)は **FM に訊いたのに
 判定が返らなかったステップ**に `StepNote.visibilityGuardSkipped`(`visibility-guard-skipped`)を立て、
 結果 JSON の `notes` から run 横断で数えられる(立てるのは FM まで到達した回だけ。マスタースイッチ OFF・
-macOS 26・インクゲートで省いた回は「訊く必要が無かった」)。同時に **requireVisible は2段**になった:
+macOS 26・インクゲートで省いた回は「訊く必要が無かった」)。**requireVisible は2段**:
 Tier-0 幾何 = 収まる軸の中心が画面外なら不可視(`TapTargetGeometry.offscreenScrollGateCentre`。
 スクロール探索の「見つかった」ゲート・逆走査 `reverseSweep`・MCP の `ft_scroll_to` 再照合と同じ述語で、
 **文言は呼び手ごと**)→ Tier-1〜 FM。iOS の木は画面外の要素も frame ごと残し、FM 側は crop が
 画像の外に落ちると nil(素通り)なので、**通り過ぎた要素への exist は FM が生きていても FM では
-塞がらなかった**(2026-08-20 受け手報告・横スクロール区画)。幾何の段は FM の有無に依らず
+塞げない**(横スクロール区画で実際に起きた)。幾何の段は FM の有無に依らず
 `fmTextVisibilityCheck || ocrTextVisibilityCheck` の下で効く(`StepExecutor.visibilityGuardActive` が唯一の入口。FTRuntime の
 保持値の高速経路もこれを見る)。
-**Tier-2 は Vision OCR**(2026-09-07): インク足切りを通って「FM に訊く」と決まった crop に、まず
+**Tier-2 は Vision OCR**: インク足切りを通って「FM に訊く」と決まった crop に、まず
 `FTCore.RegionText` が OCR を当て、**期待文字列が丸ごと読めたら可視として素通り**させる
 (FM を呼ばない)。crop 矩形は `FTCore.OcclusionCrop` を FM と共有するので、両者は同じ画素を見る。
 実 run で FM の段に届いた crop 163 枚のうち **97% がここで片付き**、FM に回ったのは本当に
@@ -60,30 +60,28 @@ Tier-0 幾何 = 収まる軸の中心が画面外なら不可視(`TapTargetGeome
 `OCROnlyVisibility` の判定だけで赤にする/ **②一致は完全含有だけ**(先頭一致を許すと、部分的に覆われて
 残りだけ読めた回を通してしまい誤った緑になる)/ **③読ませる言語は期待文字列から決め、言語補正は日本語の集合でだけ掛ける**
 (`RegionText.languages(for:)` / `usesLanguageCorrection(for:)`。ASCII の期待値に日本語モデルを載せると
-所要が 2.3 倍。en ロケールの端末は「単」を中国語フォントの字形で描き、補正なしだと「单」と読む。
-2026-09-15)/
+所要が 2.3 倍。en ロケールの端末は「単」を中国語フォントの字形で描き、補正なしだと「单」と読む)/
 **④読めなければ拡大して読み直す**(`upscaleLadder = [1,2,3]`。×4 で悪化するので上げ続けない。
 **1行も読めない crop は段を上げない** = 覆いが消えるのを待つ poll 周回で毎周 3 回払わない)。
 版(revision)は固定せず OS の既定に従い、**版・認識レベル・言語補正・言語規則が動いたことの検出は
 実 crop の固定コーパス**(`Tests/Fixtures/OcclusionCrops/`)が担う。既定 on・殺しスイッチは
 `FT_OCCLUSION_OCR=0`・`measure` でコーパス採取(実測は OG-5.17)。
-**①の例外は FM が判定を返さないときだけ**(2026-09-26。macOS 26・実呼び出しの失敗):
+**①の例外は FM が判定を返さないときだけ**(macOS 26・実呼び出しの失敗):
 近道が読んだ行を `TranscriptMatch.judge` に通し、行が無ければインク量で分ける(`FTCore.OCROnlyVisibility`)。
-不可視なら FM の反転と同じく赤(警告の段階でコーパス・E2E の誤った赤 0 を確かめてから上げた。
-実測はOG-5.19)。
+不可視なら FM の反転と同じく赤(コーパス・E2E の誤った赤 0 を確認済み。
+実測は OG-5.19)。
 **先頭だけ描かれた形**は `TranscriptMatch` が FM と OCR で共通に分ける: 省略記号 → 緑(`text-ellipsized`)/
 割合 > 0.5 → 緑(`text-partially-hidden`)/ 以下 → 赤(ユーザー決定)。
 
-**FM 段は転写 + ホスト照合**(2026-09-15): OCR で読めなかった crop に FM が答えるが、**FM に期待文字列は
+**FM 段は転写 + ホスト照合**: OCR で読めなかった crop に FM が答えるが、**FM に期待文字列は
 渡さない**。訊くのは「何が描かれているか」(転写 1 欄・prompt は定数)だけで、可否は `FTCore.TranscriptMatch`
 が期待文字列と突き合わせて決める(含む / 先頭 2 文字以上の切り詰め / 5 文字以上なら len÷5 の誤読・先頭文字
 必須 / 末尾だけ = covered / 空 = notRendered / 無関係 = textMismatch)。等倍で読めなければ 2 倍で読み直し、
 転写が 1 文字差で惜しいときだけ OCR に丸ごと読めたかを確かめる(素通りの向きだけ)。期待文字列を渡して
-「見えるか」を訊く旧形は、空白・別の文字の crop でも期待文字列を写して visible=true と答えていた
-(おうむ返し。OG-5.18・MN-19)。
+「見えるか」を訊く形にしない(空白・別の文字の crop でも期待文字列を写して visible=true と答える
+おうむ返しになる。OG-5.18・MN-19)。
 
-**近道が本道より高くつかないための3つの門と、コンパイルの置き場**(2026-09-10。経緯は
-MN-18): ①**モデルが載って実際に読めるまで近道は撃たない**
+**近道が本道より高くつかないための3つの門と、コンパイルの置き場**(MN-18): ①**モデルが載って実際に読めるまで近道は撃たない**
 (`RegionText.isModelReady`。コンパイルの探りが 1 行以上読めた回だけ ready。Vision が `[]` を返し続ける日がある)/
 ②**諦めた読みが走っている間は撃たない**(`abandonedInFlight`。積み増すと 12 本が全部予算切れになり
 戻った瞬間に協調スレッドプールが止まる)/ ③**予算 1.3 秒 = 置き換える相手(FM 照合)の実測下限**
@@ -102,7 +100,7 @@ ID に LC_UUID が入るので、`ScenarioHost.build` が ID を製品名に揃�
 に載せる(定常の所要は同じ 100〜160ms。判定の近道を FM フラップと同じ部品に依存させない。装置で読みが
 変わる 1 行はコーパスに固定)。実測: シナリオ側のコンパイル 22,980ms → 218ms、実 crop の初回読み 21,830ms → 98〜122ms。
 
-**launch 直後の未描画画面は「覆い」と見分けられない**(2026-09-03): `restartApp` / `launchApp` は
+**launch 直後の未描画画面は「覆い」と見分けられない**: `restartApp` / `launchApp` は
 木が引けた時点で戻るので、a11y の木は新インスタンスの要素を返しているのに画面はまだ
 launch storyboard(全画素同一)ということが起きる。負荷の高いランナーでは描画が既定の待ち窓に
 間に合わず、occlusion-guard が**正しく**「見えていない」と言って赤になる(実測: crop 265x100 が
@@ -114,14 +112,13 @@ launch storyboard(全画素同一)ということが起きる。負荷の高い�
 **一度だけ**同じ式(`step.timeout ?? FlowStep.defaultWaitSeconds`)で延ばして待ち直し、
 `first-frame-pending` を立てる。延ばしても一様色のままなら従来どおり赤にして `first-frame-timeout`
 を添える。**通る経路は増やさない**(flip は返し続ける) —— 変えるのは待つ長さだけなので、
-誤った緑は1つも作らない。**厳密 0 では本番の crop に効かなかった**(2026-09-04 のフル E2E で
-M1Max の launch storyboard は min=253 / max=255 = stdDev ≈ 0.1 で猶予が一度も付かず赤。
+誤った緑は1つも作らない。**上限を厳密 0 にしない**(M1Max の launch storyboard は min=253 / max=255 = stdDev ≈ 0.1 で、0 では猶予が付かず赤になる。
 `nearBlankPNG` の対照と、上限をリテラルで固定するテストで縛る)。**stdDev は Tier-1 のインク足切りを通らない経路(幾何が疑い有り・閾値 0)
-では未計算**なので、門が開いている回だけ測り直す(この取りこぼしは実装直後のレビューで見つけた)。
+では未計算**なので、門が開いている回だけ測り直す。
 
-**FM 判定の控え `VisibilityVerdictMemo`**(2026-09-04): occlusion-guard の FM 判定を、
+**FM 判定の控え `VisibilityVerdictMemo`**: occlusion-guard の FM 判定を、
 **FM への入力そのもの**(スクショのバイト列の hash・frame・screen・期待文字列)を鍵に控える。
-「読む回数を減らす」変更なので、2回目の読みが担っていた砦を列挙した —— ①画面が変わった
+「読む回数を減らす」ので、2回目の読みが担っていた砦を列挙してある —— ①画面が変わった
 (→ バイト列が変わり鍵が外れるので控えは効かない)②要素が動いた(→ frame が変わり鍵が外れる)
 ③期待値が違う(→ 鍵が外れる)④FM の死活・ブレーカの回復(→ nil は控えないので次は必ず訊く)。
 残るのは「同じ画像・同じ領域・同じ文字列に FM が違う答えを返す」だけで、FM は同一画像に
@@ -172,9 +169,7 @@ FoundationModels はモデル型を2つ持ち、**`PrivateCloudComputeLanguageMo
 1. **実行モード**: 保存済みシナリオ(Swift DSL。DS-10)を FM なしで決定的に再生。
    高速・安定で CI 向き。失敗時のロケータ自己修復も指紋照合のみで FM を呼ばない(DS-10「ロケータの指紋」)。
 
-(M2 で計画していた、FM がアプリを自律探索してシナリオを自動生成する explore モード
-[`fleetest explore` / ExplorerProfile] は廃止済み。ロケータ自己修復に FM を使う設計も
-2026-09-15 に撤去 → MN-22)
+(FM がアプリを自律探索してシナリオを生成する explore モードは持たない。ロケータ自己修復にも FM を使わない → MN-22)
 
 コンテキスト対策の原則:
 - アクセシビリティツリーは **圧縮テキスト(set-of-mark 形式)** にして 1 画面ずつ渡す
@@ -190,7 +185,7 @@ FoundationModels はモデル型を2つ持ち、**`PrivateCloudComputeLanguageMo
 │  fleetest CLI / MCP サーバ / VSCode 拡張(拡張は fleetest api を呼ぶ。   │
 │  MCP サーバは FTCore/FTBridgeClient を直接リンクし fleetest api を経由しない) │
 │  ├─ FTFoundationModels        : FoundationModels エージェント層               │
-│  │   ├─ ReplayAssist      (画面検証。ロケータ修復は撤去済み DS-10) │
+│  │   ├─ ReplayAssist      (画面検証。ロケータ修復は FM を使わない DS-10) │
 │  │   └─ OcclusionVerifier / FMDoctor / TestbaseDrafter               │
 │  ├─ FTDSL          : Swift DSL(DS-10)/ セレクタ式 / ロケータの指紋 │
 │  ├─ FTCore          : AppDriver プロトコル / StepExecutor(実行機) / 判定の型 │
@@ -297,7 +292,7 @@ foundation-tester/
 ├── E2EAppRN/                      # 自己 E2E の SUT: React Native(→ TestProjects/E2E-RN)
 │                                  #   各 SUT の docs/ui-contract.md には**型語彙と固有の罠だけ**を置く
 ├── SampleApp/                     # 検証用の小さな SwiftUI デモアプリ(テスト対象)
-├── vscode-fleetest/                # VSCode 拡張。UI 入口はここに一本化(旧 fleetest-gui は 2026-07-10 削除)
+├── vscode-fleetest/                # VSCode 拡張。UI 入口はここに一本化
 └── docs/design/                 # 本書
 ```
 
@@ -324,15 +319,15 @@ foundation-tester/
 
 ### DS-5.2 主要な @Generable 型
 
-`LocatorRepairSuggestion`(壊れたロケータの代替案を FM に提案させる型)は 2026-09-15 に撤去した
-(自己修復は指紋照合のみになり FM を呼ばないため。DS-10「ロケータの指紋」・MN-22)。
-残る `@Generable` 型はスクリーンショットの画面検証(`ScreenVerdict`)等、FM を呼ぶ他の機能のもの。
+`LocatorRepairSuggestion`(壊れたロケータの代替案を FM に提案させる型)は無い
+(自己修復は指紋照合のみで FM を呼ばないため。DS-10「ロケータの指紋」・MN-22)。
+`@Generable` 型はスクリーンショットの画面検証(`ScreenVerdict`)等、FM を呼ぶ他の機能のもの。
 
 ### DS-5.3 実装(Sources/FTFoundationModels/ の9ファイル)
 
 | 実装 | 役割 |
 |---|---|
-| `ReplayAssist.swift`(`FMReplayDelegate`) | シナリオのプロセスの FM フック: スクリーンショットの画面検証(`ScreenVerdict`。**マルチモーダル**)を常駐プロセスへ頼み、結果を記録する。ロケータ自己修復のフック(`LocatorRepairSuggestion`)は 2026-09-15 に撤去(DS-10・MN-22) |
+| `ReplayAssist.swift`(`FMReplayDelegate`) | シナリオのプロセスの FM フック: スクリーンショットの画面検証(`ScreenVerdict`。**マルチモーダル**)を常駐プロセスへ頼み、結果を記録する。ロケータ自己修復のフックは持たない(DS-10・MN-22) |
 | `OcclusionVerifier.swift` | アサーションがツリー通過した直後の、遮蔽による誤った緑の排除(マルチモーダル。要素 frame にクロップし、転写を常駐プロセスへ頼む) |
 | `FMServeServer.swift` | FM の常駐プロセス(`fleetest api fm-serve`)の本体。画像を伴う実呼び出し・載せたままにする暖機・無操作での終了。通信と起動は `FTCore/FMServe.swift` |
 | `PreloadSlot.swift` | 常駐プロセスの予備のセッション 1 つ分の規則(同じ instructions なら作り直さない・使ったら捨てる) |
@@ -425,19 +420,16 @@ MCP には届かず、同じ処理の2つ目の実装が育つ)。
    | チェックボックス | `button` | `checkBox` | `button` | `checkBox` | `switch` | `checkBox` | `other` | `checkBox` |
    | リスト行 | `button` | `clickable` | `clickable`(UITableView) | `clickable` | `button` | `button` | `button`(TaggedButton) | `button`(TaggedButton) |
 
-   ボタン・スイッチ・テキストが揃っているのは 2026-07-26 の役割正規化の結果(それ以前は
-   CMP(Android)のボタン/スイッチが `cell`[現 `clickable` の旧名]、Flutter(Android)の
-   テキストが `other` だった)。**チェックボックスとリスト行は揃わない** — iOS 側の a11y が
+   ボタン・スイッチ・テキストは役割正規化で揃えてある。**チェックボックスとリスト行は揃わない** — iOS 側の a11y が
    役割を出さないため(下記「型は役割に正規化する」)。**RN はパスワード欄・リスト行が
    ネイティブ SUT(SwiftUI/View)と同型で揃う**(RCTUITextField/ReactEditText がそれぞれ
    `UITextField`/`EditText` 派生のため。詳細は `E2EAppRN/docs/ui-contract.md`)
 
-   **入力欄は「モード間で揃える」ところまでが担保**で、OS 間では揃わない(2026-08-06 実測)。
+   **入力欄は「モード間で揃える」ところまでが担保**で、OS 間では揃わない。
    iOS の自前描画フレームワーク(Compose / Flutter)の入力欄は UIKit の `UITextField` ではないので、
-   in-app ブリッジのクラス判定を素通りして `other` に落ちていた —— **in-app だけ `other`・
-   xcuitest は `textView`** という食い違いで、MCP で探索した型がシナリオで通らなかった。
-   判定を**テキスト入力 trait(`1<<18`)**に足し、`UITextInput` 準拠で分けることで
-   XCUITest の `elementType` と一致させた(`InAppSnapshot.elementType`):
+   クラス判定だけでは in-app ブリッジで `other` に落ち、xcuitest の `textView` と食い違う
+   (MCP で探索した型がシナリオで通らなくなる)。そこで判定を**テキスト入力 trait(`1<<18`)**に足し、
+   `UITextInput` 準拠で分けて XCUITest の `elementType` と一致させる(`InAppSnapshot.elementType`):
 
    | | 要素クラス | traits | UITextInput | in-app / xcuitest とも |
    |---|---|---|---|---|
@@ -448,14 +440,13 @@ MCP には届かず、同じ処理の2つ目の実装が育つ)。
    (Compose も Flutter も secure にならない)ので、跨 OS で入力欄を指すときは `#id` を使う。
    UIKit/SwiftUI は従来どおりクラス判定が先に効き `textField` / `secureTextField` / `textView` に分かれる。
    **React Native の入力欄はこのクラス判定がそのまま効く**(`RCTUITextField` が `UITextField` 派生・
-   Android の `ReactEditText` が `EditText` 派生のため、trait 分岐を新設する必要が無かった。
-   2026-08-08 実測)。既存経路のみで `textField` / `secureTextField` / `textView`
+   Android の `ReactEditText` が `EditText` 派生のため、trait 分岐は要らない)。既存経路のみで `textField` / `secureTextField` / `textView`
    (multiline は Android のみ `textField` のまま。詳細は `E2EAppRN/docs/ui-contract.md`)
 
-   **Android は「見切れた要素の型が変わらない」ことも担保**(2026-08-06)。Compose の役割は
+   **Android は「見切れた要素の型が変わらない」ことも担保**。Compose の役割は
    同一矩形の無名子ノード(役割マーカー)で表現されるが、**見切れると親とマーカー子は独立に
-   クリップされる**ため、矩形の完全一致を条件にしていると引き上げに失敗し、
-   **同じ Composable が可視状態によって `button` と `clickable` を行き来していた**。実測3形:
+   クリップされる**ため、矩形の完全一致を条件にすると引き上げに失敗し、
+   **同じ Composable が可視状態によって `button` と `clickable` を行き来する**。実測3形:
 
    | 見切れ方 | 親 | マーカー子 |
    |---|---|---|
@@ -480,7 +471,7 @@ MCP には届かず、同じ処理の2つ目の実装が育つ)。
 2. M1: `fleetest bridge up` → `curl localhost:8123/snapshot` で圧縮ツリーが返る
 3. M3: SampleApp の identifier を 1 つ改名 → `fleetest run --set heal=true` で修復・成功。
    意図的にログインを失敗させるビルド → 結果 JSON に失敗した section/command/failureKind が
-   事実として残る(FM による `appBug` 等の分類は 2026-09-15 に撤去 → MN-21)
+   事実として残る(FM による `appBug` 等の分類は置かない → MN-21)
 4. 性能の検証・回帰比較は `Scripts/bench.swift` の計測基盤で行う。壁時計中央値・
    シナリオ/ステップ内訳・成功率・ホスト CPU/GPU/MEM を `summary.md` に出力し、
    変更前後を比較する。手順・指標の読み方は

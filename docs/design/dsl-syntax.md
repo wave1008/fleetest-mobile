@@ -55,10 +55,9 @@ DS-10 は2ファイルに分かれる。後半は dsl-execution.md。
   宣言した OS を回さない実行プロファイルでは**キュー投入前に外して skipped(対象外)として記録する**
   (`FTCore.PlatformApplicability`)。**複数の機械にまたがる分散(host 混在プロファイル /
   `--fleet --split`)でも同じ判定**を fleet 全体の OS 和集合で掛けてから割り当てる
-  (`FleetSplit.applicability`。2026-08-23 まで割り当てが throw して1本も走らなかった。
-  分散の親は recorder を持たないので、スキップは記録ではなくログに出る)。**失敗に数えない** —— 以前はクラス側の `platform:` すら
-  「担当ワーカーなし」に落ちて失敗として数えられており、「そのOSでは対象外」を表現する手段が
-  無かった。記録は `ScenarioSkipKind` で**意図された対象外**と**インフラ都合の未実行**を
+  (`FleetSplit.applicability`。割り当てで throw すると1本も走らない。
+  分散の親は recorder を持たないので、スキップは記録ではなくログに出る)。**失敗に数えない** —— 数えると
+  「そのOSでは対象外」を表現する手段が無くなる。記録は `ScenarioSkipKind` で**意図された対象外**と**インフラ都合の未実行**を
   区別する(混ぜると「緑だが1本も走っていない」run を見分けられなくなる)
 - `@Deleted("コメント")` で論理削除(Shirates の @Deleted 相当)。テストクラスまたは
   `@Test` メソッドに付与する。一覧には「削除済み」として残り、全実行・フォルダ実行・クラス名指定の一括実行から除外される。
@@ -69,7 +68,7 @@ DS-10 は2ファイルに分かれる。後半は dsl-execution.md。
   `fleetest draft-scenario` の生成物にはこちらが付く
 - コマンド(tap/type/exist/…)は**同期・非 throw のモジュールレベル自由関数**。
   `try await` も `{ it in }` も不要。カレント実行コンテキストを暗黙参照する。
-  **DSL スレッド外(Task / 別スレッド)からの呼び出しは fatalError にしない**(2026-07-29)。
+  **DSL スレッド外(Task / 別スレッド)からの呼び出しは fatalError にしない**。
   1プロセス=1シナリオなので落とすと**レポートごと消える**。`FTDriveCore.recordThreadViolation` が
   失敗ステップを**1 run につき1回だけ**記録してシナリオを中断し、以降は既存の skip 経路へ乗せる
   (`handleFailure` は呼ばない = スクショ撮影を別スレッドから走らせない)。
@@ -89,10 +88,10 @@ DS-10 は2ファイルに分かれる。後半は dsl-execution.md。
     (**ロックの正しさは目視では担保できない**。触ったら必ず TSan を通すこと)
 - **要素が見つからなければ失敗(シナリオ中断)。唯一の例外は `select`** で、掴めなければ
   失敗させず空要素を返す(`FTElement.isEmpty`)。**「出るか不定」を表す引数は持たない**
-  (`optional:` は 2026-08-02 に全廃。`irregularHandler` と `ifCanSelect` に一本化した。下記)
+  (`optional:` は無い。`irregularHandler` と `ifCanSelect` で表す。下記)
 - **待つ上限の引数名は全コマンドで `waitSeconds:`**(ユーザー決定 2026-09-19。Shirates と同名・単位が名前に出る。
-  `timeout:` は DSL に置かない。**MCP ツールの待ち上限も `waitSeconds`**(2026-09-25 に `timeout` から改名。
-  MCP は DSL を書くための入口なので、同じセッションで2つの名前を書かせない)。`FlowStep.timeout`・実行プロファイルの
+  `timeout:` は DSL に置かない。**MCP ツールの待ち上限も `waitSeconds`**
+  (MCP は DSL を書くための入口なので、同じセッションで2つの名前を書かせない)。`FlowStep.timeout`・実行プロファイルの
   `defaultTimeout` / `scenarioTimeout` は内部 / 別系統の名前で据え置き。**`ft_batch` は DSL の行を受けるので DSL と同じ `waitSeconds:`** ——
   索引の signature とビルダーのキー(`MCPServer.batchStepBuilders`)を片方だけ変えると、実在するラベルを断り
   無いラベルを受ける。`BatchLineParserTests.testWaitCapLabelFollowsTheDSL` が縛る)
@@ -100,12 +99,11 @@ DS-10 は2ファイルに分かれる。後半は dsl-execution.md。
   `exist(sel, requireVisible:, waitSeconds:, scroll:, maxSwipes:)` / `textIs(expected, requireVisible:, strict:, waitSeconds:)` /
   `checkIsON(prefer:, waitSeconds:)` / `tap(sel, holdSeconds:, maxGestureSeconds:, containerInference:, waitSeconds:, scroll:, maxSwipes:)` /
   `scrollTo(sel, direction:, scrollFrame:, startMarginRatio:, endMarginRatio:, containerInference:, maxSwipes:)`
-  (`containerInference:` もコマンド固有の引数。2026-09-25 までは末尾にあった)。以前は検証系だけ
-  `waitSeconds` が固有の引数より前で、`checkIsON` とも操作系とも逆だった
+  (`containerInference:` もコマンド固有の引数)。検証系も `waitSeconds` を固有の引数の後ろに置く(`checkIsON`・操作系と揃える)
 - tap/type/select は `waitSeconds:`(ロケータ解決の再試行待ち上限秒。0=リトライなし。
   省略時は tap/type が約0.7秒・select は `defaultTimeout`)を取る。
   出るか不定の要素を `ifCanSelect` で見るときの空振り短縮用(PT-5)
-- **秒は全て小数(Double)**(2026-07-29。`waitSeconds:` / `defaultTimeout` /
+- **秒は全て小数(Double)**(`waitSeconds:` / `defaultTimeout` /
   `--default-timeout`。`FlowStep.timeout` も `Double?`)。`waitSeconds: 1.2` が書ける。
   表示は `FTSeconds.format`(FTCore)が唯一の生成元で `5.0s` ではなく `5s`・`1.2s` と出す
   (`StepDescription.formatSeconds` はここへ委譲)。
@@ -126,9 +124,8 @@ DS-10 は2ファイルに分かれる。後半は dsl-execution.md。
   生成コード・ヒール提案の綴りが一致する(3ブリッジの wire 形式は不変 = 版上げ不要)。
   先頭大文字で書くと `validationError` が実行前に落とす
 - セレクタ式は文字列1本。**フィルタを `&&` で AND 合成**し、`||` で**候補集合の和**をとる
-  (2026-07-26 に Shirates(Classic) の記法へ、2026-07-27 に `||` の意味も寄せた。
-  優先順位は `&&` > `>>` > `||`)。**要素を1つ選ぶコマンドは和集合の先頭**(節の順 →
-  節内のツリー順)を採るので、`#id||ラベル` はヒール連鎖としても従来どおり働く。
+  (Shirates(Classic) の記法に準拠。優先順位は `&&` > `>>` > `||`)。**要素を1つ選ぶコマンドは和集合の先頭**(節の順 →
+  節内のツリー順)を採るので、`#id||ラベル` はヒール連鎖としても働く。
   唯一の解釈者は `LocatorResolver.unionCandidates` / `resolveDetailed`。
   短縮形と完全形の対応:
 
@@ -179,7 +176,7 @@ DS-10 は2ファイルに分かれる。後半は dsl-execution.md。
   (この助言が出る条件そのもの)、利用者は存在しない逃げ道を探すことになる。
   **表組みの行を1ノードへ畳む案は採らない**: セル単位のアサーションを潰すうえ、
   畳んでも連結の仕方(空白を挟むか)で利用者の書いた文字列に一致するとは限らない
-- **ゼロ幅文字は照合前に両辺から除去する**(2026-08-07。`FlowMatchMode.matches`。
+- **ゼロ幅文字は照合前に両辺から除去する**(`FlowMatchMode.matches`。
   U+200B/200C/200D/FEFF/2060。正規表現のパターンだけは書き換えない)。実データに紛れており
   **画面にもスナップショット出力にも見えない**ので、完全一致が落ちても原因に辿り着けない
   (実測: Google マップの路線名は `​​中央線​` で `"中央線"` が当たらない)。
@@ -194,7 +191,7 @@ DS-10 は2ファイルに分かれる。後半は dsl-execution.md。
   `validationError` が落とす(`textContans=x` の綴り誤りがラベル扱いで黙って緑になるのを防ぐ)。
   `名前!=値` にも同じ規則を使う(`count!=0` は素のラベル)。
   **既知の残穴**: 小文字で続く未知名(`identifier=5` 等)は生ラベルと区別できず素通りする
-- **フィルタ内 OR `(a|b)`**(2026-07-27。Shirates 準拠): トークン単位の文字列置換で
+- **フィルタ内 OR `(a|b)`**(Shirates 準拠): トークン単位の文字列置換で
   **パース時に節へ展開する**(`(保存|OK)&&.button` → `保存&&.button || OK&&.button`)。
   `||` が和集合になったのでこの等価が成立し、照合・serialize・ヒールは一切変更が要らない。
   `|` を含まない括弧はラベルの一部(`保存(推奨)`)。
@@ -203,7 +200,7 @@ DS-10 は2ファイルに分かれる。後半は dsl-execution.md。
   (`FTSelector.maxExpansion`。実際に書けるのは 31 通りまで)。
   **既知の非対応**: `(a|b)&&[2]` は「各節の 2 番目」であって「和集合の 2 番目」ではない
   (Shirates は後者。節ごとに `[n]` を持つ fleetest の構造をそのまま使うため)
-- **否定フィルタ `属性!=値` と短縮形 `!値`**(2026-07-27): `FlowLocator.not` に
+- **否定フィルタ `属性!=値` と短縮形 `!値`**: `FlowLocator.not` に
   「属性1つだけのロケータ」を並べ、肯定フィルタで絞ったあとに引く(`LocatorResolver.candidates`)。
   一致方法も使える(`textContains!=済`)。**短縮形は Shirates 準拠**で、中身を肯定と同じ経路で
   解釈して `not` に入れるだけ(`!保存` = `text!=保存` / `!#id` / `!.button`)。
@@ -213,7 +210,7 @@ DS-10 は2ファイルに分かれる。後半は dsl-execution.md。
   候補集合を絞れず黙って無視されるため)。
   **否定は「同じ条件を2回書いている」の重複検査から外す**(`attributeName` が nil を返す)。
   肯定の text と否定を並べるのは正当な使い方で、外さないと `.button&&項目&&!#btn_item_2` が
-  構文エラーになる(2026-07-27 に E2E で検出)
+  構文エラーになる
 - **スコープ `祖先 >> 子孫`**: `#list >> .clickable[2]` は `#list` で解決した要素の**子孫だけ**を
   候補にし、序数もスコープ内で数える(画面クロム・スクロール位置で序数がずれる問題への対処)。多段可。
   子孫判定は「スナップショットは pre-order + 元ツリーの depth」という 3 ブリッジ共通の規約に依存する
@@ -235,10 +232,10 @@ DS-10 は2ファイルに分かれる。後半は dsl-execution.md。
 
   **畳むと子孫が消えてスコープ対象が無くなる**のが唯一の落とし穴(Flutter の `MergeSemantics`、
   Compose の Box+重ね置き `#pad_swipe` は iOS で子 Text が同 depth に平坦化される)。
-  当初「Flutter では使えない」と判断したが、SUT が `MergeSemantics` で畳んでいただけで、
-  容器を非マージで公開したら iOS/Android とも入れ子になった(=**フレームワークの制約ではない**)。
+  Flutter で使えないように見えるのは SUT が `MergeSemantics` で畳んだときだけで、
+  容器を非マージで公開すれば iOS/Android とも入れ子になる(=**フレームワークの制約ではない**)。
   回帰は 4 SUT 共通の `#list_rows >> …`(`TestProjects/E2E-CMP/scenarios/09_否定と個数と方向セレクタ.swift`・
-  `TestProjects/E2E-*/scenarios/06_待機とタイムアウト.swift` の旧 12_セレクタ拡張 ブロック)。
+  `TestProjects/E2E-*/scenarios/06_待機とタイムアウト.swift` のセレクタ拡張ブロック)。
   `notExist` / `countIs` も 4 フレームワーク全てで同一に動く(同実測)
 - **相対セレクタ `基準:rightSwitch`**(`right` / `left` / `above` / `below` × 型別接尾辞
   `Button` / `Input` / `Label` / `Image` / `Switch` / `Widget`。Shirates 準拠で**基準が先**):
@@ -285,27 +282,27 @@ DS-10 は2ファイルに分かれる。後半は dsl-execution.md。
   `*ログイン*` が `"ログインに失敗しました"` を掴めば substring、`"ログイン"` を掴めば exact。
   読み手は**inapp モードの tap アクションだけ**で、primary が substring 止まりなら fallback を照会し
   fallback の exact を優先する(§performance-tuning「フォールバック検証の誤検知」)
-- **inapp の tap は activate 不発時に「整定待ち→要素取り直し→再 activate」で粘る**(2026-07-27)。
+- **inapp の tap は activate 不発時に「整定待ち→要素取り直し→再 activate」で粘る**。
   Compose iOS は**画面遷移直後、要素が AX ツリーに載っていても accessibilityActivate がまだ
   配線されておらず false を返す**ことがあり、その瞬間の合成タッチも無反応(成否検知不能)で
   タップが黙って空振りする(実測: sut-ec-mobile お気に入り一覧→詳細で 2/15 失敗)。
   `InAppBridge.tapByRef` が InAppSettle(イベント駆動・cap 800ms)で遷移の整定を待ってから
-  ツリーを取り直して再 activate し(+250ms でもう1回)、それでも不発なら従来どおり合成タッチへ。
+  ツリーを取り直して再 activate し(+250ms でもう1回)、それでも不発なら合成タッチへ。
   待ちはメインをブロックしない(asyncAfter)ので遷移自体は進む。**再試行は activate false の
   ときだけ**発生し通常経路のコストはゼロ。レポート注記「要素を取り直して再実行」
   (`re-fetched the element and retried`)で観測できる。
-  **撃ち直すのは自前描画(Compose / Flutter)のアプリだけ**(v109。`AppUIFramework.retriesUnfiredActivate`)。
+  **撃ち直すのは自前描画(Compose / Flutter)のアプリだけ**(`AppUIFramework.retriesUnfiredActivate`)。
   救済が効いた記録は全期間で sut-ec-mobile(Compose)の 21 件だけで、UIKit / SwiftUI / RN の不発は恒常的
   (RN の Pressable は tap の 96%・SwiftUI は表のセル・入力欄・アラートのボタン)。E2E の 9 月の約 1.6 万回で
   一度も効かず、1 回あたり約 0.4 秒(RN は 1 シナリオ 7.5 回)を払うだけだった。それ以外のアプリでは
   取り直しを**座標のためだけに**1 回行う(RN のコールドラウンチでレイアウト確定前の frame を叩いた実害 =
-  8/8 の `freshTapPoint`)。**合成タッチの前の整定待ちは省かない**(v110): v109 で「保存時の frame から
-  動いていたときだけ待つ」にしたところ、E2E-RN の回転直後の tap が吸われた(要素の位置は保存時のまま = 回転の
+  8/8 の `freshTapPoint`)。**合成タッチの前の整定待ちは省かない**(「保存時の frame から
+  動いていたときだけ待つ」にすると E2E-RN の回転直後の tap が吸われる: 要素の位置は保存時のまま = 回転の
   遷移中はタッチが捨てられる)。省くのは 250ms の小休止と 2 回目の取り直し・activate だけ。
-  語彙が読めなければ従来どおり撃ち直す。
-- **Compose/Flutter のスクロールは UIAccessibility の scroll アクションで駆動する**(2026-07-31)。
+  語彙が読めなければ撃ち直す。
+- **Compose/Flutter のスクロールは UIAccessibility の scroll アクションで駆動する**。
   両者は `UIScrollView` を持たないので `contentOffset` 経路が無く、move を一気に流す合成タッチの drag も受理
-  されない(実時間で刻む `/drag` = 座標ドラッグは 2026-10-22 から受理を確認。スクロールには使っていない)が、**VoiceOver が使う `accessibilityScroll` は実装している**
+  されない(実時間で刻む `/drag` = 座標ドラッグは受理を確認済み(2026-10-22)。スクロールには使っていない)が、**VoiceOver が使う `accessibilityScroll` は実装している**
   (Compose = `AccessibilityElement` / Flutter = `SemanticsObjectContainer`)。1回 = 1ページで、
   実測では XCUITest の実スワイプより**距離が長く**(row_01→27 対 row_01→16)、
   **1回あたり 106ms 対 456ms**。scrollToTop の中央値は 5,304→1,714ms。
@@ -314,41 +311,38 @@ DS-10 は2ファイルに分かれる。後半は dsl-execution.md。
     判定は `handleSwipe` に一本化し、不可なら 501 を返してホストにフォールバックさせる
   - **スクロール目的の swipe だけ AX 経路へ流す**(`SwipeRequest.scroll`)。DSL の `swipe`
     (ジェスチャ自体が目的)を混ぜると、**ジェスチャ検出パッドの上でもスクロール可能な親が
-    受理してしまい**、パッドに届かないまま 200 を返す(2026-07-31 に E2E-Flutter の
+    受理してしまい**、パッドに届かないまま 200 を返す(E2E-Flutter の
     ジェスチャ画面が 2/2 で黙って空振りした)
   - **包むドライバは `swipe(_:intent:path:)` を必ず素通しする**。既定実装は自分の `swipe(_:)` を
     呼ぶので、受けないと**フラグが最初のラッパーで落ちて**経路が丸ごと不発になる
-    (実際に落として、フルスイート2周ぶん「緑だが遅いまま」を測ってしまった)。
+    (落とすと「緑だが遅いまま」になる)。
     `SwipeForScrollForwardingTests` がソース走査で守る
-- **整定の打ち切りは黙って返さない**(2026-07-31)。整定待ちは3層にあり(ホストの
+- **整定の打ち切りは黙って返さない**。整定待ちは3層にあり(ホストの
   `settledSignature` = 6 poll / in-app の `InAppSettle` = cap 2,500ms / XCUITest ランナーの
-  `captureSettled` = budget 350ms)、**どれも収束と打ち切りを同じ顔で返していた**。そのため
-  「常態的に上限へ張り付いているのに緑」が誰にも見えず、実際に2件を長く見逃した
-  (ラベル振れによる `scrollToEdge` の非収束 / scroll edge effect による in-app の 2.5 秒張り付き)。
-  唯一申告していた `scrollToEdge` の `stopped at the limit of N` が、その2件を見つける入口になった。
-  以後3層とも note で申告する(ブリッジは `OKResponse.note` / `SnapshotResponse.note`、
+  `captureSettled` = budget 350ms)、**収束と打ち切りを同じ顔で返すと**
+  「常態的に上限へ張り付いているのに緑」が誰にも見えない
+  (実例: ラベル振れによる `scrollToEdge` の非収束 / scroll edge effect による in-app の 2.5 秒張り付き。
+  `scrollToEdge` の `stopped at the limit of N` が見つける入口になる)。
+  3層とも note で申告する(ブリッジは `OKResponse.note` / `SnapshotResponse.note`、
   ホストは `StepOutcome.driverFallback`)。**打ち切りは失敗ではない**ので status は 200 のまま
-- **整定は「視覚効果パラメータ」を動きと数えない**(2026-07-31)。`InAppSettle` は無アニメが
+- **整定は「視覚効果パラメータ」を動きと数えない**。`InAppSettle` は無アニメが
   100ms 続いたら整定とみなすが、iOS26/27 の scroll edge effect(スクロール縁のぼかし)が
   `CABackdropLayer` の `filters.gaussianBlur.inputRadius` を 0.25s で animate し続けるため、
   **無限反復ではなく既存の除外(match/punchout/SDF)にも掛からず**、静止区間が一度も作れない。
   結果 Compose iOS では launch 直後の 1〜2 アクションが毎回 cap 2500ms に張り付いていた
   (実測 actionMs 2,521ms。温まった後の同じ操作は 107ms。SwiftUI/Flutter には出ない)。
   `keyPath` が `filters.` / `backdropFilters.` で始まるアニメーションは無視する。
-  **位置・不透明度・transform は除外しない**ので本物の遷移待ちは従来どおり効く
-  (この修正で CMP の in-app スイートは 74s→57s)。
+  **位置・不透明度・transform は除外しない**ので本物の遷移待ちは効く
+  (除外で CMP の in-app スイートは 74s→57s)。
   同種の問題は「cap 打ち切りが常態化しても黙っている」ため見つけにくい —— 疑ったら
   `InAppSettle` に一時 NSLog を入れて `xcrun simctl spawn <udid> log stream` で層と
   キーを1回採るのが早い(手順は docs/verification/)
-  修正後: シナリオ×15 + フルスイート×3 で失敗ゼロ・救済発火4回
-- **inapp の type は Compose Multiplatform でも通る**(2026-07-21 更新。それ以前は XCUITest 切替が
-  必要だった)。Compose は「フォーカスアンカーの OverlayInputView(入力セレクタ非応答)」と
+- **inapp の type は Compose Multiplatform でも通る**。Compose は「フォーカスアンカーの OverlayInputView(入力セレクタ非応答)」と
   「実際のキーボード受け口 IntermediateTextInputUIView(UIKeyInput 準拠・isFirstResponder)」が
   **別ウィンドウの別ビュー**のため、first responder を1つ捕まえるだけでは前者を拾って 409 になる。
-  現実装(InAppInput.m)は「insertText: に応答し かつ isFirstResponder のビュー」を全ウィンドウから
+  InAppInput.m は「insertText: に応答し かつ isFirstResponder のビュー」を全ウィンドウから
   探して最優先で挿入する(実測 253〜358ms。XCUITest attach 経路 1.0〜1.3s の約1/4)。
-  - `preferTypeDriver`(Compose 検出時に最初から attach)は廃止(常に false)。
-    `/status` の `uiFramework` 申告は情報として残存
+  - Compose 検出時に最初から attach する切替は無い(`/status` の `uiFramework` 申告は情報のみ)
   - 安全網: inapp type が 409 なら `typeDriver`(`AppAttachDriver`)でリアクティブ切替
     (`StepOutcome.driverFallback` に記録。**ロケータの `passedViaFallback` とは別物**で、
     セレクタ更新の提案は出さない=セレクタは正しくドライバが変わっただけ)。
@@ -359,7 +353,7 @@ DS-10 は2ファイルに分かれる。後半は dsl-execution.md。
   見られないため type の受け皿にできない**(実測: snapshot は SBSwitcherWindow 等8要素のみ)。
   用途を混ぜないこと。XCUITest ブリッジが無いとき(xcuiPort 無し)はこの経路は無く、409 メッセージが
   xcuitest プロファイルへ誘導する
-- **`type` の `\n` は iOS では XCUITest 経路へ回す**(2026-07-28。`StepExecutor` の type 2経路):
+- **`type` の `\n` は iOS では XCUITest 経路へ回す**(`StepExecutor` の type 2経路):
   `typeText` は改行を **Return キー押下**として発火するので **iOS 既定の挙動そのもの**になり、
   「改行を入れるか確定アクションを撃つか」をフィールドが決める。in-app の `insertText` は改行の解釈が
   フレームワーク任せで OS 既定と揃わない(Compose は完全一致 `"\n"` だけアクション化、Flutter は握り潰す)。
@@ -372,7 +366,7 @@ DS-10 は2ファイルに分かれる。後半は dsl-execution.md。
   **tap の直後のロケータ無し・改行入りの type は、先に焦点が立つのを待つ**(`awaitFocusBeforeKeyInput`。
   pressEnter と同じ待ちで、焦点が既に立っていれば 1 枚読むだけ)。この経路は焦点救済も読み返しも通らず、
   Return で即確定して打ち直せない —— E2E-RN で `tap(#field_single)` → `type("pqr\n")` が "pq" で確定した
-  (9 月の 386 回で 1 回。tap が速くなった v110 以降に初出。単独 10 回では再現せず、帰属は未確定)。
+  (9 月の 386 回で 1 回・単独 10 回では再現せず、帰属は未確定)。
 - **iOS の Enter はフレームワークごとに受け口が違う**(2026-07-28 実測。吸収は
   `FTPressEnterOnComposeFirstResponder` の1箇所。**名前は Compose 由来だが実態は
   Compose / UITextField(UITextView)/ Flutter の3経路を吸収する** —— 改名すると
@@ -424,11 +418,10 @@ DS-10 は2ファイルに分かれる。後半は dsl-execution.md。
   はロケータを取らず、`FTDriveCore.performCustom` でドライバを直接呼ぶ(スナップショットも
   セレクタ解決も挟まない)。bundleID 省略時はこの run の既定アプリ(上記 ScenarioAppResolution)。
   `restartApp` は terminate の失敗を無視して launch する(既に落ちている状態から呼べる)
-- **器のディレクトリ名は `TestProjects/<name>/scenarios/`**(2026-08-05 に `Projects/` /
-  `Scenarios/` から改名。profiles / reports / results / docs と大小を揃えた)。
-  **旧名も解決する**: `ProjectStore.projectsDir` は `TestProjects/` が無ければ `Projects/`、
+- **器のディレクトリ名は `TestProjects/<name>/scenarios/`**(profiles / reports / results / docs と大小を揃える)。
+  **旧名 `Projects/` / `Scenarios/` も解決する**: `ProjectStore.projectsDir` は `TestProjects/` が無ければ `Projects/`、
   `TestProject.scenariosDir` は `scenarios/` が無ければ `Scenarios/` を見る
-  (既に導入済みの受け手は旧名のままで、`Projects`→`TestProjects` は大小が違うので
+  (導入済みの受け手は旧名のままで、`Projects`→`TestProjects` は大小が違うので
   macOS でも解決できない)。`Scripts/preflight.sh` も両方を見る
 - **`home` の機構は iOS 実機とシミュレータで違う**: シミュレータは `XCUIDevice.press(.home)`、
   **実機は springboard の下端フリック**(`press(.home)` が実機では ok を返すのに効かない。
@@ -448,14 +441,14 @@ DS-10 は2ファイルに分かれる。後半は dsl-execution.md。
   **名前をそのまま simctl へ渡さない**: 実機に繋がっているとき「Invalid device」という
   的外れな失敗になり、**同名のシミュレータが起動していればそちらを操作してしまう**。
   引き当ては booted シミュレータ優先 → 実機(devicectl 一覧は**必要になったときだけ**引く。
-  数百 ms かかる)→ どちらでもなければ従来どおり名前。実機と分かれば install/uninstall は
+  数百 ms かかる)→ どちらでもなければ名前。実機と分かれば install/uninstall は
   devicectl・clearAppData は 501。`DeviceTargetResolutionTests` が規則を固定する**権限はコンテナの外(TCC.db)にある**ので後者を省くと
   「Android では権限ダイアログが出るのに iOS では出ない」という OS 差が黙って生まれる
   (`pm clear` は権限もリセットする)。**ドライバの層では iOS はシミュレータ専用**(実機は devicectl に同等手段が
   無く 501)。DSL と MCP は実機ではアンインストール + 入れ直しに切り替える(`reinstalled-to-clear-data`)。1件でも消せなければ失敗させる(部分削除を「消えた」と言わない)。
   キーチェーン/Keystore の値は残るので、そこに初回起動判定を置くアプリでは再現しない
 - `ifCanSelect(セレクタ, waitSeconds:) { }.ifElse { }`: 「出るか不定」の唯一の表現手段
-  (`optional:` 全廃後)。既定 `waitSeconds: 0` = 即時1回判定。**`FTRuntime.perform` を
+  (`optional:` は無い)。既定 `waitSeconds: 0` = 即時1回判定。**`FTRuntime.perform` を
   通らないので構文検証を個別に呼ぶ**(上記 `validationError` 項)
 - `ios { } / android { }`: 対象 OS のときだけ実行する。**中身が実行されなかったことは警告しない**
   (ブロックに何が書かれているかは実行しないと分からないため)
@@ -507,7 +500,7 @@ DS-10 は2ファイルに分かれる。後半は dsl-execution.md。
 | 差分 | 理由 |
 |---|---|
 | `FTScrollDirection` に `None` が無い | 「スクロールしない」は引数の省略(Optional)が担う |
-| スクロールの時間指定(`scrollDurationSeconds` / `scrollIntervalSeconds`)が無い | 現行のフリング前提の実測値(Android 300ms・端送り 150ms+fling / iOS 端送り velocity 1500)を捨てることになるため。**間隔は固定 sleep でなく静止待ち**で担保する。`scrollFrame` とマージンは 2026-08-02 に実装済み(既定値だけ fleetest の実測で決める) |
+| スクロールの時間指定(`scrollDurationSeconds` / `scrollIntervalSeconds`)が無い | 現行のフリング前提の実測値(Android 300ms・端送り 150ms+fling / iOS 端送り velocity 1500)を捨てることになるため。**間隔は固定 sleep でなく静止待ち**で担保する。`scrollFrame` とマージンは実装済み(既定値だけ fleetest の実測で決める) |
 | `(a\|b)&&[2]` は「各節の2番目」(Shirates は和集合の2番目) | 節ごとに `[n]` を持つ fleetest の構造をそのまま使う |
 | `!` 短縮形で序数を否定できない(`![2]`) | 候補集合を絞れず黙って無視されるため実行前エラーにする |
 | テキスト検証(`textIs` 等)に `scroll:` が無い | ユーザー決定(上記「再提案しない」項) |
@@ -523,18 +516,18 @@ DS-10 は2ファイルに分かれる。後半は dsl-execution.md。
 | `existAll` / `dontExistAll` を持たない | `exist` のチェーンで書く方が保守しやすく、要素ごとに `waitSeconds:` / `scroll:` を指定できる(ユーザー決定 2026-07-31・**再提案しない**) |
 | `clearInput` がソフトキー/Appium clear 機構ではない(xcuitest=末尾タップ+delete 連打 / inapp=first responder のテキスト置換(WebView の欄は全選択+削除1回で、確かめは呼び手が木で行う)/ Android=ACTION_SET_TEXT "") | キーボード要素を snapshot から除外しているため(pressEnter と同じ事情) |
 | キーボード可視の取得元がブリッジで違う(iOS xcuitest=AX ツリーの `.keyboard` ノード / iOS in-app=`UITextEffectsWindow` の可視判定 / Android=ホストが見る dumpsys の InputMethod window) | IME が別プロセスの window でアプリの a11y ツリーに出ないため(iOS の2経路の事情は下記「キーボードの観測と `hideKeyboard`」) |
-| `waitForDisplay` / `waitForClose` に `throwsException` が無い(タイムアウトは常に失敗として記録) | `optional:` 全廃(2026-08-02)と同じ方針。空振りを許すと腐ったセレクタが緑のまま残る(2026-08-03 承認) |
-| `waitForClose` の expression 省略(Shirates の直前セレクタ再利用)は不可 | 2026-08-04 に `lastElement`(暗黙の要素保持)を実装したので当初の理由(概念が無い)は消えたが、**省略形は引き続き置かない** —— 待っている対象がソース上で読めなくなり、直前のコマンド次第で待ち先が変わる。値の読み出しと違って**待ちは何を待つかが読めることが要**(2026-08-03 承認の判断を維持) |
+| `waitForDisplay` / `waitForClose` に `throwsException` が無い(タイムアウトは常に失敗として記録) | `optional:` を持たないのと同じ方針。空振りを許すと腐ったセレクタが緑のまま残る(2026-08-03 承認) |
+| `waitForClose` の expression 省略(Shirates の直前セレクタ再利用)は不可 | `lastElement`(暗黙の要素保持)があるので「概念が無い」は理由にならないが、**省略形は置かない** —— 待っている対象がソース上で読めなくなり、直前のコマンド次第で待ち先が変わる。値の読み出しと違って**待ちは何を待つかが読めることが要**(2026-08-03 承認の判断を維持) |
 | `waitForDisplay` の判定は `exist` と同じ可視性込み(Shirates は `safeElementOnly=false` のツリー存在判定) | コマンド名の意味(displayed)に沿い、既存の exists 検証機構をそのまま使う(2026-08-03 承認) |
 | 待ち系(`waitForDisplay`/`waitForClose`/`appIs`)のポーリング間隔が `PollBackoff`(100→1000ms)である(Shirates は 0.2s 固定) | ポーリングは既存機構の再利用が契約(PollBackoff.swift「コピペ禁止」)。既定の待ち秒数 15.0(`WAIT_SECONDS_ON_ISSCREEN`)は踏襲(2026-08-03 承認) |
 | `screenshot` が `force`/`onChangedOnly`/`withXmlSource` を持たない(`filename:` のみ) | この3引数は Shirates の auto-screenshot 機構(毎操作の自動撮影・変化なしスキップ・XML dump)の制御で、fleetest はその機構自体を持たない(撮るのは失敗時の証跡と `screenshot()` の明示呼び出しだけ)。画像はレポートの該当ステップ直後に埋め込む(2026-08-03 承認) |
 | `flick*` は画面基点の8種のみで、`scrollableElement`/`safeMode` を持たない。`flickAndGo*` 一族・要素基点 `flickTo*`/`flickOut*` は持たない | 領域指定は `scrollFrame` のセレクタ式で足りる(既存の scroll 系と同じ判断)。`flickAndGo*` は scroll 系の別名で語彙を増やすだけ(2026-08-03 承認) |
 | `verify` が Shirates の `MANUAL` 相当(強制 passed 化)を持たず、アサーション0個は**ステップ状態 inconclusive** | 2026-08-03 ユーザー決定。MANUAL の語彙は持たない(`manual`/`knownIssue` を入れない既存方針と同根)が、失敗にもしない。passed でも failed でもない中間状態(`StepResult.Status.inconclusive`)として理由つきで記録し、シナリオは中断しない。弱い修正提案も残す |
 | `appIs` はニックネーム解決を持たず ID(iOS=bundle ID / Android=package)を直接書く | fleetest はアプリのニックネーム機構自体を持たない(既存方針。2026-08-03 承認) |
-| `packageIs` を持たない | 2026-08-03 ユーザー決定(いったん実装後に削除)。ニックネームが無い fleetest では `appIs` が ID 直指定のため Android で完全に同じ検査になり、同じことを2通りで書ける語彙になる。**再提案しない** |
+| `packageIs` を持たない | 2026-08-03 ユーザー決定。ニックネームが無い fleetest では `appIs` が ID 直指定のため Android で完全に同じ検査になり、同じことを2通りで書ける語彙になる。**再提案しない** |
 | `tapAppIcon` が `auto` 相当のみ(method 切替・マクロ機構なし) | 対象は実質エミュレータ/シミュレータで `auto` の分岐だけで足りる。名前省略時の既定は installApp と同じ形で親が解決する(`--app-name` = プロファイルの `appName`。2026-08-03 決定。実行自体は子のまま — UI 操作は「1シナリオ=1プロセス=1ドライバ」の子の責務で、親が同じランナーを叩くと二重クライアントの事故型になる) |
-| `installApp` の実行主体がオーケストレータ(親プロセス)である | 2026-08-03 ユーザー決定。子(シナリオサブプロセス)は install の依頼だけを親へ送り(stdin/stdout RPC)、親が実行プロファイルの `appPath` を解決して実インストールする。パス解決の優先順は明示引数 > プロファイルの `appPath`(Shirates の `appPackageFile` 既定に一致)。オーケストレータ無しの単独実行だけ、子が直接 `driver.install` を呼ぶ従来経路にフォールバックする(パス解決は 明示引数 > `--app-path` > 明示エラー)。iOS の inapp モードではインストールで in-app ブリッジが道連れになるが、次の `launchApp()` が再注入する(注記は実行中の ℹ️ ログにのみ出る。保存レポートには残らない) |
-| `enabledIs(expected:)`/`checkedIs(expected:)`(生文字列親形)を持たず、糖衣形 `enabledIsTrue/False`・`checkIsON/OFF` のみ | 生値比較は OS 依存(checked の iOS "1"/"")で、正規化済み Bool と衝突する。糖衣形は OS 差を吸収済みで fleetest の正規化と一致(2026-08-04 ユーザー決定。旧 `isEnabled` 系4名からの改名も同決定 — Is 後置の社内語彙とも揃う) |
+| `installApp` の実行主体がオーケストレータ(親プロセス)である | 2026-08-03 ユーザー決定。子(シナリオサブプロセス)は install の依頼だけを親へ送り(stdin/stdout RPC)、親が実行プロファイルの `appPath` を解決して実インストールする。パス解決の優先順は明示引数 > プロファイルの `appPath`(Shirates の `appPackageFile` 既定に一致)。オーケストレータ無しの単独実行だけ、子が直接 `driver.install` を呼ぶ経路にフォールバックする(パス解決は 明示引数 > `--app-path` > 明示エラー)。iOS の inapp モードではインストールで in-app ブリッジが道連れになるが、次の `launchApp()` が再注入する(注記は実行中の ℹ️ ログにのみ出る。保存レポートには残らない) |
+| `enabledIs(expected:)`/`checkedIs(expected:)`(生文字列親形)を持たず、糖衣形 `enabledIsTrue/False`・`checkIsON/OFF` のみ | 生値比較は OS 依存(checked の iOS "1"/"")で、正規化済み Bool と衝突する。糖衣形は OS 差を吸収済みで fleetest の正規化と一致(2026-08-04 ユーザー決定。Is 後置の社内語彙とも揃う) |
 
 ### `clearInput` の受け口ごとの機構と Flutter の縮退
 
@@ -571,21 +564,21 @@ DS-10 は2ファイルに分かれる。後半は dsl-execution.md。
   `keyboardIsNotShown` はこのブリッジでは通らない(下記の nil 規約どおり明示的に失敗する)
 - **iOS in-app**: **`UITextEffectsWindow` の可視判定**。キーボードはキーウィンドウの外に載るので
   AX ツリー走査では見つからない(閉じても window は残るため、画面内に張り出しているかで見る)。
-  **非表示を false で確定できる唯一の iOS 経路**(2026-08-08 に一度 nil へ潰して
-  `keyboardIsNotShown` を壊した — false を送り続けるのが契約)
+  **非表示を false で確定できる唯一の iOS 経路**(nil へ潰すと
+  `keyboardIsNotShown` が壊れる — false を送り続けるのが契約)
 - **Android**: ホスト側が `dumpsys window windows` の `InputMethod` window を見る(IME は別プロセスの
   window でアプリの a11y ツリーに出ない)。**dumpsys は固定費なので毎 snapshot では叩かない** —
   `AppDriver.captureKeyboardStateOnNextSnapshot()` を assert の直前に呼んだときだけ払う。
   採らなかった snapshot は `keyboardShown == nil` = 不明で、**nil を「非表示」と解釈しない**
   (`keyboardIsNotShown` が黙って通る嘘の成功になるため、明示的に失敗させる)
 
-**キーボードが覆う実矩形は別フィールド `SnapshotResponse.keyboardFrame`**(2026-08-08。
-取得元・罠・読み手は上記「ソフトキーボードの遮蔽」の表)。keyboardShown が可視性の Bool、
+**キーボードが覆う実矩形は別フィールド `SnapshotResponse.keyboardFrame`**
+(取得元・罠・読み手は上記「ソフトキーボードの遮蔽」の表)。keyboardShown が可視性の Bool、
 keyboardFrame が遮蔽警告用の矩形で、**申告できる条件が違う**(例: in-app は通知値が無いと
 frame を申告しないが shown は言える)ため統合しない。
 
 **`hideKeyboard` は Android・iOS とも動く**(ユーザー方針: 「人が操作できないときだけエラーにし、人ができる操作はツールも
-最善を尽くす」。以前は iOS を「空白点タップは透明なタップ領域を踏む副作用があるので採らない・再提案しない」としていたが、この方針で置き換えた)。
+最善を尽くす」。「空白点タップは透明なタップ領域を踏む副作用がある」ことは、点の選び方(下記)で避ける)。
 出ていないときは何もせず成功する(冪等)。
 
 - **Android**: 戻るキー。**出ているときだけ撃つ**(出ていないと画面が戻ってしまうので、dumpsys で可視を確かめてから送る)
@@ -605,15 +598,15 @@ frame を申告しないが shown は言える)ため統合しない。
   React Native は自前 SUT ではどちらでも閉じなかった。sut-ec-mobile の Compose の住所フォームは背景タップで閉じず Enter で閉じる
   (FD-2.5)
 
-**`tap` / `type` / `clearInput` が対象の中心をキーボードの下に見つけたとき**: まず従来どおり容器をスクロールして持ち上げる。
+**`tap` / `type` / `clearInput` が対象の中心をキーボードの下に見つけたとき**: まず容器をスクロールして持ち上げる。
 それでも覆われていれば、**副作用のない手段だけ**でキーボードを閉じる(iOS = 上の背景タップから Enter フォールバックを除いたもの /
 Android = `hideKeyboard` の戻るキー)→ 木を読み直して対象を解決し直し、注記を添えて操作する。副作用なしに閉じられないときは
 何も触らずステップを失敗にする(文言に「リターンキーなら閉じられるが欄の動作も発火するので自動では押さない・意図するなら
 ステップの前に `pressEnter()`」を書く。ユーザー決定: ここでは Enter を自動で押さない)。閉じた後に対象が消えた・まだ覆われていれば失敗。
 **Android**: キーボードが出ている間に対象が見つからないとき(窓が縮み、下の要素が木に無い。Android は枠を申告せず `keyboardShown` だけの
-ことがある)は、通常の待ちの後に戻るキーで閉じて**1回だけ**解決し直す。長押し(`holdSeconds` > 0)は従来どおり注記だけ。
+ことがある)は、通常の待ちの後に戻るキーで閉じて**1回だけ**解決し直す。長押し(`holdSeconds` > 0)は注記だけ。
 
-**Android の adjustResize は「覆う」ではなく「消す」**(2026-09-05・実測 Pixel 4a): 窓がキーボード
+**Android の adjustResize は「覆う」ではなく「消す」**(実測 2026-09-05・Pixel 4a): 窓がキーボード
 上端まで縮み、覆われていた要素が木から脱落する(iOS は窓が縮まないため要素は木に残ったまま覆われる)。
 判定は `TapTargetGeometry.KeyboardOcclusion.windowResizedAboveKeyboard` の1箇所——MCP の
 `keyboardCoverageNote` と DSL の `StepExecutor.keyboardResizedHint`(「見つからない」失敗にだけ添える)
@@ -622,8 +615,8 @@ Android = `hideKeyboard` の戻るキー)→ 木を読み直して対象を解�
 ### 型付きセレクタ(Sel)
 
 セレクタ式は文字列1本なので、綴り誤りをコンパイラが捕まえられない(実行前の `validationError` が
-唯一の防波堤)。これを型で潰す**併設経路**として `Sel`(Sources/FTDSL/Sel.swift)を追加した。
-**文字列版は一切変えていない**(署名・ステップ説明文・記録すべて同じ)。
+唯一の防波堤)。これを型で潰す**併設経路**として `Sel`(Sources/FTDSL/Sel.swift)がある。
+**文字列版と署名・ステップ説明文・記録は同じ**。
 
 ```swift
 tap(.id("login_btn"))                            // #login_btn
@@ -636,7 +629,7 @@ select(.id("txt_result")).textIs("dialog=none")   // 検証はセレクタを取
 - **引数の型が具体型なので先頭ドットで書ける**(`tap(.id(...))`)。`some FTSelectorConvertible`
   のような総称にすると leading-dot が効かなくなるため、各コマンドは String 版と `Sel` 版の
   **2 つの具体オーバーロード**を持ち、共通の impl(FTSelector を取る)へ畳む
-- **対象セレクタを取るコマンドは String / Sel が1対1**(2026-07-29 に非対称を解消)。
+- **対象セレクタを取るコマンドは String / Sel が1対1**。
   (スクロールの別名族は置いていない = 下記)
   **片方だけ足さない** — `Sel` を選ぶと別名族が使えない状態は「型付き経路を選ぶと機能が減る」
   ことを意味し、生成側を Sel 既定に寄せられなくなる。取りこぼしは
@@ -649,7 +642,7 @@ select(.id("txt_result")).textIs("dialog=none")   // 検証はセレクタを取
   「型付き経路を選ぶと機能が減る」の実害が最も小さい場所。
   `SelOverloadParityTests.testScrollFrameRemainsStringOnly` がこの決定を固定する
 - **スクロールを関数名で指定する別名族(`*WithScrollDown/Up/Right/Left`・`*WithoutScroll`)は置かない**
-  (ユーザー決定 2026-09-19。2026-08-02 の「別名は `maxSwipes:` だけ取る糖衣」という仕様を置き換えた)。
+  (ユーザー決定 2026-09-19)。
   指定は各コマンドの `scroll:` だけ = 同じことを2通りで書ける組み合わせを作らない(生成側の語彙のブレを消す)。
   Shirates の名前は `UnavailableCommands.swift` がコンパイルエラーで書き方を返す。**別名を再提案しない**
 - 組み立てるのは**文字列版と同じ `FlowLocator`**。解決・実行・レポート・ヒールは完全に共通で、
@@ -675,8 +668,8 @@ select(.id("txt_result")).textIs("dialog=none")   // 検証はセレクタを取
 ### 掴んだ要素の値の読み出し
 
 `exist` の戻り値 `FTElement` から `.text` / `.value` / `.id` で**値そのもの**を取れる
-(Shirates の `TestElement.text` 相当)。これが無いと期待値をシナリオに書き切るしかなく、
-「注文番号を控えて後の画面で照合」「画面の合計を読んで計算に使う」が書けなかった。
+(Shirates の `TestElement.text` 相当)。これにより
+「注文番号を控えて後の画面で照合」「画面の合計を読んで計算に使う」が書ける。
 
 - **新しいコマンドを足さない**。`exist` が既に解決した要素を持ち帰るだけなので、
   **追加のデバイス往復もステップ記録も発生しない**(`CommandDispatchTests` が
@@ -691,7 +684,7 @@ select(.id("txt_result")).textIs("dialog=none")   // 検証はセレクタを取
 - 型は `String?`。`ValueAssertions` の `FTValue`(`Optional: FTValue where Wrapped: FTValue`)に
   乗るので `exist("#total").text.thisContains("1,200")` がそのまま書ける
 - `checked` / `enabled` の**値**は足していない(語彙を増やさない。検証は `.checkIsON` / `.enabledIsTrue` で足りる)
-- **チェーンは網羅する**(2026-07-30): セレクタを取り「その要素」を検証する自由関数は
+- **チェーンは網羅する**: セレクタを取り「その要素」を検証する自由関数は
   **すべて同名で `FTElement` にも生やす**。一部だけだと「どれがチェーンできるか」に規則が無く、
   書いてみてコンパイルエラーで気付くことになる。例外は要素を1つに定めない
   `notExist` / `countIs` / `screenLooksLike` のみ。**検証コマンドを足すときは両方に足す** —
@@ -702,7 +695,7 @@ select(.id("txt_result")).textIs("dialog=none")   // 検証はセレクタを取
 ### 暗黙の要素保持(`lastElement`)
 
 戻り値を受けていなくても直前に掴んだ要素を読める(Shirates の `TestDriver.lastElement` 相当)。
-**鮮度のリスクを承知したうえでのユーザー決定**(2026-08-04。それ以前は「概念を持たない」が承認済み差分だった)。
+**鮮度のリスクを承知したうえでのユーザー決定**(2026-08-04)。
 
 - **更新点は1か所**: `Commands.swift` の共通経路 `perform(_:_:step:…)`。セレクタを取るコマンドは
   全部ここを通るので個々のコマンドに書き足さない(足し忘れると「どのコマンドで差し替わるか」の
@@ -720,8 +713,8 @@ select(.id("txt_result")).textIs("dialog=none")   // 検証はセレクタを取
 ### チェーンした検証の初回判定は掴んだ値で行う
 
 `exist(…).textIs(…)` は**掴んだ時点の値で先に判定し、満たしていれば実機を見に行かない**。
-満たしていなければ何もせず通常経路へ落ちる = 従来どおり取り直しながらポーリングする。
-**ユーザー決定**(2026-08-04。それ以前はチェーンも毎回セレクタから解決し直していた)。
+満たしていなければ何もせず通常経路へ落ちる = 取り直しながらポーリングする。
+**ユーザー決定**(2026-08-04)。
 
 - **判定できるアサートの表は `FTCore/HeldElementAssert`**。比較そのものは
   `LocatorResolver.matchedText` / `negativeAssertSatisfied` を**呼ぶ**(独自に書くと、同じアサートが
@@ -742,8 +735,8 @@ select(.id("txt_result")).textIs("dialog=none")   // 検証はセレクタを取
 
 ### 検証の対象は「直前に掴んだ要素」に固定
 
-`textIs("#btn_ok", "OK")` の形(セレクタを取る検証の自由関数)を**廃止**し、対象は
-`lastElement` に固定した。**ユーザー決定**。3つの書き方が同義になる:
+`textIs("#btn_ok", "OK")` の形(セレクタを取る検証の自由関数)は**無く**、対象は
+`lastElement` に固定する。**ユーザー決定**。3つの書き方が同義になる:
 
 ```swift
 select("#btn_ok").textIs("OK")                  // FTElement のメソッド(判定の実体)
@@ -756,14 +749,14 @@ select("#btn_ok"); textIs("OK")                 // 暗黙(トップレベルの�
   (`exist` は掴む側なので当然セレクタが要る)
 - **判定の実体は `FTElement` のメソッド1か所**。自由関数は `lastElement.<同名>` へ委譲するだけで、
   ステップ記録も往復回数も一致する(`HeldValueAssertTests.testTheThreeFormsAreEquivalent` が固定)
-- **セレクタを取る形の unavailable スタブは置かない**(未リリースで移行案内は不要・ユーザー決定
+- **セレクタを取る形の unavailable スタブは置かない**(移行案内は不要・ユーザー決定
   2026-08-04)。`textIs("#id", "OK")` はコンパイラの素のエラー(`extra argument in call`)になる
 - **1引数形にセレクタらしい期待値が来たら実行前に落とす**(`expectedLooksLikeSelector`)。
   `textIsNot("#btn_ok")` のような書き方は「そのテキストではない」が常に真で**黙って緑**になる。
   逃げ道はチェーン形(対象が明示なので曖昧さが無い)
 - 3つの書き方の対応は `vscode-fleetest/test/ftElementChainSync.test.mjs` がソース走査で見張る
-  (FTElement のメソッド集合 = 委譲する自由関数の集合。旧形の復活も検出する)
-- **コード生成も新形で出す**(`ScenarioCodeGen` / `ScenarioDraftCodeGen`)。索引
+  (FTElement のメソッド集合 = 委譲する自由関数の集合。セレクタを取る形の復活も検出する)
+- **コード生成もこの形で出す**(`ScenarioCodeGen` / `ScenarioDraftCodeGen`)。索引
   (`CommandIndex`)は signature を `select(selector).textIs(expected, ...)` の形で載せ、
   summary に「対象は直前に掴んだ要素」と明記する —— 生成側は JSON しか見ないため
 
@@ -773,7 +766,7 @@ select("#btn_ok"); textIs("OK")                 // 暗黙(トップレベルの�
   (`exist` の poll と対称)。可視性(occlusion)は見ない — ツリーから消えたことが唯一の判定。
   **`scroll:` を渡す(または `withScroll*` ブロックに入れる)と意味が変わる**: その向きへ
   探索しながら探し、**見つかった時点で失敗**する(`exist(scroll:)` の裏返し)。
-  見つからなければ従来どおり現在のビューポートでの消滅待ちに進む。
+  見つからなければ現在のビューポートでの消滅待ちに進む。
   inapp モードでは **不在を確定する側でだけ** `fallbackDriver` を1回照会する(pass 経路の固定費 1 回。
   システム UI のダイアログが primary の snapshot に映らないため。miss 毎に払う `exist` 側とは事情が逆)
 - **`checkIsON` / `checkIsOFF`**(セレクタの `checked=`・スナップショットの `checked`/`indeterminate` 表示も同じ源)は
@@ -857,8 +850,7 @@ select("#btn_ok"); textIs("OK")                 // 暗黙(トップレベルの�
   (`型で絞ると 3 件(例 .button&&…)`)。フレームワーク一般の性質で利用者は必ず一度は踏むが、
   メッセージが無いと `countIs("項目", 3)` が 6 を返す理由に辿り着けない(`StepExecutor.nestingHint`)
 - **失敗メッセージのロケータ表示は節を `||` で連ねる**(`FlowStep.locatorSummary`)。
-  以前は他の節を `(fallback: …)` と呼んでいたが、`||` が和集合になった今は
-  「片方だけ使われる」という誤った期待を与えるため用語ごと直した(2026-07-27)
+  `(fallback: …)` と呼ばない(`||` は和集合で、「片方だけ使われる」という誤った期待を与えるため)
 
 ### 部分一致・正規表現・反復
 
@@ -866,7 +858,7 @@ select("#btn_ok"); textIs("OK")                 // 暗黙(トップレベルの�
   (可視性ガードつき)。`textMatches` は**部分一致の正規表現**(全体一致は `^...$`)。
   occlusion-guard には**実際に一致した部分文字列**を渡す(パターン文字列は画面に出ないため。
   `LocatorResolver.matchedText` が唯一の判定者)
-- **否定・`value` 側の全対称**(2026-07-27。Shirates 準拠): `text*` の各モードに `*Not` を、
+- **否定・`value` 側の全対称**(Shirates 準拠): `text*` の各モードに `*Not` を、
   さらに `text*` の全てに `value*` を対で持つ(`textIsNot` `textContainsNot` `textStartsWithNot`
   `textEndsWithNot` `textMatchesNot` `textIsEmpty` `textIsNotEmpty` `textMatchesDateFormat` と、
   同名の `value…` 一式)。判定は `LocatorResolver.negativeAssertSatisfied` に**1箇所だけ**置く。
@@ -891,8 +883,7 @@ select("#btn_ok"); textIs("OK")                 // 暗黙(トップレベルの�
 - **`doUntilTrue(title, waitSeconds:intervalSeconds:maxLoopCount:)`**(Shirates 準拠の名前):
   ブロックが true を返すまで繰り返す。**ブロックは同期(`() throws -> Bool`)で DSL スレッドで実行する**
   = 中で DSL のコマンドを呼べる(Shirates の基本形 `{ scrollDown(); canSelect(...) }`。`repeatWhileCanSelect` と同じ形)。
-  以前はブロックを非同期のクロージャとして performCustom の中(DSL スレッドの外)で走らせていたため、中の DSL が
-  全部スレッド違反になっていた(利用者向けの例すら動かなかった)。1周ごとに `"<title> #n"` の group として記録し、
+  (DSL スレッドの外で走らせると中の DSL が全部スレッド違反になる)。1周ごとに `"<title> #n"` の group として記録し、
   最後に結果を1ステップ残す。中のコマンドの失敗はシナリオ中断に従って止まる(重ねて記録しない)。
   throw したら**リトライせず**即 NG。**1つのステップではない**ので FTSync のコマンド上限は掛からず、
   `waitSeconds` / `maxLoopCount` だけで止まる。上限は時計で測り、中の操作の前でステップの減速が待った分は
@@ -900,14 +891,14 @@ select("#btn_ok"); textIs("OK")                 // 暗黙(トップレベルの�
   Shirates の `retryOnError` / `throwOnError` / `throwOnOverMaxLoopCount` / `refreshCache` / `onTimeout` /
   `onMaxLoop` / `onError` は未実装(docs/shirates-parity.md)
 - **`tap(scroll:)` / `type(scroll:)` / `exist(scroll:)`**
-  (2026-07-27。Shirates の `tapWithScrollDown` 相当。**関数名の別名は置かない** = 下記「スクロールの語彙」):
+  (Shirates の `tapWithScrollDown` 相当。**関数名の別名は置かない** = 下記「スクロールの語彙」):
   コマンド名の変種を増やさず引数で表す。**探索は同じステップに畳む**(`FlowStep.direction` /
   `maxSwipes` を tap/exists 自身に載せ、`StepExecutor.runScrollSearch` が解決前に走る)。
   実体は `scrollTo` コマンドと共有するので挙動は1箇所にしかない。
   探索終端の空打ちドラッグ(iOS)は**触る点が手前の要素に取られないときだけ**打つ
   (`pointIsTakenByFrontElement`。取られると覆っている要素が反応する。
-  docs/verification/traps.md「スクロールした直後のタップ」)。
-  **打つ相手の判定(`shouldEmptyDrag`)を起動時プローブの締切に預けない**(2026-08-15):
+  docs/verification/resolved.md「スクロールした直後のタップ」)。
+  **打つ相手の判定(`shouldEmptyDrag`)を起動時プローブの締切に預けない**:
   あの締切は「suspend したアプリは TCP を受理して答えない」を素早く諦めるための値で、
   冷えた実機ブリッジが収まる保証は無い。外れて `uiFramework` が nil になると
   「不明なら打つ」へ倒れ、RN では横抜き 4pt が `pressRetentionOffset`(既定20pt)に収まって
@@ -925,15 +916,14 @@ select("#btn_ok"); textIs("OK")                 // 暗黙(トップレベルの�
   XCUITest ランナーが XCTest の非公開辞書 `additionalAttributes[5004]` から `ElementInfo.axClass` に載せる。
   Compose / Flutter の要素は `UIAccessibilityElement` = ビューを持たずホストが自前でタッチを処理する側、
   RN は `UIView`・SwiftUI は `NSObject`・UIKit は実クラス名。根の走査に付いてくるので追加の往復は無い。
-  UIKit の実アプリにも少数出る(地図 6/111)ので判定は掴んだ要素単位)、それも無ければ nil = **不明なら打たない**(2026-09-12 に反転):
+  UIKit の実アプリにも少数出る(地図 6/111)ので判定は掴んだ要素単位)、それも無ければ nil = **不明なら打たない**:
   打って外れると UIKit / SwiftUI / RN の行が押されてアプリの状態が黙って変わる(物理 iPhone 13 で
   `ft_scroll_to` が診断画面を開いた)が、打たずに外れるとタップが吸われて失敗として見える。
   不明になるのは材料も台帳も無い**物理 iPhone だけ**(端末に入ったアプリの中身は devicectl でも
   端末上のランナーからも読めない —— サンドボックスが `Operation not permitted`。2026-09-12 実測)。
   そのときは run の log と MCP の応答に「判定できなかったので撃っていない」と1回残す。
   **別ステップにしない理由**: 利用者が書いたのは1コマンドなので記録も1行にする。
-  合成ステップは**ソース行を持たない**ためジャンプも修正提案の照合もできず、説明の要る状態になる
-  (2026-07-27 に一度その形で入れて、直した)。
+  合成ステップは**ソース行を持たない**ためジャンプも修正提案の照合もできず、説明の要る状態になる。
   見つからなければ「N 回スクロールしても要素が見つかりません」で失敗(`select` だけは空要素を返して skipped)。
   既定のスワイプ上限は `FlowStep.defaultMaxSwipes`
 
@@ -955,13 +945,13 @@ select("#btn_ok"); textIs("OK")                 // 暗黙(トップレベルの�
   (横スクロールでは y が動かない)。ref はスナップショット毎に振り直されるので使わない
 - **署名にラベルを入れてはいけない**(2026-07-31 実測)。SwiftUI List では、静止画面でも
   画面外の再利用セル 2 件が取得のたびに別の行のラベルを名乗り、A↔B で交互に振れ続ける
-  (frame は 1pt も動かない)。ラベルを含めていた頃は `settledSignature` が毎回ポーリング上限を
+  (frame は 1pt も動かない)。ラベルを含めると `settledSignature` が毎回ポーリング上限を
   使い切り、「2回連続で変化なし」も永久に成立せず、**`scrollToTop` が毎回 `maxSwipes` 上限まで
-  回っていた**(E2E-iOS/ios-xcuitest で 44〜56s。同じ画面が in-app では 1.5s)。
+  回る**(E2E-iOS/ios-xcuitest で 44〜56s。同じ画面が in-app では 1.5s)。
   判定したいのは「動いているか」なので frame だけで足りる(`settleAfterScroll` も同じ)。
   **ランナー側の `captureSettled` は逆にラベルを外さない** — あちらは tap 直後の「内容が
   更新されたか」を待つので、レイアウト不変でテキストだけ変わる更新を取りこぼすと stale を返す
-- **用途でジェスチャを変える**(`FTSwipeIntent`。2026-08-02)。同じ「上へ払う」でも要求が違うので、
+- **用途でジェスチャを変える**(`FTSwipeIntent`)。同じ「上へ払う」でも要求が違うので、
   ホストが用途を `/swipe` へ伝えてブリッジがジェスチャを選ぶ。**ブリッジに用途の知識を集約する**形
   (`SwipeRequest.scroll` と同じ方針):
   - `gesture`(DSL の `swipe`)= 何も送らない。ジェスチャ自体が目的(向きの検出をアプリに見せたい)
@@ -990,7 +980,7 @@ select("#btn_ok"); textIs("OK")                 // 暗黙(トップレベルの�
 - **`textIs` 等の検証コマンドに `scroll:` は持たせない**(ユーザー決定 2026-07-27)。
   静止した画面を詳細に検証するためのもので、条件が揃うまで自動でスクロールする挙動は望まれていない。
   **再提案しない**
-- **`scrollFrame` でスクロール領域を指定できる**(2026-08-02。Shirates と同じくセレクタ式で受ける)。
+- **`scrollFrame` でスクロール領域を指定できる**(Shirates と同じくセレクタ式で受ける)。
   `scroll*` / `scrollTo` / `withScroll*` の引数で、`withScroll*` に渡すとブロック内の `scroll:` 探索が継承する。
   **指定時だけ**ホストが領域の矩形から座標を計算してブリッジへ渡す(`FTCore/ScrollGeometry` =
   shirates-core `ScrollingInfo` の移植。容器 ∩ 画面 → `startMarginRatio` / `endMarginRatio` で削る)。
@@ -1006,51 +996,48 @@ select("#btn_ok"); textIs("OK")                 // 暗黙(トップレベルの�
   探索だけ保守側に取るのは、**慣性を消せないので刻み = 実移動量にはならず**、行き過ぎが探索の失敗に
   直結するため(速度を落として慣性を消す案は Android に同じノブが無く、2026-08-02 の実測で収束しなかった)。
   片側の上限は `FTScrollDefaults.maxMarginRatio` = 0.45(= スパンの最小 0.1)。
-  **未指定は従来どおりブリッジ側の軸別既定**(縦 0.4 / 横 0.6 の全画面固定)—— 全画面固定のまま
+  **未指定はブリッジ側の軸別既定**(縦 0.4 / 横 0.6 の全画面固定)—— 全画面固定のまま
   スパンを変えると始点がスクロール領域の外に出て 1 ミリも動かない(PT-3.16 の実害)。
-  **画面に1件も無い scrollFrame は従来経路へ落とさず失敗させる**(2026-08-08。
+  **画面に1件も無い scrollFrame は全画面スワイプへ落とさず失敗させる**(
   `StepExecutor.scrollFrameUnresolved` の fail-fast。1本も振らないので `scrollFrameFailFastMessage`
   は「送られなかった」と言い、送信中に容器が消えた場合だけ文言を差し替える。黙って全画面スワイプへ
-  退化させていた頃はカード上のボタンを発火させる実害があった。`select` 系だけは空要素を返す契約が
-  優先し skipped)。**容器は解決したが margin で動かせる幅が潰れたときだけ従来経路へ落ちる** ——
+  退化するとカード上のボタンを発火させる。`select` 系だけは空要素を返す契約が
+  優先し skipped)。**容器は解決したが margin で動かせる幅が潰れたときだけ全画面スワイプへ落ちる** ——
   こちらは容器自体が見つかっているので fail-fast を通らず、`resolved but leaves nothing to move`
   の注記を残して全画面スワイプになる(Shirates も明示 scrollFrame は**矩形の供給元**であって、
   スクロール可能かの判定はしない)。
   **in-app は座標を「対象 + 移動量」として読む**(始点で UIScrollView を特定し、始点と終点の差を
   contentOffset へ)ので**マージンも効く**。**端送り(`SwipeRequest.edge` = scrollToEdge)だけは
-  移動量を無視して端まで一度に寄せる**(2026-08-19): この経路にジェスチャは無く慣性も無いので
+  移動量を無視して端まで一度に寄せる**: この経路にジェスチャは無く慣性も無いので
   「1回 = ビューポートの 85%」は実機の体感に寄せた刻みでしかなく、端が目的なら刻む理由が無い。
   長文(利用規約等)ではホストの往復がページ数に比例していた。**`edge` を探索(`intent: .search`)
   へ広げてはいけない** —— 1回で端まで飛んで途中の要素を全部飛び越す。
-  **Compose/Flutter は「枠が一致するスクロール容器」だけを in-app で送る**(v112。`FTSwipePath.region` =
+  **Compose/Flutter は「枠が一致するスクロール容器」だけを in-app で送る**(`FTSwipePath.region` =
   scrollFrame の要素の枠を `ScrollRegionMatch` で突き合わせ、一致した容器を根に AX の scroll を走査で撃つ)。
   2 点(始点・終点)からは hitTest も AX も領域を絞れず、指定領域の外を指しても画面本体が動いた
-  (2026-08-02 に E2E-Flutter で実測)ので、**一致しなければ従来どおり 501 で XCUITest へ回す**
+  (2026-08-02 に E2E-Flutter で実測)ので、**一致しなければ 501 で XCUITest へ回す**
   (witness = E2E-Flutter 05 scene 11 / E2E-CMP 05 scene 9 の固定ヘッダ)。実装で踏んだ2点:
   ①Compose の容器そのものは scroll を断り、受理するのは内側の要素(容器を根に走査する)
-  ②UIAccessibilityScrollDirection は縦がスクロールバーの向き(指と逆)・横は指の向き(反転していた頃は
-  横カルーセルが逆へ送られ端で断られた)。効果(手元の iOS in-app): CMP の `scrollToLeftEdge` 6.6 → 2.0 秒・
+  ②UIAccessibilityScrollDirection は縦がスクロールバーの向き(指と逆)・横は指の向き(取り違えると
+  横カルーセルが逆へ送られ端で断られる)。効果(手元の iOS in-app): CMP の `scrollToLeftEdge` 6.6 → 2.0 秒・
   `scrollLeft ×2` 4.3 → 0.47 秒、Flutter の `scrollToLeftEdge` 8.9 → 1.7 秒・`scrollDown ×2` 5.5 → 0.53 秒。
-  **scrollFrame 無しは画面中央に揃える**(v113): XCUITest / Android は画面中央を払うが、in-app は UIKit 系が
-  「画面のどこかの余地のある最大の容器」、自前描画が「木の順で最初に受理した要素」を動かしていたので、縦リストが
-  中央にある画面で横に払うと画面下のカルーセルが動いた(in-app の Flutter・SwiftUI・RN だけ。4 SUT × 3 構成で実測)。
-  いまは UIKit 系が「画面中央を含み余地のある最も内側」、自前描画が「枠が画面中央を含まない要素を部分木ごと飛ばす」
+  **scrollFrame 無しは画面中央に揃える**: XCUITest / Android は画面中央を払う。in-app も揃えないと、UIKit 系が
+  「画面のどこかの余地のある最大の容器」、自前描画が「木の順で最初に受理した要素」を動かし、縦リストが
+  中央にある画面で横に払うと画面下のカルーセルが動く(in-app の Flutter・SwiftUI・RN だけ。4 SUT × 3 構成で実測)。
+  そこで UIKit 系は「画面中央を含み余地のある最も内側」、自前描画が「枠が画面中央を含まない要素を部分木ごと飛ばす」
   (`ScrollPointReach`。枠 0 の入れ物は通す)。witness = 05_スクロール S0091 scene 5。
   時間指定は持たない(上記の承認済み差分)。
-  **未指定のときに容器を特定して座標化する案は撤回済み**(2026-08-02 実装 → 撤回 →
-  08-03 に条件を変えて再投入 → 再び撤回。**3度目は無い**)。2度目の撤回理由は2つ:
+  **未指定のときに容器を特定して座標化する案は採らない**(2度実装して2度撤回した。**3度目は無い**)。理由は2つ:
   狙いだった Compose の飛び越しに**効かない**(Compose の容器は xcuitest で `other` として出て
   `scrollable` を申告できず、そもそも対象に選べない)/ in-app では**到達距離が縮んで既定
   `maxSwipes` に届かなくなる**(E2E-iOS/ios-inapp の `tap("#row_40")` が失敗)。
   判定コードは `StepExecutor.scrollContainer` に残り、**`scrollFrame` 未指定なら必ず nil を返す**。
-  暗黙対象を選ぶ `implicitScrollTarget` は **2026-08-05 に関数ごと削除した**(production から
-  呼ばれておらず、生きているように見えるだけだったため。規則と再検討条件は
-  PT-3.19 に残っているので、必要になったら書き直す)。
+  暗黙対象を選ぶ関数は置かない(規則と再検討条件は PT-3.19)。
   **未指定でも見切れ判定は容器基準で行う**: Compose は**容器の外に子(ghost)を報告する**ので、
   viewport を画面全体にすると容器の外の要素を「見えている」と誤判定して探索がそこで止まり、
   タップが飲まれる。`scrollable` の申告が無くても、スナップショットの `depth` から
   **clip 元の祖先を復元**して viewport に使う(`ContainerGeometry.clippingContainer`。
-  **これは見切れ判定専用で、スワイプ座標には使わない**)。2026-08-03 修正・
+  **これは見切れ判定専用で、スワイプ座標には使わない**)。
   詳細は docs/verification/judgment.md「Compose の探索直後タップ」。
   **スクロールできない領域を指定したときは注記で申告する**(座標は正しく作られ 200 が返るが
   何も動かない = 端に達したのと区別できず署名では検出できないため)。判定は

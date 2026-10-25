@@ -28,8 +28,7 @@
 
 ## DS-11 テストプロジェクトと実行プロファイル
 
-シナリオのフラット配置(リポジトリ直下 scenarios/)と UserDefaults 頼みの実行設定を廃止し、
-**テストプロジェクト**(TestProjects/<name>/)と**組み合わせ型の実行プロファイル**(JSON)に移行した。
+シナリオと実行設定は、**テストプロジェクト**(TestProjects/<name>/)と**組み合わせ型の実行プロファイル**(JSON)で持つ。
 
 ### DS-11.1 テストプロジェクト
 
@@ -97,7 +96,7 @@ resolve の時点で警告する**(インストール失敗はブリッジ供給
 `appPath` の相対パスは**リポジトリルート**基準(上例の `builds/app-debug.apk` は `<repoRoot>/builds/...`)。
 `~` 展開・絶対パスも可。ビルド成果物は TestProjects/ 外に置くのが普通なためプロジェクト基準にしていない。
 
-**Android は `.apk` のほかに `.apks`(App Bundle 由来のスプリット束)も書ける**(2026-08-19)。
+**Android は `.apk` のほかに `.apks`(App Bundle 由来のスプリット束)も書ける**。
 `.apks` は単一 APK ではないので `adb install` に渡せず、**インストールは bundletool へ委譲する**
 (`ApksBundle`。無ければ「`brew install bundletool` するか `FT_BUNDLETOOL` を指す」で落ちる)。
 選別を自前でやらない理由は実測 —— 実物の `.apks` には variant 違いの master が2つ
@@ -109,8 +108,7 @@ targeting = bundletool にしか決められない。feature module を足した
 
 `healthCheckURL`(最上位・任意)— アプリが依存するバックエンドの死活確認 URL。実行開始前に
 3秒タイムアウトで到達確認し、不達なら警告する(実行はブロックしない)。バックエンド停止中は
-アプリが非同期処理でクラッシュし「Application is not running」で全滅して原因が見えにくいため
-(2026-07-21 実害)、入口で気づけるようにする。
+アプリが非同期処理でクラッシュし「Application is not running」で全滅して原因が見えにくいため、入口で気づけるようにする。
 
 **実機**(`kind: "physical"`。省略時は `"virtual"` = シミュレータ/エミュレータ)。
 識別子は iOS が `udid`、Android が `serial`(実機の serial は起動順で変わらないので直接書く):
@@ -143,20 +141,18 @@ targeting = bundletool にしか決められない。feature module を足した
   と一緒に置く**(`PresignedInAppDylib.prepare` ← `RemoteRunDispatcher.prepareWorkspace`)。ランナー機は**自分で署名できない
   ときだけ**、証明書と digest が一致する控えを使う(`InAppCodeSign.inspect(sourceDigest:)`。一致しなければ理由を足して縮退)
 - **一括起動(`devices up` / `api start-all-devices` / モニターの「全て起動」)は実機を含む**
-  (ユーザー決定 2026-09-08。2026-08-30 の除外を撤回)—— 実機の「起動」= ブリッジの起動
+  (ユーザー決定 2026-09-08)—— 実機の「起動」= ブリッジの起動
   (iOS は `BridgeProvisioner` の供給、Android は `DeviceBooter.startPhysicalAndroidBridge`)。
   **仮想デバイスの同時起動枠(maxConcurrent=2)とは別の、幅1の専用レーンで走る**
   (`DeviceBooter.buildBootQueue` の `physicalItems`)ので、数分かかるブリッジ供給が
-  仮想デバイスのブートを遅らせることはない(2026-08-30 に丸ごと除外していた理由はこれで、
-  レーンを分けたことで解消した)。`deviceStarting`/`deviceFinished` も他機と同様に出す
+  仮想デバイスのブートを遅らせることはない。`deviceStarting`/`deviceFinished` も他機と同様に出す
   (拡張のタイルは「ブリッジ起動待機」→「ブリッジを起動中」)。
   **`restart-devices`(down→up)だけは実機を丸ごと対象外のまま** —— 実機は端末を停止できず
   down 側が成立しない
-- **「すでに停止している」は停止の成功**(実害 2026-09-10。`DeviceBooter.isAlreadyStopped`):
-  iOS は `sim.booted` の guard で成功扱いなのに、Android は serial の解決が `avdNotRunning` で
-  throw するため**停止済みのデバイスが「停止に失敗」に化けていた**。全滅だけを失敗として伝えるように
-  なった直後、全台停止済みの機械で一括停止が `every device failed to stop` を出した
-  (受け手の報告。それまでは何を積んでも ok:true だったので隠れていた)。
+- **「すでに停止している」は停止の成功**(`DeviceBooter.isAlreadyStopped`):
+  iOS は `sim.booted` の guard で成功扱いだが、Android は serial の解決が `avdNotRunning` で
+  throw するので、仕分けないと**停止済みのデバイスが「停止に失敗」に化け**、全台停止済みの機械で
+  一括停止が `every device failed to stop` を出す。
   **プロファイルの誤り(avd 未記載)や実機の未接続は失敗のまま** —— 仕分けは純粋関数の1箇所で、
   テストが直接叩く(`DeviceBooterAlreadyStoppedTests`)
 - **一括停止(`devices down` の `--profile` 指定時 / `--profile` 無しの掃討(sweep) /
@@ -172,8 +168,8 @@ targeting = bundletool にしか決められない。feature module を足した
     `DevicesCommand.Down.run` が直接: iOS は `BridgeLauncher.stopAll(skipPhysical: false)`
     (ps 走査でランナーだけ殺す)、Android は `AndroidDeviceCatalog.connectedSerials()` から
     `allEmulatorSerials()` を引いた残り(= 実機の serial)へ個別に `AndroidDriver.stopBridge()`
-    を撃つ。**この掃討は以前 `skipPhysical: true` で実機のブリッジを素通りしていたが、
-    それでは「全て終了」を押しても実機のブリッジが残るため 2026-09-08 に false へ改めた**
+    を撃つ。**この掃討は `skipPhysical: false`(true だと実機のブリッジを素通りし、
+    「全て終了」を押しても実機のブリッジが残る)**
   **モニターの「全て終了」は、拡張が自分のライブ操作の serve を畳んで(終了 = デバイスの印
   `.fleetest/mcp-<鍵>.lease` が消えるまで待って)から撃つ**(`LiveTabHost.suspendServeForSweep`。
   掃討はどの機械のぶんもキューが空いてから `resumeServeAfterSweep` で立て直す)—— ライブ操作も
@@ -200,18 +196,18 @@ targeting = bundletool にしか決められない。feature module を足した
   76ms → 114ms に延びた(SE3 実測。上限は約 20 コマ/秒)。子は操作と同じ順番でブリッジを使うので奪い合わない。
   撮影1回 約 50ms をステップごとに払う。**動画の録画を起動できなかったデバイス(シミュレータの試し撮りが空・
   adb が無い等)もこの方式へ切り替える**(`VideoRecordingCoordinator.start`。警告を1行出す)。iOS シミュレータは
-  9/17 の修正後もデバイス×実行の約2%で録画が丸ごと消えていた(3/135)。**常用はしない** —— 設定で全デバイスを
-  静止画にする `recordStillFrames` を一度置いたが外した(2026-10-04 ユーザー決定): 撮影1枚あたりの実測
+  デバイス×実行の約2%で録画が丸ごと消える(3/135)。**常用はしない** —— 設定で全デバイスを
+  静止画にする `recordStillFrames` は置かない(2026-10-04 ユーザー決定): 撮影1枚あたりの実測
   (2026-10-03・M2 Ultra・モニター停止・E2E の「起動と画面遷移」1本 = 14枚・静止画/録画なしを交互に5回ずつ・
   シナリオの durationMs の差 ÷ 14)が iOS シミュレータ 約 112ms(6415 vs 4850ms・+32%)/ Android
   エミュレータ 約 165ms(7939 vs 5634ms・+41%)で、操作と操作の間の出来事(遷移・読み込み表示)も残らない。
   物理 iPhone の「約 50ms」は `/screenshot` 単体の値で、こちらは PNG の書き出しまで含む子の側の実費。
-  **救えるのは起動時に気づける失敗だけ** —— 止めたら中身が空だった型は切り替えられない(9/17 以降の3件が
-  どちらの型かは判別できなかった。理由は stderr にしか出ておらず、結果に残っていなかった)。**以後は
+  **救えるのは起動時に気づける失敗だけ** —— 止めたら中身が空だった型は切り替えられない
+  (理由が stderr にしか出ないと、どちらの型か判別できない)。**だから
   `recordings/index.json` の `sourceIssues` に事実として残す**(デバイス・起動時/停止時・録画クラスが観測した
   理由・静止画へ切り替えたか。`RecordingIndex.swift`)。録画まわりの計測の全体は PT-3.31
 - 実機で成立しない機能は無効化される: Reduce Motion 自動設定、autoInstall の差分スキップ(コンテナを読めないため
-  毎回インストール)。Android 実機は録画(`adb screenrecord`)も従来どおり動く
+  毎回インストール)。Android 実機は録画(`adb screenrecord`)も動く
 - `model` / `osVersion` は実機では**表示専用**(登録時に控えるだけで同定には使わない。端末を挿し替えても
   追随しない)。iOS シミュレータの `name`/`osVersion` だけは実体解決に使う値なので意味が違う
 - 実機の要件と罠(iOS の署名・LAN/USB 経路、Android の画面ロック)は docs/verification/
@@ -269,7 +265,7 @@ targeting = bundletool にしか決められない。feature module を足した
 
 FM(Foundation Models)を使うのは `fmTextVisibilityCheck`(occlusion-guard の FM の段。OCR の段
 `ocrTextVisibilityCheck` と独立で、guard はどちらかが true なら走る = FTRuntime が合成)・`screenLooksLike` のどちらかが true のときだけで、いずれも既定 true
-(`fmTextVisibilityCheck` は 2026-09-03 にオプトインをやめた)。両方 false の run では FM 呼び出しを
+(オプトインではない)。両方 false の run では FM 呼び出しを
 一切行わない(子ランナーへも伝搬し、delegate 自体を作らない)。screenLooksLike を無効にした
 run では該当ステップは skip(素通り)になり、FM 利用不可時と同じ扱い。子への伝搬(プロファイル →
 子 → 実行時)は `FMToggleWiringTests` が固定する。UI は「プロファイル」タブの実行プロファイル設定
@@ -284,7 +280,7 @@ run では該当ステップは skip(素通り)になり、FM 利用不可時と
 587MB 空き。さらに詰まると状態コードの代わりに `Requested internal only, but not enough space` で落ちる)。
 **`wipeDataOnBloat` が ON のときだけ**、その失敗を見た `ProfileWorkerFactory.installIfNeeded` がその AVD を
 Wipe Data し、パッケージマネージャの応答を待ってから1回だけ入れ直す(`AndroidInstallFailure` /
-`AndroidStorageRecovery`。同じ serial で戻ってきたときだけ)。**OFF のときは Wipe せず従来どおり離脱**し、
+`AndroidStorageRecovery`。同じ serial で戻ってきたときだけ)。**OFF のときは Wipe せず離脱**し、
 理由と手動の Wipe(`fleetest api wipe-device`)をログに言う(Wipe は破壊的 = 利用者が自動 Wipe を許した
 ときだけ撃つ。ユーザー決定 2026-09-28)。判定は Android 側が出す2つの形で、自前の文言の一致ではない。
 `wipeDataOnBloat`(既定 true)は実行開始時に Android AVD の wipe 対象
@@ -303,8 +299,8 @@ iOS = `--platform ios --udid <UDID>` = `simctl erase`。リモートは `remote 
 `DeviceWiper.target` が別の呼び手のために拒否を持ち続ける)。**識別子を持たない行にも出さない**
 (avd 未設定の Android エントリはそもそも wipe できない)。
 
-**停止を確認できなければ1バイトも消さず、失敗として返す**(2026-08-29 に「中止したのに
-ok:true」を踏んだ。デバイスが止まっただけで中身は残り、利用者には成功と見えた)。確認は2つの
+**停止を確認できなければ1バイトも消さず、失敗として返す**(「中止したのに ok:true」だと、
+デバイスが止まっただけで中身は残り、利用者には成功と見える)。確認は2つの
 どちらかで取れればよい: ①adb の serial が消えた ②**その AVD の qemu プロセスが消えた**
 (`AndroidDataWiper.avdProcessPresent`。前方一致では見ない —— 片方がもう片方の接頭辞になる
 AVD 名は普通にある)。②を併せて見るのは、まさに kill が遅い状況では adb 側も詰まっており、
@@ -367,7 +363,7 @@ Android 実機はグローバル設定が**永続的に**書き換わるので�
 `captureSettled`。ユーザー決定。4 SUT の A/B で退行無し)。**スワイプ(スクロールを含む)は待ちを残す**(慣性の終わりを木では
 見届けられない = E2E-RN S0090 が 6 回中 4 回落ちた)が、操作の間は待ちの上限を 6 秒に縮める(`QuiescenceWait.quiescenceCapSeconds`)。
 **DSL の `settle: false`(コマンド1回だけ、操作後の整定をすべて飛ばす)**: スワイプ(スクロールを含む)・/drag・/pinch・/rotate・/systemui/*・アプリスイッチャー・ホームの XCTest の待ちは
-`settle: false` のときだけ飛ばし、それ以外は上限 6s に縮める(v176 から。それまで /drag と /systemui/* は縮めず、知らせを返さないアプリで 60s 止まってランナーが起動し直された。走査 `RunnerQuiescenceCapCoverageTests` が上限の外の操作を落とす。/type・/clear の中の焦点のタップは待ちを飛ばす = 直後の打鍵の前の待ちと二重になり、/type 1回が 24s でホストの上限 20s を超えていた。v177 から /type の中だけ操作の**後**の待ち(isPreEvent == false)も飛ばす = `QuiescenceWait.capping(skipPostEvent:)`。完了は読み返しが値で確かめるので二重で、知らせを返さないアプリで /type が 7.8〜12.9s → 0.9〜1.8s)(/type・/clear・/pressEnter は前の待ちを飛ばさないが、v175 から待ちの上限だけ 6s に縮める = `QuiescenceWait.capping`。キーボード出現待ちを quiescence に頼るため飛ばせないが、落ち着かないアプリでは打鍵ごとに XCTest 既定の 60s を待っていた)。契約:
+`settle: false` のときだけ飛ばし、それ以外は上限 6s に縮める(/drag と /systemui/* も縮める: 縮めないと、知らせを返さないアプリで 60s 止まってランナーが起動し直される。走査 `RunnerQuiescenceCapCoverageTests` が上限の外の操作を落とす。/type・/clear の中の焦点のタップは待ちを飛ばす = 直後の打鍵の前の待ちと二重になり、/type 1回が 24s でホストの上限 20s を超えるため。/type の中だけ操作の**後**の待ち(isPreEvent == false)も飛ばす = `QuiescenceWait.capping(skipPostEvent:)`。完了は読み返しが値で確かめるので二重で、知らせを返さないアプリで /type が 7.8〜12.9s → 0.9〜1.8s)(/type・/clear・/pressEnter は前の待ちを飛ばさないが、待ちの上限だけ 6s に縮める = `QuiescenceWait.capping`。キーボード出現待ちを quiescence に頼るため飛ばせないが、上限が無いと落ち着かないアプリでは打鍵ごとに XCTest 既定の 60s を待つ)。契約:
 - **ワイヤ**: ホストが該当ステップの実行中、ブリッジへの HTTP リクエストに `X-FT-Settle: 0` を付ける(`BridgeAPI.settleHeader`)。
   ホスト側は `FlowStep.settle` → `StepExecutor.execute` が TaskLocal `SettleOverride.skip` に載せ、ブリッジクライアントが読む。
   ブリッジの版は iOS `bridgeProtocolVersion` 165・Android `VERSION_CODE` 89。
@@ -389,7 +385,7 @@ Android 実機はグローバル設定が**永続的に**書き換わるので�
 直前に、ランナーへ木を1回読ませてから撃つ**(`WebViewDelegatingDriver.pingDelegatedBeforeEvent`)。
 attach したままの XCUITest セッションは、ランナーに問い合わせないまま数秒置いた直後の
 座標イベントを **200 を返しつつ届け損なう**(実測 約13%。ページは pointerdown すら見ない。
-機構は非公開で特定できておらず、観測に立脚した防御。A/B と経緯は docs/verification/triage.md「interop WebView」)。時間閾値にしないのは、短いギャップでも確率的に落ちる実測があり安全な
+機構は非公開で特定できておらず、観測に立脚した防御。A/B と経緯は docs/verification/resolved.md「interop WebView」)。時間閾値にしないのは、短いギャップでも確率的に落ちる実測があり安全な
 境界を引けないため。false は `FT_PRE_ACTION_PING=0` として注入される(`FTCore.RunEnvironment`
 が唯一の定義元 —— ProfileRunner / ApiRunCommand の profile 有無2経路 / Fleetest.swift の
 profile 無し経路と、fleetest-mcp の resolveProfileTarget から呼ばれる)。**効くのは inapp モードの
@@ -406,29 +402,28 @@ H.264 に再エンコード。VFR ソースの区間頭フレーム欠落は直�
 契約は `recordings/index.json`(schemaVersion 2。VideoRecordingCoordinator.swift・
 RecordingIndex.swift・RecordingWallClock.swift)。録画自体の失敗は run を失敗させない。
 
-**録画できることを実物で1本確かめてから本番を始める**(2026-08-26)。`simctl io recordVideo` は
+**録画できることを実物で1本確かめてから本番を始める**。`simctl io recordVideo` は
 **端末側に録画セッションが刺さっていても "Recording started" を出し、0 バイトの .mov を作り続ける**。
 気付けるのは run の終わり(切り出し)で、その run の録画は全部失われる。そこで
-`IOSSimulatorVideoRecorder.start()` は ①同じ udid の stale な client を pkill(従来)
-②**1 秒だけ録って閉じ、ファイルが空でないかを見る**(新規)—— 空なら「この端末は録画できない」と
+`IOSSimulatorVideoRecorder.start()` は ①同じ udid の stale な client を pkill
+②**1 秒だけ録って閉じ、ファイルが空でないかを見る** —— 空なら「この端末は録画できない」と
 理由と復旧手順(デバイスの停止→起動)を出して**そのデバイスの録画だけ諦める**(run は続ける)。
 **「ファイルが育たない」は検知に使えない** —— 正常な録画でも閉じるまで 0 バイトのまま
 (実測: 8 秒間ずっと 0、停止した瞬間に 21KB)。だから*閉じてから*大きさを見る。
 
-**失敗しても index は残す**(2026-08-26)。集計欄は2つあり**別のことを言う**:
+**失敗しても index は残す**。集計欄は2つあり**別のことを言う**:
 `clipsAttempted`/`clipsFailed` は「録れた動画から切り出せなかった」、
 **`sourcesFailed` は「そもそも録れていない」**(録画プロセスは起動したのに、読めるファイルが
-1本も残らなかったワーカー数)。以前は後者のとき index を書かずに `recordings/` ごと消していたため、
-**録画が全滅した run は拡張の録画タブから黙って消え、「録画していない run」と区別が付かなかった**
-(実害: `simctl io recordVideo` が 0 バイトの .mov を作る Mac で、その機械のセッションだけ
-一覧から消えた。fleetest ではなく環境側の不調だったが、画面からは追えなかった)。
+1本も残らなかったワーカー数)。index を書かずに `recordings/` ごと消すと、
+**録画が全滅した run は拡張の録画タブから黙って消え、「録画していない run」と区別が付かない**
+(`simctl io recordVideo` が 0 バイトの .mov を作る Mac で、その機械のセッションだけ一覧から消えた)。
 拡張は行に「録画失敗 N 台」を出し、再生ビューでは**「録れていない」を「切り出せなかった」より
 優先して**理由に出す(直す場所が simctl / screenrecord 側なのか、エンコーダ側なのかが変わるため)。
 
 **切り出しは全シナリオが終わってからまとめて行う**(`VideoRecordingCoordinator.finish`。方式は1つだけ = ユーザー決定。
-シナリオごとに区切る方式・この Mac の run がすべて終わってから背景で切り出す方式も作って比べたが、ハードウェアで切り出せる
+シナリオごとに区切る方式・この Mac の run がすべて終わってから背景で切り出す方式は不採用: ハードウェアで切り出せる
 状態では壁時計の差が数秒で、区切る方式は各シナリオの先頭 約 0.5 秒が欠け、区切りと停止の SIGINT が重なると最後のファイルが
-壊れる不具合も出たので外した。比較の数値は PT-3.37)。
+壊れる。比較の数値は PT-3.37)。
 
 **各シナリオの直前に録画が撮れていることを確かめる**(`prepareScenario` → `DeviceVideoRecorderSession.ensureRecording`。
 シナリオの区間を始める前に呼ぶ = 待ちをシナリオに数えない)。止まっていれば撮り直して開始を確かめ、撮り直しても始まらなければ
@@ -469,7 +464,7 @@ RecordingIndex.swift・RecordingWallClock.swift)。録画自体の失敗は run 
 録画の付随設定(すべて `record: true` のときのみ意味を持つ): `recordFailuresOnly`(既定 false)
 は true で成功したシナリオのクリップを保存せず失敗(frozen 含む)分のみ残す。`recordBitrateKbps`
 (既定 1000)は再エンコードの bitrate(kbps)で AVVideoAverageBitRateKey と Android screenrecord
-`--bit-rate` の両方に適用。既定は 2026-10-04 の実測で 1500 から下げた(iOS のクリップが 15〜35% 小さくなり、
+`--bit-rate` の両方に適用。既定 1000 は 2026-10-04 の実測による(1500 より iOS のクリップが 15〜35% 小さく、
 OCR で読める文字の割合に差が見えない。500 は iOS の半分解像度で誤読が 2〜5 倍。条件と数値は
 PT-3.31)。`recordFullResolution`(既定 false)は true で半分解像度化(iOS 再エンコード
 時の縮小・Android `screenrecord --size`)をスキップしフル解像度のまま出力する。
@@ -496,9 +491,9 @@ DeviceBooter.defaultLocale(実行プロファイルの locale が届くのは wi
    み serial を引き、不一致は throw)はこのあとのデバイス供給の段(DS-11.4 手順3)で行う ——
    → **profile 外のはぐれエミュレータは profile 実行には一切混入しない**(ワーカー0件)。
    ただし serial 未指定の対話コマンド(`ft_status`/`ft_snapshot` 等)は接続中デバイスが
-   **1台のときだけ**それを自動採用する(2026-08-06。複数なら AVD 名付きで列挙してエラー)。
+   **1台のときだけ**それを自動採用する(複数なら AVD 名付きで列挙してエラー)。
    はぐれ Android 機が1台混ざっていると、それが唯一の候補になって診断画面がそれになりうるので、
-   規模ランの調査前に `adb -s <serial> emu kill` で掃除する(2026-07-16)
+   規模ランの調査前に `adb -s <serial> emu kill` で掃除する
 2. **アプリ解決**: デバイスの platform セクション(ios/android)から。`app`(bundle ID)必須
 3. **並列数 = 解決後のデバイス数**(maxParallel は存在しない)。プラットフォーム毎にワーカーを立て、
    RunOrchestrator の platform 別キューで両OS同時並列実行
@@ -516,7 +511,7 @@ DeviceBooter.defaultLocale(実行プロファイルの locale が届くのは wi
    `overrides:`)。**解決後の `ResolvedProfile` を上書きしない** —— 欄ごとに上書きを配線すると
    足し忘れが生まれ、実際に「チェックボックス 20 個に対し CLI は 4 個・形は3通り」まで育った
    (MN-16)。文書に当てれば全欄が自動で追随する。
-   `--report-dir` 等の専用フラグは従来どおり解決後に効くが、**同じ意味のキーを `--set` でも
+   `--report-dir` 等の専用フラグは解決後に効くが、**同じ意味のキーを `--set` でも
    渡したらエラー**(どちらかを黙って勝たせない)
 2. `ScenarioHost.build(project:)`(ホスト 1 回。入力の BuildFingerprint が前回ビルドと一致すれば
    スキップ=無変更の再実行で no-op build ~2.6s を払わない。PT-3.2)。
@@ -550,10 +545,9 @@ DeviceBooter.defaultLocale(実行プロファイルの locale が届くのは wi
 
 ### DS-11.5 インターフェース
 
-- CLI: `fleetest run [--project P] [--profile 名] [--scenario ...]`(profile 未指定時は従来どおり
+- CLI: `fleetest run [--project P] [--profile 名] [--scenario ...]`(profile 未指定時は
   手動 --port/--serial)、`fleetest profile list`(解決結果と整合チェック)
-- **GUI(SwiftUI 版 `fleetest-gui`)は 2026-07-10 に削除**。対話的 UI は VSCode 拡張
-  (`vscode-fleetest/`)に一本化した。プロジェクト/実行プロファイルの選択はコマンドパレット
+- 対話的 UI は VSCode 拡張(`vscode-fleetest/`)だけ(SwiftUI の GUI は無い)。プロジェクト/実行プロファイルの選択はコマンドパレット
   (「fleetest: プロジェクトを選択」「fleetest: 実行プロファイルを選択」、`fleetest.project` /
   `fleetest.profile` 設定)、プロファイル JSON の編集・保存時検証は問題パネル(Diagnostics)で行う。
   **実行/デバッグ実行は `fleetest.profile` 未指定なら実行せず、「デバイスモニター」タブでの指定を促す通知
@@ -595,11 +589,9 @@ DeviceBooter.defaultLocale(実行プロファイルの locale が届くのは wi
 
 ### DS-11.6 移行と後方互換
 
-- 旧 `scenarios/` は `TestProjects/SampleApp/scenarios/` へ git mv(同一コミットでアトミック移行。
-  レガシーレイアウトのランタイムサポートは持たない)
-- ルート `reports/` の既存成果物は履歴として残置。旧 `.fleetest/heal-cache.json`(2026-09-15 に
-  ヒールキャッシュ機構ごと撤去 → MN-22)は放置で無害 —— 現行コードはもう読み書き
-  しないので、残っていれば消してよい
+- シナリオは `TestProjects/<name>/scenarios/` だけ(リポジトリ直下 `scenarios/` のレガシーレイアウトのランタイムサポートは持たない)
+- ルート `reports/` の既存成果物は履歴として残置。`.fleetest/heal-cache.json` は現行コードが読み書きしない
+  (ヒールキャッシュは置かない → MN-22)ので、残っていれば消してよい
 
 ---
 
@@ -735,12 +727,12 @@ docs/user-docs/reference/tools/mcp_server_ja.md §サンドボックスと承認
 ## DS-13 実行の相乗りガードと launch 事前検査
 
 デモ凍結事故(ライブモニター稼働中のシムへ外部 run が相乗り→ launch ハング→ 60s watchdog で
-ランナー死→ストリーム凍結)の再発防止として2つのガードを入れた。**うち占有ガードは後に撤去した**(13.1)。
+ランナー死→ストリーム凍結)への備えは launch 事前検査(13.2)。相乗りの占有ガードは置かない(13.1)。
 
 ### DS-13.1 MonitorLease(占有ガード、B1)は撤去済み
 
-「モニターが見ているデバイスへの外部 run を lease で拒否する」占有ガードを一度入れたが、
-**テスト実行をモニターより優先する**方針(ユーザー決定)により全廃した。
+「モニターが見ているデバイスへの外部 run を lease で拒否する」占有ガードは置かない
+(**テスト実行をモニターより優先する**方針・ユーザー決定)。
 `MonitorLease` の実装も `.fleetest/monitor-*.lease` も現在は**存在しない**。
 モニターは受動ビューアで、run に割り込まれても respawn で復帰する。**再提案しない**。
 
@@ -758,8 +750,8 @@ run → monitor 方向の `RunLease`(DS-12 の「監視と実行の協調」)は
   bundleID はインスタンス内キャッシュ
 - 配線: xcuitest モードのシナリオ実行時、`DriverConnection.udid` が届く場合のみ
   `ScenarioRunnerMain` が BridgeClient をラップ。udid 供給元は ProfileWorkerFactory / MCPServer
-- 教訓: 当初「2ランナー競合」を凍結の主犯と推定したが、本番構成の通し run で監視中シムに
-  第2ランナーが共存しても凍結しないことを確認。主犯は「未導入 app の launch」
+- 凍結の主犯は「未導入 app の launch」(2ランナーの競合ではない。本番構成の通し run で、監視中シムに
+  第2ランナーが共存しても凍結しないことを確認済み)
 
 ### DS-13.3 ライブ操作(`api live serve`)の宛先決定と門
 
@@ -771,8 +763,8 @@ run → monitor 方向の `RunLease`(DS-12 の「監視と実行の協調」)は
 取り直しは画面を変えない観測で、host は `busy` に `observing: true` を載せる(`MonitorLiveController.busyObserving`)。webview
 (グリッドビュー)はこの間の画面の操作とデバイスを操作するボタンを捨てずに送り、host の `runGridAction` が
 観測の終わりを待って撃つ(`OBSERVATION_DEFERRABLE_ACTIONS`。`handleGridAction` は切り替えや座標の操作の前にも待つ)。撮り直しは
-操作の結果のたびに走る(1回 約 0.4 秒)ので、捨てていた頃は止まった画面へのタップが黙って空振りした(実地)。操作の最中(`runAction` =
-observing なし)は従来どおり受け付けない(画面が変わる最中)。まだ撃っていない操作を後で撃つだけ = 撃ち直しではない。
+操作の結果のたびに走る(1回 約 0.4 秒)ので、捨てると止まった画面へのタップが黙って空振りする。操作の最中(`runAction` =
+observing なし)は受け付けない(画面が変わる最中)。まだ撃っていない操作を後で撃つだけ = 撃ち直しではない。
 
 **(0) 実行中も操作を止めない**: グリッドビューは DS-12.6 のとおり、選択中のデバイスがシナリオを回している間も
 操作を受け付ける(利用者の自己責任。止めるのは整定のための自動の撮り直しだけ)。
@@ -794,10 +786,10 @@ observing なし)は従来どおり受け付けない(画面が変わる最中)�
 - **子に偽造させない**: `ScenarioSandbox.writeDeniedPaths` に `human-ops` がある
 
 **(a) 宛先の本人確認**: `XCUIBridgeResolver.resolve` が返した宛先は `FTCore.BridgeIdentityCheck`
-(F8b・2026-09-15。run 側の `RunOrchestrator.bridgeUnreachable` 再プローブと同じ判定)で `--udid` と
+(F8b。run 側の `RunOrchestrator.bridgeUnreachable` 再プローブと同じ判定)で `--udid` と
 突き合わせる(inapp モードの in-app ブリッジ側は別ポート = 別ブリッジなので `composeDriver` がそちらも別に
-確認する)。以前ライブ操作にはこの確認が無く、実害が出た(実地 2026-09-22): `api live serve
---udid <デバイスA>` を `--port` なしで起こすと既定 8123 に居た**別のデバイスのブリッジ**を掴み、
+確認する)。この確認が無いと(実地 2026-09-22): `api live serve
+--udid <デバイスA>` を `--port` なしで起こしたとき既定 8123 に居た**別のデバイスのブリッジ**を掴み、
 `actionResult.app` が別のデバイスで動いていたアプリを返した(操作もそちらへ飛んだ)。さらに
 `LiveBridgeAutoStarter.checkAndRestartIfStale` がその**別のデバイスのブリッジを「旧版」として止め、
 デバイスA の udid で同じポートに起動し直そうとした** —— 健全なブリッジが2本消えた。
@@ -815,8 +807,8 @@ observing なし)は従来どおり受け付けない(画面が変わる最中)�
   (`vscode-fleetest/src/liveModel.ts` の `buildDeviceArgs`)ので、**ブリッジのまだ無いデバイスをライブ操作で
   開く**場面では必ず既定にフォールバックする。そこで断ると、自動起動が想定しているまさにその場面で
   ライブ操作が開けなくなる
-- **応答が無いとき(`PortIdentity.silent`)は「このデバイスのブリッジ」と読まない**(2026-09-23 に
-  3値化。それまでは `/status` が答えなければ nil = 一致に畳んでいた)。ただし **busy は正常**
+- **応答が無いとき(`PortIdentity.silent`)は「このデバイスのブリッジ」と読まない**(一致・不一致・silent の3値。
+  答えが無いのを一致に畳まない)。ただし **busy は正常**
   —— 駆動中の XCUITest は `/status` に答えないので、単に「待受している」を根拠に他人扱いすると、
   自分の busy なブリッジを見捨てて同じデバイスに2本目のランナーを立ててしまう。判定は
   `/status` の代わりに**プロセスの実体**(`PortHolder.isHeldByAnotherDevice`。lsof → ps の
@@ -826,7 +818,7 @@ observing なし)は従来どおり受け付けない(画面が変わる最中)�
   プロセス。読めない相手を根拠に宛先を変えない。畳んだままだと、別のデバイスのブリッジが居るポートを宛先に採り、その後の自動起動が
   そこへ自分のブリッジを立てて**占有者の生きたランナーを残骸として殺す**
   (実地 2026-09-23: 既定ポート 8123 で実機2台が殺し合った。MN-46.1/MN-46.3)。
-  `--port` 明示の宛先は従来どおり素通し(利用者の指定を勝手に変えない)で、inapp モードの in-app ブリッジ側
+  `--port` 明示の宛先は素通し(利用者の指定を勝手に変えない)で、inapp モードの in-app ブリッジ側
   (`composeDriver`)も素通し —— in-app は背面へ回ると答えないので、ここで断ると通常の遷移で
   serve が開けなくなる
 - `checkAndRestartIfStale`(DS-12.2 の自己修復と同系統だが、ライブ操作の宛先だけを見る)も
@@ -834,10 +826,8 @@ observing なし)は従来どおり受け付けない(画面が変わる最中)�
 
 **(b) launch / activate の門**: 判定は `FTBridgeClient.InstalledAppCheck.launchGuard` の1箇所で、
 **MCP の `ft_launch`(判定材料は `installedVerdict` が集めて渡す)とライブ操作が共有**する
-(「判定は1箇所・文言は呼び手ごと」)。**2026-09-22 まで MCP の `MCPServer.launchGuardDecision` は
-同じ判定をこの関数の中に別実装で持っていた** —— 今は関数名はそのままに中身を
-`InstalledAppCheck.launchGuard` への委譲へ差し替え、MCP 向けの文言(ft_install を指す等)を
-組むだけにした。以前ライブ操作には門が無く、`{"cmd":"activate","bundle":""}` や
+(「判定は1箇所・文言は呼び手ごと」)。`MCPServer.launchGuardDecision` は `InstalledAppCheck.launchGuard` への
+委譲で、MCP 向けの文言(ft_install を指す等)を組むだけ。門が無いと `{"cmd":"activate","bundle":""}` や
 `{"cmd":"launch","bundle":"no.such.app.live"}` で**そのコマンドが30秒刺さり、
 "A single command stalled for over 30s — force-quitting (command watchdog)" で serve が落ち、
 再起動時に健全なランナーまで掃除して起動し直しになった**(実地 2026-09-22。`XCUIApplication` は
@@ -850,12 +840,12 @@ launch/activate はライブ操作側で門より前に素通しする(in-app �
 **(c) NDJSON の型違いは黙殺しない**: プロトコルは「壊れた行(JSON でない・`cmd` が無い)は stderr に
 1行ログして無視する」だが、**`cmd` が読めて値の型だけが違う行は黙殺しない** ——
 `{"kind":"actionResult","ok":false,"error":"<欄> must be …"}` を返す(文言は MCP の
-`intArgument`/`doubleArgument` と揃える)。以前は `ApiLiveServeCommand` を型付き `Decodable` で
-組んでいたため1フィールドでも型が違うと decode 全体が失敗し、`cmd` さえ読めていた行も「JSON で
-ない」行と見分けが付かず無応答のまま黙殺していた(実地 2026-09-22: `{"cmd":"pinch","scale":"2"}`
-が無反応 → 拡張の `SERVE_REQUEST_TIMEOUT` で serve ごと再起動。原因は stderr にしか出ない)。
-対策は `[String: Any]` から手で組み、cmd 以外の型違いを1件目だけ `decodeError` に残して
-`handle` が `actionResult(ok:false)` で答える形にした。**答えは正常時と同じ終端イベントまで出す**
+`intArgument`/`doubleArgument` と揃える)。`ApiLiveServeCommand` を型付き `Decodable` にすると
+1フィールドの型違いで decode 全体が失敗し、`cmd` が読めた行も「JSON でない」行と見分けが付かず
+無応答のまま黙殺される(実地 2026-09-22: `{"cmd":"pinch","scale":"2"}` が無反応 →
+拡張の `SERVE_REQUEST_TIMEOUT` で serve ごと再起動。原因は stderr にしか出ない)。
+`[String: Any]` から手で組み、cmd 以外の型違いを1件目だけ `decodeError` に残して
+`handle` が `actionResult(ok:false)` で答える。**答えは正常時と同じ終端イベントまで出す**
 (frame は `frame(ok:false)` の1行だけ、他は `actionResult(ok:false)` → 観測 = snapshot。操作は撃たない)。
 拡張は actionResult を保持して次の snapshot/frame で要求を解決するので、actionResult だけで終えると
 結局 20 秒待って serve を起動し直す(実地 2026-09-24。MN-49.6)。
@@ -869,7 +859,7 @@ launch/activate はライブ操作側で門より前に素通しする(in-app �
 
 **1 run = 1 ディレクトリ、1 シナリオ実行 = 1 ファイルの追加専用レイアウト**。
 runID = `<yyyyMMdd-HHmmss(UTC)>Z-<乱数8hex>`(マシン名は埋めない。埋めたホスト名が表示へ
-漏れ続けるため 2026-09-01 に撤去し、代わりに乱数を 4hex→8hex(2^32)へ広げて衝突を避ける。
+漏れ続けるため。衝突は乱数 8hex(2^32)で避ける。
 どの機械の run かは記録の `host` 欄が持つ)をディレクトリ名にするため、異なる実行は必ず
 別パスに書き、git 上は常に純粋な追加になる(同一秒の二重起動も乱数で分離)。JSONL 追記型は
 同一ファイルへの複数ブランチ追記で必ず衝突するため不採用。
@@ -883,19 +873,19 @@ runID = `<yyyyMMdd-HHmmss(UTC)>Z-<乱数8hex>`(マシン名は埋めない。埋
   未完了 run(クラッシュ検出に利用)。scenarios/ は追加専用(同一 run 内の再実行は `~2` 連番)
 - スキーマ詳細・フィールド一覧は **docs/results-json.md**(唯一の定義元。DTO は `RunRecord.swift`)。
   **`results/` は .gitignore なので、その中に置いた README は受け手に届かない**
-  (2026-08-20 まで design/ はそこを指していた)。ドキュメントは docs/ に置く
-- **自動クローズの抑止は `StepExecutor.handlersSuppressed` の1箇所で判定する**(2026-08-21)。
+  ドキュメントは docs/ に置く
+- **自動クローズの抑止は `StepExecutor.handlersSuppressed` の1箇所で判定する**。
   ブロック形(`handlerSuppressionDepth`)と命令形(`handlersDisabled`)を**別に持つ**のは、
   ブロック形が**1つの CAE ブロックの内側にしか置けない**ため —— 「`condition` で止めて
   `expectation` で戻す」は命令形でしか書けない。`enableHandler()` はブロック形を解除しない
   (ブロックは出口で必ず戻るので、内側から外すと入れ子の意味が壊れる)
-- **宣言された割り込みを閉じるのは `StepExecutor.dismissInterruption` の1箇所**(2026-08-20)。
+- **宣言された割り込みを閉じるのは `StepExecutor.dismissInterruption` の1箇所**。
   `perform` を通らない条件判定(`ifCanSelect` / `repeatWhileCanSelect` = `FTDriveCore.canSelect`)は
   `dismissDeclaredInterruption(in:)` から**同じ実装**を呼ぶ。**2つ目の実装を書かない** ——
   判定が割れると「操作は閉じるのに条件判定は閉じない」という、失敗ではなく**誤った経路**として
   現れる形になる(受け手が実際に踏んだ)。条件判定は**1回を1ステップとして数え直す**
   (`beginInterruptionScope`)—— 直前のステップが上限まで閉じていると1回も閉じられない
-- **失敗の素性は事実だけ**(2026-08-20): `failedSteps` に `section`(フェーズ)・`command`・
+- **失敗の素性は事実だけ**: `failedSteps` に `section`(フェーズ)・`command`・
   `failureKind`(`StepFailureKind`)・`notes` を載せ、run.json に `workerAnomalies` を載せる。
   **「環境要因の失敗」の分類は置かない** —— アプリが重いのかマシンが混んでいるのかツールには
   区別できず、推測を混ぜると誤った緑・誤った赤を作る(受け手の方針。仕分けは読み手が行う)。
@@ -923,8 +913,7 @@ trigger)は CLI エントリでしか分からないため、`RunRecorder` を C
   CLI(`fleetest results list/summary/flaky/trend/devices/slow/insights/log/response`)と
   拡張向け `fleetest api results`(1 行 JSON)の両方がこれを使う
 - ダッシュボード: デバイスモニターの「ダッシュボード」タブ
-  (`vscode-fleetest/src/monitorDashboardController.ts` + `src/webview/dashboard/`。
-  単独パネル `dashboardPanel.ts` は 2026-09-01 にこのタブへ統合して撤去した)。
+  (`vscode-fleetest/src/monitorDashboardController.ts` + `src/webview/dashboard/`)。
   ペイロード契約は `ApiResultsCommand.swift` ⇔ `dashboardModel.ts` で同期
 - スキーマ進化: 全ファイルに schemaVersion。フィールド追加は Optional でバージョン据え置き、
   読み側は自分より新しい version をスキップ。既存ファイルの書き換えマイグレーションは
@@ -939,11 +928,11 @@ TOOL_ROOT)。clone 構成(クローンの中で直接シナリオを管理)は�
 プロンプト導入**(「<リポジトリ> を隣に clone して ../foundation-tester/.claude/skills/fleetest-setup/SKILL.md に
 従ってセットアップして」)。エージェントはクローンの SKILL.md を読み、クローンの `Scripts/install.sh` を実行する。
 Claude Code のスキル(`/fleetest-scenario` 等。名前空間なし)は install.sh のステップ7.8 が作業フォルダの
-`.claude/skills/` へ**コピー**する(リンクにしない)。プラグイン配布と curl 取得の導入器は廃止した
+`.claude/skills/` へ**コピー**する(リンクにしない)。プラグイン配布と curl 取得の導入器は無い
 (MN-2.3)。`/fleetest-setup` が構成を自動判定し、受け手ディレクトリは
 外部構成へ分岐、クローン内は clone 構成。CLI・VSCode 拡張とも TOOL_ROOT の clone から `swift build` /
-`npm run install-local` でビルドする(バイナリ配布はしない)。mint は廃止(VSIX はバイナリ配布しないため
-clone がどのみち必須で、CLI だけ mint 経由にすると二重取得になるだけだったため)。
+`npm run install-local` でビルドする(バイナリ配布はしない)。mint 配布も採らない(VSIX はバイナリ配布しないため
+clone がどのみち必須で、CLI だけ mint 経由にすると二重取得になるだけ。詳細は下)。
 
 **配布の方針(2026-08-27。インストーラが面倒を見るのは Claude Code だけ)**: 導入
 runbook の正典は `.claude/skills/<name>/SKILL.md`(ツール中立の markdown 手順書。特定エージェント
@@ -959,8 +948,7 @@ runbook の正典は `.claude/skills/<name>/SKILL.md`(ツール中立の markdow
 | MCP 登録 | `.mcp.json`(プロジェクト) |
 | コマンド単位の承認 allowlist | `.claude/settings.json` |
 
-**他のエージェント(Codex・Cline・Cursor 等)には配布アダプタを置かない**(2026-08-27 に Codex の
-アダプタ一式を撤去)。中核はどれもエージェント固有ではない —— 機械作業はインストーラ、`ft_*` は
+**他のエージェント(Codex・Cline・Cursor 等)には配布アダプタを置かない**。中核はどれもエージェント固有ではない —— 機械作業はインストーラ、`ft_*` は
 標準の stdio MCP サーバ、runbook はツール中立の markdown。**エージェントごとに面倒を見ると、
 規約位置・サブコマンド名・版照合の方法・設定ファイルの書式が全部そのエージェント
 固有の分岐になり、増やすたびに複数箇所(Swift・install.sh・update.sh)へ手で
@@ -984,7 +972,7 @@ Claude Code の1系統だけを持つ。**受け手のグローバル設定(`~/.
 `sandbox_apply: Operation not permitted` で起動できない ②`xcrun simctl` が CoreSimulatorService への
 mach 接続を塞がれる**(`adb` は TCP 5037 なので network_access で通る)。
 **`network_access` / `writable_roots` を積んでも直らない**ので、それらを根拠に「OK」と言うと
-false green になる(以前 install.sh のステップ7.7 が実際に出していた)。
+false green になる。
 
 **ブランチの手順書を受け手経路で検証する**: そのブランチをチェックアウトしたクローンの SKILL.md を
 エージェントに読ませ、そのクローンの `Scripts/` を使う(`FLEETEST_REF=<ブランチ>` は未クローンの clone 先を
@@ -1000,7 +988,7 @@ false green になる(以前 install.sh のステップ7.7 が実際に出して
   `ProjectScaffold.createAndRegister` が最初のプロジェクトを登録。**`--no-project` ではプロジェクトを作らず空の
   `TestProjects/` だけ置く**(`fleetest.project` も `.vscode/settings.json` に書かない・受け手スキルも名前を焼かない。
   install.sh は `--name` 無しの新規導入でこちらを使い、プロジェクト `default` は `/fleetest-profiles` か VSCode 拡張が後から作る。
-  `--name` ありの導入 = リモートランナーは従来どおり)。内外は `isExternalPackage`
+  `--name` ありの導入 = リモートランナーはこちら)。内外は `isExternalPackage`
   (`Sources/FTScenarioRunner` の有無)で自動判定し、`PackageManifestEditor` が内部=target 参照 /
   外部=`.product` 参照のスタンザを生成する(`project sync` も同じ判定)。
 - **repoRoot の二役分離**: シナリオビルドは `ScenarioHost.packageRoot()`(= 受け手パッケージ。Package.swift
@@ -1014,12 +1002,9 @@ false green になる(以前 install.sh のステップ7.7 が実際に出して
   BridgeProvisioner へ渡しており、外部パッケージ構成で `InAppBridge/build.sh` が無く全 `ft_*` が
   失敗した)。両ルートの解決結果は `fleetest doctor --roots-only`(FM 判定に依存しない独立ゲート・
   ツール本体を解決できなければ exit 1)と `fleetest doctor` が表示する。
-- **mint 配布(採用していたが廃止)**: `mint install wave1008/foundation-tester@<ver>`。**罠(記録)**: mint は
-  temp でビルドしてバイナリのみ残しソースを消すため CLI の `#filePath` は死ぬ → ブリッジは上記②(受け手の
-  checkout)で解決する必要があった。よって外部パッケージ構成は **git 依存必須**(ブリッジ用に Runner/ を含む
-  checkout が要る)。ソース無し mint バイナリで bridge up→/status ready を実機実証済みだったが、CLI/VSIX の
-  二重取得の無駄から mint 自体を廃止(現状は上記「正典」参照)。**制約(継続)**: XCUITest ブリッジは SPM
-  ライブラリ化できないため「ソースビルド配布」前提(prebuilt をソースの無い別マシンへ運ぶと Runner/ 解決不能)。
+- **mint 配布は採らない**: mint はビルド後にソースを消すので CLI の `#filePath` が死に、ブリッジ資産(`Runner/`)を
+  上記②(受け手の checkout)でしか解決できない。外部パッケージ構成は **git 依存必須**(Runner/ を含む checkout が要る)。
+  **制約**: XCUITest ブリッジは SPM ライブラリ化できないため「ソースビルド配布」前提(prebuilt をソースの無い別マシンへ運ぶと Runner/ 解決不能)。
 - **拡張**: `binaryPath` は実在しなければ PATH フォールバック(`binaryPathResolve.ts`)で外部パッケージ構成の
   CLI(自前ビルドの PATH 登録先)を発見する。
 - **版**: git タグ(受け手の配布口)/ 拡張 package.json / プロトコル版(compatCheck)は独立。リリースは

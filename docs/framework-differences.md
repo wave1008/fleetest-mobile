@@ -146,26 +146,25 @@ Flutter・React Native)によって、**木の見え方と操作の効き方が�
 
 **揃えている点(A)**:
 - **`scrollFrame` を付けたスクロール**: Compose / Flutter でも、指定した要素がスクロール容器(枠が一致する)なら
-  in-app で送る(v112)。容器でない要素(固定ヘッダ等)を指定したら XCUITest に回して、指定どおり「何も動かない」
-  にする。UIKit 系も、指定領域の下にスクロールビューが無ければ何もしない(以前は画面のどこかの最大の
-  スクロールビューを動かしていた)。witness = `05_スクロール` S0091 scene 4 と、固定ヘッダの scene
-- **`scrollFrame` を付けないスクロール**: 「画面中央を払う」に揃える(v113)。XCUITest・Android は実際に画面中央を
-  払う。in-app も**画面中央の下にあるスクロール容器だけ**を動かす(以前は in-app の Flutter・SwiftUI・RN だけ、
-  画面下のカルーセルを動かしていた)。witness = S0091 scene 5。**画面の根の全体を覆う要素には受理させない**
+  in-app で送る。容器でない要素(固定ヘッダ等)を指定したら XCUITest に回して、指定どおり「何も動かない」
+  にする。UIKit 系も、指定領域の下にスクロールビューが無ければ何もしない(画面のどこかの最大の
+  スクロールビューへは落とさない)。witness = `05_スクロール` S0091 scene 4 と、固定ヘッダの scene
+- **`scrollFrame` を付けないスクロール**: 「画面中央を払う」に揃える。XCUITest・Android は実際に画面中央を
+  払う。in-app も**画面中央の下にあるスクロール容器だけ**を動かす(画面下のカルーセルは動かさない)。witness = S0091 scene 5。**画面の根の全体を覆う要素には受理させない**
   (`ScrollPointReach.mayAccept`。Flutter の意味木の根の入れ物 `SemanticsObjectContainer` が、画面中央に縦リストしか無いのに
   横の scroll を受理してカルーセルを動かしていた。受理する容器が無ければ 501 → XCUITest が画面中央を払う = 何も動かない)。
-  あわせて「不可」のラッチを path の有無と press で分けた(共有していた頃は、path 付きの 501 の後の path 無しの払いが
-  XCUITest で撃たれ、scene 5 は in-app を確かめていなかった)
+  「不可」のラッチは path の有無と press で分ける(共有すると、path 付きの 501 の後の path 無しの払いが
+  XCUITest で撃たれ、scene 5 が in-app を確かめなくなる)
 - **横方向の向き**: UIAccessibility の scroll の向きは「縦 = スクロールバーの向き(指と逆)・横 = 指の向き」。
-  横も反転していた頃は、Compose / Flutter の横カルーセルが逆へ送られていた(v112 で修正)
+  横も反転させると、Compose / Flutter の横カルーセルが逆へ送られる
 - **端の判定**: 「受理した容器が断った = その向きの端」と読む(Flutter は端で断る。Compose は端でも受理を返すので
   木の変化で端を知る)。witness = S0091 scene 2・3
 - **端へ飛んだ後に続きを描き足すリスト(RN の FlatList)**: in-app は端まで一度に飛ぶので、描き足し(実測 0.4〜0.7 秒)の
   前に「余地が無い」になる。しかも飛ぶたびにセルが同じ座標に並ぶので、木の署名では動いたと読めない。
-  → 端の確定は最後に動いてから 1.0 秒後・ブリッジは `contentOffset` を動かしたら `atEdge: false`(v116)。
+  → 端の確定は最後に動いてから 1.0 秒後・ブリッジは `contentOffset` を動かしたら `atEdge: false`。
   witness = RN の S0091 scene 2(開いた直後の `scrollToRightEdge`。直す前は #tag_13 で止まった)。
   **Compose / Flutter の AX の scroll は「受理 = 動いた」と言わない**(Compose は端でも受理するので、言うと
-  端を確定できず maxSwipes まで送る。v115 で実際に踏んだ)
+  端を確定できず maxSwipes まで送る)
 
 **揃っていない点(B)**:
 - 1回の送りで進む距離はブリッジ・フレームワークで違う(Compose / Flutter の in-app ブリッジは1ページ、XCUITest ブリッジは慣性つき

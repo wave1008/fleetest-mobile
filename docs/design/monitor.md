@@ -52,11 +52,10 @@ VSCode 拡張のデバイスモニターの設計。
   JPEG SOI 照合で desync を検出し、未知 KIND と同じく helper を kill して張り直す
   (`deviceStream.ts` の `handleProtocolDesync`)。タイル側もヘッダ由来の寸法を信用せず
   **デコードできた画像の実寸だけ**でアスペクト比を決める(壊れたフレーム1枚でタイル幅が
-  異常に広がったまま戻らない実害。2026-07-26)
+  異常に広がったまま戻らないため)
 - **実寸は `VideoFrame.close()` の前に控える**: close 後の VideoFrame は `displayWidth/Height` が
-  0 を返す(WebCodecs 仕様の detach)。0 を弾く実装だったため H.264 タイルはアスペクト比を
-  一度も採れず既定値(0.4615)のままだった(実害。2026-07-29)。以後は寸法が変わるたび
-  `onDimensions` で枠へ反映する(初回だけだと解像度変更で古い比率が残る)
+  0 を返す(WebCodecs 仕様の detach)ので、後で読むとアスペクト比が既定値(0.4615)のままになる。
+  寸法が変わるたび `onDimensions` で枠へ反映する(初回だけだと解像度変更で古い比率が残る)
 - **screenrecord のレターボックス補正(Android)**: screenrecord は**エンコーダ上限を超える画面を
   縮めた動画へレターボックス投影する**(黒帯が映像に焼き込まれるため、タイルは帯ごと表示する。
   実害: 1280x2856 の Pixel 10 Pro で左右に黒帯。1080x2424 では起きない)。`fleetest-androidstream` は
@@ -68,7 +67,7 @@ VSCode 拡張のデバイスモニターの設計。
 
 ### DS-12.2 ブリッジ死の検知と自己修復
 
-XCUITest ランナーは HTTP サーバだけ死んで xcodebuild 親が残ることがある(2026-07-14 実例)。
+XCUITest ランナーは HTTP サーバだけ死んで xcodebuild 親が残ることがある。
 
 - **watchdog**(`vscode-fleetest/src/monitorBridgeWatchdog.ts`): 一度 connected になったデバイスが
   booted(実体は起動中・ブリッジ無応答)へ降格して連続5観測(約10秒)続いたら `api start-device` を
@@ -169,9 +168,8 @@ adb 接続は生きているがゲスト側が不健全(Wi-Fi 無効・ゲスト
   縮小スクショでも誤検知しない): テスト実行の失敗時証跡スクショ(`FTRuntime.handleFailure`、Android のみ)が
   白フレームなら最大3回撮り直し、それでも白ければ `evidenceBlank` を立ててレポートに警告表示。実行前は
   恒常白のデバイスをワーカーからディスパッチ除外(`ProfileRunner`、短時間の連続 probe でフラップと区別)
-- **ブロードキャスト実行**(`fleetest run --broadcast`。2026-08-22): 選んだシナリオを実行プロファイルの
-  **各デバイスで1回ずつ**回す(warmup 向け。受け手が `--device` を台数ぶん外部ループで撃っていたのを
-  run 基盤に載せた)。**差し替えるのは分配だけ** —— `ScenarioDispatch.broadcast` で `RunOrchestrator.run`
+- **ブロードキャスト実行**(`fleetest run --broadcast`): 選んだシナリオを実行プロファイルの
+  **各デバイスで1回ずつ**回す(warmup 向け)。**差し替えるのは分配だけ** —— `ScenarioDispatch.broadcast` で `RunOrchestrator.run`
   が platform 別の共有キューの代わりに**レーン(デバイス論理名)別のキュー**を作り(`BroadcastPlan` =
   純粋関数。platform 未指定のシナリオは全レーンへ・明示は同 platform のレーンだけ)、ワーカーは
   `BroadcastPlan.laneKey(of:)`(= `logicalName`。復帰でポートが変わっても同じデバイスは同じキューに戻る)で
@@ -186,7 +184,7 @@ adb 接続は生きているがゲスト側が不健全(Wi-Fi 無効・ゲスト
   ホスト混在プロファイルは `DeviceMachineRunner` が**分割せず全ホストへ全件**を渡し、`--runner` は
   `RemoteRunArgs.build` が中継する。`--fleet` とは併用不可(中継していないので黙って分配になる)。
   `api run`(拡張)には載せていない(Test Explorer は flowURL = シナリオ1項目の前提)
-- **実行中の凍結による結果取り消し+別デバイス再実行**(`RunOrchestrator.runWorker`。2026-07-17):
+- **実行中の凍結による結果取り消し+別デバイス再実行**(`RunOrchestrator.runWorker`):
   シナリオが失敗した直後にそのワーカーの Android デバイスを `isDeviceFrozen`(注入プローブ=
   `AndroidHealthProbe.isPersistentlyBlank`。FTCore→FTAndroid は循環のため呼び出し側=fleetest ターゲットが注入。
   未注入時は常に false)で確認し、凍結していれば `RunRecorder.discardLast` で直前の記録を取り消し、
@@ -199,21 +197,20 @@ adb 接続は生きているがゲスト側が不健全(Wi-Fi 無効・ゲスト
     `FTDriveCore.markDeviceFrozen` が `scenarioAborted` を立ててシナリオを打ち切り、NDJSON イベント
     `deviceFrozen`(文字列 kind。`ScenarioHost.run`/`ScenarioRunnerMain`/`ApiRunCommand`/MCP は無改修で素通し)を
     emit。ホストの `ScenarioRunner.runOne` がこれを検知して戻り値 `ScenarioOutcome.frozen` を返し、事後
-    プローブ無しで即振り直す。白フレームの screenMatches は従来 `.skipped`(検証されず継続=結果汚染)だったのを
-    この経路に変更。(2) **失敗後の事後プローブ**(上記の `isDeviceFrozen`)= タイムアウト/ハング等で
+    プローブ無しで即振り直す。白フレームの screenMatches は `.skipped` にしない(検証されず継続すると結果汚染)。(2) **失敗後の事後プローブ**(上記の `isDeviceFrozen`)= タイムアウト/ハング等で
     `deviceFrozen` を出さずに死んだ凍結を拾う保険。runOne は `.passed`/`.failed`/`.frozen` を返し、
     runWorker は `.frozen` は即・`.failed` はプローブ確認で振り分ける。事後プローブは
     `AndroidHealthProbe.isBlankObserved`(窓内=既定 4×2s に一度でも blank で凍結扱い)を使う —
     `isPersistentlyBlank`(非 blank で即健全)だと約25秒周期のフラッピングの回復側を引いて見逃す
-    (実測 2026-07-18。isPersistentlyBlank は実行前の恒常白除外用として存続)
-  - **iOS はブリッジ接続不能も振り分け対象**(2026-07-18): ブリッジのウェッジ(シナリオ途中から全ステップ
+    (実測。isPersistentlyBlank は実行前の恒常白除外用)
+  - **iOS はブリッジ接続不能も振り分け対象**: ブリッジのウェッジ(シナリオ途中から全ステップ
     「ドライバに接続できません」)は Android のプローブでは拾えず通常失敗になっていた(実測: 1ワーカーで
     2件連鎖)。`.failed` 時に `/status` を2回(2s 間隔)確認し、両方失敗なら「ブリッジ接続不能」として
     同じ discard+requeue+離脱へ。復帰(reviveWorker)は BridgeProvisioner.provision を通るため、
     ウェッジしたブリッジの再供給も試みられる
-  - **Android は iOS ブリッジ供給の完了を待たず開始**(`RunOrchestrator.lateWorkers`。2026-07-18):
-    run 開始時のワーカー構築は iOS ブリッジ供給(壊れたブリッジの置き換え=数十秒)を含み、従来は
-    全ワーカーがその完了待ちだった(実測: 開始→最初のシナリオが 10s→81s に悪化)。対策として
+  - **Android は iOS ブリッジ供給の完了を待たず開始**(`RunOrchestrator.lateWorkers`):
+    iOS ブリッジ供給(壊れたブリッジの置き換え=数十秒)を全ワーカーが待つと、開始→最初のシナリオが
+    10s→81s に悪化する(実測)。そこで
     ProfileWorkerFactory を buildAndroidWorkers(数秒)/buildIOSWorkers(供給込み)に分割し、
     Android を初期ワーカーとして即時開始、iOS は lateWorkers(platforms 宣言+provider)として
     供給完了後に task group へ合流する(group スコープ内の await は既存子タスクを止めない)。
@@ -221,14 +218,14 @@ adb 接続は生きているがゲスト側が不健全(Wi-Fi 無効・ゲスト
     宣言する(iOS は供給前でも id="ios:論理名" が確定。detail「ブリッジ供給中...」のプレースホルダ)。
     label→id 変換は WorkerIDMap(NSLock)で iOS 合流時に merge。CLI(ProfileRunner)も同構成。
     **供給の手順(両レーンの中身)は `ProfileSupplyLanes` の1箇所**で、run・api run の並列経路・--debug の逐次経路が
-    同じ関数を呼ぶ(2経路に別々に持っていた間に、api run だけ WebView の更新・実機の画面の観測・Android のホームが抜けていた。
+    同じ関数を呼ぶ(2経路に別々に持つと片方だけ WebView の更新・実機の画面の観測・Android のホームが抜ける。
     `ProfileSupplyLanesWiringTests`)。**全滅は異常として run を止める**(ユーザー決定 2026-10-20): Android のレーンは
     実行前のチェックで全台が除外されたら投げる(run の開始前)/ iOS は**1台も合流しなかった時点で** RunOrchestrator が
     配布を止める —— 走っているシナリオは最後まで走らせ、残りは理由つきの未実行(`noWorker`)、run.json は `abortReason`
     (中断ではないので `interrupted` は立てない)。iOS のシナリオが待っていなければ止めない。一部の台だけが落ちたときは
-    従来どおり残りの台で続ける
-  - **供給フェーズの進行は NDJSON の `log` にも流す**(2026-09-09): 供給(デバイス起動・インストール・
-    凍結 triage)の行は stderr だけに出ていたため、拡張の OUTPUT には出るが「デバイスモニター」タブは無音だった。
+    残りの台で続ける
+  - **供給フェーズの進行は NDJSON の `log` にも流す**: 供給(デバイス起動・インストール・
+    凍結 triage)の行を stderr だけに出すと、「デバイスモニター」タブが無音になる。
     **デバイスが起動していない状態からの run は供給が長い**(実測 2026-09-09: 手元 Android 8台で
     クリック→最初のシナリオまで 3分39秒。うち起動プロセスの投入だけで 1分41秒 ——
     `AndroidLaneRecovery` は凍結対策で**1台ずつ直列**に起こす)ので、タイルが1台ずつ点いていく様子が
@@ -240,44 +237,40 @@ adb 接続は生きているがゲスト側が不健全(Wi-Fi 無効・ゲスト
     **複数機械の実行では中継側が機械名を埋める**(`ApiRunMachineFanout.machineStampedLog` が
     worker を持たない log の message へ `[<machine>] ` を付ける。手元の子も `[local]` と名乗る)——
     埋めないと3機ぶんの「Reviving 8 dead lane(s)」が混ざってどの機械のものか読めない。
-    **全体レーン(`__overall__`)は workersReady で消さない**(実害 2026-09-09: レーン構成の
-    全置換が worker を持たない受け皿ごと消しており、最初のワーカー合流で供給の進行が
-    タブから丸ごと消えていた —— 複数マシンでは合流が機械ごとに来るので最後には何も残らない)。
+    **全体レーン(`__overall__`)は workersReady で消さない**(レーン構成の全置換が worker を持たない
+    受け皿ごと消すと、最初のワーカー合流で供給の進行がタブから丸ごと消える —— 複数マシンでは
+    合流が機械ごとに来るので最後には何も残らない)。
     ホスト(`runLaneModel.applyWorkers`)と webview(`laneLog.configureLanes`)の**両方**に
-    同じ除外がある(`syncLanesToDevices` が同じ理由で既に除外していたのと対)。
-    **実行ログに出すのは選択したデバイスだけ**(DS-12.6。2026-09-21 の3ペイン化。それ以前は「選択中は
-    レーン欄にログを置かない」)なので、worker を持たない log は見出しの状況行
-    (`#lanes-run-status`)にも出す(LaneAction の `status`)—— 18台選択のまま実行していると、
-    レーン欄には拡大表示だけが並び進行がどこにも出ていなかった(実害 2026-09-09)。
+    同じ除外がある(`syncLanesToDevices` の除外と対)。
+    **実行ログに出すのは選択したデバイスだけ**(DS-12.6)なので、worker を持たない log は見出しの状況行
+    (`#lanes-run-status`)にも出す(LaneAction の `status`)—— 18台選択のまま実行すると、
+    レーン欄には拡大表示だけが並び進行がどこにも出ないため。
     **全体レーンは選択に関わらず実行ログビューに残す**(DS-12.6)ので、供給の進行はこの行と
     実行ログビューの両方で読める
   - **「テストを実行」ボタンは先に「デバイスを全て起動」と同じ処理を通す**(ユーザー決定 2026-09-09。
     `monitorPanel.startTestRunAfterDevicesUp`): タイルの「起動待機」バッジは拡張の
     ライフサイクルキュー(`opBusy` / `bulkOpActive`)からしか出ないので、run 内の供給
-    (`AndroidLaneRecovery`)に任せるとボタンから起動したときだけ無表示になっていた。
+    (`AndroidLaneRecovery`)に任せるとボタンから起動したときだけ無表示になる。
     一括起動の完了は `MonitorDeviceOps.whenLifecycleQueueIdle` で待ってから run を投げる。
     **run 内の供給は消さない**(Test Explorer 直・CLI・リモート機にはモニターが居ない。
     冪等なので起動済みなら素通りする)。**この待ちの間の「テストを中断」は run ではなく
     一括起動を止める**(まだ run が無い)。一括起動が一部失敗しても run へは進む
     (残りは run 内の供給と部分失敗の許容が面倒を見る)。**この段では「デバイスの起動を中断」を
     出さない**(ユーザー指示 2026-09-09)—— 実行中はツールバーを畳むので押せず、押せない
-    文言だけが出ていた。中断の口は「テストを中断」1つ(`refreshBulkButtons` の `upCancelMode` は
+    文言だけが出るため。中断の口は「テストを中断」1つ(`refreshBulkButtons` の `upCancelMode` は
     `testRunActive` の間 false)
   - **run 開始時の home は in-app ブリッジを持つデバイスには撃たない**(実測 2026-09-09。
-    `ProfileWorkerFactory.homeOnStartPlan`): 発端は「`RunWorker.driver` が in-app ブリッジ宛で
-    `/home` のルートが無く、inapp モードでも 18 台すべてが 0/N = homeOnStart が一度も効いていなかった」
-    (黒画面の予防措置。2026-08-11 の実測が根拠)。XCUITest ブリッジ側へ回して**効くようにしたら
-    退行した** —— home はアプリを背面へ送り、in-app ブリッジは**そのアプリの中に居る**ので
-    無応答になる。供給が壊れたブリッジと見て停止・張り直しに入り、**3機で13台がワーカーから脱落**
-    (結果は緑のままだが手元の run が 50s → 136s)。よって inapp モードは対象外にし、
-    撃てるデバイス(xcuitest モード・Android)だけ `systemUIClient` 経由で XCUITest ブリッジへ回す。
+    `ProfileWorkerFactory.homeOnStartPlan`): home は黒画面の予防措置。in-app ブリッジ宛には `/home` のルートが無い。
+    XCUITest ブリッジ側へ回して撃つと**退行する** —— home はアプリを背面へ送り、in-app ブリッジは
+    **そのアプリの中に居る**ので無応答になり、供給が壊れたブリッジと見て停止・張り直しに入って
+    **3機で13台がワーカーから脱落**する(結果は緑のままだが手元の run が 50s → 136s)。
+    よって inapp モードは対象外にし、撃てるデバイス(xcuitest モード・Android)だけ `systemUIClient` 経由で XCUITest ブリッジへ回す。
     **判定はモードで行う**(inapp モードは xcuiPort も持つので、xcuiPort の有無で決めると同じ穴に落ちる)。
     宛先の決定自体は `systemUIClient` の1箇所で、残存アラートの警告(`warnOnResidualSystemAlerts`)と共有。
     **inapp モードで黒画面の予防を復活させるなら「home → アプリを再前面化」が要る**(未検証。
-    現状は既定の inapp モードで予防が効かないままだが、2026-08-11 以降その実害の報告は無い)
-  - **一括起動/停止の最中はブリッジ無応答を数えない**(実害 2026-09-09。
-    `monitorBridgeWatchdog`): 供給中のデバイス(10 秒後に ready)へ「booted が5回連続したためブリッジ
-    無応答とみなします」を出していた。修復は既存の門で止まっていたので実害は誤検知の警告だけだが、
+    既定の inapp モードでは予防が効かないが、その実害の報告は無い)
+  - **一括起動/停止の最中はブリッジ無応答を数えない**(`monitorBridgeWatchdog`): 供給中のデバイス
+    (10 秒後に ready)へ「booted が5回連続したためブリッジ無応答とみなします」を出さない。
     **検知は誤検知0が条件**なので `inRun` と同じく streak ごと 0 に戻す
   - **MCP・ライブ操作の使用中もブリッジ無応答を数えない**(`inSession` = モニターが `MCPDeviceLease.holderPID` を読んで
     デバイスイベントに載せる): XCUITest のランナーは操作の処理中に /status へ答えないので booted に見える。使用中の端末は
@@ -291,7 +284,7 @@ adb 接続は生きているがゲスト側が不健全(Wi-Fi 無効・ゲスト
     **起動 134 秒 → ワーカー確定 179 秒 = 待ちは 45 秒**(8台とも同じ秒に待ち始めている)。
     **和ではなく最大**になるのが並列化の形。テストは待ちの差し込み口で重なりを見る
     (`DurableBridgeWaitConcurrencyTests`。直列に戻すと落ちる)
-  - **配信 helper は「アタッチ中」も生存を知らせる**(実害 2026-09-09。`fleetest-simstream`):
+  - **配信 helper は「アタッチ中」も生存を知らせる**(`fleetest-simstream`):
     消費側(`vscode-fleetest/src/deviceStream.ts`)は 15 秒 1 バイトも来なければ helper が固まったと
     見て kill→再起動する。静止画面は 3 秒ごとの keepalive ping で埋めてあったが、**CoreSimulator への
     アタッチ**(SimServiceContext / ioPorts / setPowerState)は `dispatch_main` より前の同期処理で、
@@ -316,7 +309,7 @@ adb 接続は生きているがゲスト側が不健全(Wi-Fi 無効・ゲスト
     `api stop-device` で解け、再起動後は 120KB の録画が撮れた)。停止は SIGINT のみ・止まらない
     個体は放置(`RecordingKillDisciplineTests` がソース走査で固定)。**stale の掃除も `pkill -INT`**。
     失敗の理由は simctl の stderr から採り、busy / 空 / 止まらない / 起こせない を撃ち分ける
-    (`SmokeFailure`)—— 以前は stderr を捨てて全部「セッションが残っている」と断定していた。
+    (`SmokeFailure`。全部を「セッションが残っている」と断定しない)。
     **空振りは一過性なので再試行する**(実測 2026-09-10: M1Ultra の6台が run 開始直後に同時に
     空になったが、数分後には同じデバイスで 1 秒 66KB が撮れ、並列6本でも空いていれば全部成功した)——
     予算は `spawnNextPart` と同じ(`startAttempts` / `startRetryBackoffSeconds` を共有。同じ
@@ -340,13 +333,11 @@ adb 接続は生きているがゲスト側が不健全(Wi-Fi 無効・ゲスト
     呼び手が今あるぶんを消し、「止める者がいない・ファイルは残りうる」と事実だけを言う(`handOffNotice`)。**出力名は run の中で一意**
     (`outputURL`: `<stem>~smoke.mov` / `<stem>.mov` / `<stem>~part<N>.mov`。`~` は `sanitizedFileName` が出さない。coordinator の重複判定の鍵は
     `RecordingIndexIO.collisionKey` = 大小文字・正規化を無視)。期限は壁時計でなく単調時計(`clock`)で測る。経緯は MN-87
-  - **モニターの撮影失敗は事実だけ言う**(2026-09-09): `simctl io screenshot` の期限切れに
-    「a test run is probably driving it」と断定していたが、run の2分前(一括起動中)の失敗にも
-    同じ推測が出ていた。原因は候補として並べる(run / 一括起動 / 刺さった simctl)
+  - **モニターの撮影失敗は事実だけ言う**: `simctl io screenshot` の期限切れに
+    「a test run is probably driving it」と断定しない(run の2分前の一括起動中にも起きる)。原因は候補として並べる(run / 一括起動 / 刺さった simctl)
   - **ワーカーの表示名は machine 込み**(`vscode-fleetest/src/runLaneModel.ts` の
-    `workerDisplayLabel`): TEST RESULTS の行頭は worker 名だけを出しており、同名のデバイスが
-    別の機械にも居る実行(実測: performance-android は M1Max と M1Ultra の両方に
-    "Pixel 10…-01"〜"-04")では**どちらの機械の行か判別できなかった**。レーン見出しの hover と
+    `workerDisplayLabel`): worker 名だけでは、同名のデバイスが別の機械にも居る実行
+    (例: performance-android は M1Max と M1Ultra の両方に "Pixel 10…-01"〜"-04")で**どちらの機械の行か判別できない**。レーン見出しの hover と
     同じ規則(`machine/name`)を1箇所に置いて両方から呼ぶ
   - **iOS ブリッジの実行前プレフライトは不採用**(ユーザー決定 2026-07-18): ウェッジ機で
     `scenarioTimeout`(当時の既定 90s)を失うのを実行前の status 確認で回避する試み。①「item を取ってから
@@ -355,23 +346,23 @@ adb 接続は生きているがゲスト側が不健全(Wi-Fi 無効・ゲスト
     誤判定で品質が安定せず撤去。**ウェッジの検知は失敗後の事後チェック(bridgeUnreachable/
     deviceUnreachable/deviceFrozen → 振り直し)のみで行う**(ウェッジ機の1件は 90s を失うが確実)。
     再提案しないこと
-  - **withDeadline は「先着で確定・遅い方を待たない」レースにする**(2026-07-18): 当初 `withTaskGroup`+
-    `cancelAll` で実装したが、構造化並行はスコープ終端で全子タスクの完了を待つため、op(ウェッジ機への
-    `status`=URLSession)がキャンセルに即応しないと期限側が勝っても遅い方を待ち続け、**run 全体が5分以上
-    アイドル固着した実害**(全スレッドパーク・子プロセスもソケットも無いデッドロック)。対策として
+  - **withDeadline は「先着で確定・遅い方を待たない」レースにする**: `withTaskGroup`+`cancelAll` にしてはならない。
+    構造化並行はスコープ終端で全子タスクの完了を待つため、op(ウェッジ機への `status`=URLSession)が
+    キャンセルに即応しないと期限側が勝っても遅い方を待ち続け、**run 全体が5分以上アイドル固着する**
+    (全スレッドパーク・子プロセスもソケットも無いデッドロック)。
     `withCheckedContinuation`+`DeadlineGuard`(継続を一度だけ resume)で、先に終わった方で即確定し op が
     ハングしても放置(URLSession の timeout で自然消滅)する。これで死活確認・プレフライト・warmup が
     確実に期限内で返る
-  - **死活確認系の await は必ず短期限**(`RunOrchestrator.withDeadline`。2026-07-18): ウェッジしたブリッジは
+  - **死活確認系の await は必ず短期限**(`RunOrchestrator.withDeadline`): ウェッジしたブリッジは
     **接続を受けたまま応答しない**ため、BridgeClient の既定 120s/リクエストに任せると status 確認・ウォームアップ・
     復帰 provision が 120s×N 直列に積み重なり、全シナリオ記録済みなのに run が数分〜十数分終わらない
     (実測: 8141/8142 への ESTABLISHED 固着で Test Explorer が 69/75 のまま停止)。対策: 死活確認は
     withDeadline(タスクレース+cancelAll。URLSession await はキャンセルで解ける)で bridgeUnreachable=5s、
     warmup status=10s・snapshot=15s、復帰 provision(ProfileWorkerFactory.buildWorker)=60s に制限
-  - **振り直しの監査記録(freezeRetries)**(2026-07-18): 成功した振り直しはシナリオ記録に痕跡を残さない
+  - **振り直しの監査記録(freezeRetries)**: 成功した振り直しはシナリオ記録に痕跡を残さない
     (discard 後に別ワーカーの pass で上書き)ため、`RunSummary.freezeRetries` に「シナリオ: 理由
     (元ワーカー、試行 n/1 or 上限到達)」を集約し、run.json の `freezeRetries` に永続化+CLI 末尾に表示
-  - **ワーカー・サーキットブレーカ**(2026-07-18): 凍結/消失の個別プローブに当てはまらない不良(ブリッジの
+  - **ワーカー・サーキットブレーカ**: 凍結/消失の個別プローブに当てはまらない不良(ブリッジの
     ウェッジ・ANR 連発等)で死んだワーカーへシナリオを投げ続ける事故を防ぐ一般化。同一ワーカーで通常失敗が
     `WORKER_FAILURE_CIRCUIT_THRESHOLD`(=3)連続したら原因不明でも離脱+現シナリオ振り直し(`.passed` で
     カウンタリセット)。凍結/消失判定はこのブレーカの前段(既知の即離脱)、ブレーカは後段の保険。
@@ -387,63 +378,60 @@ adb 接続は生きているがゲスト側が不健全(Wi-Fi 無効・ゲスト
     ので、守るべき形を見なくなる)。**閾値のプロファイル化だけも却下**(障害の時間帯は予測できないので
     常時高く = 保護を捨てる)。単レーンの run は連続失敗だけでは離脱しなくなる(プローブは別に効く)。
     陽性対照: 全部落ちる6本を2レーンで回し、両レーンとも held・離脱なし・6本すべて実行を確認(2026-08-24)
-  - **凍結だけでなく「実行中のデバイス消失」も振り分け対象**(2026-07-18): watchdog の実行中再起動や
+  - **凍結だけでなく「実行中のデバイス消失」も振り分け対象**: watchdog の実行中再起動や
     エミュレータのクラッシュで adb からデバイスが消える(`device offline`→`not found`)と、runner の
     固定ワーカーは以降のシナリオを全部即失敗させる(実測: 1台消失で11件連鎖失敗)。これを拾うため
     `.failed` 時に `isDeviceUnreachable`(注入=`AndroidDeviceCatalog.connectedSerials` に serial が居ないか。
     取得失敗時は誤振り分け回避で false)を **凍結プローブより先に**確認し、消失していれば同じ
     discard+requeue+離脱へ流す(理由表示「デバイス消失(offline/未検出)」)。`isDeviceFrozen`/`isDeviceUnreachable`
     の注入は `ProfileRunner`・`ApiRunCommand` の両並列経路で行う
-- **劣化ワーカーの可視化**(`RunSummary.degradedWorkers`。2026-07-18): 連鎖失敗が結果 JSON を掘るまで見えなかった
-  問題への観測性。RunOrchestrator が離脱(凍結/消失/連続失敗/接続不能)を `NoteCollector`(`degraded`)で集約し
+- **劣化ワーカーの可視化**(`RunSummary.degradedWorkers`): 連鎖失敗を結果 JSON を掘らずに見えるようにする。RunOrchestrator が離脱(凍結/消失/連続失敗/接続不能)を `NoteCollector`(`degraded`)で集約し
   `RunSummary.degradedWorkers`(「label: 理由」)に載せる。`RunRecorder.finish` 経由で run.json の `degradedWorkers`
   に永続化(空は nil 省略)し、CLI(ProfileRunner の print / ApiRunCommand の logStderr)にも末尾サマリを出す
-- **動的ワーカープール(復帰デバイスの再参加)**(`RunOrchestrator.superviseWorker`。2026-07-18): 従来ワーカー集合は
-  実行開始時固定で、離脱したデバイスは監視側が再起動しても同一実行に戻れなかった(構造的限界)。`runWorker` の戻り値を
+- **動的ワーカープール(復帰デバイスの再参加)**(`RunOrchestrator.superviseWorker`): 離脱したデバイスが
+  監視側の再起動後に同一実行へ戻れるようにする。`runWorker` の戻り値を
   `WorkerExit{completed/retired}` にし、離脱時は `superviseWorker` が同じタスクスロット内で `reviveWorker`(注入クロージャ=
   fleetest 側が `ProfileWorkerFactory.buildWorker(forLogicalName:)` を `REVIVE_TIMEOUT`=90s・5s 間隔でポーリング+アプリ再導入)を
   呼び、復帰できたら新ワーカーでキュー消化を再開。`MAX_WORKER_REVIVES`=2・`ScenarioQueue.hasItems()` ガードで暴走と
   無駄な再供給を防ぐ。動的タスク追加はせず withTaskGroup 構造は不変(=安全)。FTCore→FTAndroid 循環回避のため
   再供給は注入(既存 isDeviceFrozen 等と同じ)。**注**: 実行開始時の接続失敗も retired 扱いのため、開始時から不在の
   デバイスは最大 MAX_WORKER_REVIVES×REVIVE_TIMEOUT 分ポーリングする(他ワーカーと並行なので run はブロックしない)
-- **個別デバイス操作の2台並行**(`monitorDeviceLifecycle.ts` のスケジューラ。2026-07-18): 右クリック起動/停止の
-  ライフサイクルキューを完全直列から「running(実行中)+jobs(FIFO 待機列)」のスケジューラに変更。
+- **個別デバイス操作の2台並行**(`monitorDeviceLifecycle.ts` のスケジューラ): 右クリック起動/停止の
+  ライフサイクルキューは「running(実行中)+jobs(FIFO 待機列)」のスケジューラ。
   device ジョブは `DEVICE_LIFECYCLE_MAX_CONCURRENT`(=2)まで同時実行、bulk/restartBatch は単独占有
   (内部で2台並行するため重ねると全体上限2を超える)。追い越しはしない(先頭が開始できない間は後続も
   待つ=投入順保証)。同一デバイス名のジョブは同時に実行しない(enqueueRestart の down→up ペアの逐次性)。
-  かつての完全直列の根拠(並行 provision の waitUntilReady 失敗・ゾンビブリッジ)は ProvisionLock が
-  供給を直列化する現在は解消済み。down 系の monitor pause は参照カウント化
+  並行 provision の失敗(waitUntilReady・ゾンビブリッジ)は ProvisionLock が供給を直列化して防ぐ。down 系の monitor pause は参照カウント化
   (`MonitorDeviceOps.monitorPauseDepth`。0→1 で pause、1→0 で resume)
-- **デバイス再起動命令のロバスト化**(`MonitorDeviceOps.runDeviceOpAttempt`。2026-07-18): 再起動(`enqueueRestart`
+- **デバイス再起動命令のロバスト化**(`MonitorDeviceOps.runDeviceOpAttempt`): 再起動(`enqueueRestart`
   の down→up)の **up が失敗するとデバイスが下がったまま放置**され、watchdog も offline を blank-screen として
-  拾えず二度と復旧しなかった。対策として up 失敗時は `deviceUpMaxRetries`(=2、`deviceUpRetryDelayMs`=3s 間隔)
+  拾えず復旧しない。そこで up 失敗時は `deviceUpMaxRetries`(=2、`deviceUpRetryDelayMs`=3s 間隔)
   まで再試行してからキューを進める(down は再試行しない)。試行の終端は `settle(failed)` に集約し、
   ジョブ単位の `finishOnce` で `finishLifecycleQueueHead` を1回だけ呼ぶ
-- **GPU 再起動と一括起動の単一キュー統合(`start-all-devices --restart`)**(2026-07-18): 本質要件は
+- **GPU 再起動と一括起動の単一キュー統合(`start-all-devices --restart`)**: 本質要件は
   「操作種別を問わず**同時2台まで**」(2台同時でホスト CPU がほぼ飽和するため)。ジョブを分けると
   ジョブ境界がバリアになり並行枠が遊ぶ(例: CPU 機3台の再起動の端数1台の間、未起動機が待つ)。
   そこで「全て起動」は `devicesUp{restartNames}` 1メッセージ→ bulk up 1ジョブ→
   `fleetest api start-all-devices --restart A --restart B` とし、**DeviceBooter.bootAll の単一キュー**に
   再起動アイテム(先頭。起動済みでもスキップせず shutdownOne→bootOne[host GPU])と通常ブート
   アイテム(restart 対象は除外=同一機の二重処理防止)を混載、既存の2ワーカーが消化する。
-  NDJSON に `deviceStopping`(--restart 機の down 開始)を追加(検証: monitorModel.ts
+  NDJSON に `deviceStopping`(--restart 機の down 開始)を出す(検証: monitorModel.ts
   `isDevicesUpEvent`。受信時にそのデバイスだけ stopDeviceStreams)。cpuRenderNames の解除は
   `MonitorDeviceOps.bulkUpWithRestarts`。右クリック単発「GPUで再起動」は従来どおり
   `restartBatch` ジョブ(`fleetest api restart-devices`、`isDevicesRestartEvent`)を使う
-- **一括 down の per-device 反映(`api stop-all-devices`)**(2026-07-19): monitor は down 中 pause で
-  状態スキャンごと止まる(→タイルが全台落ちてからまとめて「未起動」化していた)。対策として **profile 指定の
-  bulk down を NDJSON 化**(`deviceStopping`/`deviceFinished`。停止ロジックは `shutdownProfile` と同一で回帰なし)、
+- **一括 down の per-device 反映(`api stop-all-devices`)**: monitor は down 中 pause で
+  状態スキャンごと止まる(→タイルが全台落ちてからまとめて「未起動」化する)。そこで **profile 指定の
+  bulk down は NDJSON**(`deviceStopping`/`deviceFinished`。停止ロジックは `shutdownProfile` と同一)で出し、
   拡張は `deviceFinished` ごとにそのタイルだけ offline を先行反映(`deviceDownFinished` → resume 後に本物の
   state で上書き)。profile 無しの down は従来の全掃討 `devices down` のまま。詳細は PT-3.4
 - **右クリックの既定メニュー(Cut/Copy/Paste)は拡張の全画面で出さない**(モニターの `main.js` が
   この規則を持つ。文字を打つ入力欄だけ残す)
-- **「プロセス」タブ(常駐プロセス一覧・停止)**(2026-07-19): **起動時は出さない** —— 設定タブ「ツール」の
+- **「プロセス」タブ(常駐プロセス一覧・停止)**: **起動時は出さない** —— 設定タブ「ツール」の
   「プロセス」で設定タブの右に現れ、タブの × で隠す(`tabs.js` の `HIDDEN_AT_STARTUP`。復元もしない)。
   `ps` の fleetest 関連常駐を分類表示
   (`residentProcesses.ts`)。Android ブリッジは**エミュレータ内 `am instrument`= ホスト `ps` に出ない**ため
   `adb forward --list` から情報行を合成(ホスト PID 無し→PID 列は `(遅延起動)`/デバイス内 PID `(12345)`)。
-  停止ボタンは「プロセスを終了してタブを閉じる」の1つ(2026-08-19 に「すべて強制終了」を廃止して
-  置き換え)。掃討スコープは**ユーザー決定**で: ① iOS ブリッジ/ランナー・in-app・モニター/
+  停止ボタンは「プロセスを終了してタブを閉じる」の1つ。掃討スコープは**ユーザー決定**で: ① iOS ブリッジ/ランナー・in-app・モニター/
   host-metrics/stream を停止し **iOS シミュレータと Android エミュ本体(qemu)は残す**(「デバイスモニター」タブの領域。
   `bridge down --all`=sim を残す/`bridge down --platform android`=qemu を残す/残余 SIGKILL は
   **この workspace 由来のみ**=workspaceRoot/binaryDir を含むコマンド。machine-wide 巻き込み回避)、
@@ -451,16 +439,15 @@ adb 接続は生きているがゲスト側が不健全(Wi-Fi 無効・ゲスト
   モニターパネルを閉じる**(モニターを止めたままタブを開いておくと「デバイスモニター」タブが状態更新を失い
   凍結するため、「止める=閉じる」を1操作にする。再開はパネルを開き直すだけ)
 
-- **監視と実行の協調(run-lease)**(2026-07-18): monitor(watchdog)と run は別プロセスで無協調のため、
-  watchdog が実行中デバイスに破壊的再起動をかけて run のワーカーを壊していた。対策として run→monitor 方向の
-  lease を追加(`Sources/FTBridgeClient/RunLease.swift`。`run-<key>.lease`)。`fleetest api run`
+- **監視と実行の協調(run-lease)**: monitor(watchdog)と run は別プロセスで無協調のため、
+  watchdog が実行中デバイスに破壊的再起動をかけて run のワーカーを壊しうる。そこで run→monitor 方向の
+  lease を置く(`Sources/FTBridgeClient/RunLease.swift`。`run-<key>.lease`)。`fleetest api run`
   (RunOrchestrator)がワーカー担当デバイス(serial/udid)へ 5s ハートビートで write、完了時と
   **離脱して復帰を諦めたとき**に remove(復帰の最中は保つ)。FTCore→FTBridgeClient は循環のため
   `writeRunLease`/`removeRunLease` クロージャ注入。記帳は `RunLeaseLedger` actor で、**打ち直しと削除を
   actor の中で直列化**する(外でキー一覧を取ってから書くと、消した直後に書き戻す)。供給フェーズの lease
   (`SupplyLeaseHolder`)は orchestrator が書き始めたキーを `handOff` で手放す —— 手放さないと、担当を
-  終えたデバイスの lease を供給側のハートビートが run の最後まで書き戻し、モニターの配信が張られては畳まれる
-  (2026-09-11)。`fleetest api monitor` が `RunLease.isFresh` を読んでデバイスイベントに `inRun` を載せ、拡張の
+  終えたデバイスの lease を供給側のハートビートが run の最後まで書き戻し、モニターの配信が張られては畳まれる。`fleetest api monitor` が `RunLease.isFresh` を読んでデバイスイベントに `inRun` を載せ、拡張の
   `monitorHealthWatchdog` が **clock-skew 等の host 再起動分岐のみ inRun 中は保留**(restartAttempts/cooldown を
   動かさず見送る)。**blank-screen(CPU フォールバック再起動)と wifi 修復は inRun でも実行**(凍結はデータ汚染で
   即対応が要件、wifi は非破壊)。凍結で run のワーカーが壊れる分は DS-12.4 の requeue が回復する
@@ -478,7 +465,7 @@ adb 接続は生きているがゲスト側が不健全(Wi-Fi 無効・ゲスト
   止める門・run の回避は見ているだけのライブ操作も「使用中」と数えるが、**対話セッション同士の警告は操作したときだけ** ——
   MCP はライブ操作が自分の前回の呼び出し以降に操作した回だけ「monitor's live control … operated this device」と言い、
   ライブ操作は自分が操作するコマンド(`refresh` / `frame` 以外)でだけ相手の MCP を言う。モニターでデバイスを選ぶだけで
-  serve は印を書くので、区別しないと AIアシスタントの作業を見ているだけで「別の MCP セッションが駆動中」と警告していた
+  serve は印を書くので、区別しないと AIアシスタントの作業を見ているだけで「別の MCP セッションが駆動中」と警告する
 
 
 ### DS-12.4.1 デバイスのストレージ計測(ダッシュボード「デバイスの健全性」)
@@ -601,7 +588,7 @@ backboardd のこのエラーは、モニターが画面を配信しているデ
 
 ### DS-12.5 タイルペインの auto-fit と「非表示中は実測しない」規律
 
-> **auto-fit は廃止した**(2026-09-17 ユーザー決定)。ボタン・`tileFitModel.js`・`tileAutoFit` の保存は無い。
+> **auto-fit は無い**(ユーザー決定 2026-09-17。ボタン・`tileFitModel.js`・`tileAutoFit` の保存を置かない)。
 > セパレーターは手動だけで、保存値が無いときの初期位置は表示エリアの 20%(`splitter.js` の
 > `DEFAULT_TILE_PANE_RATIO`。領域が測れた最初の描画で決める)。下の「非表示中は実測しない」規律は
 > `relayoutTiles` と `splitAreaHidden` に残っている。
@@ -609,7 +596,7 @@ backboardd のこのエラーは、モニターが画面を配信しているデ
 - **量の連鎖**: ペイン高さ → タイル高さ → `--tile-image-h`(= タイル実測高 − 固定 chrome 66px。
   `deviceTiles.js` の `relayoutTiles`)→ タイル幅(`--tile-image-h × --tile-aspect`)。
   padding/border/gap の定数は持たず全て実測する(style.css を変えたとき片方だけ古くなるのを防ぐ)
-- **罠(実害 2026-07-31。auto-fit があった頃に踏んだが、規律は今も効く)**: `devices` のポーリングは「デバイスモニター」タブが**非表示の間も届き続ける**
+- **罠**: `devices` のポーリングは「デバイスモニター」タブが**非表示の間も届き続ける**
   (タブ非表示の間もフレーム配信は続く = 他タブから戻ったとき張り直しで映らない時間を作らない。ユーザー決定)。`applyDevices` は毎回
   `relayoutTiles` を呼ぶため、`display:none` 中は `clientHeight=0` → `--tile-image-h` が下限 60px に
   潰れて書き込まれ、ペイン高さと `--tile-image-h` の対応が壊れていた。**タブへ戻ると実際の画像高さぶん過大**になりタイルが
@@ -640,8 +627,8 @@ backboardd のこのエラーは、モニターが画面を配信しているデ
   打ち切りで手元の木で描く。
 - **「実行中」と「デバイス」の間にもセパレーター**(`#devices-separator`。ユーザー決定 2026-09-22)。
   **見た目も挙動も `#splitter-log` と同じ**(`.splitter`)で、下げると run ボードが伸びる。
-  見出し行どうしの区切りを地色だけで付ける規律(2026-09-21)の**唯一の例外**。守る規律4つ:
-  **①保存値が無い間は高さを書かない**(中身なりに伸び縮みする = 従来の見え方。既定比を作らない)/
+  見出し行どうしの区切りは地色だけで付ける(この仕切りが**唯一の例外**)。守る規律4つ:
+  **①保存値が無い間は高さを書かない**(中身なりに伸び縮みする。既定比を作らない)/
   **②はみ出しは箱で止め、行は `#run-board-rows` が自前でスクロールする**(`min-height: 0` が無いと
   flex の既定で中身の高さまで伸びて `overflow` が効かない)/ **③畳んでいる間は出さない**
   (伸ばす中身が無い = 掴めない仕切りを見せない。CSS の `display: none` で `#splitter` /
@@ -701,7 +688,7 @@ backboardd のこのエラーは、モニターが画面を配信しているデ
     ダブルタップを送る = 印と送るものが食い違う)。host は軌跡を送るたびに要約を出力パネルへ1行残す
     (`[live] trace:` = 点の数・時間・押してから動き出すまで・範囲・最大の跳び。`liveModel.ts` の `traceSummary`)。
     **座標がウィンドウの原点 (0,0) のポインターイベントは採らない**(`isOriginPointer`。なぞっている最中に1つだけ混ざり、
-    軌跡が絵の左上の角を経由してデバイスにもその形で送られた。離した位置が (0,0) なら最後に採った位置)。
+    採ると軌跡が絵の左上の角を経由してデバイスにもその形で送られる。離した位置が (0,0) なら最後に採った位置)。
     **絵の上のダブルクリックは2回のタップで、選択の切り替えにしない**(`laneLog.js` が
     `isGridLiveScreenTarget` と修飾キーで除く。切り替えは絵の外側のダブルクリック)。
   - **操作パネル**(`#grid-live-panel`): `.lane-pair` の中、操作カラムの右隣に置く(`syncLogMirror` が組を作り直すので
@@ -727,7 +714,7 @@ backboardd のこのエラーは、モニターが画面を配信しているデ
     **「直接の結果」は host の合図 `gridActionStarted` の後に届いた最初の `snapshot` だけ**(`handleGridAction` が撃つ直前に
     送る。`runAction` は最初の await より前に busy を立てるので、合図と結果の間に別の観測は割り込まない)。host は撃つ前に
     デバイスの切り替え(開いたときの観測)や直前の処理の終わりを待つので、送った直後に届く `snapshot` は操作前の画面 ——
-    取り違えると本物の結果を「整定後」と読み、遷移の途中の位置に枠を一度描いていた。操作の段(`opPhase`)は
+    取り違えると本物の結果を「整定後」と読み、遷移の途中の位置に枠を一度描く。操作の段(`opPhase`)は
     `clearSnapshot` で消さない(切り替えの途中で消すと同じ取り違えに戻る)。撃つ前に断られたら(`gridActionError`・
     busy を立てずに返る `actionError`)手元の木で描き直す。
     **枠はその木と同じ瞬間の絵の上に描く**: 木は host の観測(serve の `snapshot`)で届くが、拡大表示の絵はモニター自身の配信・ポーリングで
@@ -843,8 +830,8 @@ CLI 実行・他人の run・ランナー機で直に打たれた run は `inRun
   消える)、build を挟む間だけ `"building"` にして**直後に戻す**。**変更が無くてビルドを省くときも
   立てない**(`ScenarioHost.build` の `willBuild` = swift build を実際に呼ぶ直前にだけ呼ばれる)。
   省く判定(`BuildFingerprint`)は**パス依存の先(ツールのクローン)の Sources/ まで見る** ——
-  外部パッケージ構成(受け手・ランナー機の WORK_DIR)は直下に Sources/ を持たず、以前はそれだけで
-  判定不能 = 毎回 swift build になっていた(2026-10-01。受け手構成の実測: 無変更の2回目が 0.11s)
+  外部パッケージ構成(受け手・ランナー機の WORK_DIR)は直下に Sources/ を持たず、見ないと
+  判定不能 = 毎回 swift build になる(受け手構成の実測: 無変更の2回目が 0.11s)
   (`RunProgressLedgerWiringTests` が2経路とも走査で固定)。**書き手は段階ごとに場所が違う** —— `"building"` は
   `Fleetest.swift`(`fleetest run` はシナリオのビルドが `ProfileRunner` の外にある)と
   `ApiRunCommand`、`"preparing"` は `ProfileRunner` と `ApiRunCommand`、`"running"` は
@@ -1009,8 +996,7 @@ CLI 実行・他人の run・ランナー機で直に打たれた run は `inRun
   プラットフォームのバッジと同じ値**(iOS / Android。`platform` が無いデバイスは色を付けない ——
   知らないものをどちらかに見せない)
 - **レーンのデバイス名は省略しない** —— 末尾で見分けるので、途中で切ると同じ見た目が並ぶ
-- **ツリーは2段・1行 = 1機械**(ユーザー決定 2026-09-30。それまでは「run / 空きの根 → 機械の枝 →
-  デバイス」の3段): **機械の行**(マシン名のバッジ。run があれば**同じ行に** `project / profile`・
+- **ツリーは2段・1行 = 1機械**(ユーザー決定 2026-09-30): **機械の行**(マシン名のバッジ。run があれば**同じ行に** `project / profile`・
   進捗・経過 / 残り)→ **デバイス**。run の無い機械の行はバッジと状態(空き / —)だけ。
   値は**その機械の run のもの** —— 機械分担の run は機械の数だけ行になり、それぞれが自分の進捗を出す
   (束ねた合計を使うのはヘッダの「実行中 N」の件数だけ)。同じ機械で run が複数走っていれば、
@@ -1076,8 +1062,7 @@ CLI 実行・他人の run・ランナー機で直に打たれた run は `inRun
   行の鍵(機械 + pid・run の有無)で引くと、次の run や 空き⇔実行中 の切り替わりで記録を失い、
   閉じた行が勝手に開く
 - **プラットフォームの表示フィルタ**(ラインビュー見出しの「ライブ更新」の右。**iOS / Android の
-  独立したトグル・既定は両方 ON**。値は `{ ios, android }`。**両方 OFF にはできない** —— 唯一 ON の側を押すと、もう片方と入れ替わる(2026-10-24)。ユーザー決定 2026-10-24 で
-  3択と「両方」を廃止): **見た目はバッジ**(ユーザー決定 2026-09-22)—— ON は**タイルのデバイス名ピルと
+  独立したトグル・既定は両方 ON**。値は `{ ios, android }`。**両方 OFF にはできない** —— 唯一 ON の側を押すと、もう片方と入れ替わる。ユーザー決定 2026-10-24): **見た目はバッジ**(ユーザー決定 2026-09-22)—— ON は**タイルのデバイス名ピルと
   同じ色**、**OFF は灰色**(aria-pressed が状態を持つ)。**ON はホバーで色を変えない**(素の
   `button:hover` が背景を塗り替えるので `--platform-badge-bg` で固定する)。OFF の側のデバイスを
   **4つのセクション(実行中・デバイス一覧・選択したデバイス・実行ログ)から同時に隠す**。
@@ -1106,9 +1091,8 @@ CLI 実行・他人の run・ランナー機で直に打たれた run は `inRun
 
 - **時間軸の帯(ガント)**: 「いつ何が動いていたか」は結果 DB(`api results`)とダッシュボードタブの
   担当で、モニターは「今」を出す口。両方に持つと同じ数字が2箇所で食い違う
-- ~~**空き機械の行をボードに並べる**~~: 当初は「行が台数ぶん伸びて run が埋もれる」として却下し
-  ヘッダの要約に畳んでいたが、**2026-09-20 に反転**(ユーザー決定)—— 要約と本体で同じ情報が
-  2箇所に出るほうが邪魔だった。いまは本体に並べ、ヘッダには件数だけを置く(DS-18.5)
+- **空き機械の要約をヘッダに置くこと**: 要約と本体で同じ情報が2箇所に出て邪魔になる(ユーザー決定
+  2026-09-20)。空き機械は本体に並べ、ヘッダには件数だけを置く(DS-18.5)
 - **自分の run だけ `runEvent` から描く**: 供給源を台帳に一本化する。2通りの経路を持つと、
   同じ run が自分と他人で違う数字になる(runEvent はログレーン用に残す)
 - **`results/<runID>/run.json` を実況の供給源にする**: `RunMetaRecord` は begin() の時点で pid ごと
