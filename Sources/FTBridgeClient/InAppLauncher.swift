@@ -304,6 +304,8 @@ public struct InAppLauncher: Sendable {
     /// waitUntilReady のタイムアウト後 = クラッシュから数十秒経っているので1回だけ引く。
     /// 窓は待った時間ぶん広くとる — 即死は待ちの先頭で起きている)
     private func crashAnnotated(_ detail: String, bundleID: String) -> String {
+        // .ips はこの Mac の Simulator のものしか引けない(実機で探すと確かめないまま「落ちたかも」と言う)
+        guard !physical else { return detail }
         guard let hit = SimulatorCrashReport.findRecent(bundleID: bundleID,
                                                         udid: udid == "booted" ? nil : udid,
                                                         within: 60) else {

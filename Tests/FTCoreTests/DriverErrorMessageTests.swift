@@ -75,6 +75,14 @@ final class DriverErrorMessageTests: XCTestCase {
                 + " If the app has not been started yet, check: fleetest bridge up. Detail: refused")
     }
 
+    /// 実機の in-app は端末との経路が間に入るので「アプリが落ちた」と言い切らない(経路の事実は detail の注記が言う)
+    func testConnectionRefusedIOSInAppPhysicalDoesNotBlameTheApp() {
+        let text = DriverErrorMessage.connectionRefused(
+            context: DriverErrorContext(bridge: .iosInApp, physicalDevice: true), detail: "refused")
+        XCTAssertFalse(text.contains("most likely exited or crashed"), text)
+        XCTAssertTrue(text.contains("the link to the physical device was lost"), text)
+    }
+
     func testConnectionRefusedIOSXCUITestPhysical() {
         let text = DriverErrorMessage.connectionRefused(context: iosXCUITestPhysical, detail: "refused")
         XCTAssertEqual(text,

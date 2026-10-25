@@ -36,4 +36,31 @@ final class UsbTunnelAdviceTests: XCTestCase {
             XCTAssertTrue(lan.isEmpty || usb.isEmpty, "both fired for \(url) physicalUDID=\(String(describing: physicalUDID))")
         }
     }
+
+    // MARK: - エラーの種類での切り分け(実測: SE3 に iproxy を張り、端末側の待受の有無と iproxy の生死を入れ替えて URLSession で撃った)
+
+    private func advice(_ code: URLError.Code, macSide: BridgeDiscovery.ConnectProbe? = nil) -> String {
+        BridgeClient.usbTunnelAdvice(baseURL: URL(string: "http://127.0.0.1:8130")!, physicalUDID: "00008110-ABC",
+                                     error: URLError(code), macSide: macSide)
+    }
+
+    func testRefusedOnTheMacSideSaysTheTunnelIsGone() {
+        let text = advice(.cannotConnectToHost)
+        XCTAssertTrue(text.contains("tunnel itself is gone"), text)
+        XCTAssertTrue(text.contains("port 8130"), text)
+        XCTAssertFalse(text.contains("bridge on the device has stopped"), text)
+    }
+
+    /// 切れた接続は Mac 側の待受で言い分ける(実測: 要求の途中で iproxy を止めると同じ `.networkConnectionLost` になる)
+    func testDroppedConnectionIsAttributedByTheMacSide() {
+        let generic = advice("http://127.0.0.1:8130", physicalUDID: "00008110-ABC")
+        let deviceSide = advice(.networkConnectionLost, macSide: .connected)
+        XCTAssertTrue(deviceSide.contains("bridge on the device has stopped"), deviceSide)
+        let tunnelGone = advice(.networkConnectionLost, macSide: .refused)
+        XCTAssertTrue(tunnelGone.contains("tunnel went away during the request"), tunnelGone)
+        XCTAssertFalse(tunnelGone.contains("bridge on the device has stopped"), tunnelGone)
+        XCTAssertEqual(advice(.networkConnectionLost, macSide: .unknown), generic, "確かめが決まらなければ帰属を言わない")
+        XCTAssertEqual(advice(.networkConnectionLost), generic, "確かめていなければ帰属を言わない")
+        XCTAssertEqual(advice(.timedOut), generic, "切り分けられない種類は従来の案内")
+    }
 }

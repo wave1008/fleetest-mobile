@@ -5451,3 +5451,20 @@ worktree の run がそれらの端末を「別のワークスペースのブリ
 - `AndroidHealthProbe.repairBlankDisplay` が wake 後の確認を `probeBlank` で行っていた。`probeBlank` は撮れないとき「blank ではない」に倒す
   (検知を誤って発火させない側)ので、それを修復の確認に使うと「撮れない = 直った」になる
 - 直し: 確認のスクショが撮れなければ false。拡張は ok をログの文言にしか使わない(段の進行は次の観測で決まる)ので、破壊的な処置は増えない
+
+### 105.4 実機の USB トンネル越しの失敗を、トンネルの側か端末の側かで言い分ける
+- 負荷テストで SE3 の inapp モードの run が「接続拒否 → 起こし直しが全部届かない」で赤。失敗文は「アプリが落ちた可能性が高い」と案内していた。
+  端末側にクラッシュ・Jetsam の記録は無く、SE3 単独では再現しなかった
+- 実測(SE3・URLSession。Mac 側に iproxy を張り、端末側の待受の有無と iproxy の生死を入れ替えた):
+  - 接続の時点で iproxy が居ない → `.cannotConnectToHost`(Could not connect to the server)。**確定的にトンネルの消失**
+  - iproxy は居て端末側に待受が無い → iproxy がいったん受けてから切るので `.networkConnectionLost`
+  - **要求の途中で iproxy が消えても `.networkConnectionLost`** —— この種類だけでは端末側の停止と言えない。最初の版はそう言い切っていて、
+    陽性対照(実行中に iproxy を止める)で誤りが出た。失敗の直後に Mac 側のポートを3値で確かめ(`BridgeDiscovery.connectProbe`)、
+    `.refused` ならトンネル・`.connected` なら端末側・それ以外は従来の案内(`BridgeClient.usbTunnelAdvice` の `macSide`)
+- 上の負荷テストの文言は `.cannotConnectToHost` = iproxy-8128 が消えていた。iproxy を止めるだけで同じ症状を再現できた
+- 併せて直した古い前提: **InAppDriver は「in-app は常にシミュレータ」として実機でも `physicalDevice: false` を渡していた**
+  (実機の inapp モードができる前の前提)。実機では見出しで「アプリが落ちた可能性が高い」と言い切らない。Mac の .ips と simctl で引く
+  クラッシュの注記(`crashAnnotated`)は実機では何も確かめられないまま「OS に殺されたかも」と言っていたので付けない
+  (ScenarioRunnerMain・MCP の CrashLogs は元から実機を除いていた = 同型はこの2か所)
+- 誰が iproxy を止めたかは未解決(docs/open-issues.md)。`launcher.stop()` 経由の teardown(`IOSDeviceTransport.stopIproxy`)だけが
+  止めても記録しなかったので、生きた iproxy を止めたときに止めた側のログへ1行残す

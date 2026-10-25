@@ -23,10 +23,13 @@ public final class InAppDriver: AppDriver {
     /// 断らないと別アプリへ同じ `FT_PORT` で注入して起動し、ポートを取り合った旧ブリッジが答えて裏のアプリを操作した。
     /// 別アプリの手順は、そのアプリの実行プロファイルで回す別のシナリオに置く
     private let ownBundleID: String?
+    /// 失敗の案内の構成(実機かどうか)。`withCrashContext` が付け替えに使う
+    private let context: DriverErrorContext
 
     public init(repoRoot: URL, udid: String, port: UInt16, ownBundleID: String? = nil,
                 physical: Bool = false, appBundle: String? = nil, wired: Bool = false) {
         self.ownBundleID = ownBundleID
+        self.context = DriverErrorContext(bridge: .iosInApp, physicalDevice: physical)
         let simulatorUDID = udid == "booted" ? nil : udid
         self.simulatorUDID = simulatorUDID
         // 実機は iproxy のループバック + token(台帳から推測)で到達する。シミュレータは従来どおりループバック直結
@@ -319,26 +322,25 @@ public final class InAppDriver: AppDriver {
         do {
             return try await op()
         } catch let DriverError.bridgeConnectionRefused(_, detail) {
-            throw DriverError.bridgeConnectionRefused(context: Self.context,
+            throw DriverError.bridgeConnectionRefused(context: context,
                                                        detail: await crashAnnotated(detail))
         } catch let DriverError.bridgeUnreachable(_, detail) {
-            throw DriverError.bridgeUnreachable(context: Self.context,
+            throw DriverError.bridgeUnreachable(context: context,
                                                  detail: await crashAnnotated(detail))
         }
     }
 
-    /// in-app は常にシミュレータ(実機への注入は不可能。CLAUDE.md 決定)なので physicalDevice は
-    /// 固定 false。**client(BridgeClient)は xcuitest 向けの context を既定に持つので、必ず
-    /// `withCrashContext` で in-app へ付け替える**(DriverErrorContext の doc 参照。
-    /// 付け替えないと Android と同じ理由で誤った構成の案内が付く)
-    private static let context = DriverErrorContext(bridge: .iosInApp, physicalDevice: false)
+    // **client(BridgeClient)は xcuitest 向けの context を既定に持つので、必ず `withCrashContext` で in-app の
+    // context(init で実機かどうかを入れたもの)へ付け替える**(DriverErrorContext の doc 参照。付け替えないと
+    // Android と同じ理由で誤った構成の案内が付く)
 
     /// クラッシュ検知時の注記。**.ips は落ちてから遅れて書かれる**(実測: ブリッジ切断の
     /// 約 2 秒後。TestProjects/E2E-iOS の 91_クラッシュ検知 で確認)。切断直後に1回だけ探すと
     /// ファイルがまだ無く「見つかりませんでした」になるため、短くポーリングして待つ。
     /// この経路は既に失敗が確定しているので、待ち時間が正常系を遅らせることはない。
     private func crashAnnotated(_ detail: String) async -> String {
-        guard let bundleID = lastBundleID else { return detail }
+        // .ips もプロセスの生死もこの Mac の Simulator でしか引けない。実機で探すと何も確かめないまま「OS に殺されたかも」と言う
+        guard !context.physicalDevice, let bundleID = lastBundleID else { return detail }
         for attempt in 0..<8 {
             // within を既定(120s)のままにすると、**前の実行が残した .ips** が先に窓へ入って
             // 古いパスと終了理由を報告してしまう(実測: 94 秒前のレポートを拾った)。

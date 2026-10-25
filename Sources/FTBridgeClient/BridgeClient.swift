@@ -1383,9 +1383,32 @@ public final class BridgeClient: AppDriver, Sendable {
     /// **宛先がループバック かつ 実機** = USB トンネル(iproxy)越しの接続。lanTransportAdvice の対で、
     /// 常にどちらか一方しか付かない(実機以外の経路は physicalUDID が無く、実機の LAN 接続は
     /// ループバックでないので guard が両方に同時に成立しない)。トンネルは iproxy プロセスが
-    /// 保っているだけなので、ケーブルが抜ける・iproxy が落ちるのどちらも同じ「届かない」エラーになる
-    static func usbTunnelAdvice(baseURL: URL, physicalUDID: String?) -> String {
+    /// 保っているだけ。切り分け(実測: SE3・URLSession): 接続時に iproxy が居なければ `.cannotConnectToHost`(確定)。
+    /// `.networkConnectionLost` は**2通りある** —— iproxy は居て端末側に待受が無い(iproxy がいったん受けてから切る)と、
+    /// **要求の途中で iproxy が消えた**。後者を前者と言わないよう、呼び手が失敗の直後に Mac 側のポートを確かめた結果
+    /// (`macSide`)で言い分ける。`.refused` 以外の確かめ(時間切れ等)と他の種類は従来の案内
+    static func usbTunnelAdvice(baseURL: URL, physicalUDID: String?, error: Error? = nil,
+                                macSide: BridgeDiscovery.ConnectProbe? = nil) -> String {
         guard physicalUDID != nil, baseURL.host == BridgeEndpoint.loopbackHost else { return "" }
+        let port = baseURL.port.map(String.init) ?? "<N>"
+        switch (error as? URLError)?.code {
+        case .cannotConnectToHost?:
+            return " (nothing is listening on this Mac's end of the USB tunnel on port \(port) — the iproxy"
+                + " tunnel itself is gone, so the device was not reached at all; a stopped app or runner shows"
+                + " up as a dropped connection instead. Check the cable and that the device is still connected,"
+                + " then rebuild the bridge with `fleetest bridge down --port \(port)` if it does not recover)"
+        case .networkConnectionLost? where macSide == .refused:
+            return " (the connection through the USB tunnel on port \(port) was dropped and nothing is listening on"
+                + " this Mac's end of it now — the iproxy tunnel went away during the request, so this says nothing"
+                + " about the app. Check the cable and that the device is still connected, then rebuild the bridge"
+                + " with `fleetest bridge down --port \(port)` if it does not recover)"
+        case .networkConnectionLost? where macSide == .connected:
+            return " (the USB tunnel (iproxy) on port \(port) is up, but the device's end did not take the connection"
+                + " — the bridge on the device has stopped (in inapp mode it lives inside the app, in xcuitest mode it"
+                + " is the XCUITest runner), or the device is no longer reachable over USB)"
+        default:
+            break
+        }
         return " (reached over the USB tunnel — a physical device's bridge stays reachable only while"
             + " iproxy keeps that tunnel open, so an unplugged cable and a killed iproxy process look"
             + " the same from here; check the cable and that the device is still connected, then rebuild"
@@ -1466,8 +1489,12 @@ public final class BridgeClient: AppDriver, Sendable {
             return result
         } catch {
             BridgeRequestTrace.emit(req, status: nil, started: started, response: nil)
+            // 切れた接続の帰属は Mac 側の待受を今確かめて分ける(usbTunnelAdvice の doc)。失敗の経路で実機の USB だけ
+            let macSide = physicalUDID != nil && baseURL.host == BridgeEndpoint.loopbackHost
+                && (error as? URLError)?.code == .networkConnectionLost
+                ? baseURL.port.flatMap(UInt16.init).map { BridgeDiscovery.connectProbe(port: $0, repoRoot: nil) } : nil
             let detail = error.localizedDescription + Self.lanTransportAdvice(baseURL: baseURL)
-                + Self.usbTunnelAdvice(baseURL: baseURL, physicalUDID: physicalUDID)
+                + Self.usbTunnelAdvice(baseURL: baseURL, physicalUDID: physicalUDID, error: error, macSide: macSide)
             // BridgeClient は元々 XCUITest ランナー向けのクライアント(このクラスの doc 冒頭
             // 参照)なので、自分の宛先が in-app/Android に化けていることを知らない。
             // InAppDriver.withCrashContext / AndroidDriver.withBridge が境界で正しい

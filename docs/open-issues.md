@@ -37,12 +37,15 @@
 
 ## デバイスで赤のまま・原因未調査
 
-- **SE3(実機・inapp モード)の in-app ブリッジが走行中に応答しなくなり、以後の起こし直しも届かない**(2026-10-25 の負荷テスト・1 回)
-  - 症状: `scrollTo` の途中で「Connection to the driver was refused … (reached over the USB tunnel)」→ 同じ run の残り3本の `launch` が
+- **SE3(実機・inapp モード)の USB トンネル(iproxy)が実行中に消え、以後の起こし直しも届かない**(2026-10-25 の負荷テスト・1 回)
+  - 症状: `scrollTo` の途中で「Connection to the driver was refused … Could not connect to the server」→ 同じ run の残り3本の `launch` が
     全部「the in-app bridge did not respond in time: connection refused」(各 30 秒)
-  - 確かめた範囲: 端末側にクラッシュ・Jetsam の記録なし。相方の XCUITest ランナー(8127)のログは失敗時刻に何もしていない。同時刻の MCP・ライブ操作・CLI の
-    ファズは SE3 に触れていない。同じ5本を単独で 2/2 緑。この文言は iproxy のトンネルが消えても同じになるので、アプリが消えたのかトンネルが切られたのかを分けられていない
-  - 要る材料: 次に起きたときの、失敗時刻の `iproxy-<port>.pid` の pid の生死と端末側のプロセス一覧(`devicectl device info processes`)
+  - 分かったこと: 「Could not connect to the server」(`.cannotConnectToHost`)は Mac 側のポートで誰も待受していないときだけ出る
+    (実測: アプリだけを止めると iproxy がいったん受けてから切るので「The network connection was lost」になる)= **アプリではなく iproxy-8128 が消えていた**。
+    iproxy を止めるだけで同じ症状を再現できた(maintainer-notes §105.4)
+  - 未解決: 誰が止めたか。その時刻にログへ残る止め方(古いトンネルの差し替え・残骸の掃除)の記録は無い。`launcher.stop()` 経由の teardown は
+    止めても記録しなかったので、止めたときに1行残すようにした
+  - 要る材料: 次に起きたときの、各プロセスのログの「stopped the USB tunnel (iproxy pid …) on port …」
 
 - **頻度の低い赤(2026-10-22 の回帰・負荷テスト。いずれも再現の材料なし)**
   - E2EX-Flutter Android「スワイプで行を削除」S0010(`Dismissible`): 3/58(10/5〜)。Android の注入は終点の MOVE を UP の前に撃つので上の型とは別

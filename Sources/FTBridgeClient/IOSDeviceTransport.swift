@@ -426,6 +426,9 @@ public enum IOSDeviceTransport {
            let pid = Int32(text.trimmingCharacters(in: .whitespacesAndNewlines)) {
             if isIproxy(pid: pid) {
                 kill(pid, SIGTERM)
+                // 止めた事実を止めた側のログに残す(他の止め方 = stopStalePeerTunnels・sweepTunnelOnlyPorts は残す。
+                // これだけ黙っていると、実行中の実機のトンネルが消えたときに誰が止めたかを後から言えない)
+                ConsoleOut.err("stopped the USB tunnel (iproxy pid \(pid)) on port \(hostPort)")
             } else if ProcessLiveness.isAlive(pid) {
                 ConsoleOut.err(
                     "pid \(pid) is no longer the iproxy tunnel (reused by a different process);"

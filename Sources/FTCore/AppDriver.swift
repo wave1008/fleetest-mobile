@@ -325,8 +325,6 @@ public enum DriverErrorMessage {
         let hint: String
         switch context.bridge {
         case .iosInApp:
-            // in-app は常にシミュレータ上で走る(InAppDriver.context 参照)ので、この文言の
-            // 読み手の構成では「実機では不可」の案内は起こりえない
             hint = " In inapp mode the backgrounded app can be suspended, so TCP is accepted"
                 + " but no HTTP response comes back. Check: fleetest bridge up."
         case .iosXCUITest:
@@ -342,9 +340,15 @@ public enum DriverErrorMessage {
         let suspect: String
         switch context.bridge {
         case .iosInApp:
-            suspect = " If this happened mid-run, the app under test most likely exited or crashed"
-                + " (on iOS inapp the bridge lives inside the app, so it becomes unreachable the"
-                + " moment the app dies)."
+            // 実機は端末との経路(USB トンネル・WiFi)が間に入るので、アプリの死とは言い切らない
+            // (経路ごとの事実は BridgeClient が detail に足す: usbTunnelAdvice / lanTransportAdvice)
+            suspect = context.physicalDevice
+                ? " If this happened mid-run, either the app under test exited (on iOS inapp the bridge"
+                    + " lives inside the app) or the link to the physical device was lost — the note in"
+                    + " the detail says which when the transport can tell."
+                : " If this happened mid-run, the app under test most likely exited or crashed"
+                    + " (on iOS inapp the bridge lives inside the app, so it becomes unreachable the"
+                    + " moment the app dies)."
         case .iosXCUITest:
             suspect = context.physicalDevice
                 ? " If this happened mid-run, the XCUITest runner most likely stopped, or the"
