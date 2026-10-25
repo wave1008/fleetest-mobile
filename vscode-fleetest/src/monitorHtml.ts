@@ -940,7 +940,7 @@ function renderSettingsPanel(): string {
       </div>
       <div class="settings-group">
         <div class="settings-section-title">${t("panels.settings.deviceMonitorSectionTitle")}</div>
-        <!-- ツールバーのホストグラフの名札を CPU n / GPU n / MEM GB にする(既定 OFF)。
+        <!-- ツールバーのホストグラフの名札を CPU n / GPU n / MEM GB にする(既定 ON)。
              対向: settingsTab.js / hostCharts.js の setShowMachineCapacity, monitorPanel.ts。 -->
         <label class="settings-item"><input type="checkbox" id="settings-show-machine-capacity" checked> ${t("panels.settings.showMachineCapacityLabel")}</label>
       </div>
