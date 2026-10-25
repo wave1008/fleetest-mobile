@@ -144,7 +144,7 @@ project's workspace. **Servers, databases and stubs are not started by a script*
 - **CI**: pass the JUnit XML from `fleetest run --junit <path>` and the exit code to your CI ([Running on CI](../../in_action/ci.md)).
 - **Aggregation and notifications**: read the results JSON ([schema, Japanese](../../../results-json.md)) and feed it to
   your own dashboard or chat notifications. What `fleetest results` can aggregate is in
-  [Analysing results](../running/results_analysis.md).
+  [Analyzing results (fleetest results, dashboard)](../running/results_analysis.md).
 
 ## What you cannot add
 

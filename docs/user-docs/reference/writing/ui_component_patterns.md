@@ -1,4 +1,4 @@
-# UI Component Patterns and Quirks
+# UI component patterns and quirks
 
 [in Japanese(日本語)](ui_component_patterns_ja.md)
 

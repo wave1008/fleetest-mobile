@@ -2,8 +2,9 @@
 
 [in English](running_scenarios.md)
 
-`fleetest run` は Swift DSL シナリオを決定的に実行します(通常の再生も自己修復
-(ロケータの指紋照合)も FM を呼びません)。このページでは CLI オプションを説明します。`--dry-run` は
+`fleetest run` は Swift DSL シナリオを決定的に実行します。再生そのものと自己修復(ロケータの指紋照合)は FM を呼びません。
+FM を呼ぶのは実行プロファイルの `fmTextVisibilityCheck` / `screenLooksLike`(どちらも既定 ON・オンデバイスだけ)で、
+両方を `false` にすれば run 中に FM は一切呼ばれません([実行プロファイルの設定項目](../project/run_profile_ja.md))。このページでは CLI オプションを説明します。`--dry-run` は
 [dry_run_ja.md](./dry_run_ja.md)、`--set` による自己修復の有効化は
 [self_healing_ja.md](./self_healing_ja.md) を参照してください。
 
@@ -75,7 +76,7 @@ fleetest run --platform android
 
 | コマンド | 説明 |
 |---|---|
-| `fleetest devices up` / `devices down` | 全実行プロファイルのデバイスの和集合を起動・停止する(`--profile` を付けるとそのプロファイルのデバイスだけ) |
+| `fleetest devices up` / `devices down` | 全実行プロファイルのデバイスの和集合を起動・停止する(`--profile` を付けるとそのプロファイルのデバイスだけ)。`--profile` 無しの `devices down` は、この Mac に加えて登録済みのランナー機のデバイスとブリッジも SSH 越しに止める(手元のデバイスだけなら `--profile` を付ける)。`devices up` はこの Mac だけ |
 | `fleetest bridge up` / `bridge down` / `bridge status` | 常駐ブリッジ(iOS: XCUITest ランナー / Android: 端末常駐サーバー)を管理する |
 
 ### Link

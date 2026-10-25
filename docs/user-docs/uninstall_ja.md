@@ -37,9 +37,11 @@ VSCode の拡張ビューからアンインストールし、`Developer: Reload 
 `scripts/compose.yaml` のサービスを使っていたなら、プロセスを止める前に(作業フォルダとクローンが残っているうちに)サービスを止めて消します。
 
 ```bash
-fleetest services down     # 作業フォルダのサービスを止める
-fleetest services reset    # コンテナ・ネットワーク・名前付きボリューム・控えを消す
+../foundation-tester/.build/debug/fleetest services down     # 作業フォルダのサービスを止める
+../foundation-tester/.build/debug/fleetest services reset    # コンテナ・ネットワーク・名前付きボリューム・控えを消す
 ```
+
+常駐の `services up` が残っていれば `services reset --force` にします。
 
 自分でビルドしたイメージと取得したイメージはコンテナランタイム側に残るので、不要なら `container image rm <名前>` /
 `docker image rm <名前>` で消します(例: `ghcr.io/wave1008/sut-ec-mobile-server:latest`・`postgres:16-alpine`)。
@@ -63,6 +65,7 @@ VSCode を終了してから、作業フォルダと fleetest のクローン(�
 - `~/.fleetest`(この Mac での実行の記録など)・`~/Library/Logs/fleetest`(ログ)・`~/Library/Caches/fleetest`
 - `~/.config/fleetest/`(設定と、この Mac だけのテストデータ)。**`dataset/` や `secrets/<プロジェクト>.env`(compose.yaml が参照する秘密)にパスワードなどの秘密を置いているなら、
   必ず消します**
+- VSCode のユーザー設定 `fleetest.language`(拡張を消せば無害です)
 - fleetest のために作った仮想デバイスが不要なら、Xcode の「Devices and Simulators」や Android Studio の
   Device Manager から削除します
 

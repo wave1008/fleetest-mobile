@@ -15,32 +15,6 @@ id もラベルも持たないアイコンのように、セレクタで指せ�
 | `existImage(label, threshold:, aspectRatioTolerance:, waitSeconds:, scroll:, maxSwipes:)` | 見本画像が画面にあることを検証します。探し方は `findImage` と同じで、**見つからなければ失敗**します。見つけた要素を返します。`waitSeconds` を省くと、実行プロファイルの既定の待ち時間まで、出るのを待ちます(`exist` と同じ)。 |
 | `element.tap(holdSeconds:, maxGestureSeconds:, settle:)` | 掴んだ要素をタップします。`findImage` / `findImages` で掴んだ要素は、見つけた枠の中心を座標でタップします。`holdSeconds` を 0 より大きくすると長押しになります(上限は既定 10 秒で、`maxGestureSeconds:` を渡すとこの1回だけ最大 60 秒まで上げられます)。 |
 
-## 探し方
-
-1. 見本画像を DefaultClassifier の見本から探します。ラベル(フォルダ)が `label` で終わるフォルダの画像を使い、
-   `@i`(iOS)/ `@a`(Android)の付いた、実行中の OS 向けのものを先に試します。
-2. 画面のアクセシビリティ要素を、要素の枠でスクリーンショットから切り出します。見本と**アスペクト比が近い**要素
-   (許容幅 `aspectRatioTolerance`、既定 0.2)だけを、近い順に候補にします。
-3. 候補ごとに、見本との**画像特徴量の距離**(Vision の FeaturePrint。小さいほど似ている)を測ります。
-4. `findImage` は最も近い1件が `threshold`(既定 0.15)以下なら掴みます。超えたときは、その1件を
-   DefaultClassifier に掛けます([imageIs](image_assertion_ja.md) と同じ分類器)。ラベルが一致し、さらにそのラベルの
-   見本のどれかとの距離が `threshold` 以下(または分類の確信度が `threshold` 以下)のときだけ掴みます。
-   分類器は見本のどれかのラベルを必ず答えるので、ラベルの一致だけでは掴みません。
-
-## 見本画像の置き場所
-
-[imageIs](image_assertion_ja.md) と同じ見本を使います。
-
-```
-<プロジェクト>/vision/classifiers/DefaultClassifier/
-  @i/Home/[Camera Icon]/   見本画像(png / jpg)
-  @a/Home/[Camera Icon]/
-```
-
-- 見本は、探したい要素の**枠そのもの**を切り出したものを置きます(`fleetest vision capture` で切り出せます。
-  MCP からの使い方は [MCP サーバー](../tools/mcp_server_ja.md))。
-- `findImages` もラベルのフォルダの見本を全部使います。同じ要素に複数の見本が当たったときは、最も近い距離で1件にまとめます。
-
 ## 例
 
 ```swift
@@ -94,6 +68,32 @@ existImage("[Share Icon]", scroll: .down).tap()
 - 見つけてから画面を動かすと、`tap()` は古い座標をタップします。見つけた直後にタップしてください。
 - 候補の切り出しはアクセシビリティ要素の枠です。アクセシビリティに
   出てこない部品は探せません。
+
+## 探し方
+
+1. 見本画像を DefaultClassifier の見本から探します。ラベル(フォルダ)が `label` で終わるフォルダの画像を使い、
+   `@i`(iOS)/ `@a`(Android)の付いた、実行中の OS 向けのものを先に試します。
+2. 画面のアクセシビリティ要素を、要素の枠でスクリーンショットから切り出します。見本と**アスペクト比が近い**要素
+   (許容幅 `aspectRatioTolerance`、既定 0.2)だけを、近い順に候補にします。
+3. 候補ごとに、見本との**画像特徴量の距離**(Vision の FeaturePrint。小さいほど似ている)を測ります。
+4. `findImage` は最も近い1件が `threshold`(既定 0.15)以下なら掴みます。超えたときは、その1件を
+   DefaultClassifier に掛けます([imageIs](image_assertion_ja.md) と同じ分類器)。ラベルが一致し、さらにそのラベルの
+   見本のどれかとの距離が `threshold` 以下(または分類の確信度が `threshold` 以下)のときだけ掴みます。
+   分類器は見本のどれかのラベルを必ず答えるので、ラベルの一致だけでは掴みません。
+
+## 見本画像の置き場所
+
+[imageIs](image_assertion_ja.md) と同じ見本を使います。
+
+```
+<プロジェクト>/vision/classifiers/DefaultClassifier/
+  @i/Home/[Camera Icon]/   見本画像(png / jpg)
+  @a/Home/[Camera Icon]/
+```
+
+- 見本は、探したい要素の**枠そのもの**を切り出したものを置きます(`fleetest vision capture` で切り出せます。
+  MCP からの使い方は [MCP サーバー](../tools/mcp_server_ja.md))。
+- `findImages` もラベルのフォルダの見本を全部使います。同じ要素に複数の見本が当たったときは、最も近い距離で1件にまとめます。
 
 ### Link
 - [index](../../index_ja.md)

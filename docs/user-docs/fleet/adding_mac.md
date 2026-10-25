@@ -5,10 +5,10 @@
 These steps add another Mac (a runner machine) to your fleet so it can run your tests. For the big picture, see
 [Fleet concepts](concepts.md); for what remote runs can do and how they work in detail, see [Remote Runners](remote_runners.md).
 
-Most steps can be done either in the terminal (CLI) or in the VS Code extension. However,
+Most steps can be done either in the terminal (CLI) or in the VSCode extension. However,
 **installing fleetest on the runner (Step 3) can only be done in the terminal**.
 
-| Step | Where | CLI | VS Code extension |
+| Step | Where | CLI | VSCode extension |
 |---|---|---|---|
 | 0. Prepare the runner | Runner | — (by hand) | — |
 | 1. Set up SSH key login | Your Mac | ✅ | — |
@@ -126,8 +126,14 @@ Set up SSH so that I can connect to user@192.168.xxx.xxx
 
 Typing the password is needed, so the AI assistant may stop partway and ask you to enter it.
 
+Expected result:
+
+- `ssh -o BatchMode=yes <destination> 'echo ok'` prints `ok` without a password
+
 <details>
 <summary><b>If you do it manually (click to show details)</b></summary>
+
+If you have no key yet, create one with `ssh-keygen -t ed25519`.
 
 ```bash
 ssh-copy-id <user@192.168.xxx.xxx>                       # enter the password once, the first time only
@@ -155,27 +161,14 @@ refer to the runner by this name.
 Register the machine M1Max (user@192.168.xxx.xxx) in fleetest.
 ```
 
+Expected result:
+
+- `fleetest remote machines` lists the machine name
+
 <details>
 <summary><b>If you do it manually (click to show details)</b></summary>
 
-### Register with the CLI
-
-```bash
-fleetest remote machines add M1Max --host <user@192.168.xxx.xxx>
-fleetest remote machines        # check the registration
-```
-
-- A machine name may contain only letters, digits, `_`, `.` and `-`. `local` means your own Mac,
-  so it cannot be used.
-- Running `add` again with the same name updates the registration.
-- A destination that is already registered under another machine name is rejected.
-- To remove it, run `fleetest remote machines remove M1Max`.
-- If you keep the Xcode you want this runner to use somewhere other than `/Applications`, add
-  `--developer-dir <path to the .app>` (for example `--developer-dir /Applications/Xcode_27.app`)
-  to pin it. Omit it when the runner's `/Applications` has at most one Xcode matching each
-  product version you run tests on it with.
-
-### Register in the VS Code extension
+### Register in the VSCode extension
 
 1. Run `fleetest: Show Device Monitor` from the Command Palette to open the Device Monitor.
 2. Open the "Settings" tab and press "Add remote host" under the "Machines" table. A new row is
@@ -204,6 +197,23 @@ fleetest remote machines        # check the registration
   fields are outlined and the reason appears under the table.
 - If saving fails, the reason appears under the table as "Failed to save the machine registry".
 
+### Register with the CLI
+
+```bash
+fleetest remote machines add M1Max --host <user@192.168.xxx.xxx>
+fleetest remote machines        # check the registration
+```
+
+- A machine name may contain only letters, digits, `_`, `.` and `-`. `local` means your own Mac,
+  so it cannot be used.
+- Running `add` again with the same name updates the registration.
+- A destination that is already registered under another machine name is rejected.
+- To remove it, run `fleetest remote machines remove M1Max`.
+- If you keep the Xcode you want this runner to use somewhere other than `/Applications`, add
+  `--developer-dir <path to the .app>` (for example `--developer-dir /Applications/Xcode_27.app`)
+  to pin it. Omit it when the runner's `/Applications` has at most one Xcode matching each
+  product version you run tests on it with.
+
 The CLI and the extension read and write the same registry (`~/.config/fleetest/config.json`),
 so either way gives the same result.
 
@@ -211,7 +221,7 @@ so either way gives the same result.
 
 ## Step 3: Install fleetest on the runner (on your Mac)
 
-**This cannot be done from the VS Code extension.** Ask the AI assistant, or run the following command in the terminal.
+**This cannot be done from the VSCode extension.** Ask the AI assistant, or run the following command in the terminal.
 You do not need to log in to the runner over SSH yourself.
 
 ### Prompt for the AI
@@ -222,6 +232,11 @@ Set up fleetest remote runs on M1Max (ssh user@192.168.xxx.xxx). The project is 
 
 If something from Step 0 is still missing, the AI assistant lists the missing items and stops. Finish them on the
 runner, then give the same prompt again.
+
+Expected result:
+
+- `✅ [ok] verify: dispatch to … passed` appears and the exit code is 0
+- Or the exit code is 2 and only warnings for unfinished items remain
 
 <details>
 <summary><b>If you do it manually (click to show details)</b></summary>
@@ -269,10 +284,14 @@ automatically on every run. You never need to edit files on the runner.
 Find the devices on M1Max and add them to the run profile ios-run.
 ```
 
+Expected result:
+
+- The run profile's `devices` has devices with `"machine": "M1Max"`
+
 <details>
 <summary><b>If you do it manually (click to show details)</b></summary>
 
-### Add them in the VS Code extension
+### Add them in the VSCode extension
 
 1. In the Device Monitor's "Profiles" tab, open the run profile that should use the runner's
    devices.
@@ -319,6 +338,11 @@ Find the devices on M1Max and add them to the run profile ios-run.
 Check the state of the runner M1Max and whether it can be reached.
 ```
 
+Expected result:
+
+- `REACHABLE` and `LOGIN` are `yes`, and `BINARY` is `yes`
+- If ⚠️ or ❌ appears, fix it by the table below
+
 <details>
 <summary><b>If you do it manually (click to show details)</b></summary>
 
@@ -343,7 +367,9 @@ user@mac2     yes        yes    ✅ 9655a21…  ✅ Xcode27…   ✅ iOS 27.0: 2
 | ⚠️ `iOS <version>: none` in `RUNTIME` | That runner has no Simulator runtime for the Xcode in use there, so devices on that iOS version cannot be created (Simulator runtimes do not come with Xcode) | Run `xcodebuild -downloadPlatform iOS` on that runner |
 | `BINARY` is `no` | fleetest is not built on the runner | Run Step 3 again |
 
-### Check in the VS Code extension
+`FM` is measured only when you pass `--fm` (otherwise it shows `-`).
+
+### Check in the VSCode extension
 
 When you open the Device Monitor, the runner's devices appear as tiles just like your local ones,
 with a badge showing the machine name.
@@ -365,6 +391,11 @@ Later runs start within seconds. Reports, recordings and logs are brought back t
 Run the scenario <scenario name> on M1Max with the run profile ios-run.
 ```
 
+Expected result:
+
+- The scenario runs on the runner and produces a result
+- Reports, recordings and logs are brought back to your Mac
+
 <details>
 <summary><b>If you do it manually (click to show details)</b></summary>
 
@@ -384,7 +415,7 @@ to warm them up beforehand (optional):
 fleetest remote exec M1Max -- devices up --profile <run profile>
 ```
 
-### Run in the VS Code extension
+### Run in the VSCode extension
 
 1. Run `fleetest: Select Run Profile` from the Command Palette and choose the run profile from
    Step 4.
@@ -419,7 +450,7 @@ Bring fleetest on the runner M1Max to the same version as my Mac.
 
 - **CLI**: run `fleetest remote setup M1Max` again. To align the version only,
   `fleetest remote align M1Max` also works.
-- **VS Code extension**: use "Update and run", which appears when you start a run.
+- **VSCode extension**: use "Update and run", which appears when you start a run.
 
 </details>
 

@@ -14,7 +14,7 @@
 
 ```json
 {
-  "[account1]": { "password": "..." }
+  "[account1]": { "id": "alice@example.com", "password": "..." }
 }
 ```
 
@@ -23,9 +23,13 @@
 ### AIへの指示文
 
 ```text
-fleetest のテストプロジェクト myshop に、自分のアプリのテスト用アカウントを [account1] として登録して(パスワードは書かず、この Mac の ~/.config/fleetest/dataset/myshop/accounts.json に置いてある)。
-ログインの手順を独自コマンド login にまとめて、account() で引くようにして。ログイン後に残る状態は、各テストの afterEach で元に戻して。
+fleetest のテストプロジェクト myshop に、自分のアプリのテスト用アカウントを [account1] として登録して(ID とパスワードは書かず、この Mac の ~/.config/fleetest/dataset/myshop/accounts.json に置いてある)。
+ログインの手順を独自コマンド login にまとめて、ログイン ID は account("[account1].id")、パスワードは account("[account1].password") で読んで。ログイン後に残る状態は、各テストの afterEach で元に戻して。
 ```
+
+期待する結果:
+
+- `scenarios/` に `login` の関数(`@FTCommand` 付き)が増えます。
 
 ## 3. テストごとにアカウントを分ける
 
@@ -40,8 +44,8 @@ fleetest のテストプロジェクト myshop で、サーバー側の状態を
 
 ## パスワードをレポートに残さない(任意)
 
-既定では、入力したパスワードがレポートと実行ログにそのまま残ります。この Mac の `~/.config/fleetest/config.json` に
-`"redactAccountValues": true` を自分で書くと、`account()` の値が `***` に伏せられます(スクリーンショットに写った文字は伏せられません)。
+既定では、入力したパスワードがレポート・実行ログ・結果 JSON にそのまま残ります。この Mac の `~/.config/fleetest/config.json` に
+`"redactAccountValues": true` を自分で書くと、`account()` の値がレポート・実行ログ・結果 JSON で `***` に伏せられます(スクリーンショットに写った文字は伏せられません)。
 
 詳しく:
 

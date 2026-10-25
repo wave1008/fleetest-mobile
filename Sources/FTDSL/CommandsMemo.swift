@@ -1,7 +1,7 @@
 // CommandsMemo.swift
 // メモ(デバイスセッションの共有値)。名前・挙動は Shirates の Memo と同じ(writeMemo は履歴に追記・
-// readMemo は最後の値か ""・clearMemo は全消去)。スコープは「1回の run × 1デバイス」で、
-// 別デバイスで書いた値は見えない。親への通知とハンドオフの契約は FTCore/DeviceSessionHandoff.swift。
+// readMemo は最後の値か ""・clearMemo は全消去)。スコープは 1回の run 全体(全デバイスのシナリオで
+// 共有。履歴は親が持ち、シナリオは開始時点の写しを見る)。親への通知とハンドオフの契約は FTCore/DeviceSessionHandoff.swift。
 
 import Foundation
 import FTCore

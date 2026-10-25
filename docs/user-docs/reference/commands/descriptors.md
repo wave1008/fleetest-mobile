@@ -44,8 +44,8 @@ class LoginFlow {
             scene(1, "log in") {
                 action {
                     launchApp()
-                    tap("#email"); type("user@example.com")
-                    tap("#password"); type("secret")
+                    type("#email", "user@example.com")
+                    type("#password", account("[account1].password"))
                     tap("#login_btn")
                 }.expectation {
                     exist("#welcome_text")
@@ -58,10 +58,9 @@ class LoginFlow {
 
 ## Notes
 
-- **`procedure { }` is where a scenario should put code it does not want to run after a
-  failure.** If an earlier step has failed, the block does not run at all. Raw Swift inside a block is not skipped when an earlier step in the scene has
-  failed, so wrap anything that should not fire on a broken state in `procedure { }` (a
-  thrown error there aborts the scenario the same way a failed command does).
+- **`procedure { }` is where a scenario puts code it does not want to run after a failure.** Raw Swift written directly in a scene's
+  `action { }` / `expectation { }` block is not skipped when an earlier step has failed; only the body of `procedure { }` is skipped once an
+  earlier step has failed (a thrown error inside it aborts the scenario the same way a failed command does).
 - `beforeAll()` runs in the process of the first scenario of the class, so instance properties it sets are not visible to other scenarios — pass values with `writeMemo` / `readMemo`. The wait of other devices is not counted in a scenario's duration or timeout. If it fails (or the process dies after it began), it is not re-run and the remaining scenarios of that class in the run are recorded as failed without running. If the scenario that was to run it ends before it began (for example the app could not be launched), another device takes it over. When a run is split across machines, each machine runs it once.
 - `setUpDevice()` runs in the process of that first scenario only, so **instance properties it sets are not visible to other scenarios** — pass values with `writeMemo` / `readMemo`. If it fails, the remaining scenarios of that class on the same device are recorded as failed without running, and it is never retried on that device within the run.
 - `afterEach()` still runs after a `@Test` fails — use it for cleanup that must happen either

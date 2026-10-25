@@ -49,19 +49,32 @@ https://github.com/wave1008/foundation-tester をこのフォルダの隣に clo
 
 ```text
 ../foundation-tester/.build/debug/fleetest doctor を実行して結果を報告して。
+Apple Intelligence(On-device model)の行の ❌ は、使わない機能(screenLooksLike・テキストの可視性検証)が止まるだけなので無視してよい。
+それ以外に ❌ が無いことを確かめて。
 ```
+
+期待する結果:
+
+- Xcode・Simulator・(Android なら)adb が ✅ になります。
+- Apple Intelligence の行は ❌ でも先へ進めます。
 
 ## 4. サンプルアプリの準備
 
 サンプルアプリ
 ([sut-ec-mobile](https://github.com/wave1008/sut-ec-mobile)。Compose Multiplatform の EC 買い物アプリ)を
-セットアップします。
+セットアップし、そのサーバー(Kotlin(Ktor)+ PostgreSQL)を fleetest に宣言します。
 
 ### AIへの指示文
 
 ```text
 https://github.com/wave1008/sut-ec-mobile をこのフォルダの隣に clone して、このフォルダで bash ../sut-ec-mobile/fleetest/prepare.sh を実行して。
 ```
+
+期待する結果:
+
+- Apple Container と JDK が無ければ Homebrew で入ります(初回は Linux カーネルとイメージの取得で数分かかります)。
+- 最後に `Done. fleetest starts and stops the server on every run.` と出ます。
+- `TestProjects/project1/workspace/scripts/compose.yaml` ができます。
 
 <details>
 <summary><b>手動で実行する場合(クリックで詳細表示)</b></summary>
@@ -86,14 +99,14 @@ bash ../sut-ec-mobile/fleetest/prepare.sh
 iOS の場合:
 
 ```text
-fleetest のテストプロジェクト project1 に、sut-ec-mobile の iOS アプリをビルドしてプロファイルを作成して。アプリの表示名は「SUT Store」。デバイスは2台にして。
+fleetest のテストプロジェクト project1 に、sut-ec-mobile の iOS アプリをビルドしてプロファイルを作成して。アプリの表示名は「SUT Store」。デバイスは2台にして。アプリ ID は com.sutec.mobile.ios。
 ビルドには JDK 25(Homebrew の openjdk@25。/opt/homebrew/opt/openjdk@25)を使って。シェルの設定ファイルは変更しないで。
 ```
 
 Android の場合:
 
 ```text
-fleetest のテストプロジェクト project1 に、sut-ec-mobile の Android アプリをビルドしてプロファイルを作成して。アプリの表示名は「SUT Store」。デバイスは2台にして。
+fleetest のテストプロジェクト project1 に、sut-ec-mobile の Android アプリをビルドしてプロファイルを作成して。アプリの表示名は「SUT Store」。デバイスは2台にして。アプリ ID は com.sutec.mobile.android。
 ビルドには JDK 25(Homebrew の openjdk@25。/opt/homebrew/opt/openjdk@25)を使って。シェルの設定ファイルは変更しないで。
 ```
 
@@ -142,6 +155,11 @@ VSCode のデバイスモニターの「プロファイル」タブを開き、�
 
 <img src="images/quick_start/ja/profiles_tab.png" width="640" alt="デバイスモニターの「プロファイル」タブに実行プロファイル ios-run が並んだところ">
 
+期待する結果:
+
+- 「プロファイル」タブに ios-run(デバイス2台)が並びます。
+- iOS ランタイムが未導入なら、数 GB の取得で数分〜数十分かかります。
+
 ## 6. シナリオを作る
 
 商品を開くまでの基本ルートのテストを作成してみましょう。
@@ -159,8 +177,14 @@ fleetest のテストプロジェクト project1 で、SUT Store の「商品詳
 - Android の場合は「iOS で」を「Android で」に読み替えてください。
 - AIアシスタントはデバイス上でアプリを起動し、画面を操作しながら要素を読み取って、その流れをシナリオに落とします。
 
+期待する結果:
+
+- `scenarios/` にシナリオが1本できます。
+
 <details>
 <summary><b>手動で実行する場合(クリックで詳細表示)</b></summary>
+
+自分で書くときは[テストクラスの作成](reference/testclass/creating_testclass_ja.md)を参照してください。
 
 サーバーを手で起こしてからテストを作り、終わったら止めます。
 
@@ -186,6 +210,10 @@ fleetest のテストプロジェクト project1 のシナリオを ios-run プ�
 ※Android で作ったシナリオなら「android-run プロファイルで実行して」と指示します。
 
 <img src="images/quick_start/ja/run_in_progress.png" width="640" alt="デバイスモニターで実行している最中">
+
+期待する結果:
+
+- テストセッションタブに結果が出ます。
 
 <details>
 <summary><b>手動で実行する場合(クリックで詳細表示)</b></summary>
@@ -217,8 +245,12 @@ VSCode からは **Test Explorer** でシナリオを選び、**実行**をク�
 ### AIへの指示文
 
 ```text
-fleetest のテストプロジェクト project1 の直近の実行結果を要約し、失敗があればレポートから原因を調べて。
+fleetest のテストプロジェクト project1 の直近の実行結果を要約し、失敗があればレポートから原因を調べて。シナリオはまだ直さないで。
 ```
+
+期待する結果:
+
+- 失敗の要約が返ります。
 
 <details>
 <summary><b>手動で実行する場合(クリックで詳細表示)</b></summary>

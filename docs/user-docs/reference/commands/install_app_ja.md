@@ -8,7 +8,7 @@
 
 | 関数 | 説明 |
 |---|---|
-| `installApp(appPackageFile?)` | アプリをインストールします(iOS: `.app` / Android: `.apk` または `.apks`)。`appPackageFile` 省略時はアプリプロファイルの `<platform>.appPath`(実行プロファイルの `app` が指すアプリプロファイル)が使われます(明示引数はプロファイルより優先されます)。 |
+| `installApp(appPackageFile?)` | アプリをインストールします(iOS: `.app` / Android: `.apk` または `.apks`。`.apks` は Mac に bundletool が要ります)。`appPackageFile` 省略時はアプリプロファイルの `<platform>.appPath`(実行プロファイルの `app` が指すアプリプロファイル)が使われます(明示引数はプロファイルより優先されます)。 |
 | `removeApp(appID?)` | アプリをアンインストールします。`appID` 省略時の解決は `launchApp()` の `appID` と同じです。 |
 | `clearAppData(appID?)` | アプリは残したままデータと権限だけ消します。オンボーディングや権限ダイアログが再び出るようになります。`appID` 省略時の解決は `launchApp()` の `appID` と同じです。 |
 
@@ -16,6 +16,7 @@
 
 ```swift
 installApp()                       // アプリプロファイルの appPath から
+launchApp()                        // inapp モードの iOS では install の直後に呼ぶ
 installApp("/path/to/MyApp.app")
 clearAppData()                     // 初回起動相当の状態に戻す
 removeApp()
@@ -23,6 +24,9 @@ removeApp()
 
 ## 注意点
 
+- **iOS の既定(inapp モード)では、`installApp()` の直後に `launchApp()` を呼んでください。** インストールでアプリの中のブリッジが
+  終了し、次の `launchApp()` が入れ直すまで `tap` などの操作が届きません(ステップに `the in-app bridge will be reinjected on the next
+  launchApp()` の注記が出ます)。
 - **入れ直しても権限は戻りません。** iOS Simulator では、アプリを削除して再インストール
   しても TCC(位置情報等)の許可が残ったままで、許可ダイアログは再び出ません。「入れ直せば
   初回状態」を前提にしたシナリオは書けないので、権限から戻したいときは `clearAppData()` を

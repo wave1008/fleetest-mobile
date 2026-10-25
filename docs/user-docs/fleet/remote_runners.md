@@ -32,7 +32,7 @@ Find the devices on M1Max and add them to the run profile ios-run.
 <details>
 <summary><b>If you do it manually (click to show details)</b></summary>
 
-In the VS Code extension, open "Select Devices" from the run profile's "Add device" button and switch "Machine:".
+In the VSCode extension, open "Select Devices" from the run profile's "Add device" button and switch "Machine:".
 On the CLI, look up the runner's devices with `fleetest remote exec M1Max -- api installed-devices` and write them, with
 `machine`, into the run profile's `devices`. Both are described in Step 4 of [Adding a Mac](adding_mac.md).
 
@@ -69,6 +69,7 @@ fleetest run --project <project> --fleet <name> --split          # split the sce
 A fleet is a list of machine and run profile pairs. Define it in
 `TestProjects/<project>/profiles/fleets/<name>.json` as `host` (machine name) and `profile`
 (run profile name) pairs under `runs`. Write `"local"` for your own Mac.
+Running a fleet definition is available from the CLI only (not from the extension or MCP), and it is experimental.
 
 ```jsonc
 // profiles/fleets/two-runners.json
@@ -90,7 +91,7 @@ In a fleet definition you write the machine name under the `host` key (the key d
 
 The first run takes a few minutes to start, because the runner builds the scenarios and so on. Later runs start within seconds.
 
-## 3. Using it from the VS Code extension
+## 3. Using it from the VSCode extension
 
 The extension has no "choose where to run" screen. When you choose a run profile, the `machine`
 its devices name decides where the run goes.
@@ -147,11 +148,11 @@ kept from fighting over the same device. When the runner is busy, you are shown 
 using it and since when. Your own Mac works the same way for the runs you start on it (see
 [Parallel execution](../reference/running/parallel_execution.md)).
 
-- **Wait until it is free**: this is the default, for up to 1 hour — long enough to sit through
+- **Wait until it is free**: a run **from the extension** waits for up to 1 hour by default — long enough to sit through
   several runs ahead of you. Change it in the Device Monitor's **Settings** tab, under **Machines** →
   **Max wait on runner contention** (0 fails right away without waiting); the setting key is
-  `fleetest.remoteWaitLock`. On the CLI, add `--wait-lock <seconds>`. While you are in line, the
-  run log shows your position. The extension has no way to take over a busy runner.
+  `fleetest.remoteWaitLock`. The **CLI** does not wait by default and fails instead, so add `--wait-lock <seconds>`.
+  While you are in line, the run log shows your position. The extension has no way to take over a busy runner.
 - **See who is using it**: it appears in the LOCK column of
   `fleetest remote status --runner <machine>`. `-` means "could not be checked", not "free".
   The Device Monitor shows 🔒 on that machine's row in the toolbar.
@@ -209,7 +210,8 @@ You do need both of the following:
 
 Nobody looks at a runner machine's results, reports, and recordings the way you look at your own, so
 they pile up unnoticed. Run `fleetest remote clean --runner <machine>` from time to time. You can check the free
-space with `fleetest remote status`. `remote clean` stops if a test is running (`--ignore-lock` overrides this, but kills that run).
+space with `fleetest remote status --runner <machine>` (`--runner` is required). `remote clean` deletes results, reports and recordings older than
+7 days (change it with `--keep-days <days>`; artifacts are already collected to your Mac after every run). It stops if a test is running (`--ignore-lock` overrides this, but kills that run).
 
 When you update fleetest on your Mac, bring the runner machines to the same version too (see "When you update fleetest"
 in [Adding a Mac](adding_mac.md)).

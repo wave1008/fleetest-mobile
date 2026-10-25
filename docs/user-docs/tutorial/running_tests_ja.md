@@ -39,7 +39,7 @@ VSCode では Test Explorer でシナリオを選び、「実行」をクリッ�
 - デバイスモニターの3台がそれぞれ別のシナリオを同時に動かします。
 - 終わると成否の一覧が出ます(シナリオ側の変更は要りません)。
 
-<img src="../images/tutorial/ja/parallel_run.png" width="640" alt="6本のシナリオを fleetest が3台のデバイスへ自動で振り分ける">
+<img src="../images/tutorial/ja/parallel_run.png" width="640" alt="例: 6本のシナリオを fleetest が3台のデバイスへ自動で振り分ける">
 
 もっと詳しく:
 

@@ -39,7 +39,7 @@ Expected result:
 - The three devices in the Device Monitor run different scenarios at the same time.
 - A list of pass/fail appears when it finishes (no change to the scenarios is needed).
 
-<img src="../images/tutorial/en/parallel_run.png" width="640" alt="fleetest distributes six scenarios across three devices automatically">
+<img src="../images/tutorial/en/parallel_run.png" width="640" alt="Example: fleetest distributes six scenarios across three devices automatically">
 
 More details:
 

@@ -1,4 +1,4 @@
-# Agent Guide: from an app screen to a passing scenario
+# Agent guide: from an app screen to a passing scenario
 
 [in Japanese(日本語)](agent_guide_ja.md)
 
@@ -11,7 +11,7 @@ read the runbook when you need the full rules.
 1. **Pick the device.** `ft_list_devices`, then pass the same `profile:` (a run profile name) — or
    `udid:` / `port:` / `serial:` — to every `ft_*` call, so exploring and running use one device.
 2. **Explore.** `ft_launch` the app, then `ft_snapshot`. Each row is
-   `[ref] Type "label" id=… (x,y WxH)`. Move with `ft_tap` / `ft_type` (by `ref` or selector).
+   `[ref] Type "label" id=… (x,y WxH)`. Move with `ft_tap` / `ft_type` (by `ref`; to fire by selector, use `ft_batch`).
    For long lists use `ft_scroll_to` with a selector instead of repeating `ft_swipe`.
    Take a snapshot of every screen you pass — the dry-run checks `#id`s against them.
 3. **Draft.** `ft_draft_scenario` turns the operations since the last `ft_launch` into Swift and
@@ -120,7 +120,7 @@ background and returns at once; follow progress and the result with `ft_run_stat
 with `fleetest run` in the shell or similar; tell the user the run needs their approval (the approval setting is the
 safety line the user chose).
 It runs inside the MCP server, so it also works for agents whose shell is sandboxed.
-To have the services the app depends on (`compose.yaml`) up for exploring or live operation, use `ft_services` (`up`, use them, then `down`). `ft_start_run` starts them again itself, so leaving them `up` is fine.
+To have the services the app depends on (`compose.yaml`) up for exploring or Live Control, use `ft_services` (`up`, use them, then `down`). `ft_start_run` starts them again itself, so leaving them `up` is fine.
 
 | Request | Tool (arguments) |
 |---|---|

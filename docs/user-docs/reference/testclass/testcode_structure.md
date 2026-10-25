@@ -1,4 +1,4 @@
-# Test Code Structure
+# Test code structure
 
 [in Japanese(日本語)](testcode_structure_ja.md)
 

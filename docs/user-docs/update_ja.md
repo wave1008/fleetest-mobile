@@ -87,8 +87,7 @@ bash ../foundation-tester/Scripts/update.sh
 
 ## 閉域網で更新する
 
-インターネットに出られない環境では、`bash <クローン>/Scripts/update.sh` を直接実行します
-(`curl` で取る形は使えません)。GitHub 宛てを社内ミラーへ向ける設定は
+インターネットに出られない環境では、`bash <クローン>/Scripts/update.sh` を直接実行します。GitHub 宛てを社内ミラーへ向ける設定は
 [ネットワークの露出とセキュリティ](security/network_security_ja.md)にあります。
 
 ### Link

@@ -199,7 +199,7 @@ class サンドボックス確認 {
 実行すると、S0040 が成功し、`note.txt` がその run の出力フォルダのクラス名の下に残ります(`work.txt` はシナリオの終わりに消えます)。
 詳細は[出力フォルダと一時フォルダ(TestLog)](../reference/commands/test_log_ja.md)。
 
-run の前後に走らせるスクリプト(`run-setup.sh` / `run-teardown.sh`)が、`<workspace>/data/` 以外へ書く必要があるときだけ、
+run の前後に走らせるスクリプト(`run-setup.sh` / `run-teardown.sh`)もサンドボックスの枠の中で動くので、`<workspace>/data/` 以外へ書く必要があるときだけ、
 マシン設定の `hooks.writablePaths` に場所を足します。
 
 ```json
@@ -275,7 +275,7 @@ DEMO_TOKEN=dummy ../foundation-tester/.build/debug/fleetest run --profile ios-ru
 }
 ```
 
-**開けると、シナリオは Emulator のシェル経由で外へ出られ、繋いだ全 Android 端末に届きます。** 確かめたら `false` に戻してください。
+**開けると、シナリオは Emulator のシェル経由で外へ出られ、繋いだ全 Android 端末に届きます。adb の鍵(`~/.android`)も読めるようになります。** 確かめたら `false` に戻してください。
 Android SDK(adb)が入っていることが前提です。
 
 ### AIへの指示文
@@ -451,6 +451,8 @@ AIアシスタントは編集を断られ、書くべき内容を案内するだ
 - サンドボックスに入るのはシナリオ実行バイナリとその子孫だけです。fleetest 本体・テスト対象のアプリ・`Package.swift` の評価と
   依存のビルドは枠の外で動きます。compose.yaml の `build:` が参照する場所を広げる設定 `services.buildSources` は
   [アプリが依存するサービス](../reference/writing/services_ja.md)にあります。
+- run の前後のスクリプト(`run-setup.sh` / `run-teardown.sh`)も別の枠で動きます。書けるのは `<workspace>/data/` と `hooks.writablePaths`・
+  通信は compose.yaml の公開ポートと `allowedDomains` のプロキシだけです。
 - 起動のたびに十数ミリ秒ほど増えるだけで、テスト全体の所要時間にはほとんど現れません。
 - 設定キーの一覧は[マシン設定(config.json)](../reference/project/machine_settings_ja.md)、既定で書ける場所・読めない場所・通信先は
   [サンドボックスの既定](../reference/running/sandbox_access_ja.md)。

@@ -69,6 +69,7 @@ fleetest run --project <プロジェクト> --fleet <名前> --split      # シ�
 フリートは、マシンと実行プロファイルの組を並べたものです。
 `TestProjects/<プロジェクト>/profiles/fleets/<名前>.json` に、`host`(マシン名)と
 `profile`(実行プロファイル名)の組を `runs` に並べて定義します。手元の Mac は `"local"` と書きます。
+フリート定義での実行は CLI だけ(拡張・MCP からは実行できません)で、試験的な機能です。
 
 ```jsonc
 // profiles/fleets/two-runners.json
@@ -142,11 +143,11 @@ fleetest run --runner M1Max --profile <実行プロファイル> --scenario <シ
 使っているかが表示されます。手元の Mac で起動する実行も同じです
 ([並列実行](../reference/running/parallel_execution_ja.md)参照)。
 
-- **空くまで待つ**: 既定で待ちます(上限 1 時間。先に並んでいる run が数本あっても待ち切れる長さです)。
+- **空くまで待つ**: **拡張から**の実行は既定で最大 1 時間待ちます(先に並んでいる run が数本あっても待ち切れる長さです)。
   秒数はデバイスモニターの「**設定**」タブ →「**マシン**」→「**ランナー競合時の
   最大待機時間**」で変えられます(0 にすると待たずに失敗します)。設定キーは
-  `fleetest.remoteWaitLock`、CLI では `--wait-lock <秒>` です。並んでいる間は、実行ログに
-  自分の順番が出ます。使用中のランナー機を奪う操作は、拡張にはありません。
+  `fleetest.remoteWaitLock` です。**CLI** は既定では待たずに失敗するので、`--wait-lock <秒>` を付けます。
+  並んでいる間は、実行ログに自分の順番が出ます。使用中のランナー機を奪う操作は、拡張にはありません。
 - **誰が使っているかを見る**: `fleetest remote status --runner <マシン名>` の LOCK 欄に出ます。
   `-` は「確認できなかった」という意味で、「空いている」ではありません。デバイスモニターでは、
   ツールバーのそのマシンの行に 🔒 が出ます。
@@ -201,8 +202,9 @@ fleetest run --runner M1Max --profile <実行プロファイル> --scenario <シ
 ### ランナー機の保守
 
 ランナー機の結果・レポート・録画は、手元と違って誰も見ていないので、気付かないうちに溜まります。
-ときどき `fleetest remote clean --runner <マシン名>` を実行してください。空き容量は `fleetest remote status` で
-確かめられます。テストが走っているときは、`remote clean` は止まります(`--ignore-lock` で押し切れますが、その run を殺します)。
+ときどき `fleetest remote clean --runner <マシン名>` を実行してください。空き容量は `fleetest remote status --runner <マシン名>`(`--runner` は必須)で
+確かめられます。`remote clean` は 7 日より古い結果・レポート・録画を消します(`--keep-days <日>` で変えられます。
+成果物は実行のたびに手元へ回収済みです)。テストが走っているときは、`remote clean` は止まります(`--ignore-lock` で押し切れますが、その run を殺します)。
 
 手元の fleetest を更新したら、ランナー機も同じ版に揃えます([Mac を追加する](adding_mac_ja.md)の「fleetest を更新したとき」)。
 

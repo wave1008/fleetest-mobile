@@ -28,35 +28,41 @@ git status --short
 
 期待する結果:
 
-- `fleetest init` とインストールが、次の3行を `.gitignore` に足します(作業フォルダが git のリポジトリのとき)。
+- `fleetest init` とインストールが、次の5行を `.gitignore` に足します(作業フォルダが git のリポジトリのとき)。
 
 ```text
 .build/
 .fleetest/
 TestProjects/*/reports/
+TestProjects/*/results/
+TestProjects/*/workspace/apps/
 ```
 
-| git に入れる | git に入れない(最初の3つは `.gitignore` が外す) |
+| git に入れる | git に入れない(最初の5つは `.gitignore` が外す) |
 |---|---|
 | `Package.swift` | `.build/`(ビルド成果物) |
 | `TestProjects/<プロジェクト>/scenarios/`(シナリオ) | `.fleetest/`(この Mac の状態) |
 | `TestProjects/<プロジェクト>/profiles/`(アプリ・実行プロファイル) | `TestProjects/*/reports/`(Markdown レポート。画面の文字が入る) |
+| `TestProjects/<プロジェクト>/dataset/`(共有してよいテストデータ) | `TestProjects/*/results/`(結果 JSON と録画。録画は画面の文字が写る) |
+| `TestProjects/<プロジェクト>/docs/`(あれば) | `TestProjects/*/workspace/apps/`(run のたびにアプリの束が複製される) |
 | `TestProjects/<プロジェクト>/workspace/scripts/compose.yaml`(サーバーの宣言。[アプリが依存するサービス](../reference/writing/services_ja.md)) | `.mcp.json`(絶対パスを含むので Mac ごとに違う。`.gitignore` には自動では入らないので、`git add` しないか自分で足す) |
-| `TestProjects/<プロジェクト>/dataset/`(共有してよいテストデータ) | `~/.config/fleetest/` の中身(作業フォルダの外にあり、そもそも git に入らない) |
-| `TestProjects/<プロジェクト>/docs/`(あれば) | |
+| | `~/.config/fleetest/` の中身(作業フォルダの外にあり、そもそも git に入らない) |
+| | `.vscode/settings.json`・`.claude/settings.json`(クローンの絶対パスを含む。入れるなら2人目が自分のパスへ書き直す) |
 
-- `results/` は、自動では `.gitignore` に入りません。結果 JSON は複数の Mac の分をマージできる形で書かれますが
-  ([結果の分析](../reference/running/results_analysis_ja.md)の「構成」)、同じ `results/runs/<月>/<runID>/` の下に録画も
-  入ります。**録画は画面の文字が写り、容量も大きい**ので、共有する前に `git status` で何が増えているかを見て、
-  入れるか決めてください([テスト結果に何が残るかを確かめる](../security/test_outputs_ja.md))。
+- `results/` は `.gitignore` が外します。結果 JSON を共有したいときは、同じ `results/runs/<月>/<runID>/` の下に
+  **画面の文字が写る録画**も入ることを知ったうえで、入れるものを選んでください([テスト結果に何が残るかを確かめる](../security/test_outputs_ja.md))。
 - シークレットやパスワードは、リポジトリに入れません。後述のステップ 5 を見てください。
 
 ## 2. commit して push する
 
+`Package.swift` の `.package(path:)` は、クローンが作業フォルダの隣にあれば `../foundation-tester` の相対パスで書かれています
+(2人目も隣に clone する前提)。クローンを別の場所に置いた場合は絶対パス(`/Users/<あなた>/...`)なので、commit する前に
+2人目の Mac でも解ける形に直してください。
+
 ### AIへの指示文
 
 ```text
-git status で入れてよいものだけを選んで commit して。results/ と reports/ は入れないで。push はまだしないで、commit の内容を見せて。
+Package.swift の .package(path:) が絶対パスなら ../foundation-tester に直して。git status で入れてよいものだけを選んで commit して。results/ と reports/ と workspace/apps/ は入れないで。push はまだしないで、commit の内容を見せて。
 ```
 
 内容を確かめたら、push を指示します。
@@ -65,7 +71,7 @@ git status で入れてよいものだけを選んで commit して。results/ �
 <summary><b>手動で実行する場合(クリックで詳細表示)</b></summary>
 
 ```bash
-git add Package.swift .gitignore TestProjects/
+git add Package.swift .gitignore TestProjects/*/scenarios TestProjects/*/profiles TestProjects/*/workspace/scripts TestProjects/*/dataset
 git status --short           # reports/ と results/ が入っていないことを確かめる
 git commit -m "Add fleetest test project"
 git push
@@ -86,18 +92,22 @@ https://github.com/wave1008/foundation-tester をこのフォルダの隣に clo
 ../foundation-tester/.claude/skills/fleetest-setup/SKILL.md の手順でセットアップして。
 ```
 
-セットアップが終わったら、clone で持ってきた `TestProjects/` を `Package.swift` に登録します。
+セットアップが終わったら、`Package.swift` の `.package(path:)` が自分のクローン(隣に clone したなら `../foundation-tester`)を
+指しているか確かめます。
 
 <details>
 <summary><b>手動で実行する場合(クリックで詳細表示)</b></summary>
 
 ```bash
-../foundation-tester/.build/debug/fleetest project sync
 ../foundation-tester/.build/debug/fleetest project list
 ```
 
-`project sync` は、`TestProjects/` を走査して `Package.swift` のマーカー区間を作り直します
-(手動コピーや `git pull` の後に必要です。[テストプロジェクトの作成](../reference/project/creating_project_ja.md)の「プロジェクトの管理」)。
+`Package.swift` を共有しなかった場合は、先に `project sync` を実行します。`TestProjects/` を走査して `Package.swift` のマーカー区間を作り直します
+(手動コピーや `git pull` の後にも必要です。[テストプロジェクトの作成](../reference/project/creating_project_ja.md)の「プロジェクトの管理」)。
+
+```bash
+../foundation-tester/.build/debug/fleetest project sync
+```
 
 </details>
 <br>
@@ -171,6 +181,9 @@ fleetest の ios-run-mine プロファイルで、すべてのシナリオを実
 - `~/.config/fleetest/secrets/<プロジェクト>.env`(compose.yaml が参照する秘密。
   [アプリが依存するサービス](../reference/writing/services_ja.md)の「秘密」)。
 - `~/.config/fleetest/config.json`(マシン設定。[マシン設定(config.json)](../reference/project/machine_settings_ja.md))。
+- compose.yaml が `image:` で指す自前ビルドのイメージ(2人目の Mac で同じ名前でビルドし直します。
+  [アプリが依存するサーバーを用意する](../own_app/preparing_server_ja.md)のステップ 1)。
+- コンテナランタイム(Docker か Apple Container。両方あるならマシン設定の `services.runtime`)。
 
 ## 6. 同じランナー機を2人で使う
 

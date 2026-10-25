@@ -3,7 +3,7 @@
 [in Japanese(日本語)](sharing_project_ja.md)
 
 The steps for sharing the scenarios and profiles you made through git, until a second person runs them on their own Mac.
-It assumes you have a work folder where you finished the [Quick Start](../quick-start.md).
+It assumes you have a work folder where you finished the [Quick start](../quick-start.md).
 
 ## 1. Check what goes into git and what does not
 
@@ -28,36 +28,41 @@ git status --short
 
 Expected result:
 
-- `fleetest init` and the installer add these three lines to `.gitignore` (when the work folder is a git repository).
+- `fleetest init` and the installer add these five lines to `.gitignore` (when the work folder is a git repository).
 
 ```text
 .build/
 .fleetest/
 TestProjects/*/reports/
+TestProjects/*/results/
+TestProjects/*/workspace/apps/
 ```
 
-| Goes into git | Stays out of git (the first three are excluded by `.gitignore`) |
+| Goes into git | Stays out of git (the first five are excluded by `.gitignore`) |
 |---|---|
 | `Package.swift` | `.build/` (build products) |
 | `TestProjects/<project>/scenarios/` (scenarios) | `.fleetest/` (state of this Mac) |
 | `TestProjects/<project>/profiles/` (app and run profiles) | `TestProjects/*/reports/` (Markdown reports; they contain screen text) |
+| `TestProjects/<project>/dataset/` (test data that may be shared) | `TestProjects/*/results/` (result JSON and recordings; recordings show screen text) |
+| `TestProjects/<project>/docs/` (if present) | `TestProjects/*/workspace/apps/` (the app bundles are copied there on every run) |
 | `TestProjects/<project>/workspace/scripts/compose.yaml` (server declarations; [Services the app depends on](../reference/writing/services.md)) | `.mcp.json` (contains absolute paths, so it differs per Mac; it is not added to `.gitignore` automatically, so do not `git add` it or add it yourself) |
-| `TestProjects/<project>/dataset/` (test data that is fine to share) | The contents of `~/.config/fleetest/` (outside the work folder, so never in git to begin with) |
-| `TestProjects/<project>/docs/` (if present) | |
+| | The contents of `~/.config/fleetest/` (outside the work folder, so never in git to begin with) |
+| | `.vscode/settings.json`, `.claude/settings.json` (contain the absolute path of the clone; if you do commit them, the second person rewrites them to their own path) |
 
-- `results/` is not added to `.gitignore` automatically. Result JSON is written in a form that merges across several Macs
-  ("Layout" in [Analysing results (fleetest results, dashboard)](../reference/running/results_analysis.md)), but recordings
-  also go under the same `results/runs/<month>/<runID>/`. **Recordings show screen text and are large**, so before sharing look at what
-  has grown with `git status` and decide
-  ([Checking what a test leaves behind](../security/test_outputs.md)).
+- `results/` is excluded by `.gitignore`. If you want to share result JSON, remember that **recordings showing screen text** live under the
+  same `results/runs/<month>/<runID>/`, and pick what goes in ([Checking what a test leaves behind](../security/test_outputs.md)).
 - Do not put secrets or passwords into the repository. See step 5 below.
 
 ## 2. Commit and push
 
+When the clone sits next to the work folder, the `.package(path:)` in `Package.swift` is written as the relative path
+`../foundation-tester` (this assumes the second person also clones it next to the work folder). If you put the clone elsewhere,
+it is an absolute path (`/Users/<you>/...`), so change it before you commit to a form that resolves on the second person's Mac.
+
 ### Prompt for the AI
 
 ```text
-Pick only what should go in from git status and commit it. Leave out results/ and reports/. Don't push yet; show me what the commit contains.
+If the .package(path:) in Package.swift is an absolute path, change it to ../foundation-tester. Pick only what should go in from git status and commit it. Leave out results/, reports/ and workspace/apps/. Don't push yet; show me what the commit contains.
 ```
 
 Once you have checked the contents, tell it to push.
@@ -66,7 +71,7 @@ Once you have checked the contents, tell it to push.
 <summary><b>If you do it manually (click to show details)</b></summary>
 
 ```bash
-git add Package.swift .gitignore TestProjects/
+git add Package.swift .gitignore TestProjects/*/scenarios TestProjects/*/profiles TestProjects/*/workspace/scripts TestProjects/*/dataset
 git status --short           # confirm reports/ and results/ are not included
 git commit -m "Add fleetest test project"
 git push
@@ -87,18 +92,21 @@ Clone https://github.com/wave1008/foundation-tester next to this folder and
 set it up following ../foundation-tester/.claude/skills/fleetest-setup/SKILL.md.
 ```
 
-When setup is done, register the `TestProjects/` that came with the clone in `Package.swift`.
+When setup is done, check that the `.package(path:)` in `Package.swift` points at your own clone (`../foundation-tester` if you cloned it next to the work folder).
 
 <details>
 <summary><b>If you do it manually (click to show details)</b></summary>
 
 ```bash
-../foundation-tester/.build/debug/fleetest project sync
 ../foundation-tester/.build/debug/fleetest project list
 ```
 
-`project sync` scans `TestProjects/` and regenerates the marker section of `Package.swift`
-(needed after a manual copy or a `git pull`; "Managing projects" in [Creating a test project](../reference/project/creating_project.md)).
+If you did not share `Package.swift`, run `project sync` first. It scans `TestProjects/` and regenerates the marker section of `Package.swift`
+(also needed after a manual copy or a `git pull`; "Managing projects" in [Creating a test project](../reference/project/creating_project.md)).
+
+```bash
+../foundation-tester/.build/debug/fleetest project sync
+```
 
 </details>
 <br>
@@ -172,6 +180,9 @@ The following belong **to that Mac** and are not shared. The second person prepa
 - `~/.config/fleetest/secrets/<project>.env` (secrets that compose.yaml refers to;
   "Secrets" in [Services the app depends on](../reference/writing/services.md)).
 - `~/.config/fleetest/config.json` (machine settings; [Machine settings (config.json)](../reference/project/machine_settings.md)).
+- Self-built images that compose.yaml points at with `image:` (rebuild them under the same name on the second person's Mac;
+  step 1 of [Preparing the servers your app depends on](../own_app/preparing_server.md)).
+- The container runtime (Docker or Apple Container; if both are present, the machine setting `services.runtime`).
 
 ## 6. Two people use the same runner machine
 
@@ -210,7 +221,7 @@ Adding a runner machine is covered in [Adding a Mac](../fleet/adding_mac.md).
 ## 7. Review scenarios the AI wrote
 
 Scenarios you share are checked by a person even when the AI wrote them. The points to look for are the headings of
-[Writing Robust Scenarios](../reference/writing/writing_robust_scenarios.md). The body text is there.
+[Writing robust scenarios](../reference/writing/writing_robust_scenarios.md). The body text is there.
 Making the list is something you can ask the AI to do.
 
 ### Prompt for the AI
@@ -222,7 +233,7 @@ Review the fleetest scenarios against the guidance for writing robust scenarios 
 - Don't add `wait` for element appearance
 - Take selectors from a real screenshot, not from memory
 - Don't leave coordinate taps in a scenario
-- Wrap anything that may or may not appear
+- Wrap anything that may or may not appear in `ifCanSelect` and `irregularHandler`
 - Always put an assertion in `expectation`
 - Failure aborts the whole scenario — `afterEach` still runs
 - Don't pin `app:` / `platform:` if the scenario should run on both OS

@@ -54,8 +54,6 @@ fleetest run --profile <name> --set responseMeasurement=true --set responseRepea
   ```sh
   fleetest run --profile <名前> --runner local --device "Pixel 8" --set responseMeasurement=true --scenario <シナリオID>
   ```
-- iOS の実機では、**最初のフレームまで** を Xcode の Instruments(`xctrace`)で記録して、run の終わりに結果へ書き足します。
-  Xcode が入っていて、その端末を Instruments で記録できる状態が必要です。記録できなかったときは、その旨を1行出して値を空のままにします。
 - `responseRepeat`(既定 `5`、`1`〜`50`)で、各シナリオを続けて何回回すかを決めます。回数が多いほど、中央値・p90 が安定します。
   結果ファイルは `<id>`、`<id>~2`、`<id>~3`、… の名前で並びます。
 - 計測の条件をそろえるため、計測モードでは次のように動きます。
@@ -68,6 +66,7 @@ fleetest run --profile <name> --set responseMeasurement=true --set responseRepea
     そのままにします。`--for` で期限付きにしている場合は run の間だけ期限なしに置き換え、終わりにまだ期限前なら元の停止に戻します)。
 - 次の指定と一緒には使えません(名前付きのエラーで止まります): `enableAnimations: false`、`fmTextVisibilityCheck` /
   `ocrTextVisibilityCheck` / `screenLooksLike` / `record` を `true`、`iosMode` かデバイスの `mode` を `inapp`、`--broadcast`・`--fleet`・`--split`。
+  これらのキーを書いていなければ計測モードが自動で止めます。`true` と明示してあるプロファイルは断られるので、`false` にするかキーを消してください。
 
 計測モードでは、操作の前に毎回「アプリの描画が止まる」のを待つので(最長 10 秒)、通常の実行より時間がかかります。
 
@@ -142,6 +141,8 @@ fleetest results response [--project <name>] [--since <期間>] [--json]
 
 ### iOS の実機で測るとき
 
+- iOS の実機では、**最初のフレームまで** を Xcode の Instruments(`xctrace`)で記録して、run の終わりに結果へ書き足します。
+  Xcode が入っていて、その端末を Instruments で記録できる状態が必要です。記録できなかったときは、その旨を1行出して値を空のままにします。
 - **最初のフレームまで** には、XCUITest が入力を端末へ届けるまでの時間も含まれます(Android より長めに出ます)。
 - iOS の **最初のフレームまで** は、入力の後に最初に画面が更新されるまでです。Instruments の記録は画面全体の更新なので、アプリ以外
   (ステータスバー等)の更新が先に来ればそれを数えます。

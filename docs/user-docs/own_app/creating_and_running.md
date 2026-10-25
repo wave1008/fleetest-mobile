@@ -9,9 +9,13 @@ Create a happy-path test for your own app (for example the test project myshop),
 ### Prompt for the AI
 
 ```text
-In the fleetest test project <name>, create one happy-path test (the normal flow) for my app. Do <the screens and the flow>, and check <what must be visible for it to succeed>.
+In the fleetest test project myshop, create one happy-path test (the normal flow) for my app. Do <the screens and the flow>, and check <what must be visible for it to succeed>.
 This app sometimes shows a "<dialog name>" dialog right after launch. "<close button label>" dismisses it, so close it when it appears, then continue.
 ```
+
+Expected result:
+
+- One scenario is added, and the dry-run and the device run are green.
 
 For screens that sometimes appear (first-launch guides, announcements, OS permission dialogs), give the name and the close button's label. To check that the screen changed, make the success condition a text that appears only on the destination screen.
 
@@ -24,7 +28,7 @@ More details:
 
 ## 2. Before you run
 
-An irreversible operation such as an order, submission or registration can happen twice in one run. Find such tests first, and point them at a test counterpart (a payment test mode, staging) before you run.
+An irreversible operation such as an order, submission or registration can happen twice in one run (a device problem makes the scenario run again from the start → [Writing robust scenarios](../reference/writing/writing_robust_scenarios.md#write-every-scenario-to-survive-being-re-run-from-the-start)). Find such tests first, and point them at a test counterpart (a payment test mode, staging) before you run.
 
 ### Prompt for the AI
 

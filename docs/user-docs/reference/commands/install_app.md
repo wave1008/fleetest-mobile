@@ -8,7 +8,7 @@ Installs, uninstalls, or resets the data of the app under test.
 
 | function | description |
 |---|---|
-| `installApp(appPackageFile?)` | Installs the app (iOS: `.app`, Android: `.apk` or `.apks`). Without `appPackageFile`, the app profile's `<platform>.appPath` (the app profile that the run profile's `app` points to) is used (an explicit path always wins over the profile). |
+| `installApp(appPackageFile?)` | Installs the app (iOS: `.app`, Android: `.apk` or `.apks`; `.apks` needs bundletool on the Mac). Without `appPackageFile`, the app profile's `<platform>.appPath` (the app profile that the run profile's `app` points to) is used (an explicit path always wins over the profile). |
 | `removeApp(appID?)` | Uninstalls the app. `appID` defaults the same way as `launchApp()`'s `appID` when omitted. |
 | `clearAppData(appID?)` | Keeps the app installed but clears its data and permissions, so onboarding and permission dialogs reappear. `appID` defaults the same way as `launchApp()`'s `appID`. |
 
@@ -16,6 +16,7 @@ Installs, uninstalls, or resets the data of the app under test.
 
 ```swift
 installApp()                       // path from the app profile's appPath
+launchApp()                        // on iOS in `inapp` mode, call it right after install
 installApp("/path/to/MyApp.app")
 clearAppData()                     // back to a first-run state
 removeApp()
@@ -23,6 +24,9 @@ removeApp()
 
 ## Notes
 
+- **On iOS in the default `inapp` mode, call `launchApp()` right after `installApp()`.** The install ends the bridge inside the app, and
+  operations such as `tap` do not reach the app until the next `launchApp()` reinjects it (the step carries the note `the in-app bridge
+  will be reinjected on the next launchApp()`).
 - **Reinstalling does not restore permissions.** On an iOS Simulator, uninstalling and
   reinstalling an app leaves TCC permissions (location, etc.) granted, and the permission
   dialogs do not reappear. A scenario that assumes "reinstall = first-run state" will not see

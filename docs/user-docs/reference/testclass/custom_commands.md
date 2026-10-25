@@ -1,4 +1,4 @@
-# Custom Commands
+# Custom commands
 
 [in Japanese(日本語)](custom_commands_ja.md)
 
@@ -8,10 +8,8 @@ write it as a **plain Swift function** under `scenarios/`.
 
 ```swift
 func login(user: String, password: String) {
-    tap("#login_email")
-    type(user)
-    tap("#login_password")
-    type(password)
+    type("#login_email", user)
+    type("#login_password", password)
     tap("#btn_login")
     exist("#home_title")
 }
@@ -22,10 +20,12 @@ Call it like any other step inside a `scene`:
 ```swift
 scene(1, "Sign in") {
     action {
-        login(user: "demo@example.com", password: "hunter2")
+        login(user: account("[user1].id"), password: account("[user1].password"))
     }
 }
 ```
+
+Account values live in `dataset/accounts.json` — see [Test data and accounts](../commands/dataset.md).
 
 ## Listing it in the command index (`@FTCommand`)
 
@@ -37,10 +37,8 @@ function with `@FTCommand("summary")` to list it in the command index:
 ```swift
 @FTCommand("Logs in with email and password and waits for the home screen")
 func login(user: String, password: String) {
-    tap("#login_email")
-    type(user)
-    tap("#login_password")
-    type(password)
+    type("#login_email", user)
+    type("#login_password", password)
     tap("#btn_login")
     exist("#home_title")
 }

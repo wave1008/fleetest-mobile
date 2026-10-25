@@ -25,7 +25,7 @@ combined by reference rather than by inheritance:
 ```
 
 - `platform` (optional): `"ios"`, `"android"` or `"hybrid"` — the OS(es) the app runs on. `hybrid` means
-  both, and omitting the key means the same (saving from the VS Code extension's Profiles tab writes
+  both, and omitting the key means the same (saving from the VSCode extension's Profiles tab writes
   `hybrid` explicitly too). Devices of an OS the app does not target are **ignored at run time**
   (each one is reported as a warning; the run profile's JSON is not changed). A run whose devices are
   all ignored fails with an error naming the app profile.
@@ -110,13 +110,13 @@ with the same combination pre-selected.
 | `fleetest profile setup --platform <ios\|android\|hybrid> --app-id <id> [--auto-device [--count <N>]] [...]` | Create/refresh the app and run profiles together (idempotent). `--count <N>` (with `--auto-device`) adds devices until the run profile holds N devices of that OS in total: devices already listed count, existing ones with the same model and OS are reused from the lowest number, and only the missing ones are created with unused numbers; nothing is added when it already has N or more. `--platform` is also written to the app profile's `platform`; adding the other OS to an existing app profile makes it `hybrid`. The app profile name is `--app-ref`; when omitted, the one the run profile already uses, else `<platform>-app` (`ios-app` / `android-app` / `hybrid-app`). The run profile name is `--run`; when omitted, `<platform>-run` (`ios-run` / `android-run`; `hybrid` makes one per OS) |
 | `fleetest profile list` | List run profiles and their devices |
 
-## Editing in VS Code
+## Editing in VSCode
 
-The VS Code extension's Profiles tab lets you edit run/app profiles interactively — the run
+The VSCode extension's Profiles tab lets you edit run/app profiles interactively — the run
 profile section shows the union of every run profile's devices, with checkboxes selecting which
 ones this run profile runs — and `profiles/{apps,runs}/*.json` get a JSON schema
 (`schemas/*.schema.json`) contributed by the extension for completion, hover and structural
-validation while editing by hand. See [VS Code Extension](../tools/vscode_extension.md).
+validation while editing by hand. See [VSCode extension](../tools/vscode_extension.md).
 
 ### Link
 - [index](../../index.md)

@@ -10,7 +10,7 @@ assistant then captures the real selectors from the live screen, replaces the pl
 ## Putting a test base in place
 
 The location is `TestProjects/<project>/docs/testbases/` (the folder is created by
-[Creating a Test Project](../project/creating_project.md)). Put SC / TC specifications, test viewpoint tables or notes on the
+[Creating a test project](../project/creating_project.md)). Put SC / TC specifications, test viewpoint tables or notes on the
 original requirements there as Markdown; they are the basis for having an AI assistant write scenarios.
 The `README.md` in that folder describes the place and does not count as a test base.
 
@@ -106,9 +106,11 @@ The generated class carries `@Draft`.
 
 Step text is mapped to a command template by simple keyword matching (a rough guide that you finish by hand).
 
+In an English test base only the Latin keywords below fire; the other rows fall back to `tap("#TODO")` / `exist("#TODO")`.
+
 | Bucket | Words in the text | Template |
 |---|---|---|
-| Condition | `launch`, or the Japanese words for launch / start up; or both "app" and "open"/"show" | `launchApp()` (any other condition becomes only a `// TODO` comment) |
+| Condition | `launch`, or the Japanese words for launch / start up; or "app" together with the Japanese words for open / show (listed on the Japanese page) | `launchApp()` (any other condition becomes only a `// TODO` comment) |
 | Action | `type`, or the Japanese words for enter / fill in / key in | `type("#TODO", "TODO")` |
 | Action | the Japanese words for long press / long tap | `tap("#TODO", holdSeconds: 1)` |
 | Action | `scroll`, `swipe`, or their Japanese equivalents | `scrollTo("#TODO")` |
@@ -147,7 +149,7 @@ and record the issue as a defect.
 
 An AI assistant can also read the specification directly and write a scenario without a draft. `draft-scenario` is the entry point
 for when you want a mechanical skeleton first and finish it afterwards. Note that the MCP `ft_draft_scenario` is a different
-thing: it returns the operations you performed while exploring as a Swift scenario ([MCP Server](../tools/mcp_server.md)).
+thing: it returns the operations you performed while exploring as a Swift scenario ([MCP server](../tools/mcp_server.md)).
 
 ## When a specification violation is found
 

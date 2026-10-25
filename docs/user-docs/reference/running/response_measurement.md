@@ -65,12 +65,13 @@ fleetest run --profile <name> --set responseMeasurement=true --set responseRepea
   - It turns off the text visibility check (`fmTextVisibilityCheck`, `ocrTextVisibilityCheck`), `screenLooksLike`, recording
     (`record`) and host-load pacing.
   - On iOS it runs in xcuitest mode (the measurement lives in the XCUITest bridge; `iosMode` defaults to `xcuitest` for the run).
-  - It holds the device monitor's observation and streaming for the duration of the run (released at the end). A hold without a time limit that you set yourself
+  - It holds the Device Monitor's observation and streaming for the duration of the run (released at the end). A hold without a time limit that you set yourself
     with `fleetest monitor pause` is left as it is; a hold with `--for` is replaced by one without a limit for the run and restored at
     the end if it has not expired yet.
 - It cannot be combined with the following (the run stops with a named error): `enableAnimations: false`; `fmTextVisibilityCheck`,
   `ocrTextVisibilityCheck`, `screenLooksLike` or `record` set to `true`; `iosMode` or the device's `mode` set to `inapp`;
   `--broadcast`, `--fleet`, `--split`.
+  Measurement mode turns these off by itself when the keys are not written. A profile that sets one explicitly to `true` is refused, so set it to `false` or remove the key.
 
 Before every action, measurement mode waits for the app to stop drawing (up to 10 seconds), so a run takes longer than usual.
 
@@ -161,7 +162,7 @@ In the following cases there is neither a time until ready nor a reason (the ste
   number of reads the judgement could use).
 - The device's Reduce Motion setting cannot be changed by the tool; the device is measured with its own setting.
 
-Related: [Measuring app responsiveness (procedure)](../../response/measuring_app_response.md) / [Run profile](../project/run_profile.md) / [Analysing results](./results_analysis.md) / [Running scenarios](./running_scenarios.md)
+Related: [Measuring app responsiveness (procedure)](../../response/measuring_app_response.md) / [Run profile](../project/run_profile.md) / [Analyzing results (fleetest results, dashboard)](./results_analysis.md) / [Running scenarios](./running_scenarios.md)
 
 ### Link
 - [index](../../index.md)

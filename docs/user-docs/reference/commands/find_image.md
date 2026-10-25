@@ -15,33 +15,6 @@ Use it to grab elements a selector cannot point at, such as icons with neither a
 | `existImage(label, threshold:, aspectRatioTolerance:, waitSeconds:, scroll:, maxSwipes:)` | Asserts that the sample image is on the screen. It searches the same way as `findImage` and **fails when nothing is found**. Returns the found element. Without `waitSeconds` it waits for the image to appear up to the run profile's default wait (same as `exist`). |
 | `element.tap(holdSeconds:, maxGestureSeconds:, settle:)` | Taps the grabbed element. An element grabbed by `findImage` / `findImages` is tapped at the centre of the found frame. `holdSeconds` greater than 0 makes it a long press, capped at 10s by default — pass `maxGestureSeconds:` to allow up to 60 for this one call. |
 
-## How it searches
-
-1. It looks up the sample images of DefaultClassifier. It uses the images in folders whose label ends with `label`,
-   trying the ones for the running OS (marked `@i` for iOS / `@a` for Android) first.
-2. It cuts the accessibility elements of the screen out of the screenshot by their frames. Only the elements whose
-   **aspect ratio is close** to the sample (tolerance `aspectRatioTolerance`, 0.2 by default) become candidates, closest first.
-3. For each candidate it measures the **image feature print distance** to the sample (Vision's FeaturePrint; smaller is more similar).
-4. `findImage` grabs the nearest one when its distance is at most `threshold` (0.15 by default). Otherwise it
-   classifies that one with DefaultClassifier (the same classifier as [imageIs](image_assertion.md)). It grabs it only when the
-   label matches and, in addition, its distance to one of that label's samples is at most `threshold` (or the classification
-   confidence is at most `threshold`). A matching label alone is not enough, because the classifier always answers one of
-   the sample labels.
-
-## Where the sample images go
-
-It uses the same samples as [imageIs](image_assertion.md).
-
-```
-<project>/vision/classifiers/DefaultClassifier/
-  @i/Home/[Camera Icon]/   sample images (png / jpg)
-  @a/Home/[Camera Icon]/
-```
-
-- Put images cut out by **the element's own frame** (`fleetest vision capture` cuts them for you;
-  for MCP, see [MCP server](../tools/mcp_server.md)).
-- `findImages` also uses every sample in the label folder. When several samples hit the same element, it is returned once with the nearest distance.
-
 ## Example
 
 ```swift
@@ -97,6 +70,33 @@ existImage("[Share Icon]", scroll: .down).tap()
 - Moving the screen after finding makes `tap()` hit the old coordinates. Tap right after finding.
 - The candidates are the frames of accessibility
   elements. Parts that do not appear in accessibility cannot be found.
+
+## How it searches
+
+1. It looks up the sample images of DefaultClassifier. It uses the images in folders whose label ends with `label`,
+   trying the ones for the running OS (marked `@i` for iOS / `@a` for Android) first.
+2. It cuts the accessibility elements of the screen out of the screenshot by their frames. Only the elements whose
+   **aspect ratio is close** to the sample (tolerance `aspectRatioTolerance`, 0.2 by default) become candidates, closest first.
+3. For each candidate it measures the **image feature print distance** to the sample (Vision's FeaturePrint; smaller is more similar).
+4. `findImage` grabs the nearest one when its distance is at most `threshold` (0.15 by default). Otherwise it
+   classifies that one with DefaultClassifier (the same classifier as [imageIs](image_assertion.md)). It grabs it only when the
+   label matches and, in addition, its distance to one of that label's samples is at most `threshold` (or the classification
+   confidence is at most `threshold`). A matching label alone is not enough, because the classifier always answers one of
+   the sample labels.
+
+## Where the sample images go
+
+It uses the same samples as [imageIs](image_assertion.md).
+
+```
+<project>/vision/classifiers/DefaultClassifier/
+  @i/Home/[Camera Icon]/   sample images (png / jpg)
+  @a/Home/[Camera Icon]/
+```
+
+- Put images cut out by **the element's own frame** (`fleetest vision capture` cuts them for you;
+  for MCP, see [MCP server](../tools/mcp_server.md)).
+- `findImages` also uses every sample in the label folder. When several samples hit the same element, it is returned once with the nearest distance.
 
 ### Link
 - [index](../../index.md)

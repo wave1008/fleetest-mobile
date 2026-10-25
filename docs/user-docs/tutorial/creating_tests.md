@@ -18,6 +18,11 @@ When it is ready, run it on iOS (ios-run) to confirm.
 
 The AI assistant compiles it, verifies it without a device (dry-run), runs it on a device, and reports the result.
 
+Expected result:
+
+- `scenarios/AddToCart.swift` is created.
+- The compile, the dry-run, and the run with ios-run are reported, and they succeed.
+
 <img src="../images/tutorial/en/ai_workflow.png" width="720" alt="Operate and read the screen, write the scenario, compile, dry-run, run on a device, report the result">
 
 ## 2. Add to an existing test
@@ -29,6 +34,19 @@ In the fleetest test project project1, add a second test to the "add-to-cart tes
 without logging in, set the quantity to 3 in the product details and add it to the cart. Don't create a new file.
 Check that the quantity of that product in the cart is 3. When it is ready, run it on iOS (ios-run) to confirm.
 ```
+
+Expected result:
+
+- A second `@Test` is added to the same file.
+- Both tests pass.
+
+<details>
+<summary><b>If you do it manually (click to show details)</b></summary>
+
+To write it yourself, see [Creating a test class](../reference/testclass/creating_testclass.md).
+
+</details>
+<br>
 
 If the behavior you ask for is not in the app, the AI assistant reports the actual behavior and leaves the decision of whether that matches the specification to you.
 

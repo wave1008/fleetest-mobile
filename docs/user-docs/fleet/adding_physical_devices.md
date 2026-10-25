@@ -18,6 +18,15 @@ When you ask an AI assistant, name the connected device by its model (for exampl
 over USB in the fleetest run profile ios-physical"). The AI assistant does not do the steps that need a person
 (settings on the device, signing in to Xcode) for you.
 
+## Before you start
+
+| What you need | Check |
+|---|---|
+| Xcode and a signed-in Apple ID (iOS only) | `xcodebuild -version` |
+| An Apple Developer Program team (iOS only; a free Personal Team's signature expires after about 7 days) | Xcode → Settings → Accounts |
+| Homebrew (iOS only; you install `libimobiledevice`) | `brew --version` |
+| The Android SDK (adb) (Android only) | `adb version` |
+
 ## iOS
 
 ### 1. Prepare the Mac
@@ -53,6 +62,11 @@ over USB in the fleetest run profile ios-physical"). The AI assistant does not d
      settings file.
    - Signing cannot be fixed in Xcode's Signing & Capabilities. fleetest overrides it with these values on every build.
 
+Expected result:
+
+- `brew install libimobiledevice` succeeds
+- `~/.config/fleetest/config.json` has `developmentTeam` and `bundleIDPrefix`
+
 ### 2. Prepare the device
 
 👉 **Do this once for each device.**
@@ -63,13 +77,17 @@ over USB in the fleetest run profile ios-physical"). The AI assistant does not d
    screen has gone dark. If the screen turns off during a step that waits a long time, later app launches are refused
    and the run stops.
 
+Expected result:
+
+- The device is connected over USB and trusted, with Developer Mode on and Auto-Lock set to Never
+
 ### 3. Prepare the app for the device
 
 A physical device needs a **build signed for devices** (an `.ipa` or an `.app`). A Simulator build does not install
 (it fails with `The executable contains an invalid signature`).
 
 Put the path of the device build in `appPathPhysical` in the app profile ("Package Path (Physical Device)" in the
-VS Code extension). It sits next to `appPath`, which is for the Simulator ([Profiles](../reference/project/profiles.md)).
+VSCode extension). It sits next to `appPath`, which is for the Simulator ([Profiles](../reference/project/profiles.md)).
 
 #### Prompt for the AI
 
@@ -87,11 +105,19 @@ port (before that it reads the device's forwards with `adb reverse --list`: if t
 leaves it alone, and if it points elsewhere the run stops. If setting it up fails, it re-reads the state and only warns
 when it can confirm no forward exists; if the device does not respond, the run stops). See [Services the app depends on](../reference/writing/services.md).
 
+Expected result:
+
+- The app profile's `appPathPhysical` holds the path of a build signed for the device
+
 ## Android
 
 ### 1. Prepare the Mac
 
 If you have the Android SDK (adb), nothing more is needed. Check that `adb devices` works.
+
+Expected result:
+
+- `adb devices` runs
 
 ### 2. Prepare the device
 
@@ -115,9 +141,17 @@ If you have the Android SDK (adb), nothing more is needed. Check that `adb devic
 - A device connected to adb over Wi-Fi works too, as long as `adb devices` lists it as `device`. Use the identifier it
   shows (such as `192.168.1.23:5555`) as is.
 
+Expected result:
+
+- `adb devices` lists the device as `device`
+
 ### 3. Prepare the app for the device
 
 Use your usual APK as is. Release-signed APKs can be installed too.
+
+Expected result:
+
+- You know the path of the APK to install on the device
 
 ## 4. Add it to a run profile
 
@@ -142,9 +176,9 @@ runner machine, give the machine name too.
 <details>
 <summary><b>If you do it manually (click to show details)</b></summary>
 
-### In the VS Code extension
+### In the VSCode extension
 
-1. In the device monitor's "Profiles" tab, open the run profile and press "+" next to "Add devices".
+1. In the Device Monitor's "Profiles" tab, open the run profile and press "+" next to "Add devices".
 2. The "Select Devices" list shows the **connected physical devices** (iOS shows "model / connection / UDID"). For a
    device connected to a runner machine, choose that machine in "Machine:" at the top.
 3. Check the device and press "OK".
@@ -170,6 +204,11 @@ Add the device to the run profile's `devices` with `"kind": "physical"` and its 
 - `machine` is the machine name of the Mac the device is connected to (`"local"` for your own Mac).
 
 </details>
+<br>
+
+Expected result:
+
+- The run profile's `devices` has a device with `"kind": "physical"`
 
 ## 5. Try it
 
@@ -189,8 +228,13 @@ fleetest run --profile <run profile> --scenario <scenario ID>
 </details>
 <br>
 
-In the device monitor, a physical device's tile has a "Device" badge. You can also start only the bridge, without
+In the Device Monitor, a physical device's tile has a "Device" badge. You can also start only the bridge, without
 running a test, with "Start bridge" in the tile's right-click menu.
+
+Expected result:
+
+- The scenario runs on the physical device
+- The device's tile in the Device Monitor carries the "Device" badge
 
 ### Approvals on iOS the first time
 
@@ -247,6 +291,7 @@ A physical device connected to a runner machine works with the same steps. **Do 
 - To use an iPhone connected over Wi-Fi, the runner machine and the device must be on the same subnet, and the access
   point's client isolation (privacy separator) must be off. What matters is the runner machine's LAN, not your Mac.
 - Install `brew install libimobiledevice` on runner machines that use physical devices too.
+- If the app uses services (compose.yaml), also put `services.publishForPhysicalDevices` (the runner machine's LAN address) in the runner machine's machine settings (a run reads the runner machine's machine settings).
 - The bridge used by inapp mode is signed with the app's certificate by the Mac that sends out the test, and
   sent along with it. It works on in-app even if the runner machine's keychain does not hold the app's signing key
   (step 3 above is still needed to build the XCUITest bridge).

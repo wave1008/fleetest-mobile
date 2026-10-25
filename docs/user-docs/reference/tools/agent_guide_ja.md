@@ -11,7 +11,7 @@
 1. **デバイスを決める。** `ft_list_devices` のあと、すべての `ft_*` に同じ `profile:`(実行プロファイル名)
    —— または `udid:` / `port:` / `serial:` —— を渡す。探索と実行が同じデバイスを使うため。
 2. **探索する。** `ft_launch` でアプリを起動し、`ft_snapshot` を撮る。各行は
-   `[ref] Type "label" id=… (x,y WxH)`。`ft_tap` / `ft_type`(ref かセレクタ)で進める。
+   `[ref] Type "label" id=… (x,y WxH)`。`ft_tap` / `ft_type`(ref。セレクタで撃つなら `ft_batch`)で進める。
    長いリストは `ft_swipe` を繰り返さず、セレクタを渡して `ft_scroll_to` を使う。
    通った画面は全部撮っておく —— dry-run がそこで見た `#id` と照合する。
 3. **下書きを得る。** `ft_draft_scenario` は、直前の `ft_launch` 以降の操作を Swift にして文字列で返す

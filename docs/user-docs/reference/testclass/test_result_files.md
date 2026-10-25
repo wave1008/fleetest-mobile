@@ -60,7 +60,7 @@ most recent run **for that run profile**, so `fleetest run --failed` can re-run 
 failures. Records are kept separately per run profile (and in their own bucket for a
 profile-less run), so a green run of one profile never hides a red run of another.
 
-## From the VS Code extension
+## From the VSCode extension
 
 The extension's Test Explorer shows pass/fail per test and can open the generated Markdown
 report directly ("Open Report").

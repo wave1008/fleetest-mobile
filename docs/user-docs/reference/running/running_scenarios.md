@@ -2,8 +2,10 @@
 
 [in Japanese(日本語)](running_scenarios_ja.md)
 
-`fleetest run` executes Swift DSL scenarios deterministically — ordinary playback and self-healing
-(locator fingerprint matching) never call FM. This page covers the CLI options; see
+`fleetest run` executes Swift DSL scenarios deterministically. Playback itself and self-healing (locator fingerprint
+matching) never call FM. FM is called only by the run profile's `fmTextVisibilityCheck` / `screenLooksLike` (both ON by
+default, on-device only); set both to `false` and no FM call is made during the run
+([Run profile settings](../project/run_profile.md)). This page covers the CLI options; see
 [dry_run.md](./dry_run.md) for `--dry-run` and [self_healing.md](./self_healing.md) for
 enabling self-healing with `--set`.
 
@@ -75,7 +77,7 @@ fleetest run --platform android
 
 | Command | Description |
 |---|---|
-| `fleetest devices up` / `devices down` | Start/stop the union of every run profile's devices (or only one run profile's devices with `--profile`) |
+| `fleetest devices up` / `devices down` | Start/stop the union of every run profile's devices (or only one run profile's devices with `--profile`). `devices down` without `--profile` also stops the devices and bridges of every registered runner machine over SSH, in addition to this Mac (add `--profile` to stop only local devices). `devices up` acts on this Mac only |
 | `fleetest bridge up` / `bridge down` / `bridge status` | Manage the resident bridge (iOS: XCUITest runner / Android: on-device server) |
 
 ### Link

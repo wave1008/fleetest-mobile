@@ -7,10 +7,12 @@
 - サンドボックス(権限のエラー・`403`)→ [注意事項と制限事項](../security/limitations_ja.md)の「うまく動かないとき」
 - リモート実行 → [Mac を追加する](../fleet/adding_mac_ja.md)の「うまくいかないとき」
 - 実機 → [実機を追加する](../fleet/adding_physical_devices_ja.md)の「うまくいかないとき」
+- アプリが依存するサーバー(起きない・商品が出ない)→ [アプリが依存するサービス](../reference/writing/services_ja.md)の「途中で死んだら」
 
 | 症状 | 確認 | 対処 |
 |---|---|---|
-| オンデバイスモデルが利用不可 | システム設定で Apple Intelligence が有効か | 有効化する(macOS 27+ で、システム設定 → Siri で Siri をオン(Siri が Apple Intelligence を使います)。`fleetest doctor` が利用不可の理由を表示します)。`availability` が available のまま全呼び出しが失敗することがある(OS 更新の直後などに起きた)ので、実際に推論する `fleetest doctor --fm-only` で確認する。止まった FM は数分で戻ることもありますが、`--fm-only` が失敗し続けるなら Mac を再起動する([長く使うためのメンテナンス](maintenance_ja.md))。FM は experimental([environments_ja.md](../overview/environments_ja.md))。これがブロックするのは `screenLooksLike`・[テキストの可視性検証](../reference/testclass/text_visibility_check_ja.md)だけで、自己修復(ロケータの指紋照合。FM を使いません)を含め他は無くても動きます |
+| サンプルアプリに商品が出ない / `services up` が失敗する | `fleetest services status`・`results/runs/<月>/<runID>/services/<service>.log` | `container system status` → 止まっていれば `container system start`。prepare.sh が `run this in your fleetest work folder` で止まるときは、作業フォルダ(Package.swift のある所)で実行する |
+| オンデバイスモデルが利用不可 | システム設定で Apple Intelligence が有効か | 有効化する(macOS 27+ で、システム設定 → Siri で Siri をオン(Siri が Apple Intelligence を使います)。`fleetest doctor` が利用不可の理由を表示します)。`availability` が available のまま全呼び出しが失敗することがある(OS 更新の直後などに起きた)ので、実際に推論する `fleetest doctor --fm-only` で確認する。止まった FM は数分で戻ることもありますが、`--fm-only` が失敗し続けるなら Mac を再起動する([長く使うためのメンテナンス](maintenance_ja.md))。FM は experimental。これがブロックするのは `screenLooksLike`・[テキストの可視性検証](../reference/testclass/text_visibility_check_ja.md)だけで、自己修復(ロケータの指紋照合。FM を使いません)を含め他は無くても動きます |
 | OCR(Vision)が止まっている | `fleetest doctor` が OCR(Vision)も実際に呼んで確かめ、「read nothing from the built-in test image」と出る | 止まっている間は、文中リンクのタップ・打鍵の読み返し・テキストの可視性検証の OCR 段が失敗します。Mac を再起動すると戻ったことがあります |
 | run の後も `fleetest api fm-serve` が残っている | アクティビティモニタ / `ps` | 正常です。オンデバイスモデルを呼ぶ処理を1つのプロセスに集め、呼び出しの合間もモデルを載せたままにしています(使うたびに載せ直すと、その瞬間にモデルが止まることがあるため)。どこからも使われないまま 30 分経つと自動で終わり、次の run がまた起こします。今すぐ止めたいときは `pkill -f "fleetest api fm-serve"`(止めても次の run が起こし直すだけで、害はありません)。VSCode 拡張のモニターを開いている間はモデルの死活を毎分確かめるので終わりません |
 | ドライバに接続できない | iOS: ブリッジが起動しているか。Android: `adb devices` にデバイスが見えているか | iOS: 先に `fleetest bridge up` を実行する(ログは `.fleetest/bridge-<ポート>.log`)。Android: デバイス/Emulator を繋ぎ直して `adb devices` に出るようにする |

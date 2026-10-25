@@ -3,8 +3,8 @@
 [in English](for_shirates_users.md)
 
 Fleetest の Swift DSL は Shirates(Classic)の慣習に準拠しています。コマンド名・引数名・
-既定値・挙動をそのまま踏襲し、独自の改良はしていません。Shirates を知っていれば、ほぼ
-そのまま書き始められます。
+既定値・挙動を**原則**踏襲しています。名前が違うもの(下表)と、ニックネームなど意図的に
+持たないものがあるので、乗り換え前にこのページを一度通読してください。
 
 このページは、同名で使えるもの・名前が違うもの・持たないもの・fleetest にしか無いものを
 順に一覧します。
@@ -21,18 +21,24 @@ Fleetest の Swift DSL は Shirates(Classic)の慣習に準拠しています。
 
 | 分類 | コマンド |
 |---|---|
-| タップ・要素選択 | `tap`(+`holdSeconds:`)、`select` |
+| タップ・アプリアイコン | `tap`(+`holdSeconds:`)、`tapAppIcon` |
 | 存在検証 | `exist`、`appIs` |
+| 掴んだ要素 | `lastElement` |
+| キーボード・入力 | `pressEnter`、`clearInput`、`hideKeyboard`(iOS の閉じ方が違う)、`keyboardIsShown` / `keyboardIsNotShown` |
+| 属性・状態の検証 | `idIs`、`enabledIsTrue` / `enabledIsFalse`、`checkIsON` / `checkIsOFF` |
 | テキスト・値の検証 | `textIs` / `textIsNot` / `textContains(Not)` / `textStartsWith(Not)` / `textEndsWith(Not)` / `textMatches(Not)` / `textMatchesDateFormat` / `textIsEmpty` / `textIsNotEmpty`、`valueIs…` も同じ10種一式 |
 | 任意の値の検証 | `thisIs` / `thisIsNot` / `thisIsTrue` / `thisIsFalse` / `thisIsEmpty` / `thisIsNotEmpty` / `thisIsBlank` / `thisIsNotBlank` / `thisContains(Not)` / `thisStartsWith(Not)` / `thisEndsWith(Not)` / `thisMatches(Not)` / `thisMatchesDateFormat` / `thisIsGreaterThan(OrEqual)` / `thisIsLessThan(OrEqual)` |
-| スクロール | `scrollDown/Up/Left/Right`(+`repeat:`)、`scrollToBottom/Top/RightEdge/LeftEdge`(+`maxSwipes:`)、`withScrollDown/Up/Left/Right`、`withoutScroll` |
+| スクロール | `scrollDown/Up/Left/Right`(+`repeat:`)、`scrollToBottom/Top/RightEdge/LeftEdge`(+`maxSwipes:`)、`withScrollDown/Up/Left/Right`、`withoutScroll`、`scrollFrame`、`startMarginRatio` / `endMarginRatio` |
 | フリック | `flickCenterToTop/Bottom/Left/Right`、`flickLeftToRight/RightToLeft`、`flickBottomToTop/TopToBottom` |
 | スワイプ | `swipePointToPoint`、`swipeElementToElement` |
-| 分岐・反復 | `ifCanSelect { }.ifElse { }`、`doUntilTrue`、`ios { }` / `android { }` |
+| 分岐 | `ifCanSelect { }.ifElse { }`、`ios { }` / `android { }` |
 | 割り込み制御 | `suppressHandler { }` / `useHandler { }` / `disableHandler()` / `enableHandler()` |
 | アプリ制御 | `launchApp` / `terminateApp` / `restartApp` / `installApp` / `removeApp` |
 | 待機 | `wait` / `waitForDisplay` / `waitForClose` |
 | 記録・フロー | `procedure`、`screenshot`、`verify`、`@Deleted` |
+| 前後処理 | `beforeEach` / `afterEach` |
+| メモ | `writeMemo` / `readMemo` / `clearMemo` / `memoTextAs` |
+| ログのフォルダ | `TestLog.directoryForLog` |
 
 ## 名前・形が違うもの
 
@@ -45,6 +51,8 @@ Fleetest の Swift DSL は Shirates(Classic)の慣習に準拠しています。
 | `irregularHandler { }`(ラムダ登録) | `irregularHandler(sel, dismiss:, maxDismissals:)` | ラムダではなくセレクタで宣言する形。出るか不定のアプリ内モーダルを出るたびに自動で閉じる |
 | `goPreviousApp` | `appSwitcher()` | アプリスイッチャーを開くだけで、直前のアプリへの切り替えまでは行わない |
 | `displayedIs` | `requireVisible:` 引数 + 実行プロファイルの `fmTextVisibilityCheck` / `ocrTextVisibilityCheck` | 可視性の確認は独立したアサーションではなく、各コマンドの引数として指定する |
+| `doUntilTrue` | `doUntilTrue` | ブロックの throw は即失敗(Shirates の既定はリトライ)。`retryOnError` 等の引数は無い |
+| `select` | `select` | 見つからなくても失敗しない(空要素)。在ることを保証するなら `exist` |
 
 ## 持たないもの — 代わりにこう書く
 
@@ -64,6 +72,28 @@ Fleetest の Swift DSL は Shirates(Classic)の慣習に準拠しています。
 | `existAll` / `canSelectAll` / `dontExistAll` | 個別の `exist` をチェーンで並べる(要素ごとに `waitSeconds:` / `scroll:` を指定できる) |
 | `tempSelector` / `tempValue` | 呼び出し箇所にセレクタを直接書く |
 | `withContext`(native/web コンテキスト切替) | 不要 —— WebView の中身も同じセレクタ・同じコマンドで透過的に読める |
+| `swipeCenterTo*` ほか swipe 一族 | `swipe(.up)` など(方向を引数に取る1本) |
+| `cell` / `cellOf` | セレクタのスコープ `>>` |
+| `accessIs*` | `#id` |
+| `classIs` | セレクタの `.型` |
+| `assertEquals` | `thisIs` |
+| `ifTrue` / `ifFalse` / `ifScreenIs` / `ifCheckON` | Swift の `if` |
+| `shell` | `procedure { }` |
+| `describe` / `caption` / `comment` / `output` | `scene` の説明文 |
+| `silent` / `info` / `warn`、`onScreen` / `onError`、`isAppInstalled` | 無い |
+| `beforeAllAfterSetup` | `setUpDevice()` |
+| `setEventHandlers` | `beforeEach()` の中で書く |
+| `typeChars` | 不要 |
+
+## まだ無いもの(足す予定)
+
+代わりに書く方法はありません。
+
+| Shirates | 状況 |
+|---|---|
+| `internetOn/Off`・`wiFiOn/Off`・`mobileOn/Off` | 足す予定 |
+| `pressSearch`・`pressTab`・`pressKeys`・`pressAndroid` | 足す予定 |
+| `tapCenterOfScreen`・`tapCenterOf`・`tapOffset` | 足す予定 |
 
 ## fleetest 独自のコマンド
 
@@ -71,6 +101,10 @@ Shirates に対応物が無いもの:
 
 | コマンド | 内容 |
 |---|---|
+| `fold()` / `unfold()` / `hinge(_)` | 折りたたみ端末の畳み・開き・ヒンジ角 |
+| `beforeAll` / `afterAll` / `setUpDevice` / `tearDownDevice` | run × クラス、またはデバイス × クラスの単位で1回だけ走る前後処理 |
+| `TestLog.directoryForTemp` | 一時フォルダ |
+| `maxGestureSeconds:` | 秒数を取るジェスチャ系コマンド(`tap(holdSeconds:)`・swipe・pinch・flick 等)で、既定の秒数上限(10秒)をそのコマンド1回だけ最大60秒まで上げる引数 |
 | `screenLooksLike("説明文")` | スクリーンショットと自然文を照合する FM マルチモーダル視覚検証 |
 | `countIs(sel, n)` | 一致する要素数を検証する |
 | `scrollTo(sel, direction:, maxSwipes:)` | セレクタが解決するまでその方向へスクロールする |

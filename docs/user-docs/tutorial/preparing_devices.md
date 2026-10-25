@@ -17,14 +17,20 @@ Then show me the profile's updated device list.
 <details>
 <summary><b>If you do it manually (click to show details)</b></summary>
 
-In the **Profiles** tab of the device monitor, press the run profile's "Add device" button.
+In the **Profiles** tab of the Device Monitor, press the run profile's "Add device" button.
+
+From the CLI, run the following. `--count` makes the run profile hold N devices of that OS in total (the existing ones included).
+
+```bash
+../foundation-tester/.build/debug/fleetest profile setup --project project1 --platform ios --app-id com.sutec.mobile.ios --auto-device --count 3
+```
 
 </details>
 <br>
 
-Check the result:
+Expected result:
 
-- Check the **Profiles** tab of the device monitor.
+- Check the **Profiles** tab of the Device Monitor.
 
 <br>
 

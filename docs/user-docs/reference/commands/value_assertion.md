@@ -14,7 +14,7 @@ select("#email"); lastElement.valueIs("test@example.com") // explicit lastElemen
 select("#email"); valueIs("test@example.com")             // implicit (the last grabbed element)
 ```
 
-Arguments are `(expected, strict:, waitSeconds:)` (the positive forms also take `requireVisible:`; `valueMatchesDateFormat` takes no `strict:` — see the table below). There is
+Arguments are `(expected, requireVisible:, strict:, waitSeconds:)` for the positive forms and `(expected, strict:, waitSeconds:)` for the negative and empty forms (`valueMatchesDateFormat` takes no `strict:` — see the table below). There is
 no form that takes a selector.
 
 ## Functions
@@ -41,9 +41,9 @@ select("#email").valueContains("@example.com")
 
 ## Notes
 
-- On iOS, an empty text field can return its placeholder text as the value instead of an empty
-  string — avoid asserting `valueIsEmpty` on such a field; check `valueIsNotEmpty` or a specific
-  expected value instead where the field is populated.
+- Read a text field's contents with the `value*` assertions; an empty field is `valueIsEmpty` (the value of an empty field is empty in
+  every UI framework). A text field's `text` returns the placeholder string in Compose Multiplatform (iOS), Flutter (iOS) and React Native,
+  so do not assert `textIsEmpty` / `textIs` on a text field.
 - Negative forms and the empty checks do not consider visibility, and none of these commands take
   `scroll:` — same rules as text assertions.
 - A chained check first evaluates against the value already grabbed, and only polls the device if

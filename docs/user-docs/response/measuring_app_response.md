@@ -32,6 +32,11 @@ The left column is the device's identifier (serial). Step 4 uses it.
 Check that the Android physical device connected over USB shows up in adb as "device", and tell me its identifier (serial).
 ```
 
+Expected result:
+
+- `adb devices` lists the device as `device`
+- You know its identifier (serial)
+
 ## 2. Write the Mac's LAN address in the machine settings
 
 The sample app's servers (the services declared in compose.yaml) are normally published only inside the Mac (`127.0.0.1`).
@@ -47,6 +52,10 @@ switch that loosens the sandbox lives there). Finding the address is something y
 ```text
 Tell me this Mac's LAN IPv4 address.
 ```
+
+Expected result:
+
+- You know the LAN IPv4 address
 
 Then write it yourself in `~/.config/fleetest/config.json` (create the file if it does not exist).
 
@@ -65,6 +74,10 @@ ipconfig getifaddr en0        # e.g. 192.168.1.10 (en0 for Wi-Fi, en1 or similar
 <br>
 
 The examples below use `192.168.1.10`. Replace it with your own address.
+
+Expected result:
+
+- `~/.config/fleetest/config.json` has `services.publishForPhysicalDevices`
 
 ## 3. Build the app for the physical device
 
@@ -94,6 +107,11 @@ cp androidApp/build/outputs/apk/debug/androidApp-debug.apk build/android-physica
 
 When you use the Emulator APK again later, rebuild without `-P` (the copy for the physical device stays).
 
+Expected result:
+
+- The build succeeds
+- `build/android-physical/androidApp-debug.apk` exists
+
 ## 4. Make a run profile for measurement
 
 Make a run profile `android-response` that uses the physical device and the APK built for it, and turn the measurement on.
@@ -118,7 +136,8 @@ Run in the work folder (`--serial` is the identifier from step 1).
   --app-path ../sut-ec-mobile/build/android-physical/androidApp-debug.apk
 ```
 
-Add `responseMeasurement` and `responseRepeat` to the resulting `TestProjects/project1/profiles/runs/android-response.json`.
+Add `responseMeasurement` and `responseRepeat` to the resulting `TestProjects/project1/profiles/runs/android-response.json`
+(if `fmTextVisibilityCheck: true` is written there, for example by a profile saved from the extension's form, set it to `false`).
 
 ```json
 {
@@ -135,6 +154,11 @@ Add `responseMeasurement` and `responseRepeat` to the resulting `TestProjects/pr
 <br>
 
 `responseRepeat` is how many times the same scenario runs back to back (default 5, up to 50). More repeats give a steadier median.
+
+Expected result:
+
+- `profiles/runs/android-response.json` has `responseMeasurement: true` and `responseRepeat: 5`
+- `fmTextVisibilityCheck: true` is not written
 
 ## 5. Measure
 
@@ -156,7 +180,7 @@ Run the login scenario created in the Quick start with the fleetest android-resp
 </details>
 <br>
 
-<img src="../images/response_measurement/en/quickstart_run.png" width="720" alt="A measurement run installs the APK on the device, starts the servers, runs the same scenario 5 times back to back and writes the values into the report. Before every action it waits for drawing to stop, and animations stay on. The device monitor is held during the run">
+<img src="../images/response_measurement/en/quickstart_run.png" width="720" alt="A measurement run installs the APK on the device, starts the servers, runs the same scenario 5 times back to back and writes the values into the report. Before every action it waits for drawing to stop, and animations stay on. The Device Monitor is held during the run">
 
 This is what happens inside the run.
 
@@ -164,8 +188,12 @@ This is what happens inside the run.
 - The same scenario runs 5 times back to back. Before every action it waits for the app to stop drawing (up to
   10 seconds), so each run takes longer than usual.
 - The device's animations **stay on** (a normal run turns them off), because the time users experience is what is measured.
-- The device monitor's observation and streaming are held during the run. Tiles that stop updating are normal.
+- The Device Monitor's observation and streaming are held during the run. Tiles that stop updating are normal.
 - Pass/fail is given as usual. In a scenario that failed, the steps after the failure cannot be measured.
+
+Expected result:
+
+- The same scenario runs 5 times back to back and finishes
 
 ## 6. Read the results
 
@@ -177,7 +205,11 @@ Each step in the scenario report (`TestProjects/project1/reports/`) gets its val
 
 - `first frame` = **time to first frame** (from the tap until the app first redraws the screen)
 - `ready` = **time until ready** (from the tap until the element the scenario operates next can be pressed)
-- Verification steps such as `exist` get no values. The last action of a scenario has no `ready` (there is no next action).
+- A `ready` of a few milliseconds is not an anomaly (a row whose next element stays in the same place through the transition is pressable from its start).
+
+Expected result:
+
+- The action steps in the report carry `first frame` and `ready` values
 
 Now look at the 5 runs together.
 
@@ -207,12 +239,11 @@ Login.S0010  s2 action tap tap "My page" #1    R5CT1234ABC  my-mac  5  177      
 Login.S0010  s2 action tap tap "Settings" #1   R5CT1234ABC  my-mac  5  91         98      0     0        -                -             -               -
 ```
 
-| Column | How to read it |
-|---|---|
-| `median ms` / `p90 ms` | Median and p90 of the time to first frame. `n` is the sample count (the number of runs) |
-| `ready median ms` | Median of the time until ready. A row whose next element stays in the same place throughout the transition (a tab bar, …) reads a few milliseconds. It means "pressable from the start of the transition" and is not an anomaly |
-| `busy` | How many times the app was still drawing before the action, so that run was not measured. A high count means the previous action's animation does not stop within 10 seconds on that screen |
-| `prev median ms` / `delta` | The change from the previous measurement run. `-` on the first run |
+For how to read the columns, see "Reading the results" in the reference [Response measurement](../reference/running/response_measurement.md).
+
+Expected result:
+
+- One row per step, with `n` of 5
 
 ## 7. Measure again and look at the change
 
@@ -233,6 +264,10 @@ Run the same scenario again with the fleetest android-response profile and list 
 - **A difference based on few samples cannot be told apart from noise.** When a difference matters, raise `responseRepeat`
   (`--set responseRepeat=10` overrides it for that run only).
 - To measure after changing the app, rebuild the APK into the same place as in step 3 and run again.
+
+Expected result:
+
+- `prev median ms` and `delta` are filled in
 
 ## Measuring on iOS
 

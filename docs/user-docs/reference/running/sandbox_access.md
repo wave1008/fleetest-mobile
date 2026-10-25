@@ -21,12 +21,12 @@ There are other places that are writable because fleetest itself uses them (they
 | Place | Used for |
 |---|---|
 | The report directory | Results, screenshots, logs |
-| `.fleetest/` in the project and the work folder, `~/.fleetest/` | fleetest's state. Things fleetest itself reads and runs or distributes in the next run or when preparing devices (such as `hooks/`) are not writable |
+| `.fleetest/` in the project, the work folder and the fleetest clone, `~/.fleetest/` | fleetest's state. Things fleetest itself reads and runs or distributes in the next run or when preparing devices (such as `hooks/`, the bridge ledgers and `DerivedData*`) are not writable |
 | `~/Library/Logs/fleetest`, `~/Library/Caches/fleetest` | Logs, serializing Apple Intelligence calls |
 | `~/Library/Caches/<scenario binary name>`, `~/Library/HTTPStorages/<scenario binary name>` | Model cache for image matching, the default store of `URLSession` |
 | App data of the Simulator the scenario is using | So that `clearAppData` can delete data (other Simulators' data is not writable) |
 
-**Examples of places you cannot write**: the scenario sources and other project files, the fleetest clone, the rest
+**Examples of places you cannot write**: the scenario sources and other project files, the fleetest clone (except its `.fleetest/`), the rest
 of your home folder, `/tmp`, and the location returned by `NSTemporaryDirectory()` or
 `FileManager.default.temporaryDirectory` (writing fails with "You don’t have permission").
 
@@ -40,7 +40,7 @@ What is unreadable by default is the usual places for credentials and personal d
 | Credentials and keys | `.ssh`, `.aws`, `.azure`, `.gnupg`, `.kube`, `.docker`, `.config` (but `config.json` and the running project's dataset under `.config/fleetest` are readable), `.netrc`, `.git-credentials`, `.npmrc`, `.pypirc`, `.pgpass`, `.vault-token`, `.terraform.d` |
 | AI assistant settings | `.claude`, `.claude.json`, `.codex` |
 | Build and distribution credentials | `.gradle`, `.m2`, `.gem/credentials`, `.cargo/credentials` (and `.toml`), `.pub-cache/credentials.json`, `.yarnrc`, `.yarnrc.yml`, `.bundle/config`, `.appstoreconnect`, `private_keys`, `.private_keys`, `.fastlane`, `.expo` |
-| Android keys | `.android` (adb keys), `.emulator_console_auth_token` |
+| Android keys | `.android` (adb keys), `.emulator_console_auth_token` (readable when the machine setting `sandbox.allowDirectAdb: true` is on) |
 | Keychain and app data | `Library/Keychains`, `Library/Cookies`, `Library/Safari`, `Library/Mail`, `Library/Messages`, the profiles of Chrome, Firefox, Edge, Brave and Arc, app data of VSCode, Cursor, Slack and Claude |
 | Shell history | `.zsh_history`, `.zsh_sessions`, `.bash_history`, `.bash_sessions`, `.python_history`, `.node_repl_history`, `.psql_history`, `.mysql_history` |
 

@@ -31,9 +31,9 @@ Results are stable, runs are fast, and there are no charges.
 
 Fleetest implements its own custom drivers for both iOS and Android and optimizes them. It does not depend on existing general-purpose drivers, which leaves it free to make its own improvements.
 
-## inapp mode for the iOS Simulator
+## The `inapp` mode for iOS
 
-The inapp mode, designed for the iOS Simulator, is one of Fleetest's distinctive mechanisms. It is a hybrid configuration that automatically switches between a fast in-app bridge and a general-purpose XCUITest bridge.
+The `inapp` mode is one of Fleetest's distinctive mechanisms. It automatically switches between a fast in-app bridge and a general-purpose XCUITest bridge. It works on Simulators and on physical devices running a development-signed (debuggable) app.
 
 - **In-app bridge**
   - Injected into the process of the app under test when the app launches. With no cross-process round trip, it runs fast.
@@ -56,7 +56,7 @@ The inapp mode, designed for the iOS Simulator, is one of Fleetest's distinctive
 
 ## Fully local execution
 
-- Tests can be run entirely locally on a Mac. **While tests run**, your app and screen data never leave your own fleet of Macs and devices (with a remote runner, they are sent to that other Mac). When you create tests, the screen contents are sent to the AI assistant you use. With a local LLM, even creating the tests can be kept fully local. This makes Fleetest easy to adopt in projects with high security requirements, such as those where cloud services are restricted.
+- Tests can be run entirely locally on a Mac. **While tests run**, your app and screen data never leave your own fleet of Macs and devices (scenarios can reach the destinations you write in the machine setting `sandbox.allowedDomains`; the default is empty, so none; with a runner machine, the data is sent to that other Mac). When you create tests, the screen contents are sent to the AI assistant you use. With an MCP-capable local LLM client, even creating the tests can be kept fully local (not verified by fleetest). This makes Fleetest easy to adopt in projects with high security requirements, such as those where cloud services are restricted.
 
 <br>
 

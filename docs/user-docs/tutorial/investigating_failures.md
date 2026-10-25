@@ -1,4 +1,4 @@
-# Reading Results and Investigating Failures
+# Reading results and investigating failures
 
 [in Japanese(日本語)](investigating_failures_ja.md)
 

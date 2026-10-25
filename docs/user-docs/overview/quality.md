@@ -11,7 +11,7 @@ how far you can trust it: **AI-friendliness, stability, security and privacy**. 
   "run the tests", "find out why this failed" and so on). You do not need to read or write test code yourself
   ([Basics of using fleetest](../tutorial/basic_usage.md)).
 - **When you ask for a test, the AI operates the app through the MCP server, reads the screen, gathers what it
-  needs and then writes the test code** ([MCP Server](../reference/tools/mcp_server.md)).
+  needs and then writes the test code** ([MCP server](../reference/tools/mcp_server.md)).
 
 ## Automated synchronization and performance optimization
 
@@ -25,16 +25,16 @@ how far you can trust it: **AI-friendliness, stability, security and privacy**. 
 ## Parallel test runs on a fleet
 
 - **Tests can run in parallel on a group of Simulators, Emulators and physical devices (a fleet).**
-  This makes the most of the processor's multiple cores ([Parallel Execution](../reference/running/parallel_execution.md)).
-- **Add a Mac and you can use it as a remote runner over the network.**
-  Devices on remote runners can also be added to the fleet
+  This makes the most of the processor's multiple cores ([Parallel execution](../reference/running/parallel_execution.md)).
+- **Add a Mac and you can use it as a runner machine over the network.**
+  Devices on runner machines can also be added to the fleet
   ([Remote Runners](../fleet/remote_runners.md)).
 
 ## Fault tolerance
 
 - **Devices in trouble are recovered automatically.**
   If the connection to a device drops, fleetest tries to restore it.
-- **Tests that fail because of a device problem, such as a device freezing partway through a test, are rerun on another device.**
+- **Tests that fail because of a device problem, such as a device freezing partway through a test, are [rerun on another device](../reference/writing/writing_robust_scenarios.md#write-every-scenario-to-survive-being-re-run-from-the-start).**
 
 ## Reproducibility and cost efficiency
 
@@ -55,10 +55,10 @@ There are mechanisms that limit the risk if harmful code gets mixed into test co
 
 ## Privacy
 
-- **Data never leaves the fleet you set up with your Macs and devices.**
-  No cloud service is accessed.
+- **While tests run, data never leaves your own fleet (Macs and devices).**
+  When you create tests, the screen contents are sent to the AI assistant you use (with a local LLM, creation stays local too).
 - **Some features use FM (Foundation Models), Apple's local LLM, but Apple's cloud (Private Cloud Compute) is not used.**
-- **Frontier models such as Claude or GPT are recommended for creating tests, but a local LLM can be used when security requirements are strict.**
+- **Frontier models such as Claude or GPT are recommended for creating tests, but an MCP-capable local LLM can be used when security requirements are strict (not verified by fleetest).**
 
 ## Customizability
 
@@ -67,7 +67,7 @@ There is no need to modify fleetest itself ([Adding your own features](../refere
 
 - **Turn frequent steps into your own commands.**
   Wrap repeated steps such as logging in or emptying the cart in a single function and call it from any test
-  ([Custom Commands](../reference/testclass/custom_commands.md)).
+  ([Custom commands](../reference/testclass/custom_commands.md)).
 - **Insert any processing before and after tests.**
   For example, you can add setup and cleanup for a database or a stub server.
 
@@ -83,10 +83,10 @@ There is no need to modify fleetest itself ([Adding your own features](../refere
   ([Running on CI](../in_action/ci.md)).
 - **Results can be examined later.**
   Run results are recorded, so you can later find which tests often fail and where
-  ([Analysing results](../reference/running/results_analysis.md)).
+  ([Analyzing results (fleetest results, dashboard)](../reference/running/results_analysis.md)).
 - **You can watch tests as they run.**
   The VSCode extension shows each device's screen and run log live
-  ([VS Code Extension](../reference/tools/vscode_extension.md)).
+  ([VSCode extension](../reference/tools/vscode_extension.md)).
 - **Disk cleanup is automatic.**
   Recordings and logs are deleted oldest first as they approach their size limit
   ([Maintenance for long-term use](../in_action/maintenance.md)).

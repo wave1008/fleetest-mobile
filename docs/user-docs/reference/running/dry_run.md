@@ -10,7 +10,7 @@ surface during, or after, a slow device run — in seconds.
 fleetest run --dry-run --scenario LoginTest
 ```
 
-MCP exposes the same check as `ft_dry_run`; the VS Code extension runs it via
+MCP exposes the same check as `ft_dry_run`; the VSCode extension runs it via
 `fleetest api run --dry-run` (the Test Explorer's "Run (dry-run)" action).
 
 ## What it catches
@@ -39,7 +39,7 @@ execute for the platform being checked (to cover both OSes, dry-run once per pla
 With `--profile`, a dry-run warns when one of the following commands cannot run on a device of that profile
 (a ⚠️ line; the dry-run still passes or fails as before). On a device run these fail only when that step is reached
 (`fold` / `unfold` / `hinge` on a device that cannot fold are still skipped as not applicable without being sent).
-In the VS Code extension's dry-run the warnings appear in the Output panel, not in each test's result in the Test Explorer.
+In the VSCode extension's dry-run the warnings appear in the Output panel, not in each test's result in the Test Explorer.
 
 | Device | Commands warned about |
 |---|---|

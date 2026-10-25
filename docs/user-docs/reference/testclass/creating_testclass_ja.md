@@ -26,8 +26,8 @@ class ログインテスト {
                 condition {
                     launchApp()
                 }.action {
-                    tap("#email"); type("test@example.com")
-                    tap("#password"); type("password123")
+                    type("#email", "test@example.com")
+                    type("#password", account("[user1].password"))
                     tap("#login_btn||ログイン")
                 }.expectation {
                     exist("#welcome_text||ようこそ")
@@ -37,6 +37,8 @@ class ログインテスト {
     }
 }
 ```
+
+値は `dataset/accounts.json` に置きます([テストデータ・アカウント](../commands/dataset_ja.md))。
 
 - `import FTDSL` が必要です。
 - `@TestClass` がクラスに付けるマーカーです。**`@TestClass` に `app:` は書けません** —— 対象アプリは

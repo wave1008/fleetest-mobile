@@ -8,10 +8,8 @@
 
 ```swift
 func login(user: String, password: String) {
-    tap("#login_email")
-    type(user)
-    tap("#login_password")
-    type(password)
+    type("#login_email", user)
+    type("#login_password", password)
     tap("#btn_login")
     exist("#home_title")
 }
@@ -22,10 +20,12 @@ func login(user: String, password: String) {
 ```swift
 scene(1, "ログイン") {
     action {
-        login(user: "demo@example.com", password: "hunter2")
+        login(user: account("[user1].id"), password: account("[user1].password"))
     }
 }
 ```
+
+値は `dataset/accounts.json` に置きます([テストデータ・アカウント](../commands/dataset_ja.md))。
 
 ## コマンドの一覧に載せる(`@FTCommand`)
 
@@ -37,10 +37,8 @@ scene(1, "ログイン") {
 ```swift
 @FTCommand("メールとパスワードでログインし、ホーム画面まで進む")
 func login(user: String, password: String) {
-    tap("#login_email")
-    type(user)
-    tap("#login_password")
-    type(password)
+    type("#login_email", user)
+    type("#login_password", password)
     tap("#btn_login")
     exist("#home_title")
 }

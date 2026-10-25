@@ -13,17 +13,25 @@
 <サーバーのフォルダ> の Dockerfile からイメージ myapp-server:local をビルドし、fleetest のテストプロジェクト myshop の
 TestProjects/myshop/workspace/scripts/compose.yaml に宣言して。Dockerfile が無ければ作って(ビルド段と実行段を分け、
 実行段には healthcheck に使う bash を入れる)。公開ポートは 127.0.0.1:8080。healthcheck を書いて。
-Apple Container を使うなら、先にビルダー VM をメモリ 3 GB にして。
+Apple Container を使うなら、先に `container builder stop && container builder start --cpus 6 --memory 8g` でビルダー VM を増やして。
 アプリの接続先は、iOS Simulator 向けのビルドでは http://127.0.0.1:8080、Android Emulator 向けでは http://10.0.2.2:8080 に
 なるようビルド設定で切り替えられるようにして、両方ビルドし直してアプリプロファイルのパスを更新して。
 fleetest services up --project myshop --profile ios-run で起動を確かめ、/health が ok を返すことを確認したら services down して、結果を報告して。
 ```
 
+期待する結果:
+
+- `services up` が公開ポートを印字し、`/health` が ok を返します。
+- `services down` の後は `services status` が空になります。
+
 ## 2. アプリの接続先を合わせる
 
 iOS Simulator 向けは 127.0.0.1、Android Emulator 向けは 10.0.2.2 を向けます(上の指示文に含めてあります)。
-実機はこの Mac の LAN アドレスに向けます(マシン設定 `services.publishForPhysicalDevices` も要ります。
-[アプリの反応の速さを測る](../response/measuring_app_response_ja.md)のステップ 2〜3 に実例)。
+実機は OS で分かれます。
+
+- iOS の実機: この Mac の LAN アドレスを焼き込んだビルドにします(マシン設定 `services.publishForPhysicalDevices` も要ります。
+  [アプリの反応の速さを測る](../response/measuring_app_response_ja.md)のステップ 2〜3 に実例)。
+- Android の実機: `adb reverse` が張られるので、Emulator 用と同じ 127.0.0.1 のビルドでも届きます(LAN アドレスでも可)。
 
 ## 3. 自分で書く必要があるもの
 

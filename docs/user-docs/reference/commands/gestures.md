@@ -55,7 +55,7 @@ a non-positive duration, too long a gesture) fails the step without touching the
 
 **On iOS this command always runs through XCUITest, even in the default inapp mode.** Use cases: pattern lock,
 long-press-then-drag without lifting (e.g. reordering a list), a custom two-finger rotate,
-gestures needing 3+ fingers, drawing or signing.
+gestures needing 3+ fingers, drawing or signing. On an older Xcode without this API it cannot be sent and the step fails (unlike pinch, there is no alternative path).
 
 ## `hold`: verifying something that only shows while pressed
 

@@ -5,6 +5,12 @@
 Register your own app with fleetest. Put it in a new test project, separate from `project1` for the sample app (SUT Store)
 (registering it in `project1` overwrites the sample's registration).
 
+What you need:
+
+- The app's display name
+- The iOS bundle ID and the Android applicationId
+- The app's source, or a `.app` / `.apk` already built for the Simulator / Emulator
+
 ## 1. Register the app
 
 ### Prompt for the AI
@@ -25,12 +31,12 @@ When you're done, tell me the names of the run profiles you created. There's no 
 Expected result:
 
 - The AI assistant reports the run profile names (such as `ios-run`).
-- In VSCode, switch to `myshop` with `fleetest: Select Project` in the Command Palette, and they appear in the **Profiles** tab of the device monitor.
+- In VSCode, switch to `myshop` with `fleetest: Select Project` in the Command Palette, and they appear in the **Profiles** tab of the Device Monitor.
 
 <details>
 <summary><b>If you do it manually (click to show details)</b></summary>
 
-Build the app first (the [Quick Start](../quick-start.md) has an `xcodebuild` example for the iOS Simulator;
+Build the app first (the [Quick start](../quick-start.md) has an `xcodebuild` example for the iOS Simulator;
 build React Native apps in the Release configuration), then run these in the work folder.
 
 ```bash
@@ -40,6 +46,8 @@ build React Native apps in the Release configuration), then run these in the wor
 ../foundation-tester/.build/debug/fleetest profile setup --project myshop --platform android --app-id com.example.myshop.android \
   --app-name "My Shop" --auto-device --app-path ~/builds/myshop-debug.apk
 ```
+
+If the Android system image is not installed yet, add `--accept-licenses` to `profile setup`.
 
 </details>
 
@@ -53,6 +61,10 @@ Ask only when the path or file name changes.
 ```text
 Change the iOS app path in the app profile of the fleetest test project myshop to ~/builds/MyShop-2.0.app.
 ```
+
+Expected result:
+
+- The iOS app path in the app profile is `~/builds/MyShop-2.0.app`.
 
 Settable items:
 

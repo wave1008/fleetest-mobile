@@ -1,4 +1,4 @@
-# AI Assistants Other Than Claude Code
+# AI assistants other than Claude Code
 
 [in Japanese(日本語)](other_agents_ja.md)
 
@@ -8,7 +8,7 @@ Nothing at the core of fleetest is agent-specific. In Claude Code the
 
 | What you need | How to get it | Agent-specific? |
 |---|---|---|
-| The mechanical work (clone, build, test package preparation, VS Code extension) | the clone and installer below | no |
+| The mechanical work (clone, build, test package preparation, VSCode extension) | the clone and installer below | no |
 | `ft_*` (exploring screens, driving devices, running scenarios) | register `fleetest-mcp` as an MCP server | only the config file format |
 | The runbooks | point the agent at the `SKILL.md` files in the clone | only where they live |
 

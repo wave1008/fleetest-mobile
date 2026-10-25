@@ -31,6 +31,11 @@ R5CT1234ABC    device
 USB でつないだ Android の実機が adb に device として見えているか確かめて、識別子(serial)を教えて。
 ```
 
+期待する結果:
+
+- `adb devices` に端末が `device` と出る
+- 識別子(serial)が分かる
+
 ## 2. Mac の LAN アドレスをマシン設定に書く
 
 サンプルアプリのサーバー(compose.yaml で宣言したサービス)は、ふだんは Mac の中(`127.0.0.1`)だけに公開されます。
@@ -46,6 +51,10 @@ USB でつないだ Android の実機が adb に device として見えている
 ```text
 この Mac の LAN の IPv4 アドレスを教えて。
 ```
+
+期待する結果:
+
+- LAN の IPv4 アドレスが分かる
 
 次に、`~/.config/fleetest/config.json`(無ければ作ります)に自分で書きます。
 
@@ -64,6 +73,10 @@ ipconfig getifaddr en0        # 例: 192.168.1.10(Wi-Fi は en0、有線は en1 
 <br>
 
 以降の例では `192.168.1.10` と書きます。自分のアドレスに読み替えてください。
+
+期待する結果:
+
+- `~/.config/fleetest/config.json` に `services.publishForPhysicalDevices` が書かれている
 
 ## 3. 実機用のアプリをビルドする
 
@@ -93,6 +106,11 @@ cp androidApp/build/outputs/apk/debug/androidApp-debug.apk build/android-physica
 
 Emulator 用の APK をあとでまた使うときは、`-P` を付けずにビルドし直します(実機用のコピーは残ります)。
 
+期待する結果:
+
+- ビルドが成功する
+- `build/android-physical/androidApp-debug.apk` ができている
+
 ## 4. 計測用の実行プロファイルを作る
 
 実機と実機用の APK を使う実行プロファイル `android-response` を作り、計測を有効にします。
@@ -117,7 +135,8 @@ fleetest に、USB でつないでいる Android の実機を使う実行プロ�
   --app-path ../sut-ec-mobile/build/android-physical/androidApp-debug.apk
 ```
 
-できた `TestProjects/project1/profiles/runs/android-response.json` に、`responseMeasurement` と `responseRepeat` を足します。
+できた `TestProjects/project1/profiles/runs/android-response.json` に `responseMeasurement` と `responseRepeat` を足します
+(拡張のフォームで保存したプロファイルなど `fmTextVisibilityCheck: true` が書かれていれば `false` にします)。
 
 ```json
 {
@@ -134,6 +153,11 @@ fleetest に、USB でつないでいる Android の実機を使う実行プロ�
 <br>
 
 `responseRepeat` は、同じシナリオを続けて回す回数です(既定 5・最大 50)。回数が多いほど中央値が安定します。
+
+期待する結果:
+
+- `profiles/runs/android-response.json` に `responseMeasurement: true` と `responseRepeat: 5` がある
+- `fmTextVisibilityCheck: true` が書かれていない
 
 ## 5. 計測する
 
@@ -166,6 +190,10 @@ run の中では次のことが起きます。
 - run の間、デバイスモニターの観測と配信は止まります。タイルが更新されなくても正常です。
 - 合否はふだんと同じに付きます。失敗したシナリオの、失敗より後のステップは測れません。
 
+期待する結果:
+
+- 同じシナリオが 5 回続けて回り、終了する
+
 ## 6. 結果を見る
 
 シナリオのレポート(`TestProjects/project1/reports/`)の各ステップに、値が付きます。
@@ -176,7 +204,11 @@ run の中では次のことが起きます。
 
 - `first frame` = **最初のフレームまで**(タップしてから、アプリが最初に画面を描き直すまで)
 - `ready` = **操作可能まで**(タップしてから、シナリオが次に操作する要素が押せるようになるまで)
-- `exist` などの検証のステップには付きません。シナリオの最後の操作には `ready` がありません(次の操作が無いため)。
+- `ready` が数 ms の行は異常ではありません(遷移の間も同じ位置にある部品を次に押す行は、遷移の最初から押せるため)。
+
+期待する結果:
+
+- レポートの操作のステップに `first frame` と `ready` の値が付いている
 
 5 回分をまとめて見ます。
 
@@ -206,12 +238,11 @@ scenario       step                               device       host    n  median
 ログイン.S0010  s2 action tap tap "設定" #1         R5CT1234ABC  my-mac  5  91         98      0     0        -                -             -               -
 ```
 
-| 列 | 見方 |
-|---|---|
-| `median ms` / `p90 ms` | 最初のフレームまでの中央値と p90。`n` は標本数(回した回数) |
-| `ready median ms` | 操作可能までの中央値。遷移の間もずっと同じ位置にある部品(タブバーなど)を次に押す行は数 ms になります。「遷移の最初から押せる」という意味で、異常ではありません |
-| `busy` | 操作の前から描画が続いていて、その回は測らなかった回数。多いなら、その画面は前の操作のアニメーションが 10 秒止まりません |
-| `prev median ms` / `delta` | 前回の計測 run との差。初回は `-` です |
+列の読み方は、リファレンスの[レスポンス計測](../reference/running/response_measurement_ja.md)の「結果を見る」を見てください。
+
+期待する結果:
+
+- ステップごとに 1 行で、`n` が 5 の行が並ぶ
 
 ## 7. もう1度測って、差を見る
 
@@ -232,6 +263,10 @@ fleetest の android-response プロファイルで同じシナリオをもう1�
 - **標本が少ない差は、ばらつきと区別できません。** 差が気になるときは `responseRepeat` を増やします
   (`--set responseRepeat=10` で、その run だけ上書きできます)。
 - アプリを変えたあとに測るときは、ステップ 3 と同じ場所に APK をビルドし直してから回します。
+
+期待する結果:
+
+- `prev median ms` と `delta` に値が入る
 
 ## iOS で測るとき
 

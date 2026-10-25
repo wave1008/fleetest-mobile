@@ -74,7 +74,7 @@ httpRequest("https://api.example.com/orders", method: "POST", body: body)
 ```
 
 - It looks in the same two places as `account()` / `data()`: `~/.config/fleetest/dataset/<project name>/<file name>`
-  on the Mac that runs the scenario if it exists, otherwise `TestProjects/<project name>/dataset/<file name>`.
+  on the Mac that runs the scenario if it exists, otherwise `<project>/dataset/<file name>`.
 - **The whole file is replaced** (there is no per-attribute override as with `accounts.json`; contents are not merged).
 - Write the file name relative to the dataset folder (folders are fine, as in `csv/users.csv`). Names that start with
   `/` or `~`, and names containing `..`, are not allowed.
@@ -94,7 +94,7 @@ addMedia("img/avatar.png")
 ```
 
 - The file is looked up exactly as in `dataFile` (`~/.config/fleetest/dataset/<project name>/<file name>` on the Mac
-  that runs the scenario if it exists, otherwise `TestProjects/<project name>/dataset/<file name>`). If it is in
+  that runs the scenario if it exists, otherwise `<project>/dataset/<file name>`). If it is in
   neither place, the step fails and the scenario stops.
 - Supported extensions (case does not matter): images `jpg` `jpeg` `png` `heic` `gif`, videos `mp4` `mov`. Any other
   file fails without being sent.

@@ -3,7 +3,7 @@
 [in Japanese(日本語)](concepts_ja.md)
 
 In fleetest, the set of devices (virtual devices and physical devices) that run your tests is called a **fleet**.
-You can grow your fleet by adding devices on local and remote Macs.
+You can grow your fleet by adding devices on your Mac and other Macs (runner machines).
 
 <img src="../images/fleet/en/concept.png" width="720" alt="When you ask for tests on your Mac (machine name local), scenarios, profiles and the app are sent over SSH to the runner machines M1Max and M2Ultra, and reports, recordings and logs are collected back to your Mac. The machine field of each device in the run profile decides which device on which machine runs the tests, and scenarios are split across machines by how many devices each has and run at the same time">
 
@@ -11,7 +11,7 @@ You can grow your fleet by adding devices on local and remote Macs.
 
 | Name | Description |
 |---|---|
-| Your Mac | The Mac you operate. You ask for tests from an AI assistant, VS Code or the CLI, and read the results here. Its machine name is `local` |
+| Your Mac | The Mac you operate. You ask for tests from an AI assistant, VSCode or the CLI, and read the results here. Its machine name is `local` |
 | Runner machine | Another Mac that runs tests for you. It does not need to be on the same LAN, as long as your Mac can log in to it over SSH |
 | Machine name | A name you give a runner machine on your Mac (for example `M1Max`). Profiles use this name, not a host name or IP address |
 | Device | Where the tests run: Simulators and Emulators (virtual devices) and physical devices (a real iPhone or Android). Every device belongs to one machine |
@@ -29,8 +29,8 @@ This name is called the **machine name**.
 Register machine names with `fleetest remote machines add` or in the Device Monitor's Settings
 tab (see Step 2 of [Adding a Mac](adding_mac.md)).
 
-Renaming a machine later causes no trouble. Records such as result JSON keep the host name, and
-the machine name never appears in the files or arguments sent to the runner.
+To rename a machine, `remove` and then `add` it in the registry, and rewrite the `devices[].machine` of every run profile and
+the `host` of every fleet definition that uses the name. Past result JSON keeps the host name, so it is not affected.
 
 ## The run profile decides where tests run
 
@@ -52,8 +52,8 @@ The devices listed in a run profile's `devices` are where the run goes. Each dev
   there.
 - Physical devices work the same way. List a device with `"kind": "physical"` and its identifier, with the `machine`
   of the Mac it is connected to.
-- Write `"machine": "local"` for devices on your own Mac — always write it explicitly, since
-  there is no profile-level default to fall back on.
+- Write `"machine": "local"` for devices on your own Mac. Leaving it out is treated as your own Mac, but writing
+  `"machine": "local"` explicitly is recommended, to match what the extension writes.
 - `--runner <name>` on the command line takes priority over the profile (pass `--runner local` to
   force a run to stay on your Mac). Besides a machine name, `--runner` also accepts a host name
   or IP address directly.
@@ -63,9 +63,10 @@ The devices listed in a run profile's `devices` are where the run goes. Each dev
   machine, or `--all-machines` to run on every machine that has a device with that name. If the name
   is on only one machine, the run goes ahead as before.
 
-To run the same scenarios on every machine, create a **fleet definition** that lists pairs of a machine and a run
-profile (`TestProjects/<project>/profiles/fleets/<name>.json`) and run `fleetest run --fleet <name>` (`--split`
+To run the same scenarios on every machine, create a **fleet definition**, which lists which machine runs which run profile
+within the fleet (`TestProjects/<project>/profiles/fleets/<name>.json`) and run `fleetest run --fleet <name>` (`--split`
 splits the scenarios across the machines instead of running all of them everywhere; see "Run it" in [Remote Runners](remote_runners.md)).
+Running a fleet definition is available from the CLI only (not from the extension or MCP), and it is experimental.
 
 ## What happens automatically
 
@@ -73,7 +74,7 @@ splits the scenarios across the machines instead of running all of them everywhe
   only on your Mac and never touch the files on a runner machine.
 - **Collecting**: reports, JUnit, recordings and logs are collected back to your Mac and included in `fleetest results`
   (flaky detection and so on).
-- **Watching**: the device monitor in the VS Code extension lists the devices of every machine just like your own
+- **Watching**: the Device Monitor in the VSCode extension lists the devices of every machine just like your own
   (with a machine-name badge).
 - **Keeping versions aligned**: before a run, fleetest checks that the runner machine has the same fleetest version as
   your Mac. If they differ, the run does not start.
@@ -99,7 +100,7 @@ foundation-tester elsewhere, it is never touched.
 
 | Capability | Supported |
 |---|---|
-| Send a run to another Mac (from the CLI or the VS Code extension) | ✅ |
+| Send a run to another Mac (from the CLI or the VSCode extension) | ✅ |
 | Progress display, cancellation, timeout | ✅ |
 | Bring reports, JUnit, recordings and run logs back to your Mac | ✅ |
 | Provision a runner from your Mac in one command (`remote setup`); remove it the same way (`remote teardown`) | ✅ |
@@ -109,6 +110,8 @@ foundation-tester elsewhere, it is never touched.
 | Split one set of scenarios across several runners (`run --fleet <name> --split`) | ✅ |
 | Include remote results in `fleetest results` (flaky detection etc.) | ✅ (collected by default) |
 | See remote devices' state and video in the Device Monitor | ✅ |
+
+Running a fleet (`run --fleet`) is available from the CLI only (not from the extension or MCP), and it is experimental.
 
 ## How to grow it
 
@@ -127,14 +130,14 @@ one Mac starts to slow things down, it is time to add a Mac.
 - **A runner machine runs only one run at a time.** While someone is using it, other runs wait until it is free
   ("Sharing one runner between several people" in [Remote Runners](remote_runners.md)).
 - **Keep a user logged in on each runner machine.** A Mac sitting at the login window cannot run tests.
-- **You can take a machine out temporarily.** Clear "Machine enabled" under "Machines" in the device monitor's
+- **You can take a machine out temporarily.** Clear "Machine enabled" under "Machines" in the Device Monitor's
   Settings tab, and no tests are sent to that machine.
 
 ## Related
 
 - [Adding a Mac](adding_mac.md) — preparing a runner machine and adding it to the fleet
 - [Adding physical devices](adding_physical_devices.md) — adding a real iPhone or Android to the fleet
-- [Remote Runners](remote_runners.md) — running on a runner machine (`--runner`, `--fleet`, the VS Code extension, sharing), plus setups across a router, maintenance and safety
+- [Remote Runners](remote_runners.md) — running on a runner machine (`--runner`, `--fleet`, the VSCode extension, sharing), plus setups across a router, maintenance and safety
 
 ### Link
 - [index](../index.md)

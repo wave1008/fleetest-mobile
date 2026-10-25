@@ -1,4 +1,4 @@
-# Analysing results (fleetest results, dashboard)
+# Analyzing results (fleetest results, dashboard)
 
 [in Japanese(日本語)](results_analysis_ja.md)
 
@@ -15,6 +15,9 @@ results/runs/<YYYY-MM>/<runID>/
   scenarios/<scenarioID>.json  ... one scenario execution
   scenarios/<scenarioID>~2.json ... a re-run within the same run (numbered)
   events/<scenarioID>.ndjson   ... that scenario's execution log (see `fleetest results log` below)
+  events/.inflight-<UUID>.ndjson ... an execution log still being written (or killed before it was finalized)
+  superseded/<scenarioID>[~N].<k>.json ... a record cancelled by a re-run
+  events/superseded/<scenarioID>[~N].<k>.ndjson ... the execution log of the same cancelled record
   host-metrics.ndjson          ... host load (cpu/gpu/mem) during the run
 ```
 
@@ -117,7 +120,7 @@ jq -r 'select(.passed==false) | .failedSteps[0]
   results/runs/2026-08/*/scenarios/*.json | sort | uniq -c
 ```
 
-## In VS Code
+## In VSCode
 
 The command palette's **"fleetest: Open Results Dashboard"** opens a panel showing notable issues,
 the comparison with the previous run, recent runs, a filterable/sortable
@@ -126,7 +129,7 @@ Monitor combined with run-history counts: excluded from run, requeued, pre-run e
 recovery operations, app crashes) — backed by the
 same `fleetest results` data (a toolbar control switches the aggregation period between the last 5/10
 minutes, 1/3/8/16 hours, and 1/2/3/7/30/90 days). See the Results Dashboard section of
-[VS Code Extension](../tools/vscode_extension.md).
+[VSCode extension](../tools/vscode_extension.md).
 
 ## CI
 

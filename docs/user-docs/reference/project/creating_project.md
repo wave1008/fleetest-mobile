@@ -1,4 +1,4 @@
-# Creating a Test Project
+# Creating a test project
 
 [in Japanese(日本語)](creating_project_ja.md)
 

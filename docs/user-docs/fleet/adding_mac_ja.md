@@ -124,8 +124,14 @@ user@192.168.xxx.xxx へSSHで接続できるようにして
 
 パスワードの入力が要るので、AIアシスタントが途中で止まって入力を求めることがあります。
 
+期待する結果:
+
+- `ssh -o BatchMode=yes user@192.168.xxx.xxx 'echo ok'` がパスワードなしで `ok` と表示される
+
 <details>
 <summary><b>手動で実行する場合(クリックで詳細表示)</b></summary>
+
+鍵が無ければ `ssh-keygen -t ed25519` で作ります。
 
 ```bash
 ssh-copy-id user@192.168.xxx.xxx  # ← 適切なユーザー名とホストに書き換えて実行します
@@ -151,6 +157,10 @@ fleetest はパスワードを入力せずに接続するので、2行目はパ�
 ```text
 fleetest にマシン M1Max(user@192.168.xxx.xxx)を登録して。
 ```
+
+期待する結果:
+
+- `fleetest remote machines` の一覧にマシン名が出る
 
 <details>
 <summary><b>手動で実行する場合(クリックで詳細表示)</b></summary>
@@ -219,6 +229,11 @@ fleetest のリモート実行を M1Max(ssh user@192.168.xxx.xxx)にセットア
 ステップ0の準備が残っていると、AIアシスタントは足りない項目を一覧にして止まります。ランナー機で済ませてから、
 同じ指示をもう一度渡してください。
 
+期待する結果:
+
+- `✅ [ok] verify: dispatch to … passed` と出て、終了コード 0 で終わる
+- または終了コード 2 で、未実施の警告だけが残る
+
 <details>
 <summary><b>手動で実行する場合(クリックで詳細表示)</b></summary>
 
@@ -264,6 +279,10 @@ fleetest remote setup <マシン名> --project <プロジェクト>
 ```text
 M1Max にあるデバイスを調べて、実行プロファイル ios-run に追加して。
 ```
+
+期待する結果:
+
+- 実行プロファイルの `devices` に、`"machine": "M1Max"` の付いたデバイスが入っている
 
 <details>
 <summary><b>手動で実行する場合(クリックで詳細表示)</b></summary>
@@ -313,6 +332,11 @@ M1Max にあるデバイスを調べて、実行プロファイル ios-run に�
 M1Max に接続できるか、ランナー機の状態を確認して。
 ```
 
+期待する結果:
+
+- `REACHABLE` と `LOGIN` が `yes`、`BINARY` が `yes` になる
+- ⚠️ や ❌ が出ていれば、下の表に従って直す
+
 <details>
 <summary><b>手動で実行する場合(クリックで詳細表示)</b></summary>
 
@@ -337,6 +361,8 @@ user@mac2     yes        yes    ✅ 9655a21…  ✅ Xcode27…   ✅ iOS 27.0: 2
 | `RUNTIME` に ⚠️ `iOS <版>: none` | そのランナー機に、使われている Xcode に対応する Simulator のランタイムが無い(ランタイムは Xcode に付いてきません)。その iOS のデバイスを作れません | そのランナー機で `xcodebuild -downloadPlatform iOS` を実行します |
 | `BINARY` が `no` | ランナー機に fleetest がビルドされていない | ステップ3をもう一度実行します |
 
+`FM` は `--fm` を付けたときだけ測ります(付けないと `-`)。
+
 ### VSCode 拡張で確認する
 
 デバイスモニターを開くと、ランナー機のデバイスも手元のデバイスと同じようにタイルで表示されます。
@@ -359,6 +385,11 @@ user@mac2     yes        yes    ✅ 9655a21…  ✅ Xcode27…   ✅ iOS 27.0: 2
 ```text
 実行プロファイル ios-run で、M1Max にシナリオ <シナリオ名> を実行して。
 ```
+
+期待する結果:
+
+- シナリオがランナー機で実行され、結果が出る
+- レポート・録画・ログが手元の Mac へ回収される
 
 <details>
 <summary><b>手動で実行する場合(クリックで詳細表示)</b></summary>

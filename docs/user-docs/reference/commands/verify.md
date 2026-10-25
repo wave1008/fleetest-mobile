@@ -8,7 +8,7 @@ Groups several assertions into one reported check.
 
 | function | description |
 |---|---|
-| `verify(message) { }` | Runs the block and records it as one check step named `message`. Passes when one or more assertion commands (`exist` / `notExist` / the text-value-id-this-app assertions) inside the block all succeed. |
+| `verify(message) { }` | Runs the block and records it as one check step named `message`. Passes when one or more assertion commands (every assertion command except `screenLooksLike`: `exist` / `notExist` / `countIs`, the text / value / id / state / image / keyboard / this / app assertions) inside the block all succeed. |
 
 ## Example
 

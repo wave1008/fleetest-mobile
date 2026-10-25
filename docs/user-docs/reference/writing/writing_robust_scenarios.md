@@ -1,4 +1,4 @@
-# Writing Robust Scenarios
+# Writing robust scenarios
 
 [in Japanese(日本語)](writing_robust_scenarios_ja.md)
 
@@ -17,7 +17,7 @@ sliding in).
 ## Take selectors from a real screenshot, not from memory
 
 Never guess an id or label. Capture the real screen (with `ft_snapshot`, or the VSCode
-extension's device monitor, Grid View element list) and copy the id/label/type it actually reports. Prefer `#id`
+extension's Device Monitor, Grid View element list) and copy the id/label/type it actually reports. Prefer `#id`
 first — it's the most durable. Where an id isn't available, add a label as a fallback with `||`:
 
 ```swift

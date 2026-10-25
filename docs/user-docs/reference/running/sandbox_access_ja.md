@@ -21,12 +21,12 @@
 | 場所 | 用途 |
 |---|---|
 | レポートの出力先 | 結果・スクリーンショット・ログ |
-| プロジェクトと作業フォルダの `.fleetest/`、`~/.fleetest/` | fleetest の状態の記録。ただし、次の run やデバイスの用意で fleetest 本体が読んで実行・配布するもの(`hooks/` など)は書けません |
+| プロジェクト・作業フォルダ・fleetest 本体のクローンの `.fleetest/`、`~/.fleetest/` | fleetest の状態の記録。ただし、次の run やデバイスの用意で fleetest 本体が読んで実行・配布するもの(`hooks/`・ブリッジの台帳・`DerivedData*` など)は書けません |
 | `~/Library/Logs/fleetest`・`~/Library/Caches/fleetest` | ログ、Apple Intelligence の呼び出しの直列化 |
 | `~/Library/Caches/<シナリオ実行バイナリ名>`・`~/Library/HTTPStorages/<シナリオ実行バイナリ名>` | 画像照合のモデルのキャッシュ、`URLSession` の既定の保存先 |
 | シナリオが使っている Simulator のアプリのデータ | `clearAppData` がデータを消すため(他の Simulator のものは書けません) |
 
-**書けない場所の例**: シナリオのソースとプロジェクトの他のファイル、fleetest 本体のクローン、ホームの他の場所、
+**書けない場所の例**: シナリオのソースとプロジェクトの他のファイル、fleetest 本体のクローン(`.fleetest/` を除く)、ホームの他の場所、
 `/tmp`、`NSTemporaryDirectory()` や `FileManager.default.temporaryDirectory` が返す場所
 (書くと「You don’t have permission」で失敗します)。
 
@@ -40,7 +40,7 @@
 | 認証情報・鍵 | `.ssh`・`.aws`・`.azure`・`.gnupg`・`.kube`・`.docker`・`.config`(ただし `.config/fleetest` の `config.json` と、そのプロジェクトのデータセットは読めます)・`.netrc`・`.git-credentials`・`.npmrc`・`.pypirc`・`.pgpass`・`.vault-token`・`.terraform.d` |
 | AIアシスタントの設定 | `.claude`・`.claude.json`・`.codex` |
 | ビルド・配布の資格情報 | `.gradle`・`.m2`・`.gem/credentials`・`.cargo/credentials`(`.toml` も)・`.pub-cache/credentials.json`・`.yarnrc`・`.yarnrc.yml`・`.bundle/config`・`.appstoreconnect`・`private_keys`・`.private_keys`・`.fastlane`・`.expo` |
-| Android の鍵 | `.android`(adb の鍵)・`.emulator_console_auth_token` |
+| Android の鍵 | `.android`(adb の鍵)・`.emulator_console_auth_token`(マシン設定 `sandbox.allowDirectAdb: true` のときは読めます) |
 | キーチェーン・アプリのデータ | `Library/Keychains`・`Library/Cookies`・`Library/Safari`・`Library/Mail`・`Library/Messages`、Chrome・Firefox・Edge・Brave・Arc のプロファイル、VSCode・Cursor・Slack・Claude のアプリのデータ |
 | シェルの履歴 | `.zsh_history`・`.zsh_sessions`・`.bash_history`・`.bash_sessions`・`.python_history`・`.node_repl_history`・`.psql_history`・`.mysql_history` |
 

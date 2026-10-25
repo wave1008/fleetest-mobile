@@ -14,7 +14,7 @@ description: セットアップ済みのプロジェクトに、Swift DSL のテ
 > 以下は `/` 形で書くので、別の記法のエージェントではそちらへ読み替える。
 
 既存プロジェクト(`fleetest init` / `fleetest project create` 済み・アプリ/デバイス/実行プロファイルが
-ある)に、**1本のテストシナリオ .swift** を作る。DSL の正典は DS-10「Swift DSL」と
+ある)に、**1本のテストシナリオ .swift** を作る。DSL の正典は DS-10「Swift DSL」(記述: `docs/design/dsl-syntax.md` / 実行: `docs/design/dsl-execution.md`)と
 docs/commands.md・docs/user-docs/reference/(testclass/・selector/)。ここはエージェントが順に実行するための手順書。
 
 未セットアップなら `/fleetest-setup`、対象アプリ・デバイス・実行プロファイルが無ければ `/fleetest-profiles`。
@@ -41,7 +41,7 @@ docs/commands.md・docs/user-docs/reference/(testclass/・selector/)。ここは
   |---|---|
   | コマンドの名前・署名・掴んだ要素から読める値 | `ft_dsl_commands`(値は `category: "property"` = `exist(sel).text` 等、読んだ値の検証は `category: "this"`) |
   | コマンドの引数・挙動 | `docs/commands.md`・`docs/user-docs/reference/commands/` |
-  | テストクラスの構造(`beforeEach` / `setUpDevice` 等) | `docs/user-docs/reference/testclass/testcode_structure_ja.md`・`docs/user-docs/reference/commands/descriptors_ja.md` |
+  | テストクラスの構造(`beforeEach` / `setUpDevice` 等) | `docs/user-docs/reference/testclass/testcode_structure_ja.md`・`docs/user-docs/reference/testclass/creating_testclass_ja.md`・`docs/user-docs/reference/commands/descriptors_ja.md` |
   | セレクタの書き方 | `docs/user-docs/reference/selector/` |
 
   docs で答えが見つからなければ、ソースを読みに行かず、完了報告で「docs に無かったこと」として挙げる
@@ -260,12 +260,12 @@ id の照合は**ステップ2で `ft_snapshot` を撮った画面ぶんだけ**
   isError になり、失敗したステップのエラー・**失敗した瞬間の要素一覧とスクリーンショット**・
   レポートパスが返る。**直すときはまず要素一覧を読む**(画像からは `#id` を読めない)。
   そこに無いものが画面にあるなら、別ウィンドウ・システムアラートの覆いを疑う。
-  ロケータのブレを吸収したいときだけ `heal: true`(ロケータの指紋照合。FM は使わない)。
+  ロケータの指紋照合による自己修復は既定で有効(`--profile` の run)。止めるときだけ `heal: false`(FM は使わない)。
 - 利用者に全部の実行を頼まれたら `ft_start_run`(profile=実行プロファイル。`fleetest run --profile` と同じで
   結果の履歴・録画が残る)。裏で始まってすぐ返るので、`ft_run_status` で進み具合と結果を引く。
 
-レポートで期待通りか確認する。セレクタがヒール修正提案付きで通っている場合は、提案を人がレビューして
-ソースを実ラベルに直す(DS-10「ロケータの指紋」)。
+レポートで期待通りか確認する。セレクタが自己修復で通っている場合、run の終わりに修正はソースへ自動で書き戻される。
+`git diff` を利用者に見せてコミットの判断を取る(DS-10「ロケータの指紋」= `docs/design/dsl-execution.md`)。
 
 ### 6. 仕様違反のバグ起票(testbase を根拠に書いたときだけ)
 

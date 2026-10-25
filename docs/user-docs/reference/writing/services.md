@@ -7,7 +7,7 @@ If the app under test needs a database, an API or a stub server, declare it in
 run and stops them afterwards**. It waits until they are up (the `healthcheck`) before `run-setup.sh` runs, and stops them
 after `run-teardown.sh`. If the file is not there, nothing happens.
 
-It works with `fleetest run`, a run from the VS Code extension and the MCP tool `ft_start_run`. It does not start with
+It works with `fleetest run`, a run from the VSCode extension and the MCP tool `ft_start_run`. It does not start with
 `ft_run_scenario` (a single scenario) or `--dry-run`; to have the services up while you explore, use
 `fleetest services up` ([Starting and stopping by hand](#starting-and-stopping-by-hand)). For a run sent to a
 [remote runner](../../fleet/remote_runners.md), the services start **on the runner machine** (with that machine's
@@ -180,7 +180,7 @@ The scripts themselves run in their own sandbox ([Running scripts before and aft
 
 ## Starting and stopping by hand
 
-For exploring, live operation and writing scenarios, a person can start the services before a run.
+For exploring, Live Control and writing scenarios, a person can start the services before a run.
 
 | Command | What it does |
 |---|---|

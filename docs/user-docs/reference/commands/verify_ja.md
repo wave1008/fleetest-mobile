@@ -8,7 +8,7 @@
 
 | 関数 | 説明 |
 |---|---|
-| `verify(message) { }` | ブロックを実行し、`message` を名前とする1ステップ(check)として記録します。ブロック内で `exist` / `notExist` / text・value・id・this・app 系の検証コマンドが1つ以上実行され、すべて成功すれば passed になります。 |
+| `verify(message) { }` | ブロックを実行し、`message` を名前とする1ステップ(check)として記録します。ブロック内で `screenLooksLike` を除くすべての検証コマンド(`exist` / `notExist` / `countIs`・text・value・id・状態・画像・キーボード・this・app 系)が1つ以上実行され、すべて成功すれば passed になります。 |
 
 ## 例
 

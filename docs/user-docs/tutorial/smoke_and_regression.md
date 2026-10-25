@@ -59,6 +59,8 @@ Expected result:
 
 Next, run everything without naming a folder (regression) and compare how many ran.
 
+### Prompt for the AI
+
 ```text
 With the ios-run profile of the fleetest test project project1, run all scenarios.
 ```

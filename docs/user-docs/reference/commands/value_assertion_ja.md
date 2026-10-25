@@ -14,7 +14,7 @@ select("#email"); lastElement.valueIs("test@example.com") // lastElement を明�
 select("#email"); valueIs("test@example.com")              // 暗黙(直前に掴んだ要素)
 ```
 
-引数は `(期待値, strict:, waitSeconds:)`(肯定形は `requireVisible:` も取ります。`strict:` を取らない `valueMatchesDateFormat` を除く。下の表のとおり)。セレクタを渡す形はありません。
+引数は、肯定形が `(期待値, requireVisible:, strict:, waitSeconds:)`、否定形と空判定が `(期待値, strict:, waitSeconds:)` です(`valueMatchesDateFormat` は `strict:` を取りません。下の表のとおり)。セレクタを渡す形はありません。
 
 ## 関数
 
@@ -40,8 +40,9 @@ select("#email").valueContains("@example.com")
 
 ## 注意点
 
-- iOS では、空欄の入力欄が空文字ではなく placeholder の文字列を value として返すことがあります。
-  そのような欄では `valueIsEmpty` を避け、`valueIsNotEmpty` や具体的な期待値での検証を使ってください。
+- 入力欄の内容は `value*` で見てください。空欄は `valueIsEmpty` で判定できます(全 UI フレームワークで空欄の value は空)。
+  入力欄の `text` は Compose Multiplatform(iOS)・Flutter(iOS)・React Native で placeholder の文字列を返すので、入力欄に
+  `textIsEmpty` / `textIs` を当てないでください。
 - 否定系と空判定は可視性を見ません。また、これらのコマンドに `scroll:` はありません
   — テキストの検証と同じ規則です。
 - チェーンした検証は、まず掴んだ時点の値で判定し、それで満たしていなければデバイスをポーリングします。

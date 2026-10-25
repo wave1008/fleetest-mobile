@@ -1,4 +1,4 @@
-# Parallel Execution
+# Parallel execution
 
 [in Japanese(日本語)](parallel_execution_ja.md)
 
@@ -52,7 +52,7 @@ connection is effectively exclusive to one client.
   run stops dropping. If a run turns red only at the higher count, go back to the lower one.
 - A freshly cold-booted Simulator can time out on its accessibility IPC. Workers warm up with a
   snapshot automatically at start, but if it still fails, run `bridge up` then launch the app and take one
-  snapshot by hand (MCP `ft_launch` and `ft_snapshot`; see [MCP Server](../tools/mcp_server.md)) before the real run.
+  snapshot by hand (MCP `ft_launch` and `ft_snapshot`; see [MCP server](../tools/mcp_server.md)) before the real run.
 
 ## Slowing down when the Mac is busy
 
@@ -120,7 +120,7 @@ If you do start a second one:
 - **On the CLI** it stops right away with `another fleetest run is already running on this Mac`,
   telling you who started the run in progress and since when. Add `--wait-lock <seconds>` to queue
   for it instead of failing; runs are served in the order they got in line.
-- **In the VS Code extension** it waits by default, for up to 1 hour. Change it in the Device
+- **In the VSCode extension** it waits by default, for up to 1 hour. Change it in the Device
   Monitor's **Settings** tab, under **Machines** → **Max wait on runner contention** (0 fails right
   away without waiting). While you are in line, the run log shows your position.
 
@@ -130,9 +130,9 @@ the runner is busy for everyone until it finishes — see
 
 ## Other places parallel execution shows up
 
-- The VS Code extension runs the same parallel execution through the `fleetest.profile` setting
+- The VSCode extension runs the same parallel execution through the `fleetest.profile` setting
   (see the Device Monitor section of
-  [VS Code Extension](../tools/vscode_extension.md)).
+  [VSCode extension](../tools/vscode_extension.md)).
 - LPT ordering (longest-past-runtime-first dispatch) balances the queue across workers using
   recent run history; `--no-lpt`/`--lpt-history-runs` control it (see
   [running_scenarios.md](./running_scenarios.md)).

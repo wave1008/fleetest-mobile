@@ -1,4 +1,4 @@
-# Creating a Test Class
+# Creating a test class
 
 [in Japanese(日本語)](creating_testclass_ja.md)
 
@@ -26,8 +26,8 @@ class LoginTest {
                 condition {
                     launchApp()
                 }.action {
-                    tap("#email"); type("test@example.com")
-                    tap("#password"); type("password123")
+                    type("#email", "test@example.com")
+                    type("#password", account("[user1].password"))
                     tap("#login_btn||Log In")
                 }.expectation {
                     exist("#welcome_text||Welcome")
@@ -37,6 +37,8 @@ class LoginTest {
     }
 }
 ```
+
+Account values live in `dataset/accounts.json` — see [Test data and accounts](../commands/dataset.md).
 
 - `import FTDSL` is required.
 - `@TestClass` marks the class. **`@TestClass` takes no `app:`** — the target app is resolved

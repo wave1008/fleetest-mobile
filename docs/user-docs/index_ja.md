@@ -8,6 +8,8 @@ E2E テストツールです。名前の由来と特徴は [Fleetest とは](ove
 はじめての方は、[クイックスタート](quick-start_ja.md)でインストールからサンプルアプリでの実行までを通し、
 [チュートリアル](#チュートリアル)へ進んでください。
 
+**導入を判断する方へ**: [fleetest とは](overview/about_ja.md) → [環境](overview/environments_ja.md) → [品質特性](overview/quality_ja.md) → [注意事項と制限事項](security/limitations_ja.md) → [ネットワークの露出とセキュリティ](security/network_security_ja.md) の順に読んでください。
+
 ## リポジトリ
 
 - [foundation-tester](https://github.com/wave1008/foundation-tester)
@@ -28,6 +30,14 @@ E2E テストツールです。名前の由来と特徴は [Fleetest とは](ove
 - [結果を読み、失敗を調べる](tutorial/investigating_failures_ja.md)
 - [スモークと回帰を分けて回す](tutorial/smoke_and_regression_ja.md)
 - [VSCode で見る](tutorial/watching_in_vscode_ja.md)
+
+## 自分のアプリでテストする
+
+- [テスト対象アプリを用意する](own_app/preparing_app_ja.md)
+- [アプリが依存するサーバーを用意する](own_app/preparing_server_ja.md)
+- [ログインが必要なアプリをテストする](own_app/logging_in_ja.md)
+- [テストを作って回す](own_app/creating_and_running_ja.md)
+- [アプリの変更にテストを追従させる](own_app/keeping_up_ja.md)
 
 ## セキュリティ
 
@@ -56,18 +66,11 @@ E2E テストツールです。名前の由来と特徴は [Fleetest とは](ove
 - [トラブルシューティング](in_action/troubleshooting_ja.md)
 - [長く使うためのメンテナンス](in_action/maintenance_ja.md)
 
-## 自分のアプリでテストする
-
-- [テスト対象アプリを用意する](own_app/preparing_app_ja.md)
-- [アプリが依存するサーバーを用意する](own_app/preparing_server_ja.md)
-- [ログインが必要なアプリをテストする](own_app/logging_in_ja.md)
-- [テストを作って回す](own_app/creating_and_running_ja.md)
-- [アプリの変更にテストを追従させる](own_app/keeping_up_ja.md)
-
 ## Appendix
 
 - [品質特性(非機能要件)](overview/quality_ja.md)
 - [用語集](overview/glossary_ja.md)
+- [他のテストフレームワークからの乗り換え: Shirates 利用者向けの対応表](overview/for_shirates_users_ja.md)
 
 ## 開発者向けリファレンス
 
@@ -190,4 +193,3 @@ E2E テストツールです。名前の由来と特徴は [Fleetest とは](ove
 
 - [DSL コマンドリファレンス](../commands.md)
 - [結果 JSON のスキーマ](../results-json.md)
-- [Shirates 利用者向けの対応表](overview/for_shirates_users_ja.md)

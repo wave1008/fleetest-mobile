@@ -96,7 +96,7 @@ left. FM judges those. Where FM is unavailable, they pass unverified.
 ## When a step fails
 
 - **Check that the screenshot is not stale**: the tree can be on the right screen while the screenshot
-  still shows the previous one. This has happened while the VSCode extension's device monitor was
+  still shows the previous one. This has happened while the VSCode extension's Device Monitor was
   streaming an Android Emulator's screen. Look at whether the failure screenshot in the report shows a
   different screen.
 

@@ -70,7 +70,7 @@ foundation-tester のクローン内で作業している場合は `swift run fl
 | コマンド | 説明 | 主なオプション | 詳細 |
 |---|---|---|---|
 | `devices up` | 実行プロファイルのデバイスを起動する(同時に 2 台まで。起動済みは飛ばす) | `--profile`・`--no-bridge`・`--device-machine` | [シナリオの実行](../running/running_scenarios_ja.md) |
-| `devices down` | ブリッジを止め、Simulator / Emulator を停止する(実機は停止せずブリッジだけ止める)。`--profile` を付けるとそのプロファイルのデバイスだけ | `--profile`・`--device-machine`・`--force` | [並列実行](../running/parallel_execution_ja.md) |
+| `devices down` | ブリッジを止め、Simulator / Emulator を停止する(実機は停止せずブリッジだけ止める)。`--profile` を付けるとそのプロファイルのデバイスだけ。`--profile` 無しは、この Mac に加えて登録済みのランナー機のデバイスとブリッジも SSH 越しに止める(手元のデバイスだけなら `--profile` を付ける)。`devices up` はこの Mac だけ | `--profile`・`--device-machine`・`--force` | [並列実行](../running/parallel_execution_ja.md) |
 | `bridge up` | ブリッジを起動して常駐させる(iOS: Simulator のランナー / Android: デバイス上のサーバー) | `--device`・`--port`・`--physical`・`--platform`・`--with-sample-app`(iOS のみ。SampleApp もビルドして入れる) | [並列実行](../running/parallel_execution_ja.md) |
 | `bridge down` | ブリッジを止める | `--port`・`--all`・`--platform`・`--force` | [並列実行](../running/parallel_execution_ja.md)・[実機を追加する](../../fleet/adding_physical_devices_ja.md) |
 | `bridge status` | ブリッジの状態を表示する | `--platform`・`--port`・`--serial` | [トラブルシューティング](../../in_action/troubleshooting_ja.md) |
@@ -111,7 +111,7 @@ MCP の `ft_*` ツール([MCP サーバー](./mcp_server_ja.md))と同じ操作�
 | `services status` | このワークスペースのサービスの貸出・ロック・ランタイム資源を表示する | `--profile` | 同上 |
 | `services pull` | `compose.yaml` が宣言するイメージを run の前に取得する(初回は中継用イメージもビルドする) | `--refresh` | 同上 |
 | `services load` | レジストリへ届かない Mac のために、tar アーカイブからイメージをコンテナランタイムへ読み込む | — | 同上 |
-| `services reset` | このワークスペースのサービスのコンテナ・ネットワーク・ボリューム、貸出とロックを消す | — | 同上 |
+| `services reset` | このワークスペースのサービスのコンテナ・ネットワーク・ボリューム、貸出とロックを消す | `--force`(常駐の `services up` を止めてから消す) | 同上 |
 | `hooks reap` | 後始末の前に死んだ run が残した teardown スクリプトを実行する | `--quiet` | 同上 |
 
 ## フリート
@@ -123,7 +123,7 @@ MCP の `ft_*` ツール([MCP サーバー](./mcp_server_ja.md))と同じ操作�
 | `remote status` | ランナー機の到達性・ログイン状態・git の版・ツールチェーン・空きディスクを表示する | `--runner`・`--fm`・`--json` | 同上 |
 | `remote align` | 手元の HEAD の版をランナー機で fetch・checkout・ビルドする(`remote setup` の版合わせの段だけ) | `--remote-dir` | 同上 |
 | `remote exec <マシン> -- <引数>` | ランナー機で `fleetest <引数>` を実行し、出力と終了コードを中継する | `--remote-dir`(`--` の前に書く) | 同上 |
-| `remote clean` | ランナー機の残ったブリッジ・Simulator を止め、`--keep-days` より古い結果・レポート等を消す | `--runner`・`--keep-days` | 同上 |
+| `remote clean` | ランナー機の残ったブリッジ・Simulator を止め、`--keep-days` より古い結果・レポート等を消す | `--runner`・`--keep-days`・`--dry-run`(消す対象を並べるだけ)・`--ignore-lock`(実行中の run を止める) | 同上 |
 | `remote unlock` | 死んだ dispatch が残したロックを解く(生きている run のロックは `--force` なしでは解かない) | `--runner`・`--force` | 同上 |
 | `remote teardown` | ランナー機のベースディレクトリを削除する(破壊的) | `--remote-dir` | 同上 |
 

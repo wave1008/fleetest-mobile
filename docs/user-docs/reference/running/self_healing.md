@@ -1,4 +1,4 @@
-# Self-Healing
+# Self-healing
 
 [in Japanese(日本語)](self_healing_ja.md)
 
@@ -24,7 +24,7 @@ Self-healing is fingerprint matching only — it does not call FM (Foundation Mo
 - In the run profile itself, `heal` (default `true`) is its own toggle, independent of the FM- and
   OCR-based toggles (`fmTextVisibilityCheck`, `screenLooksLike`, `ocrTextVisibilityCheck`) — see
   [run_profile.md](../project/run_profile.md).
-- In the VS Code extension, the `fleetest.heal` setting appends `--set heal=true` to Test
+- In the VSCode extension, the `fleetest.heal` setting appends `--set heal=true` to Test
   Explorer's "Run" and "Debug" actions (not "Run (dry-run)", since dry-run never touches a
   device). When `fleetest.heal` is `false` (the default) and you're using `fleetest.profile`,
   the run profile's own `heal` setting is used instead.
@@ -57,9 +57,9 @@ At the end of the run, the fix suggestions (those with file, line, old and new s
 git: review the changes with `git diff` and commit them (the tool never commits).
 
 - **Who writes:** the side that receives the results. That is `fleetest run` (with or without a
-  profile), `fleetest api run` (used by the VS Code extension), and the MCP tools `ft_run_scenario`
+  profile), `fleetest api run` (used by the VSCode extension), and the MCP tools `ft_run_scenario`
   and `ft_start_run`. For remote runs (`--runner <host>` / fleet), the issuing Mac writes after it
-  collects the results; the runner Mac never rewrites its own copy. Dry-run never writes.
+  collects the results; the runner machine never rewrites its own copy. Dry-run never writes.
 - **Runs split across machines** (`--fleet`, or a profile whose devices span several machines) write
   once, after every machine has finished, using all the suggestions together. Different suggestions
   for the same place from different machines are not written either.
@@ -95,11 +95,11 @@ Anything that could not be written is listed with its reason; the suggestions st
 
 To avoid write-back, turn self-healing off (`--set heal=false`, or `heal: false` in the run profile).
 
-### VS Code extension
+### VSCode extension
 
 When a non-dry-run run ends with fix suggestions, the extension shows a notification with the number of
 fixed selectors. The run log lists what was written back and what could not be. The "Show Changes"
-button opens VS Code's Source Control view; review the git diff and commit.
+button opens VSCode's Source Control view; review the git diff and commit.
 
 ### Link
 - [index](../../index.md)

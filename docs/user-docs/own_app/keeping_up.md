@@ -16,6 +16,10 @@ Update the login-related scenarios in the fleetest test project myshop to match 
 Don't rewrite tests that are failing because of an app bug just to make them pass.
 ```
 
+Expected result:
+
+- Only the scenarios you fixed are run, and they are green. Those failing because of an app bug are reported in a list.
+
 ## 2. When more interrupting screens appear
 
 When new announcement dialogs, surveys, or OS permission dialogs make many tests fail at once, ask for them to be handled together.
@@ -28,6 +32,7 @@ Update every test in the fleetest test project myshop so that, if the dialog app
 ```
 
 Minor changes such as a screen ID having changed are absorbed by self-healing: [Self-healing](../reference/running/self_healing.md)
+Healed selectors are written back to the scenario source automatically at the end of the run, so review them with `git diff` and commit.
 
 Related:
 

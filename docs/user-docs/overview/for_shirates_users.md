@@ -1,10 +1,11 @@
-# For Shirates Users
+# For Shirates users
 
 [in Japanese(日本語)](for_shirates_users_ja.md)
 
 Fleetest's Swift DSL follows Shirates (Classic) conventions. Command names, argument names,
-defaults, and behavior are carried over rather than reinvented, so if you know Shirates you can
-start writing almost immediately.
+defaults, and behavior are carried over **in principle**. Some things are named differently (see
+the tables below) and some, such as nicknames, are intentionally absent, so read this page once
+before you switch.
 
 This page lists, in order: what works under the same name, what is renamed, what is not
 present, and what only fleetest has.
@@ -21,18 +22,24 @@ present, and what only fleetest has.
 
 | Category | Commands |
 |---|---|
-| Tap / select | `tap` (+`holdSeconds:`), `select` |
+| Tap / app icon | `tap` (+`holdSeconds:`), `tapAppIcon` |
 | Existence | `exist`, `appIs` |
+| Grabbed element | `lastElement` |
+| Keyboard / input | `pressEnter`, `clearInput`, `hideKeyboard` (closes the keyboard differently on iOS), `keyboardIsShown` / `keyboardIsNotShown` |
+| Attribute / state assertions | `idIs`, `enabledIsTrue` / `enabledIsFalse`, `checkIsON` / `checkIsOFF` |
 | Text / value assertions | `textIs` / `textIsNot` / `textContains(Not)` / `textStartsWith(Not)` / `textEndsWith(Not)` / `textMatches(Not)` / `textMatchesDateFormat` / `textIsEmpty` / `textIsNotEmpty`, and the same 10-form set for `valueIs…` |
 | Any-value assertions | `thisIs` / `thisIsNot` / `thisIsTrue` / `thisIsFalse` / `thisIsEmpty` / `thisIsNotEmpty` / `thisIsBlank` / `thisIsNotBlank` / `thisContains(Not)` / `thisStartsWith(Not)` / `thisEndsWith(Not)` / `thisMatches(Not)` / `thisMatchesDateFormat` / `thisIsGreaterThan(OrEqual)` / `thisIsLessThan(OrEqual)` |
-| Scroll | `scrollDown/Up/Left/Right` (+`repeat:`), `scrollToBottom/Top/RightEdge/LeftEdge` (+`maxSwipes:`), `withScrollDown/Up/Left/Right`, `withoutScroll` |
+| Scroll | `scrollDown/Up/Left/Right` (+`repeat:`), `scrollToBottom/Top/RightEdge/LeftEdge` (+`maxSwipes:`), `withScrollDown/Up/Left/Right`, `withoutScroll`, `scrollFrame`, `startMarginRatio` / `endMarginRatio` |
 | Flick | `flickCenterToTop/Bottom/Left/Right`, `flickLeftToRight/RightToLeft`, `flickBottomToTop/TopToBottom` |
 | Swipe | `swipePointToPoint`, `swipeElementToElement` |
-| Branch / loop | `ifCanSelect { }.ifElse { }`, `doUntilTrue`, `ios { }` / `android { }` |
+| Branch | `ifCanSelect { }.ifElse { }`, `ios { }` / `android { }` |
 | Interrupt handling | `suppressHandler { }` / `useHandler { }` / `disableHandler()` / `enableHandler()` |
 | App control | `launchApp` / `terminateApp` / `restartApp` / `installApp` / `removeApp` |
 | Waiting | `wait` / `waitForDisplay` / `waitForClose` |
 | Recording / flow | `procedure`, `screenshot`, `verify`, `@Deleted` |
+| Before / after | `beforeEach` / `afterEach` |
+| Memo | `writeMemo` / `readMemo` / `clearMemo` / `memoTextAs` |
+| Log folder | `TestLog.directoryForLog` |
 
 ## Renamed / different form
 
@@ -45,6 +52,8 @@ present, and what only fleetest has.
 | `irregularHandler { }` (lambda registration) | `irregularHandler(sel, dismiss:, maxDismissals:)` | declared by selector rather than by registering a lambda; auto-dismisses an in-app modal whenever it appears |
 | `goPreviousApp` | `appSwitcher()` | opens the app switcher only; it doesn't select the previous app for you |
 | `displayedIs` | `requireVisible:` argument + a run profile's `fmTextVisibilityCheck` / `ocrTextVisibilityCheck` | visibility checking is a parameter on the relevant command rather than its own assertion |
+| `doUntilTrue` | `doUntilTrue` | a throw in the block fails immediately (Shirates retries by default); there are no `retryOnError`-style arguments |
+| `select` | `select` | does not fail when nothing is found (returns an empty element); use `exist` to guarantee presence |
 
 ## Not present — write it this way instead
 
@@ -64,6 +73,28 @@ present, and what only fleetest has.
 | `existAll` / `canSelectAll` / `dontExistAll` | a chain of individual `exist` calls (each can have its own `waitSeconds:` / `scroll:`) |
 | `tempSelector` / `tempValue` | write the selector directly at the call site |
 | `withContext` (native/web context switching) | not needed — WebView content is read transparently through the same selectors and commands |
+| `swipeCenterTo*` and the other swipe commands | `swipe(.up)` etc. (one command that takes a direction) |
+| `cell` / `cellOf` | the selector scope `>>` |
+| `accessIs*` | `#id` |
+| `classIs` | the selector's `.type` |
+| `assertEquals` | `thisIs` |
+| `ifTrue` / `ifFalse` / `ifScreenIs` / `ifCheckON` | Swift `if` |
+| `shell` | `procedure { }` |
+| `describe` / `caption` / `comment` / `output` | the `scene` description |
+| `silent` / `info` / `warn`, `onScreen` / `onError`, `isAppInstalled` | not available |
+| `beforeAllAfterSetup` | `setUpDevice()` |
+| `setEventHandlers` | write it inside `beforeEach()` |
+| `typeChars` | not needed |
+
+## Not yet present (planned)
+
+There is no way to write these in the meantime.
+
+| Shirates | Status |
+|---|---|
+| `internetOn/Off`, `wiFiOn/Off`, `mobileOn/Off` | planned |
+| `pressSearch`, `pressTab`, `pressKeys`, `pressAndroid` | planned |
+| `tapCenterOfScreen`, `tapCenterOf`, `tapOffset` | planned |
 
 ## fleetest-only additions
 
@@ -71,6 +102,10 @@ Shirates has no equivalent for these:
 
 | Command | What it does |
 |---|---|
+| `fold()` / `unfold()` / `hinge(_)` | folds, unfolds and sets the hinge angle of a foldable device |
+| `beforeAll` / `afterAll` / `setUpDevice` / `tearDownDevice` | before/after hooks that run once per run × class or per device × class |
+| `TestLog.directoryForTemp` | a temporary folder |
+| `maxGestureSeconds:` | an argument on gesture commands that take a duration (`tap(holdSeconds:)`, swipe, pinch, flick, etc.); raises the default 10-second cap to at most 60 seconds for that one command |
 | `screenLooksLike("description")` | FM multimodal visual verification against a screenshot |
 | `countIs(sel, n)` | asserts the number of matching elements |
 | `scrollTo(sel, direction:, maxSwipes:)` | scrolls in the given direction until the selector resolves |

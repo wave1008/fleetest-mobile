@@ -7,7 +7,7 @@ fleetest 固有の用語を五十音順に並べました。英字で始まる�
 ## 用語
 
 - **アプリプロファイル** — テスト対象のアプリ(bundle ID / パッケージ名、ビルド成果物のパス)を記す設定です。`profiles/apps/<name>.json` に置きます。 詳しくは [プロファイル(アプリ / 実行)](../reference/project/profiles_ja.md)。
-- **FM(Foundation Models)** — Apple のオンデバイスの言語モデルです。macOS 27 以降で Apple Intelligence を有効にすると使えます。使うのはオンデバイスのモデルだけで、画面の情報は Mac の外に出ません。テキストの可視性検証・`screenLooksLike`・`draft-scenario` の構造化などが使います。 詳しくは [環境](environments_ja.md)。
+- **FM(Foundation Models)** — Apple のオンデバイスの言語モデルです。macOS 26 以降で Apple Intelligence を有効にすると使えます。画像を渡す機能(`screenLooksLike`・テキストの可視性検証の FM 段)だけは macOS 27 以降です。`draft-scenario` の構造化はテキスト系なので macOS 26 で動きます。使うのはオンデバイスのモデルだけで、画面の情報は Mac の外に出ません。 詳しくは [環境](environments_ja.md)。
 - **MCP サーバー(ft_*)** — デバイス操作・シナリオ実行・シナリオ作成を `ft_*` ツールとして公開する stdio の MCP サーバー(`fleetest-mcp`)です。AIアシスタントが人の代わりに CLI・拡張と同じ機能を呼び出せます。 詳しくは [MCP サーバー](../reference/tools/mcp_server_ja.md)。
 - **モード** — iOS で画面を読み操作する構成です。`inapp`(既定。アプリへ注入される高速な in-app ブリッジを主に、XCUITest ブリッジをフォールバックに使う)と `xcuitest`(汎用の XCUITest ブリッジだけ)があります。iOS の実機も、アプリが**開発署名(デバッグ可能)**なら inapp モードを使えます(そうでなければ自動で xcuitest モードに縮退します)。Android に選択肢はありません。 詳しくは [実行プロファイルの設定項目](../reference/project/run_profile_ja.md)。
 - **仮想デバイス** — Simulator(iOS)と Emulator(Android)の総称です。実機とは区別します。 詳しくは [フリートの考え方](../fleet/concepts_ja.md)。
@@ -48,6 +48,7 @@ fleetest 固有の用語を五十音順に並べました。英字で始まる�
 - **レポート** — シナリオ実行ごとに成否を問わず `reports/scenario-*.md` へ出る Markdown です。`scene → condition/action/expectation → ステップ` の階層、失敗時の要素一覧とスクリーンショット、セレクタの修正提案を含みます。 詳しくは [テスト結果ファイル](../reference/testclass/test_result_files_ja.md)。
 - **レーン** — run の中で、実行プロファイルのデバイス1台ぶんに当たる実行の流れです(ワーカーと同じ単位)。 詳しくは [並列実行](../reference/running/parallel_execution_ja.md)。
 - **ワーカー** — run の中でシナリオを受け持つ単位です。実行プロファイルの各デバイスが1ワーカーになり、シナリオはその間で分配されます。並列数はワーカーの数(解決後のデバイス数)です。 詳しくは [並列実行](../reference/running/parallel_execution_ja.md)。
+- **ワークスペース(workspace)** — テストプロジェクトの `workspace/` フォルダ(アプリの束のステージ先・compose.yaml・データ)です。VSCode のワークスペースとは別の語です。
 
 ## コマンドのオプション
 

@@ -43,7 +43,7 @@ Expected result:
 
 ## 4. Run from the Test Explorer
 
-Open VSCode's Testing view, choose a run profile with `fleetest: Select Run Profile`, then select a test and press "Run" or "Run (dry-run)".
+Open the Test Explorer (VSCode's Testing view), choose a run profile with `fleetest: Select Run Profile`, then select a test and press "Run" or "Run (dry-run)".
 When there is only one run profile, it is selected automatically even if you do not choose.
 
 Expected result:
@@ -67,6 +67,10 @@ Expected result:
 ```text
 For iOS runs of the fleetest test project project1, keep recordings only for failed scenarios.
 ```
+
+Expected result:
+
+- `recordFailuresOnly` of the run profile ios-run becomes true (check it in the "Profiles" tab).
 
 <img src="../images/tutorial/en/vscode_test_sessions.png" width="720" alt="Test Sessions">
 

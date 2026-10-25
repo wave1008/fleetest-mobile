@@ -16,6 +16,8 @@ type, default, meaning and the page that covers it in detail.
 - **An unknown key or broken JSON stops with an error before the scenario starts.** It stops for an unknown key inside
   the `sandbox`, `hooks` or `services` section, and when the file as a whole is not valid JSON (so that a restriction you
   added is never silently dropped). For example, `"sandbox": { "allowedDomain": [...] }` (a missing `s`) is caught as an error.
+- **A misspelled top-level key (such as `redactAccountValues`) is silently ignored.** After writing one, confirm the `***` by following
+  [Checking what a test leaves behind](../../security/test_outputs.md).
 - **Settings take effect from the next scenario launch.** No restart is needed.
 
 ## Example
@@ -61,7 +63,7 @@ type, default, meaning and the page that covers it in detail.
 | `bundleIDPrefix` | string | `com.example` | The prefix of the bundle id of the physical-iOS-device bridge. Use a value no other team uses. The environment variable `FT_BUNDLE_ID_PREFIX` takes priority | [Adding physical devices](../../fleet/adding_physical_devices.md) |
 | `issuerId` | string | `user name@host name` | A self-declared name that records "who started this" for remote runs (not authentication). The environment variable `FT_ISSUER` takes priority | [Remote runners](../../fleet/remote_runners.md), [Adding physical devices](../../fleet/adding_physical_devices.md) |
 | `fmConcurrency` | integer | `1` | How many Apple Intelligence (Foundation Models) calls **this Mac** makes at once. An integer of 1 or more. The environment variable `FT_FM_CONCURRENCY` takes priority. For a remote runner machine, put it in that machine's registration (`fmConcurrency` in `remoteHosts`) | The basis for tuning is in the maintainer document `docs/performance-tuning/` |
-| `defaultProject` | string | none | The project name used when `--project` is omitted. It follows project renames and removals (`fleetest project`) automatically | [Creating a Test Project](creating_project.md) |
+| `defaultProject` | string | none | The project name used when `--project` is omitted. It follows project renames and removals (`fleetest project`) automatically | [Creating a test project](creating_project.md) |
 | `lastRunProfile` | object (project name → run profile name) | none | Where the extension remembers the run profile it last selected. **The extension writes it; do not edit it by hand** | — |
 | `localMachineEnabled` | boolean | `true` | "Machine enabled" for this Mac's row in the extension's Settings tab. Only `false` is stored. **The extension writes it; do not edit it by hand** | [VSCode extension](../tools/vscode_extension.md) |
 

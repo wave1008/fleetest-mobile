@@ -201,8 +201,8 @@ Add this to the `SandboxCheck` class.
 Running it makes S0040 pass, and `note.txt` stays under the class name in that run's output folder (`work.txt` is deleted
 when the scenario ends). Details: [Output folder and temporary folder (TestLog)](../reference/commands/test_log.md).
 
-Only when the scripts that run before and after a run (`run-setup.sh` / `run-teardown.sh`) have to write somewhere
-other than `<workspace>/data/`, add the place to `hooks.writablePaths` in the machine settings.
+Only when the scripts that run before and after a run (`run-setup.sh` / `run-teardown.sh`), which also run inside the sandbox,
+have to write somewhere other than `<workspace>/data/`, add the place to `hooks.writablePaths` in the machine settings.
 
 ```json
 {
@@ -281,7 +281,7 @@ the machine settings.
 ```
 
 **Once it is open, a scenario can reach the outside through the shell inside an Emulator and reach every connected
-Android device.** After you have checked, set it back to `false`. The Android SDK (adb) must be installed.
+Android device. It also makes the adb keys (`~/.android`) readable.** After you have checked, set it back to `false`. The Android SDK (adb) must be installed.
 
 ### Prompt for the AI
 
@@ -459,6 +459,9 @@ It is not written when the work folder is inside the clone.
   scenario runs inside the frame. The only exception is `sandbox.disabled: true` in the machine settings of the Mac that runs
   it; then every scenario prints `⚠️ sandbox: disabled on this Mac` (on a remote runner that Mac's settings apply, so this
   line is how you notice).
+- The scripts that run before and after a run (`run-setup.sh` / `run-teardown.sh`) run in a separate sandbox of their own. They
+  can write only to `<workspace>/data/` and `hooks.writablePaths`, and connect only to compose.yaml's published ports and the
+  `allowedDomains` proxy.
 - Only the scenario binary and its descendants go into the sandbox. fleetest itself, the app under test, evaluating
   `Package.swift` and building dependencies run outside. `services.buildSources`, which widens the places a compose.yaml
   `build:` may refer to, is in [Services the app depends on (compose.yaml)](../reference/writing/services.md).
@@ -473,7 +476,7 @@ It is not written when the work folder is inside the clone.
 
 - **See what a test leaves behind**: [Checking what a test leaves behind](test_outputs.md)
 - **Know what is not stopped**: [Notes and limitations](limitations.md)
-- **Know the network exposure**: [Network Exposure and Security](network_security.md)
+- **Know the network exposure**: [Network exposure and security](network_security.md)
 
 ### Link
 - [index](../index.md)

@@ -12,8 +12,10 @@ Jenkins を例にしていますが、手順 1〜3 は他の CI でも同じで�
   iOS Simulator / Android Emulator には macOS が必須のため、GitHub ホストランナー
   (`macos-*`)はサポート外です(実体が macOS VM のため Apple Intelligence が使えず、
   この経路の動作検証もしていません)。
-- **ログイン済みの GUI セッションのユーザーで実行してください**(Simulator 実行の一般則です)。
-  ヘッドレスの `LaunchDaemon` や ssh 直のセッションでは Simulator が不安定になります。
+- CI 機の準備は[Mac を追加する](../fleet/adding_mac_ja.md)のステップ0(リモートログインと画面共有以外)と同じです。
+  CI 固有の点は次の2つです。
+  - **Jenkins エージェントは、ログイン済みの GUI セッションから起こしてください**(ヘッドレスの `LaunchDaemon` や ssh 直のセッションでは Simulator が不安定になります)。
+  - **EC2 Mac は、GUI でログインしておいてください**(画面共有経由)。
 - Xcode(Android を回すなら Android SDK も)がランナーに導入済みであること。
 - **`scripts/compose.yaml` を持つプロジェクトを回すなら**([サービス宣言](../reference/writing/services_ja.md)):
   CI 機に Apple Container か Docker が要ります。自分でビルドしたイメージは CI 機でビルドするか `fleetest services load <tar>` で載せてください
@@ -21,23 +23,48 @@ Jenkins を例にしていますが、手順 1〜3 は他の CI でも同じで�
   Docker の API を TCP(2375 / 2376)で公開していると run が始まりません。
 - **Apple Intelligence は不要です。** 無くても決定的実行と自己修復は動きます(違いは末尾の「知っておくこと」)。
 
-成功するとこう見える: CI のジョブと同じユーザーのターミナル(ログイン済みの GUI セッション)で `xcodebuild -version` が版を表示します。
+期待する結果:
+
+- CI のジョブと同じユーザーのターミナル(ログイン済みの GUI セッション)で `xcodebuild -version` が版を表示する
 
 ## 2. fleetest を入れる
 
-CI では拡張・MCP は不要です。次のコマンドは冪等で、2回目以降はほぼ skip します。
+CI では拡張・MCP は不要です。CI 機でテストプロジェクトを checkout し、その隣に fleetest を clone します
+(リリースタグへの移動は install.sh が行います)。テストプロジェクトを git に置く話は
+[テストプロジェクトを共有し、2人目が回すまで](sharing_project_ja.md)を見てください。
 
 ```bash
-bash foundation-tester/Scripts/install.sh --work-dir "$PWD" --skip-extension --skip-mcp --no-doctor
+git clone https://github.com/wave1008/foundation-tester.git ../foundation-tester
 ```
 
-成功するとこう見える: 各手順が1行ずつ出て、2回目以降は大半が skip になります。
+次のコマンドは冪等で、2回目以降はほぼ skip します。
+
+```bash
+bash ../foundation-tester/Scripts/install.sh --work-dir "$PWD" --skip-extension --skip-mcp --no-doctor
+```
+
+### AIへの指示文
+
+```text
+install.sh で fleetest を導入して。拡張と MCP は不要で、冪等に実行して。
+```
+
+期待する結果:
+
+- 各手順が1行ずつ出る
+- 2回目以降は大半が skip になる
 
 ## 3. ジョブに実行コマンドを書く
 
 ```bash
 # 実行: --quiet でステップ行を抑制、--junit で JUnit XML を書く
-fleetest run --profile ios-run --quiet --junit reports/junit.xml
+../foundation-tester/.build/debug/fleetest run --profile ios-run --quiet --junit reports/junit.xml
+```
+
+### AIへの指示文
+
+```text
+ios-run を --quiet --junit reports/junit.xml 付きで回して。終了コードと reports/junit.xml の有無も教えて。
 ```
 
 - **exit code**: `0` = 全シナリオ成功 / `1` = 失敗あり(JUnit は失敗時も書かれます)。
@@ -50,8 +77,10 @@ fleetest run --profile ios-run --quiet --junit reports/junit.xml
   スクリーンショット・自己修復の提案)が出ます。ビルド成果物として保存しておくと、JUnit の
   `report:` 行から辿れます。
 
-成功するとこう見える: 全シナリオが通ればコマンドは exit code `0` で終わり、`reports/junit.xml` ができています。
-1本でも落ちれば exit code `1` ですが、`reports/junit.xml` は書かれています。
+期待する結果:
+
+- 全シナリオが通ればコマンドは exit code `0` で終わり、`reports/junit.xml` ができる
+- 1本でも落ちれば exit code `1` で終わるが、`reports/junit.xml` は書かれている
 
 ## 4. JUnit を読ませる
 
@@ -95,8 +124,10 @@ pipeline {
 </details>
 <br>
 
-成功するとこう見える: ジョブの結果ページにシナリオクラスごとのテスト結果が並びます。失敗したジョブでは、
-`reports/junit.xml` とレポートがビルド成果物に残り、JUnit の `report:` 行からレポートを開けます。
+期待する結果:
+
+- ジョブの結果ページにシナリオクラスごとのテスト結果が並ぶ
+- 失敗したジョブでは、`reports/junit.xml` とレポートがビルド成果物に残り、JUnit の `report:` 行からレポートを開ける
 
 ## 5. 定期実行にして、ジョブの間を掃除する
 
@@ -124,7 +155,10 @@ pipeline {
 Jenkinsfile に毎晩 2 時の定期実行を足して。fleetest run には --wait-lock 1800 を付け、ジョブの末尾で fleetest devices down --profile ios-run を実行して。
 ```
 
-成功するとこう見える: 重なったジョブは、`--wait-lock` を付けていれば順番に実行され、付けていなければ上の文言で止まります。
+期待する結果:
+
+- 重なったジョブは、`--wait-lock` を付けていれば順番に実行される
+- 付けていなければ上の文言で止まる
 
 ## 知っておくこと
 

@@ -1,6 +1,6 @@
 # fleetest シナリオの DSL リファレンス
 
-fleetest-scenario スキル(SKILL.md)のステップ3「シナリオ .swift を書く」の直前に読む。正典は DS-10。
+fleetest-scenario スキル(SKILL.md)のステップ3「シナリオ .swift を書く」の直前に読む。正典は DS-10(記述: `docs/design/dsl-syntax.md` / 実行: `docs/design/dsl-execution.md`)。
 
 ### 構造
 
@@ -23,13 +23,13 @@ fleetest-scenario スキル(SKILL.md)のステップ3「シナリオ .swift を�
 | タップ/入力 | `tap(sel, waitSeconds:)` / `tap(sel, holdSeconds:)`(長押し)/ **入力は `type(sel, text)` で書く**(探す・焦点を立てる・打つ・読み返すまで1ステップ。前に `tap(sel)` や `select(sel)` を置く `tap(sel); type(text)` / `tap(sel).type(text)` / `select(sel).type(text)` はステップが増えるだけなので生成しない)/ `type(text)`(フォーカス中の欄へ。セレクタで指せない欄だけ)/ `select(sel)`(掴むだけ。**掴めなければ空要素**を返し失敗しない)/ `lastElement`(直前に掴んだ要素。**値は掴んだ時点の凍結値**なので、掴んだ直後に読むときだけ使う。離れた場所で使うなら `let e = select(…)` で受ける) |
 | スワイプ/スクロール | `swipe(.up/.down/.left/.right)`(**指の動き**。生のジェスチャ)/ 以下は**コンテンツ基準**(`.down` = 下に読み進める): `scrollTo(sel, direction:, maxSwipes:)` / `scrollDown(repeat:)` `scrollUp` `scrollRight` `scrollLeft` / `scrollToBottom(maxSwipes:)` `scrollToTop` `scrollToRightEdge` `scrollToLeftEdge` / `flickCenterToTop/Bottom/Left/Right` `flickLeftToRight/RightToLeft` `flickBottomToTop/TopToBottom`(画面基点・8種。速い1ストロークの生ジェスチャ) |
 | スクロールしながら探す | `tap(sel, scroll: .down)` / `exist(sel, scroll: .down)`(**`tapWithScrollDown` のような関数名の別名は無い** = スクロールの指定は `scroll:` だけ)/ ブロックで囲む `withScrollDown { … }` と、打ち消し: 1コマンドだけなら `scroll: .noScroll`(`exist(sel, scroll: .noScroll)`)・ブロックなら `withoutScroll { … }`。**画像系(`findImage` / `existImage`)は別名が無く `scroll:` だけ** |
-| 検証 | セレクタを取るのは `exist(sel)` / `notExist(sel)` / `countIs(sel, 個数)` / `screenLooksLike(画面の説明文)` だけ。**要素の属性検証は「掴んでから」書く**: `select(sel).enabledIsTrue()` / `.enabledIsFalse()` / `.checkIsON()` / `.checkIsOFF()` / `.idIs("…")` / `.imageIs("[ラベル]")`(要素の画像の分類。**プロジェクトの `vision/classifiers/DefaultClassifier/` に見本画像があるときだけ**書く = 無ければ必ず失敗する。見本は `ft_capture_element`(MCP)か `fleetest vision capture` で端末から採り、`fleetest vision check` で点検する)。`verify("説明") { … }` は複数アサーションを1ステップに集約(ブロック内0個なら inconclusive = passed でも failed でもない・シナリオは続行) |
+| 検証 | セレクタを取るのは `exist(sel)` / `notExist(sel)` / `countIs(sel, 個数)` だけ。`screenLooksLike(説明文)` は FM の見た目照合で、アサーションに数えない・MCP の既定では飛ぶ。**要素の属性検証は「掴んでから」書く**: `select(sel).enabledIsTrue()` / `.enabledIsFalse()` / `.checkIsON()` / `.checkIsOFF()` / `.idIs("…")` / `.imageIs("[ラベル]")`(要素の画像の分類。**プロジェクトの `vision/classifiers/DefaultClassifier/` に見本画像があるときだけ**書く = 無ければ必ず失敗する。見本は `ft_capture_element`(MCP)か `fleetest vision capture` で端末から採り、`fleetest vision check` で点検する)。`verify("説明") { … }` は複数アサーションを1ステップに集約(ブロック内0個なら inconclusive = passed でも failed でもない・シナリオは続行) |
 | テキスト・値の検証 | **セレクタは取らない**(対象は直前に掴んだ要素)。`select(sel).textIs("期待値")` と書くか、`select(sel)` の次の行に `textIs("期待値")` を書く(**同義**。`lastElement.textIs(…)` も同じ)。種類は `textIs` `textContains` `textStartsWith` `textEndsWith` `textMatches`(正規表現)`textMatchesDateFormat` `textIsEmpty` `textIsNotEmpty` と、**それぞれの否定** `textIsNot` `textContainsNot` … / `value…` も同名で一式。**これらに `scroll:` は無い**(静止画面の検証用。画面外は先に `scrollTo`) |
 | 画面に依らない値の検証 | `thisIs` `thisIsNot` `thisIsTrue` `thisContains` `thisMatchesDateFormat` `thisIsGreaterThan` …(API 応答・計算結果に直接生える。失敗は1ステップとして記録される) |
 | アプリ制御 | `launchApp(bundleID?)` / `restartApp()` / `terminateApp()` / `home()` / `appSwitcher()` / `installApp(path?)` / `removeApp(id?)` / `appIs(id, waitSeconds:)` / `tapAppIcon(name?)`(ホーム画面のアイコンをタップ。省略時はプロファイルの appName) |
-| 待機/分岐 | `wait(秒)` / `waitForDisplay(sel, waitSeconds:)`(表示まで待つ。スクロールしない)/ `waitForClose(sel, waitSeconds:)`(消えるまで待つ。スクロールしない)/ `ifCanSelect(sel, waitSeconds:) { … }.ifElse { … }` / `ios { }` / `android { }` / `procedure("名") { try await … }` |
+| 待機/分岐 | `wait(秒)` / `waitForDisplay(sel, waitSeconds:)`(表示まで待つ。スクロールしない)/ `waitForClose(sel, waitSeconds:)`(消えるまで待つ。スクロールしない)/ `ifCanSelect(sel, waitSeconds:) { … }.ifElse { … }` / `ios { }` / `android { }` / `procedure("名") { try … }`(同期・throws。`await` は書けない) |
 | 反復 | `repeatWhileCanSelect(sel, maxLoopCount: n) { … }`(解決できる限り繰り返す。上限到達は失敗にしない)/ `doUntilTrue("名", waitSeconds:) { 条件 }`(**アプリ・外部の状態待ち専用**。要素の出現待ちは各コマンドの `waitSeconds:`) |
-| 割り込み | `irregularHandler("#promo_modal", dismiss: "#btn_close")` を beforeEach で宣言すると、出るか不定の**アプリ内メッセージ**を出た時点で自動的に閉じる(OS のダイアログはツール側が吸収するので書かない)。**そのモーダル自体を検証・操作したい区間**では `suppressHandler { … }`(1つの CAE ブロックの内側)か `disableHandler()` … `enableHandler()`(**CAE を跨ぐとき**)で自動クローズを止める |
+| 割り込み | `irregularHandler("#promo_modal", dismiss: "#btn_close")` を beforeEach で宣言すると、出るか不定の**アプリ内メッセージ**を出た時点で自動的に閉じる。**iOS の OS アラート(権限・ATT・「"◯◯"で開きますか?」)は別プロセスで木に載らないので `irregularHandler` では閉じない** —— `iosAlertHandler(alert: "*写真*", button: "許可しない")` を beforeEach で予告する(`alert:` は必須。宣言なしで自動で閉じるのは `openURL` の初回確認だけ)。**そのモーダル自体を検証・操作したい区間**では `suppressHandler { … }`(1つの CAE ブロックの内側)か `disableHandler()` … `enableHandler()`(**CAE を跨ぐとき**)で自動クローズを止める |
 | まとまり | `group("ログイン") { … }`(記録に `[ログイン]` を前置するだけ。実行・失敗の扱いは素の列と同じ) |
 | テストデータ・外部 API | `account("[user1].password")` / `data("[order1].item")`(値は `TestProjects/<proj>/dataset/accounts.json`・`data.json` に `{ "[user1]": { "id": "…", "password": "…" } }` の形で置き、その Mac の `~/.config/fleetest/dataset/<proj>/` の同名ファイルが属性単位で上書きする。dry-run はキーをそのまま返す)/ `dataFile("csv/users.csv")`(キーと値で表せない CSV・JSON・画像の `URL`。置き場は同じ `dataset/`・マシン側はファイル単位で差し替え)/ `addMedia("photo.png")`(データセットのフォルダの画像 jpg/jpeg/png/heic/gif・動画 mp4/mov を写真ライブラリへ入れる。iOS Simulator と Android だけ・iOS 実機は失敗・入れたものを消すコマンドは無い)/ `httpRequest(url, method:, headers:, body:, waitSeconds:)`(テストデータを API で準備する。応答の `status` / `text` / `json` を `thisIs` で検証。localhost へはそのまま届く・外部の宛先はその Mac の `sandbox.allowedDomains` に載っているものだけ) |
 | 記録 | `screenshot(filename?)`(ファイル名はラベル無し)(現在の画面を撮り、このステップ直後にレポートへ埋め込む) |
@@ -37,18 +37,18 @@ fleetest-scenario スキル(SKILL.md)のステップ3「シナリオ .swift を�
 
 - **要素が見つからなければ失敗**(シナリオ中断)。**唯一の例外は `select`**(空要素を返す。`.isEmpty` で分岐)。
   「出るか不定」を表す引数は無いので、アプリ内メッセージは `irregularHandler`、その場限りの分岐は
-  `ifCanSelect(sel) { … }` で書く。`waitSeconds:` = ロケータ再試行の上限秒(0=即諦め、省略=約0.7秒)で、
-  `ifCanSelect` / `select` の空振り短縮に使う。
+  `ifCanSelect(sel) { … }` で書く。`waitSeconds:` = ロケータ再試行の上限秒(0=即諦め)で、
+  `ifCanSelect` / `select` の空振り短縮に使う。省略時の待ちは3値: 操作(`tap` / `type` / `clearInput`)は約0.7秒・`select` / `exist` / `textIs` 系は
+  実行プロファイルの `defaultTimeout`(既定5秒)・`ifCanSelect` だけ0。
 - **`wait(秒)` は原則不要**。`tap` はロケータ解決を約0.7秒(`waitSeconds:` でその秒数)まで再試行し、
-  `exist`/`textIs`/`valueIs` は既定タイムアウト(5秒・実行プロファイルの `--default-timeout` で上書き)まで
+  `exist`/`textIs`/`valueIs` は既定タイムアウト(5秒・実行プロファイルの `defaultTimeout`。`--set defaultTimeout=N` で1回だけ上書き)まで
   ポーリング再判定する。要素の**出現待ち**はこれらが暗黙にこなすので、遷移後の `exist` 直前などに
   `wait` を入れても冗長。待ちが足りなければ `exist(sel, waitSeconds:)` / `tap(sel, waitSeconds:)` を上げる。
 - **`ifCanSelect` だけは既定で即時判定**(`waitSeconds:0`)。遷移直後に分岐条件を待ちたいときは
   先行 `wait` ではなく `ifCanSelect(sel, waitSeconds:)` を使う(解決できたら即進む)。
 - **`type` は Compose Multiplatform / Flutter 等(UIKit の入力欄を持たないアプリ)でもそのまま書いてよい**。
   iOS の既定の inapp モードが Compose を自動判定し、type だけ XCUITest ブリッジ実行に切り替える(tap/exist は
-  高速な in-app ブリッジのまま)。Android は常に inapp で type 可。type の前の `tap(入力欄)` は両 OS 共通で入れておく
-  (Android inapp のフォーカス確立に必要)。
+  高速な in-app ブリッジのまま)。Android は常に inapp で type 可。`type` は打つ前に対象を自分でタップするので、前に `tap` を置かない。
 - **パスワード・アカウントをシナリオに直書きしない**。`account()` で受け取り、値は `dataset/accounts.json` に置く
   (本物のパスワードを git に入れたくないなら、🧑 にその Mac の `~/.config/fleetest/dataset/<proj>/accounts.json` へ
   置いてもらう)。データセットファイルが無ければ、作る前に 🧑 に値を聞く(推測した値を置かない)。
@@ -104,7 +104,7 @@ fleetest-scenario スキル(SKILL.md)のステップ3「シナリオ .swift を�
 - `!値` / `属性!=値` — **否定**(`.button&&!キャンセル` = キャンセル以外のボタン)。
   `!#id` `!.型` も可。**否定だけの節は書けない**(「〇〇以外の全要素」は容器まで掴むため)
 
-### セレクタ選定の罠(そのまま踏む。DS-10 実測)
+### セレクタ選定の罠(そのまま踏む。DS-10 実測 = `docs/design/dsl-syntax.md`)
 
 - **部分一致を安易に使うと誤マッチする**。`"*許可*"` は `"通知を許可"` にも当たる。素の文字列は
   完全一致なので、まず**実 UI の完全ラベル**をスナップショットから採って素で書く。

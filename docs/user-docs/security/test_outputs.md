@@ -5,10 +5,10 @@
 Running a test leaves reports, results, logs and recordings on your Mac's disk. They contain **the text on the app's
 screen** (button labels, values you typed, body text that was shown). This page walks through opening what is left to see
 where it is, masking secrets, checking the contents before you send anything out, and deleting what you no longer need.
-It assumes you have finished the [Quick Start](../quick-start.md) up to step 7 (creating one scenario and running it).
+It assumes you have finished the [Quick start](../quick-start.md) up to step 7 (creating one scenario and running it).
 
-> Data does not leave your Mac and devices. FM (Apple's on-device model) also runs only on the Mac.
-> See "Privacy" in [Quality characteristics](../overview/quality.md). Something leaves only when you send a zip or the like yourself.
+> The data **a test run** leaves does not leave your Mac and devices. FM (Apple's on-device model) also runs only on the Mac.
+> See "Privacy" in [Quality characteristics](../overview/quality.md) and [Network exposure and security](network_security.md). Something leaves only when you send a zip or the like yourself.
 
 ## 1. Run one scenario
 
@@ -36,12 +36,12 @@ Every run adds files in these places (`<project>` is `project1` or similar).
 
 | Where | What | Screen text |
 |---|---|---|
-| `TestProjects/<project>/reports/` | A Markdown report per scenario (`scenario-*.md`). On a failure it also holds the element list at the moment of failure and a screenshot (`.png`) | Step descriptions contain labels and the values you typed. The element list is the screen text itself |
+| `TestProjects/<project>/reports/` | A Markdown report per scenario (`scenario-*.md`). On a failure it also holds the element list at the moment of failure and a screenshot (`.png`), and `.failure.json` (the element list at failure, read by the VSCode extension; masking applies) | Step descriptions contain labels and the values you typed. The element list is the screen text itself |
 | `TestProjects/<project>/results/runs/<month>/<runID>/` | `run.json`, `scenarios/<scenarioID>.json` (result JSON) and `events/<scenarioID>.ndjson` (the scenario's execution log) | The execution log contains step descriptions and `print()` output |
 | `TestProjects/<project>/results/runs/<month>/<runID>/recordings/` | A recording per scenario | Every character visible on the screen |
 
 The full list of what goes where is in [Test result files](../reference/testclass/test_result_files.md), and how to read the result JSON
-is in [Analysing results (fleetest results, dashboard)](../reference/running/results_analysis.md).
+is in [Analyzing results (fleetest results, dashboard)](../reference/running/results_analysis.md).
 
 ### Prompt for the AI
 

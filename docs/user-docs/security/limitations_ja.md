@@ -34,7 +34,7 @@
 - **`allowedDomains` はポートまで書く**ことを勧めます。ポートを書かない行は、そのホストの全ポート(データベースなど
   別のサービスを含む)へ届きます。
 - **`allowDirectAdb` は必要なときだけ**にしてください。開けると、シナリオから Emulator の中のシェル経由で外部へ出られ、
-  繋がった全 Android 端末に届くようになります。代行と比べて速さはほとんど変わりません。
+  繋がった全 Android 端末に届くようになります。adb の鍵(`~/.android`)も読めるようになります。代行と比べて速さはほとんど変わりません。
 - **`sandbox.disabled` は原因の切り分けのために一時的に使う**ものです。外して動くならサンドボックスが断っている操作が
   あるということなので、[サンドボックスを確かめて、必要な穴をあける](sandbox_ja.md)の手順3〜4の決まった口で書き直し、設定を戻してください。
 - **MCP からの実行は承認で受けます**。Claude Code では、インストーラが `ft_start_run`(run の前後のスクリプトを含む
@@ -51,7 +51,7 @@
 | 起きること | 見るところ |
 |---|---|
 | ファイルを書くと「You don’t have permission」で失敗する | 書けるのは `TestLog` の2つのフォルダだけです |
-| 外部への通信がタイムアウトする・`403 Forbidden` が返る | [シナリオから外部へ通信する](../reference/writing/network_access_ja.md)の繋がらないときの表 |
+| 外部への通信がタイムアウトする・`403 Forbidden` が返る・`kCFErrorDomainCFNetwork error 310` で失敗する | [シナリオから外部へ通信する](../reference/writing/network_access_ja.md)の繋がらないときの表 |
 | シナリオが起動せず、設定ファイルのエラーが出る | `~/.config/fleetest/config.json` の JSON の形と、知らないキーが無いか |
 | 環境変数が空に見える | シナリオに渡るのは fleetest が使う変数だけです([サンドボックスの既定(書ける場所・読めない場所・通信先)](../reference/running/sandbox_access_ja.md)) |
 

@@ -71,6 +71,9 @@ ssh -o BatchMode=yes -o ConnectTimeout=10 <宛先> 'echo ok'
 
 ### 2. セットアップを実行する
 
+先に `fleetest remote machines add <マシン名> --host <宛先>` で登録し、以後の `<宛先>` は `<マシン名>` で指す
+(実行プロファイルの `devices[].machine` に書く名前)。
+
 ```
 fleetest remote setup <宛先> --project <プロジェクト>
 ```

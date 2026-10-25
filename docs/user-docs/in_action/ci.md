@@ -11,8 +11,10 @@ It uses Jenkins as the example, but steps 1 to 3 are the same on other CI system
 - **Self-hosted Mac only** (a Jenkins agent, an AWS EC2 Mac instance, etc.). iOS Simulators and
   Android Emulators require macOS, so GitHub-hosted runners (`macos-*`) are not supported — those
   run inside a macOS VM, which cannot use Apple Intelligence, and this path is not verified there.
-- **Run as a logged-in GUI session user** — the general rule for driving Simulators. A headless
-  `LaunchDaemon` or a bare `ssh` session makes Simulators unstable.
+- Preparing the CI machine is the same as step 0 of [Adding a Mac](../fleet/adding_mac.md) (except Remote Login and Screen Sharing).
+  Two points are specific to CI:
+  - **Start the Jenkins agent from a logged-in GUI session** (a headless `LaunchDaemon` or a bare `ssh` session makes Simulators unstable).
+  - **On an EC2 Mac, log in through the GUI** (via Screen Sharing) beforehand.
 - Xcode (and the Android SDK, if running Android scenarios) already installed on the runner.
 - **If the project has `scripts/compose.yaml`** ([service declarations](../reference/writing/services.md)):
   the CI machine needs Apple Container or Docker. Build your own images on the CI machine or load them with
@@ -21,23 +23,48 @@ It uses Jenkins as the example, but steps 1 to 3 are the same on other CI system
 - **Apple Intelligence is not required.** Without it, deterministic execution and self-healing run unaffected
   (what changes is under "Things to know" at the end).
 
-What success looks like: in a terminal of the same user as the CI job (a logged-in GUI session), `xcodebuild -version` prints a version.
+Expected result:
+
+- In a terminal of the same user as the CI job (a logged-in GUI session), `xcodebuild -version` prints a version
 
 ## 2. Install fleetest
 
-The extension and MCP aren't needed in CI. The command is idempotent — a second run is mostly a no-op.
+The extension and MCP aren't needed in CI. Check out the test project on the CI machine and clone fleetest next to it
+(install.sh moves it to the release tag). For keeping the test project in git, see
+[Sharing the test project until a second person runs it](sharing_project.md).
 
 ```bash
-bash foundation-tester/Scripts/install.sh --work-dir "$PWD" --skip-extension --skip-mcp --no-doctor
+git clone https://github.com/wave1008/foundation-tester.git ../foundation-tester
 ```
 
-What success looks like: each step prints one line, and on a second run most of them are skipped.
+The next command is idempotent — a second run is mostly a no-op.
+
+```bash
+bash ../foundation-tester/Scripts/install.sh --work-dir "$PWD" --skip-extension --skip-mcp --no-doctor
+```
+
+### Prompt for the AI
+
+```text
+Install fleetest with install.sh. The extension and MCP are not needed; run it idempotently.
+```
+
+Expected result:
+
+- Each step prints one line
+- On a second run most of them are skipped
 
 ## 3. Put the run command in the job
 
 ```bash
 # Run: --quiet suppresses per-step lines, --junit writes JUnit XML
-fleetest run --profile ios-run --quiet --junit reports/junit.xml
+../foundation-tester/.build/debug/fleetest run --profile ios-run --quiet --junit reports/junit.xml
+```
+
+### Prompt for the AI
+
+```text
+Run ios-run with --quiet --junit reports/junit.xml. Also tell me the exit code and whether reports/junit.xml exists.
 ```
 
 - **Exit code**: `0` = every scenario passed, `1` = at least one failure (JUnit is still written
@@ -50,8 +77,10 @@ fleetest run --profile ios-run --quiet --junit reports/junit.xml
   (element list, screenshot, self-healing suggestions). Archive it as a build artifact so the
   JUnit `report:` line can be followed back to it.
 
-What success looks like: when every scenario passes, the command ends with exit code `0` and `reports/junit.xml` exists.
-If even one fails, the exit code is `1`, but `reports/junit.xml` has still been written.
+Expected result:
+
+- When every scenario passes, the command ends with exit code `0` and `reports/junit.xml` exists
+- If even one fails, the exit code is `1`, but `reports/junit.xml` has still been written
 
 ## 4. Have CI read the JUnit
 
@@ -96,8 +125,10 @@ pipeline {
 </details>
 <br>
 
-What success looks like: the job's result page lists test results per scenario class. For a failed job,
-`reports/junit.xml` and the reports are kept as build artifacts, and the JUnit `report:` line leads to the report.
+Expected result:
+
+- The job's result page lists test results per scenario class
+- For a failed job, `reports/junit.xml` and the reports are kept as build artifacts, and the JUnit `report:` line leads to the report
 
 ## 5. Make it periodic, and clean up between jobs
 
@@ -127,7 +158,10 @@ Have the job start periodically (in Jenkins, `triggers { cron('H 2 * * *') }`; f
 Add a nightly 2 a.m. schedule to the Jenkinsfile. Give fleetest run --wait-lock 1800, and run fleetest devices down --profile ios-run at the end of the job.
 ```
 
-What success looks like: overlapping jobs run one after another if they carry `--wait-lock`, and stop with the message above if they do not.
+Expected result:
+
+- Overlapping jobs run one after another if they carry `--wait-lock`
+- Without it, they stop with the message above
 
 ## Things to know
 
@@ -173,7 +207,7 @@ Instead:
   discarded and run again (it was judged on a frozen screen). A scenario with an operation that cannot be undone, such as
   sending, purchasing or registering, can therefore run twice within one run. There is no setting to turn requeuing off.
   **Write scenarios on the assumption that they may be re-run from the start**
-  ([Writing Robust Scenarios](../reference/writing/writing_robust_scenarios.md)).
+  ([Writing robust scenarios](../reference/writing/writing_robust_scenarios.md)).
   Point operations that cannot be undone at an environment where running them twice does no harm (test payments, a
   staging server).
 

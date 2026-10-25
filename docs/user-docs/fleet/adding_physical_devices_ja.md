@@ -18,6 +18,15 @@ AIアシスタントへ指示するときは、つないだ端末を機種名で
 実行プロファイル ios-physical に登録して」)。人の手が要るステップ(端末の設定・Xcode へのサインイン)は、
 AIアシスタントは代わりに行いません。
 
+## 始める前に
+
+| 必要なもの | 確認方法 |
+|---|---|
+| Xcode と、サインイン済みの Apple ID(iOS だけ) | `xcodebuild -version` |
+| Apple Developer Program のチーム(iOS だけ。無料の Personal Team は約7日で署名が切れます) | Xcode → Settings → Accounts |
+| Homebrew(iOS だけ。`libimobiledevice` を入れます) | `brew --version` |
+| Android SDK(adb)(Android だけ) | `adb version` |
+
 ## iOS
 
 ### 1. Mac を準備する
@@ -50,6 +59,11 @@ AIアシスタントは代わりに行いません。
    - 環境変数 `FT_DEVELOPMENT_TEAM` / `FT_BUNDLE_ID_PREFIX` でも指定でき、設定ファイルより優先されます。
    - 署名の設定は Xcode の Signing & Capabilities では直せません。fleetest がビルドのたびにこの値で上書きします。
 
+期待する結果:
+
+- `brew install libimobiledevice` が成功する
+- `~/.config/fleetest/config.json` に `developmentTeam` と `bundleIDPrefix` が書かれている
+
 ### 2. 端末を準備する
 
 👉 **端末ごとに1回だけ作業します。**
@@ -58,6 +72,10 @@ AIアシスタントは代わりに行いません。
 2. **デベロッパモードを ON にする**: 設定 → プライバシーとセキュリティ → デベロッパモード。端末が再起動します。
 3. **自動ロックを切る**: 設定 → 画面表示と明るさ → 自動ロック → なし。fleetest は画面の消えた端末を起こせません。
    待ちの長いステップの最中に画面が消えると、以後のアプリの起動が断られて実行が止まります。
+
+期待する結果:
+
+- 端末が USB でつながり、「信頼」済みで、デベロッパモードが ON、自動ロックが「なし」になっている
 
 ### 3. 実機用のアプリを用意する
 
@@ -83,11 +101,19 @@ Mac の LAN のアドレスを焼き込んだビルドを使います。
 転送が無いと確認できたときだけ警告します。端末が応答しなければ run を止めます)。
 [アプリが依存するサービス](../reference/writing/services_ja.md)を見てください。
 
+期待する結果:
+
+- アプリプロファイルの `appPathPhysical` に、実機向けに署名したビルドのパスが書かれている
+
 ## Android
 
 ### 1. Mac を準備する
 
 Android SDK(adb)があれば、追加の準備は要りません。`adb devices` が動くことを確かめます。
+
+期待する結果:
+
+- `adb devices` が動く
 
 ### 2. 端末を準備する
 
@@ -110,9 +136,17 @@ Android SDK(adb)があれば、追加の準備は要りません。`adb devices`
 - Wi-Fi で adb 接続した端末も、`adb devices` に `device` で出ていれば、表示された識別子(`192.168.1.23:5555` など)を
   そのまま使えます。
 
+期待する結果:
+
+- `adb devices` に端末が `device` と表示される
+
 ### 3. 実機用のアプリを用意する
 
 いつもの APK をそのまま使えます。release 署名の APK も入れられます。
+
+期待する結果:
+
+- 実機に入れる APK のパスが分かる
 
 ## 4. 実行プロファイルに入れる
 
@@ -163,6 +197,11 @@ AIアシスタントは、つながっている実機から UDID(iOS)や serial(
 - `machine` は、実機をつないだ Mac のマシン名です(手元なら `"local"`)。
 
 </details>
+<br>
+
+期待する結果:
+
+- 実行プロファイルの `devices` に、`"kind": "physical"` のデバイスが入っている
 
 ## 5. 動かしてみる
 
@@ -184,6 +223,11 @@ fleetest run --profile <実行プロファイル> --scenario <シナリオID>
 
 デバイスモニターでは、実機のタイルに「実機」のバッジが付きます。右クリックの「ブリッジを起動」で、テストを
 流さずにブリッジだけを起動することもできます。
+
+期待する結果:
+
+- シナリオが実機で実行される
+- デバイスモニターの実機のタイルに「実機」のバッジが付く
 
 ### iOS の初回の許可
 
@@ -236,6 +280,7 @@ fleetest run --profile <実行プロファイル> --scenario <シナリオID>
 - Wi-Fi でつないだ iPhone を使うときは、ランナー機と端末が同じサブネットにいて、アクセスポイントのクライアント隔離
   (プライバシーセパレータ)が切ってある必要があります。関係するのはランナー機の側の LAN で、手元の Mac は関係しません。
 - 実機を使うランナー機にも `brew install libimobiledevice` を入れてください。
+- サービス(compose.yaml)を使うアプリなら、ランナー機のマシン設定にも `services.publishForPhysicalDevices`(ランナー機の LAN アドレス)を書きます(run はランナー機のマシン設定を読みます)。
 - inapp モードで使うブリッジは、テストを送り出す側の Mac がアプリの証明書で署名して一緒に送ります。
   ランナー機のキーチェーンにアプリの署名の鍵が無くても in-app で動きます(上の3は XCUITest のブリッジのビルドに要ります)。
 

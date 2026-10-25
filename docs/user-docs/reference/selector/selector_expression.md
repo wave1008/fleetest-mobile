@@ -1,4 +1,4 @@
-# Selector Expression
+# Selector expression
 
 [in Japanese(日本語)](selector_expression_ja.md)
 

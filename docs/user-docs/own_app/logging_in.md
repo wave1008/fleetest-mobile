@@ -14,7 +14,7 @@ Write it in `~/.config/fleetest/dataset/<test project name>/accounts.json`. For 
 
 ```json
 {
-  "[account1]": { "password": "..." }
+  "[account1]": { "id": "alice@example.com", "password": "..." }
 }
 ```
 
@@ -23,9 +23,13 @@ Write it in `~/.config/fleetest/dataset/<test project name>/accounts.json`. For 
 ### Prompt for the AI
 
 ```text
-In the fleetest test project myshop, register a test account of my app as [account1] (do not write the password; it is in ~/.config/fleetest/dataset/myshop/accounts.json on this Mac).
-Put the login steps into a custom command named login that takes the account with account(). Undo whatever state remains after logging in in each test's afterEach.
+In the fleetest test project myshop, register a test account of my app as [account1] (do not write the ID or password; they are in ~/.config/fleetest/dataset/myshop/accounts.json on this Mac).
+Put the login steps into a custom command named login that reads the login ID with account("[account1].id") and the password with account("[account1].password"). Undo whatever state remains after logging in in each test's afterEach.
 ```
+
+Expected result:
+
+- A `login` function (with `@FTCommand`) is added under `scenarios/`.
 
 ## 3. Use separate accounts per test
 
@@ -40,8 +44,8 @@ If they do, change them so that each scenario uses its own account. List the acc
 
 ## Keep passwords out of reports (optional)
 
-By default, typed passwords stay as they are in reports and run logs. If you write `"redactAccountValues": true` yourself in
-`~/.config/fleetest/config.json` on this Mac, the values from `account()` are replaced with `***` (text visible in screenshots cannot be hidden).
+By default, typed passwords stay as they are in reports, run logs and result JSON. If you write `"redactAccountValues": true` yourself in
+`~/.config/fleetest/config.json` on this Mac, the values from `account()` are replaced with `***` in reports, run logs and result JSON (text visible in screenshots cannot be hidden).
 
 More:
 

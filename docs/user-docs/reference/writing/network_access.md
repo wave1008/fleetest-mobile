@@ -63,6 +63,7 @@ code.
 |---|---|
 | `URLSession` cannot connect or times out | You use your own `URLSession` without passing the proxy (use `httpRequest` / `fleetestURLSession`), or `allowedDomains` is not set |
 | The proxy answers `403 Forbidden` (body `fleetest sandbox: <host>:<port> is not in allowedDomains …`) | The destination does not match `allowedDomains`. Note that `*.example.org` does not match `example.org`, and an entry with a port matches only that port |
+| `httpRequest` / `fleetestURLSession` fails with `kCFErrorDomainCFNetwork error 310` | The HTTPS destination is not allowed (the proxy refused `CONNECT` with 403; the failure message points to `allowedDomains`). Add the destination to `sandbox.allowedDomains` |
 | The proxy answers `502 Bad Gateway` | The destination is allowed but cannot be reached from the Mac |
 | A non-HTTP connection (e.g. directly to a database) fails | It does not go through the proxy (the client cannot send `CONNECT`), or its port is not allowed |
 

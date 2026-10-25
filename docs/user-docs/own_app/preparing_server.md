@@ -13,17 +13,25 @@ This is not needed if you only connect to an existing server. How to read the de
 Build the image myapp-server:local from the Dockerfile in <server folder> and declare it in
 TestProjects/myshop/workspace/scripts/compose.yaml of the fleetest test project myshop. If there is no Dockerfile, create one
 (split a build stage from a run stage, and include bash in the run stage for the healthcheck). Publish the port on 127.0.0.1:8080. Write a healthcheck.
-If you use Apple Container, first set the builder VM to 3 GB of memory.
+If you use Apple Container, first enlarge the builder VM with `container builder stop && container builder start --cpus 6 --memory 8g`.
 Make the app's server address switchable in the build settings: http://127.0.0.1:8080 for the iOS Simulator build and http://10.0.2.2:8080 for the Android Emulator build.
 Rebuild both and update the paths in the app profile.
 Check the start-up with fleetest services up --project myshop --profile ios-run, confirm that /health returns ok, then services down and report the result.
 ```
 
+Expected result:
+
+- `services up` prints the published ports, and `/health` returns ok.
+- After `services down`, `services status` is empty.
+
 ## 2. Point the app at the server
 
 The iOS Simulator build points at 127.0.0.1 and the Android Emulator build at 10.0.2.2 (the prompt above includes this).
-A physical device points at this Mac's LAN address (the machine setting `services.publishForPhysicalDevices` is also needed;
-a worked example is in steps 2-3 of [Measuring the app's responsiveness](../response/measuring_app_response.md)).
+Physical devices differ by OS.
+
+- iOS physical device: build with this Mac's LAN address baked in (the machine setting `services.publishForPhysicalDevices` is also needed;
+  a worked example is in steps 2-3 of [Measuring the app's responsiveness](../response/measuring_app_response.md)).
+- Android physical device: `adb reverse` is set up, so the same 127.0.0.1 build as for the Emulator reaches the server (the LAN address also works).
 
 ## 3. Things you write yourself
 

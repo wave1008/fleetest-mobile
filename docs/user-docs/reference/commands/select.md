@@ -36,6 +36,9 @@ Reading a value out of a grabbed element (`.text`, `.value`, `.id`) is covered i
   thrown error. Only the commands you chain onto it (`.textIs(...)`, etc.) can fail the step.
 - `lastElement` is empty at the start of each `scene`, is overwritten with an empty element when
   a command fails to grab, and is empty (with a warning) if nothing has been grabbed yet.
+- When `waitSeconds:` is omitted, `select` keeps looking for the element up to the run profile's default wait (`defaultTimeout`, 5 s by
+  default) before returning an empty element — unlike actions such as `tap`, which retry for about 0.7 s. To look at the current screen once
+  and branch, write `select(sel, waitSeconds: 0)`.
 
 ### Link
 - [index](../../index.md)

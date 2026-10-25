@@ -1,4 +1,4 @@
-# Quick Start
+# Quick start
 
 [in Japanese(日本語)](quick-start_ja.md)
 
@@ -41,15 +41,22 @@ following ../foundation-tester/.claude/skills/fleetest-setup/SKILL.md.
 
 5. When the installation finishes, restart VSCode.
 
-6. Click **fleetest mobile** in the status bar at the lower-left corner of VSCode. The device monitor opens.
+6. Click **fleetest mobile** in the status bar at the lower-left corner of VSCode. The Device Monitor opens.
 
-   <img src="images/quick_start/en/device_monitor.png" width="1200" alt="The device monitor just opened">
+   <img src="images/quick_start/en/device_monitor.png" width="1200" alt="The Device Monitor just opened">
 
 7. Give your AI assistant this instruction and confirm that no errors are reported
 
 ```text
 Run ../foundation-tester/.build/debug/fleetest doctor and report the result.
+A ❌ on the Apple Intelligence (On-device model) row only stops features you are not using (screenLooksLike and the text visibility check), so ignore it.
+Confirm that there is no other ❌.
 ```
+
+Expected result:
+
+- Xcode, the Simulator, and (for Android) adb show ✅.
+- You can go on even if the Apple Intelligence row shows ❌.
 
 ## 4. Preparing the sample app
 
@@ -62,6 +69,12 @@ and declare its server to fleetest. The server is built with Kotlin (Ktor) and P
 ```text
 Clone https://github.com/wave1008/sut-ec-mobile next to this folder, then run bash ../sut-ec-mobile/fleetest/prepare.sh in this folder.
 ```
+
+Expected result:
+
+- Apple Container and a JDK are installed with Homebrew if missing (the first run takes a few minutes to fetch the Linux kernel and the images).
+- It ends with `Done. fleetest starts and stops the server on every run.`
+- `TestProjects/project1/workspace/scripts/compose.yaml` is created.
 
 <details>
 <summary><b>If you do it manually (click to show details)</b></summary>
@@ -86,14 +99,14 @@ Create the app profile and the run profile.
 For iOS:
 
 ```text
-In the fleetest test project project1, build the sut-ec-mobile iOS app and create its profiles. The app's display name is "SUT Store". Use two devices.
+In the fleetest test project project1, build the sut-ec-mobile iOS app and create its profiles. The app's display name is "SUT Store". Use two devices. The app ID is com.sutec.mobile.ios.
 Use JDK 25 for the build (Homebrew's openjdk@25, at /opt/homebrew/opt/openjdk@25). Don't modify any shell configuration files.
 ```
 
 For Android:
 
 ```text
-In the fleetest test project project1, build the sut-ec-mobile Android app and create its profiles. The app's display name is "SUT Store". Use two devices.
+In the fleetest test project project1, build the sut-ec-mobile Android app and create its profiles. The app's display name is "SUT Store". Use two devices. The app ID is com.sutec.mobile.android.
 Use JDK 25 for the build (Homebrew's openjdk@25, at /opt/homebrew/opt/openjdk@25). Don't modify any shell configuration files.
 ```
 
@@ -134,14 +147,19 @@ Passing the built app to `--app-path` makes the run install it on the device aut
 when missing; a missing iOS runtime is downloaded first: several GB, several minutes to tens of minutes;
 one that is not running is started automatically at run time). The app profiles are named `ios-app` and `android-app`, and the
 run profiles `ios-run` and `android-run`. `--count 2` makes the run profile hold two devices of that OS in total (existing devices with the same settings are reused in ascending number order and the missing ones are created; it is the same as "use two devices" in the instruction). You can also add devices later with "Add device" on the
-"Profiles" tab of the VSCode extension's device monitor.
+"Profiles" tab of the VSCode extension's Device Monitor.
 
 </details>
 <br>
 
-Open the "Profiles" tab of the VSCode device monitor and check that the app profile and the run profile have been created.
+Open the "Profiles" tab of the VSCode Device Monitor and check that the app profile and the run profile have been created.
 
-<img src="images/quick_start/en/profiles_tab.png" width="640" alt="The Profiles tab of the device monitor listing the run profile ios-run">
+<img src="images/quick_start/en/profiles_tab.png" width="640" alt="The Profiles tab of the Device Monitor listing the run profile ios-run">
+
+Expected result:
+
+- The "Profiles" tab lists ios-run (with two devices).
+- If no iOS runtime is installed, fetching it takes several GB and a few minutes to tens of minutes.
 
 ## 6. Create the scenarios
 
@@ -160,8 +178,14 @@ Stop once you've told me the file name of the new scenario.
 - For Android, read "on iOS" as "on Android".
 - The AI assistant launches the app on a device, reads the elements of the screens while operating them, and turns that flow into a scenario.
 
+Expected result:
+
+- One scenario is created in `scenarios/`.
+
 <details>
 <summary><b>If you do it manually (click to show details)</b></summary>
+
+To write it yourself, see [Creating a test class](reference/testclass/creating_testclass.md).
 
 Start the server by hand, create the test, and stop it when you are done.
 
@@ -186,7 +210,11 @@ Run the scenarios of the fleetest test project project1 with the ios-run profile
 
 For scenarios created on Android, ask "with the android-run profile" instead.
 
-<img src="images/quick_start/en/run_in_progress.png" width="640" alt="The device monitor while the run is in progress">
+<img src="images/quick_start/en/run_in_progress.png" width="640" alt="The Device Monitor while the run is in progress">
+
+Expected result:
+
+- The result appears in the Test Sessions tab.
 
 <details>
 <summary><b>If you do it manually (click to show details)</b></summary>
@@ -217,8 +245,12 @@ Let's summarize the reports and analyze the errors.
 ### Prompt for the AI
 
 ```text
-Summarize the latest run of the fleetest test project project1. If anything failed, use the report to find out why.
+Summarize the latest run of the fleetest test project project1. If anything failed, use the report to find out why. Do not fix the scenario yet.
 ```
+
+Expected result:
+
+- A summary of the failures comes back.
 
 <details>
 <summary><b>If you do it manually (click to show details)</b></summary>

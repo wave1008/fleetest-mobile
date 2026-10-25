@@ -3,7 +3,7 @@
 [in Japanese(日本語)](update_ja.md)
 
 The normal way to update fleetest is **from the VSCode extension's notification**. When a new release is out, the
-extension tells you, and you update from the Settings tab of the device monitor. Asking the AI assistant or running
+extension tells you, and you update from the Settings tab of the Device Monitor. Asking the AI assistant or running
 the update script in a terminal also works (see "Other ways" below).
 
 An update brings in the **latest release** of fleetest.
@@ -14,7 +14,7 @@ When VSCode starts, the extension checks whether a new release exists (at most o
 notification appears at the bottom right.
 
 ```
-fleetest X.Y.Z is available (current: A.B.C). You can apply it from the Settings tab of the device monitor.
+fleetest X.Y.Z is available (current: A.B.C). You can apply it from the Settings tab of the Device Monitor.
 [Open Settings tab] [What's new] [Skip this version]
 ```
 
@@ -90,7 +90,7 @@ bash ../foundation-tester/Scripts/update.sh
 
 ## Updating on a closed network
 
-Where the Mac cannot reach the Internet, run `bash <clone>/Scripts/update.sh` directly (the `curl` form cannot be used).
+Where the Mac cannot reach the Internet, run `bash <clone>/Scripts/update.sh` directly.
 The setting that points GitHub to an internal mirror is in
 [Network exposure and security](security/network_security.md).
 

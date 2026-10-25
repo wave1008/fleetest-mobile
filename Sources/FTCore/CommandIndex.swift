@@ -145,7 +145,9 @@ public enum DSLCommandIndex {
                 + "the block does not run. On iOS in inapp mode the press runs through the "
                 + "XCUITest bridge instead (same fallback as tap's long press)."),
         .init("select", "operation", "select(selector, requireVisible:, waitSeconds:, scroll:, maxSwipes:)",
-              "Grabs an element without touching the device. Returns an empty element instead of failing."),
+              "Grabs an element without touching the device. Returns an empty element instead of failing."
+                  + " Waits up to the run profile's defaultTimeout (5 s by default) before returning an empty"
+                  + " element; pass waitSeconds: 0 to look at the current screen once."),
         .init("findImage", "operation",
               "findImage(label, threshold:, aspectRatioTolerance:, waitSeconds:, scroll:, maxSwipes:)",
               "Finds the element whose image is nearest to a DefaultClassifier sample image whose label ends with label "
@@ -164,7 +166,7 @@ public enum DSLCommandIndex {
                   + " The single-argument form targets the focused element and takes text, not a selector."
                   + " The selector form returns the element it grabbed (like exist / select), so"
                   + " assertions chain directly."
-                  + " Also chains as element.type(text, replace:, waitSeconds:) on a grabbed element:"
+                  + " Also chains as element.type(text, replace:, settle:, waitSeconds:) on a grabbed element:"
                   + " select(\"#login_id\").type(\"alice\") re-resolves the grabbed selector and types"
                   + " exactly like type(selector, text). An element grabbed by findImage/findImages has no"
                   + " selector, so it fails without typing (tap it, then type(text)).",
@@ -279,7 +281,7 @@ public enum DSLCommandIndex {
               "Makes every command in the block search by scrolling left."),
         .init("withoutScroll", "scroll", "withoutScroll { }",
               "Cancels an enclosing withScroll* for the block. For a single command pass scroll: .noScroll "
-                + "(tap / type / clearInput / select / exist / notExist / findImage / existImage); "
+                + "(tap / hold / type / clearInput / select / exist / notExist / findImage / existImage); "
                 + "scrolling is specified only by scroll: (scroll: .down to search while scrolling). "
                 + "There are no *WithScrollDown/Up/Right/Left or *WithoutScroll functions."),
         .init("withoutContainerInference", "scroll", "withoutContainerInference { }",
@@ -355,7 +357,8 @@ public enum DSLCommandIndex {
         .init("keyboardIsNotShown", "existence", "keyboardIsNotShown(waitSeconds:)",
               "Asserts the soft keyboard is hidden."),
         .init("screenLooksLike", "existence", "screenLooksLike(description)",
-              "Visual screen check by Foundation Models. Skipped when fm is off."),
+              "Visual screen check by Foundation Models. Skipped (passes through) when the run profile has"
+                  + " screenLooksLike: false. Does not count as an assertion."),
         .init("appIs", "existence", "appIs(appID, waitSeconds:)",
               "Asserts the foreground app is the given bundle ID / package name."),
 
@@ -431,7 +434,7 @@ public enum DSLCommandIndex {
         .init("terminateApp", "app", "terminateApp()",
               "Terminates the app."),
         .init("installApp", "app", "installApp(path?)",
-              "Installs the app. Without a path, the run profile appPath is used."),
+              "Installs the app. Without a path, the app profile's <platform>.appPath (the app the run profile points to) is used."),
         .init("removeApp", "app", "removeApp(appID?)",
               "Uninstalls the app. Removing the app under test breaks the rest of the run."),
         .init("clearAppData", "app", "clearAppData(appID?)",
@@ -439,14 +442,14 @@ public enum DSLCommandIndex {
         .init("home", "app", "home()",
               "Goes to the home screen."),
         .init("back", "app", "back(settle:)",
-              "Goes back (Android back key / iOS left-edge swipe)."),
+              "Goes back (Android back key / iOS: the navigation bar's back button, else a left-edge swipe)."),
         .init("appSwitcher", "app", "appSwitcher()",
               "Opens the app switcher."),
         .init("tapAppIcon", "app", "tapAppIcon(name?)",
               "Finds and taps the app icon on the home screen."),
         .init("screenshot", "app", "screenshot(filename?)",
               "Captures the screen and embeds it in the report after this step."
-              + " The file name can also be passed positionally: screenshot(\"a.png\")."),
+              + " The file name is positional: screenshot(\"a.png\") (there is no filename: label)."),
 
         // MARK: control
         .init("wait", "control", "wait(seconds)",

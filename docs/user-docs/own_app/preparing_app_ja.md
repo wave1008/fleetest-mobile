@@ -5,6 +5,12 @@
 自分のアプリを fleetest に登録します。サンプルアプリ(SUT Store)の `project1` とは別の、新しいテストプロジェクトに入れます
 (`project1` に入れると、サンプルの登録が上書きされます)。
 
+用意するもの:
+
+- アプリの表示名
+- iOS の bundle ID と Android の applicationId
+- アプリのソース、または Simulator・Emulator 向けにビルド済みの `.app`・`.apk`
+
 ## 1. アプリを登録する
 
 ### AIへの指示文
@@ -41,6 +47,8 @@ React Native は Release 構成)、作業フォルダで実行します。
   --app-name "My Shop" --auto-device --app-path ~/builds/myshop-debug.apk
 ```
 
+Android のシステムイメージが未導入なら、`profile setup` に `--accept-licenses` を付けます。
+
 </details>
 
 ## 2. アプリを作り直したとき
@@ -53,6 +61,10 @@ React Native は Release 構成)、作業フォルダで実行します。
 ```text
 fleetest のテストプロジェクト myshop のアプリプロファイルにある iOS のアプリのパスを、~/builds/MyShop-2.0.app に変えて。
 ```
+
+期待する結果:
+
+- アプリプロファイルの iOS のアプリのパスが `~/builds/MyShop-2.0.app` になります。
 
 設定できる項目:
 

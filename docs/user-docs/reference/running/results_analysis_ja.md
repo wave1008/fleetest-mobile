@@ -15,6 +15,9 @@ results/runs/<YYYY-MM>/<runID>/
   scenarios/<シナリオID>.json  ... シナリオ1回分の実行結果
   scenarios/<シナリオID>~2.json ... 同一 run 内の再実行(連番)
   events/<シナリオID>.ndjson   ... そのシナリオの実行ログ(後述の `fleetest results log` 参照)
+  events/.inflight-<UUID>.ndjson ... 書き込み途中(または途中で kill されて確定しなかった)実行ログ
+  superseded/<シナリオID>[~N].<k>.json ... 振り直しで取り消した記録
+  events/superseded/<シナリオID>[~N].<k>.ndjson ... 同じ取り消しの実行ログ
   host-metrics.ndjson          ... 実行中のホスト負荷(cpu/gpu/mem)
 ```
 

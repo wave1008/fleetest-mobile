@@ -34,7 +34,7 @@ What scenarios cannot do (writing to the temporary folder, reading environment v
 - **Writing the port in `allowedDomains` is recommended.** A line without a port reaches every port of the host,
   including other services such as databases.
 - **Use `allowDirectAdb` only when needed.** Once open, a scenario can reach the outside through the shell inside an
-  Emulator and reach every connected Android device. Speed is almost the same as with delegation.
+  Emulator and reach every connected Android device. The adb keys (`~/.android`) also become readable. Speed is almost the same as with delegation.
 - **`sandbox.disabled` is for temporarily isolating a cause.** If a scenario works without the sandbox, it is doing
   something the sandbox refuses; rewrite it with the fixed doors in steps 3 and 4 of [Checking the sandbox and opening the holes you need](sandbox.md) and restore the setting.
 - **Runs from MCP go through approval.** In Claude Code, the installer writes settings that ask for confirmation only
@@ -52,13 +52,13 @@ What scenarios cannot do (writing to the temporary folder, reading environment v
 | What happens | Where to look |
 |---|---|
 | Writing a file fails with "You don’t have permission" | Only the two `TestLog` folders are writable |
-| Outbound requests time out or return `403 Forbidden` | The troubleshooting table in [Network access from scenarios](../reference/writing/network_access.md) |
+| Outbound requests time out, return `403 Forbidden` or fail with `kCFErrorDomainCFNetwork error 310` | The troubleshooting table in [Network access from scenarios](../reference/writing/network_access.md) |
 | The scenario does not start and an error about the settings file appears | The JSON in `~/.config/fleetest/config.json` and whether it has unknown keys |
 | An environment variable looks empty | Only the variables fleetest uses are passed to scenarios ([Sandbox defaults (writable places, unreadable places, destinations)](../reference/running/sandbox_access.md)) |
 
 ## Related
 
-- [Network Exposure and Security](network_security.md) — the ports fleetest opens, outbound traffic, and running on a closed network
+- [Network exposure and security](network_security.md) — the ports fleetest opens, outbound traffic, and running on a closed network
 - [Checking the sandbox and opening the holes you need](sandbox.md)
 - [Sandbox defaults (writable places, unreadable places, destinations)](../reference/running/sandbox_access.md)
 

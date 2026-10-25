@@ -1,14 +1,14 @@
-# VS Code Extension
+# VSCode extension
 
 [in Japanese(日本語)](vscode_extension_ja.md)
 
-The `vscode-fleetest` extension surfaces scenarios in VS Code's Test Explorer, and adds device
+The `vscode-fleetest` extension surfaces scenarios in the Test Explorer (VSCode's Testing view), and adds device
 control, live inspection and result review around them. It works by spawning the same `fleetest`
 CLI used from the terminal, so behavior matches the CLI and MCP entry points.
 
 ## Test Explorer
 
-Scenarios appear in the Testing view as a folder → class → `@Test` method tree, built from
+Scenarios appear in the Test Explorer as a folder → class → `@Test` method tree, built from
 `TestProjects/<project>/scenarios/**/*.swift`. The target `<project>` comes from the
 `fleetest.project` setting; when it is empty the extension auto-resolves it, creating
 `TestProjects/project1/` on startup with `fleetest project create project1` if it is missing and selecting
@@ -32,7 +32,7 @@ and shows an error with a "Select run profile" button.
 
 ## Steps View
 
-A read-only **fleetest Steps** tree view (in the Testing view container) follows the cursor: put
+A read-only **fleetest Steps** tree view (in the Test Explorer) follows the cursor: put
 the cursor inside a `@Test` method and it lists that scenario's `scene` groups and steps.
 Clicking a step jumps to the matching source line. It also opens from a scenario's right-click
 menu ("fleetest: Show Step List").
@@ -63,7 +63,7 @@ polling (screenshots at a fixed interval); the choice is remembered per workspac
   (recording clips are still extracted with the software encoder, which is slower; hover it for the reason and when it was observed).
   Only for a run with the OCR text visibility check (`ocrTextVisibilityCheck`) turned on: while the OCR model is being compiled (for example on the first run after a rebuild; tens of seconds), the run waits
   for the compile to finish before starting its first scenario ("Compiling Vision…" appears in the running list).
-  Turning on **"Show memory size, CPU cores, and GPU cores in the device monitor"** (Machines section of the
+  Turning on **"Show memory size, CPU cores, and GPU cores in the Device Monitor"** (Machines section of the
   Settings tab, off by default) adds each machine's capacity to the labels, such as `MEM 192` (GB) / `CPU 24` /
   `GPU 76` (`MEM -` until the values arrive).
 - The **run board** under the toolbar shows one row per machine — this Mac and every registered
@@ -150,7 +150,7 @@ seconds (reusing an existing build); only the very first build for that device t
 | Toolbar zoom in/out | Pinch (whole screen) |
 
 On iOS, double tap (Command (⌘) + click) does not register in a Compose app on a physical device or
-with an `xcuitest`-only setup. To zoom in, use the toolbar's zoom (a pinch) instead
+in `xcuitest` mode. To zoom in, use the toolbar's zoom (a pinch) instead
 ([gestures](../commands/gestures.md)).
 
 The element list next to the screenshot is for reading: clicking a row does not touch the device.
@@ -161,13 +161,13 @@ After an operation it waits for the screen to settle, then re-reads the element 
 (it does not re-read while the device is running a test).
 
 You can keep driving the device after the app under test leaves the foreground (iOS). When the home
-screen, the app switcher, another app or a system dialog comes to the front, live control follows
+screen, the app switcher, another app or a system dialog comes to the front, Live Control follows
 whatever is on screen — gestures land on it and the element list shows it. It switches back on its
 own once the app returns to the front (if it does not, launch the app again).
 
 ## Results Dashboard
 
-Command **"fleetest: Open Results Dashboard"** shows, in the device monitor's **Dashboard** tab, a summary of
+Command **"fleetest: Open Results Dashboard"** shows, in the Device Monitor's **Dashboard** tab, a summary of
 `fleetest api results` for the project. Sections, top to bottom:
 
 - **Machine health**: one row per Mac, showing the health of FM (Foundation Models, text and image) and
@@ -210,7 +210,7 @@ visible while it re-fetches in the background.
 Setting `fleetest.heal` to `true` adds `--set heal=true` to Run (not Run (dry-run)) and Debug, enabling
 selector self-healing (fingerprint matching). When a run produces fix suggestions, it writes the fixed
 selectors back to the scenario sources at the end and shows a notification. **"Show Changes"** opens
-VS Code's Source Control view; review the git diff and commit. Anything that could not be written back
+VSCode's Source Control view; review the git diff and commit. Anything that could not be written back
 is listed in the run log (see [Self-healing](../running/self_healing.md)).
 
 ## Update Check
@@ -235,14 +235,14 @@ reads `git ls-remote` and never modifies the repository.
 `fleetest.language` (`auto`/`ja`/`en`) controls the extension's own UI text. `auto` follows VS
 Code's display language. You can also switch it from **"Display Language"** in the Settings tab.
 
-The installer (`Scripts/install.sh`) writes `ja` to your VS Code user settings when the macOS language is
+The installer (`Scripts/install.sh`) writes `ja` to your VSCode user settings when the macOS language is
 Japanese, and `en` otherwise. It leaves `fleetest.language` untouched if you have already set it.
 
 ## Cleaning Up Logs and Recordings
 
 Recordings, reports, and logs pile up with every run, so each category has a size limit and the
 oldest files are deleted first. The controls are in the Settings tab's **"Logs & recordings"**
-section. They are stored as **this Mac's settings** (`fleetest api retention`), not VS Code
+section. They are stored as **this Mac's settings** (`fleetest api retention`), not VSCode
 settings, so they also apply to tests you run directly from a terminal.
 
 - **"Clean up in the background after a test run"** (on by default): cleanup runs in the
@@ -266,7 +266,7 @@ settings, so they also apply to tests you run directly from a terminal.
   dialog shows the total that will be removed.
 - Result records (the pass/fail and timing JSON) are never deleted.
 - **Bridge diagnostics** of a running bridge can't be deleted. So when this category goes over its
-  limit, a bridge that no test, MCP session, or live control is using is rebuilt automatically and its
+  limit, a bridge that no test, MCP session, or Live Control is using is rebuilt automatically and its
   old log is removed (that device's screen pauses for tens of seconds meanwhile). Turning off
   "Clean up in the background after a test run" also turns this off.
 - Reports are also cleaned up in the output folder a run profile sets with `reportDir`. A folder

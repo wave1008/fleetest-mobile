@@ -1,4 +1,4 @@
-# Network Exposure and Security
+# Network exposure and security
 
 [in Japanese(日本語)](network_security_ja.md)
 
@@ -10,7 +10,7 @@ How the files and destinations that test code (scenarios) can reach are restrict
 
 | What | Where it listens | Authentication |
 |---|---|---|
-| Your Mac (CLI, MCP server, monitor, live control) | **Opens no externally reachable port.** Everything is NDJSON over standard input/output between parent and child processes only | — |
+| Your Mac (CLI, MCP server, monitor, Live Control) | **Opens no externally reachable port.** Only NDJSON over standard input/output and unix domain sockets that only the same user can connect to (files, not TCP ports) | — |
 | The scenario sandbox's proxy | `127.0.0.1` only. Started only when `sandbox.allowedDomains` is set, on a port that changes each time | Not needed (loopback; it relays only to the `allowedDomains` destinations) |
 | iOS Simulator bridge (XCUITest / in-app) | `127.0.0.1` inside the device only. The Simulator shares its host's network stack, so your machine can reach it | Not needed (loopback) |
 | Android bridge (physical device and Emulator alike) | **Loopback inside the device only.** Reached from your machine through a dynamic local port that `adb forward` opens | Not needed (loopback) |
@@ -55,6 +55,9 @@ How the files and destinations that test code (scenarios) can reach are restrict
 - **The app under test is never sent to Google.** Android's `adb install` can otherwise be
   blocked indefinitely by a Play Protect prompt, so verification is turned off only for the
   duration of the install and always restored afterward.
+- **When you create tests**, MCP server responses (the screen tree, screenshots, the app's text) go to your AI assistant and
+  on to that assistant's model provider (this is the AI assistant's traffic, not fleetest's; with a local LLM nothing leaves
+  your machine).
 - Outbound traffic happens **only during setup, updates, the update check (once a day by the VSCode extension, with
   `git ls-remote`), and when Android system images are downloaded**. **Nothing goes out while tests run** (except what a
   scenario sends to destinations listed in `sandbox.allowedDomains`, and the images a run of a project with compose.yaml pulls
@@ -180,14 +183,14 @@ These steps check that what is described above actually holds on your own Mac. A
 
 The ports fleetest uses are the bridge ports, 8123-8154. Check that none is open in a form reachable from outside (on all interfaces).
 
-#### Instruction for your AI assistant
+#### Prompt for the AI
 
 ```text
 Check the TCP listeners on this Mac. Split the result of lsof -nP -iTCP:8123-8154 -sTCP:LISTEN into those whose address is 127.0.0.1 (loopback) and those with * or 0.0.0.0 (all interfaces). Also run fleetest doctor and tell me about any warning.
 ```
 
 <details>
-<summary><b>Run it manually (click to expand)</b></summary>
+<summary><b>If you do it manually (click to show details)</b></summary>
 
 ```bash
 lsof -nP -iTCP:8123-8154 -sTCP:LISTEN    # the bridge ports
@@ -213,14 +216,14 @@ Expected result:
 
 Read this Mac's `sandbox.allowedDomains` and check that the list is the only set of destinations a scenario can reach.
 
-#### Instruction for your AI assistant
+#### Prompt for the AI
 
 ```text
 Tell me what ~/.config/fleetest/config.json has in sandbox.allowedDomains. If the file or the sandbox key does not exist, say so. Do not edit anything.
 ```
 
 <details>
-<summary><b>Run it manually (click to expand)</b></summary>
+<summary><b>If you do it manually (click to show details)</b></summary>
 
 ```bash
 cat ~/.config/fleetest/config.json
@@ -245,14 +248,14 @@ Expected result:
 
 On a closed network, check that either Option A (allow the destinations) or Option B (an internal mirror) goes through.
 
-#### Instruction for your AI assistant
+#### Prompt for the AI
 
 ```text
 I want to check that the closed-network setup works. Check git's insteadOf settings, a git ls-remote of foundation-tester on github.com, and HTTPS reachability (status codes) of raw.githubusercontent.com, github.com, registry.npmjs.org and dl.google.com, and tell me the results. Do not change any settings.
 ```
 
 <details>
-<summary><b>Run it manually (click to expand)</b></summary>
+<summary><b>If you do it manually (click to show details)</b></summary>
 
 ```bash
 git config --global --get-regexp '^url\..*\.insteadof$'

@@ -9,6 +9,8 @@ Claude Code in natural language. For the origin of the name and its features, se
 If you are new, go through the [Quick start](quick-start.md), from installation to running the sample app,
 then continue with the [Tutorial](#tutorial).
 
+**If you are deciding whether to adopt fleetest**, read [What is fleetest?](overview/about.md) → [Environment](overview/environments.md) → [Quality attributes](overview/quality.md) → [Notes and limitations](security/limitations.md) → [Network exposure and security](security/network_security.md), in that order.
+
 ## Repository
 
 - [foundation-tester](https://github.com/wave1008/foundation-tester)
@@ -29,6 +31,14 @@ then continue with the [Tutorial](#tutorial).
 - [Reading results and investigating failures](tutorial/investigating_failures.md)
 - [Running smoke and regression separately](tutorial/smoke_and_regression.md)
 - [Watching in VSCode](tutorial/watching_in_vscode.md)
+
+## Testing your own app
+
+- [Preparing the app under test](own_app/preparing_app.md)
+- [Preparing the servers your app depends on](own_app/preparing_server.md)
+- [Testing an app that needs a login](own_app/logging_in.md)
+- [Creating and running tests](own_app/creating_and_running.md)
+- [Keeping tests up with app changes](own_app/keeping_up.md)
 
 ## Security
 
@@ -57,18 +67,11 @@ then continue with the [Tutorial](#tutorial).
 - [Troubleshooting](in_action/troubleshooting.md)
 - [Maintenance for long-term use](in_action/maintenance.md)
 
-## Testing your own app
-
-- [Preparing the app under test](own_app/preparing_app.md)
-- [Preparing the servers your app depends on](own_app/preparing_server.md)
-- [Testing an app that needs a login](own_app/logging_in.md)
-- [Creating and running tests](own_app/creating_and_running.md)
-- [Keeping tests up with app changes](own_app/keeping_up.md)
-
 ## Appendix
 
 - [Quality attributes (non-functional requirements)](overview/quality.md)
 - [Glossary](overview/glossary.md)
+- [Migrating from another test framework: for Shirates users](overview/for_shirates_users.md)
 
 ## Developer reference
 
@@ -84,7 +87,7 @@ scenarios the AI assistant wrote, or to write some yourself.
 
 ### Creating TestClass
 
-- [Creating a TestClass](reference/testclass/creating_testclass.md)
+- [Creating a test class](reference/testclass/creating_testclass.md)
 - [Select and assert](reference/testclass/select_and_assert.md)
 - [How the text visibility check decides](reference/testclass/text_visibility_check.md)
 - [Test code structure](reference/testclass/testcode_structure.md)
@@ -164,7 +167,7 @@ scenarios the AI assistant wrote, or to write some yourself.
 - [dry-run](reference/running/dry_run.md)
 - [Self-healing](reference/running/self_healing.md)
 - [Parallel execution](reference/running/parallel_execution.md)
-- [Analysing results (fleetest results, dashboard)](reference/running/results_analysis.md)
+- [Analyzing results (fleetest results, dashboard)](reference/running/results_analysis.md)
 - [Response measurement](reference/running/response_measurement.md)
 - [Test bases and scenario drafts (draft-scenario)](reference/running/testbases.md)
 - [Sandbox defaults (writable places, unreadable places, destinations)](reference/running/sandbox_access.md)
@@ -191,4 +194,3 @@ scenarios the AI assistant wrote, or to write some yourself.
 
 - [DSL command reference (Japanese)](../commands.md)
 - [Results JSON schema (Japanese)](../results-json.md)
-- [For Shirates users](overview/for_shirates_users.md)

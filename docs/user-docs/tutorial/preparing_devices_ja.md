@@ -19,10 +19,16 @@ fleetest のテストプロジェクト project1 の実行プロファイル ios
 
 デバイスモニターの「プロファイル」タブで、実行プロファイルの「デバイスを追加」を押します。
 
+CLI では次のとおりです。`--count` は、実行プロファイルの該当 OS のデバイスを全部で N 台にします(今ある分を含みます)。
+
+```bash
+../foundation-tester/.build/debug/fleetest profile setup --project project1 --platform ios --app-id com.sutec.mobile.ios --auto-device --count 3
+```
+
 </details>
 <br>
 
-結果の確認:
+期待する結果:
 
 - デバイスモニターの「プロファイル」タブを確認します。
 

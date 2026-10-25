@@ -61,6 +61,7 @@ let response = httpRequest("https://api.example.com/health")   // プロキシ�
 |---|---|
 | `URLSession` で接続できない・タイムアウトする | 自作の `URLSession` にプロキシを渡していない(`httpRequest` / `fleetestURLSession` を使う)か、`allowedDomains` を書いていない |
 | プロキシが `403 Forbidden` を返す(本文 `fleetest sandbox: <host>:<port> is not in allowedDomains …`) | 宛先が `allowedDomains` に一致しない。`*.example.org` は `example.org` に一致しない・ポートを書いた行はそのポートにしか一致しない点に注意 |
+| `httpRequest` / `fleetestURLSession` が `kCFErrorDomainCFNetwork error 310` で失敗する | HTTPS の宛先が許可外(プロキシが `CONNECT` を 403 で断った形。失敗文に `allowedDomains` の案内が付く)。`sandbox.allowedDomains` に宛先を足す |
 | プロキシが `502 Bad Gateway` を返す | 宛先は許可されているが、Mac からその宛先へ繋がらない |
 | HTTP 以外の接続(DB への直接接続など)が失敗する | プロキシを通っていない(そのクライアントが `CONNECT` を送れない)か、ポートが許可されていない |
 

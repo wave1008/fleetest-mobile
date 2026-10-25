@@ -81,7 +81,7 @@ Run fleetest doctor --fm-only and check whether FM works on this Mac. If it does
 - **Bridge diagnostic logs**: If a bridge keeps running, for example while you stream a physical device's
   screen or keep an MCP session going, the log grows by a few GB per device per day. While the VSCode
   extension is open, a bridge that goes over the limit is rebuilt automatically, as long as no test, MCP
-  session, or live control is using it (that device's screen pauses for tens of seconds meanwhile). If you
+  session, or Live Control is using it (that device's screen pauses for tens of seconds meanwhile). If you
   use fleetest without the extension, stop the bridges you are not using when the log goes over the limit
   (`fleetest bridge down --port <port>`).
 - **Wallpaper cache of stopped Simulators**: `fleetest clean --simulator-poster-cache` clears it for every

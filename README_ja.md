@@ -17,7 +17,10 @@ CI に向きます。すべてを手元で動かせるので、クラウドを�
 
 - Apple silicon の Mac、macOS 26+
 - Xcode 27.2+
-- Android SDK
+- Homebrew
+- VSCode
+- Android SDK(Android をテストする場合)
+- MCP 対応の AIアシスタント(Claude Code・Codex で確認)
 - Apple Intelligence(Foundation Models)は任意
 
 詳細: [環境](docs/user-docs/overview/environments_ja.md)
@@ -38,7 +41,7 @@ https://github.com/wave1008/foundation-tester をこのフォルダの隣に clo
 | やりたいこと | 入口 |
 |---|---|
 | 自分のアプリで fleetest を使う | [利用者向けドキュメント](docs/user-docs/index_ja.md)([English](docs/user-docs/index.md)) |
-| DSL コマンドを調べる | [DSL コマンドリファレンス](docs/commands.md) |
+| DSL コマンドを調べる | [関数/プロパティ](docs/user-docs/index_ja.md#関数プロパティ)([全コマンドの仕様(日本語)](docs/commands.md)) |
 | fleetest 本体を改造する | [CLAUDE.md](CLAUDE.md)(規則)・[docs/README.md](docs/README.md)(保守者向け文書の索引)・[docs/development.md](docs/development.md)(ビルドとリポジトリ構成) |
 
 ## 4つのインターフェース
