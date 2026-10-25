@@ -137,7 +137,7 @@ let package = Package(
                 .product(name: "SwiftCompilerPlugin", package: "swift-syntax"),
             ]
         ),
-        // Shirates 風 Swift テスト DSL(シナリオ記述用のユーザー向けライブラリ)
+        // Swift のテスト DSL(シナリオ記述用のユーザー向けライブラリ)
         .target(
             name: "FTDSL",
             dependencies: ["FTCore", "FTDSLMacros"]

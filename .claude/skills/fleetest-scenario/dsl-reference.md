@@ -31,7 +31,7 @@ fleetest-scenario スキル(SKILL.md)のステップ3「シナリオ .swift を�
 | 反復 | `repeatWhileCanSelect(sel, maxLoopCount: n) { … }`(解決できる限り繰り返す。上限到達は失敗にしない)/ `doUntilTrue("名", waitSeconds:) { 条件 }`(**アプリ・外部の状態待ち専用**。要素の出現待ちは各コマンドの `waitSeconds:`) |
 | 割り込み | `irregularHandler("#promo_modal", dismiss: "#btn_close")` を beforeEach で宣言すると、出るか不定の**アプリ内メッセージ**を出た時点で自動的に閉じる(OS のダイアログはツール側が吸収するので書かない)。**そのモーダル自体を検証・操作したい区間**では `suppressHandler { … }`(1つの CAE ブロックの内側)か `disableHandler()` … `enableHandler()`(**CAE を跨ぐとき**)で自動クローズを止める |
 | まとまり | `group("ログイン") { … }`(記録に `[ログイン]` を前置するだけ。実行・失敗の扱いは素の列と同じ) |
-| テストデータ・外部 API | `account("[user1].password")` / `data("[order1].item")`(Shirates と同じ。値は `TestProjects/<proj>/dataset/accounts.json`・`data.json` に `{ "[user1]": { "id": "…", "password": "…" } }` の形で置き、その Mac の `~/.config/fleetest/dataset/<proj>/` の同名ファイルが属性単位で上書きする。dry-run はキーをそのまま返す)/ `dataFile("csv/users.csv")`(キーと値で表せない CSV・JSON・画像の `URL`。置き場は同じ `dataset/`・マシン側はファイル単位で差し替え)/ `addMedia("photo.png")`(データセットのフォルダの画像 jpg/jpeg/png/heic/gif・動画 mp4/mov を写真ライブラリへ入れる。iOS Simulator と Android だけ・iOS 実機は失敗・入れたものを消すコマンドは無い)/ `httpRequest(url, method:, headers:, body:, waitSeconds:)`(テストデータを API で準備する。応答の `status` / `text` / `json` を `thisIs` で検証。localhost へはそのまま届く・外部の宛先はその Mac の `sandbox.allowedDomains` に載っているものだけ) |
+| テストデータ・外部 API | `account("[user1].password")` / `data("[order1].item")`(値は `TestProjects/<proj>/dataset/accounts.json`・`data.json` に `{ "[user1]": { "id": "…", "password": "…" } }` の形で置き、その Mac の `~/.config/fleetest/dataset/<proj>/` の同名ファイルが属性単位で上書きする。dry-run はキーをそのまま返す)/ `dataFile("csv/users.csv")`(キーと値で表せない CSV・JSON・画像の `URL`。置き場は同じ `dataset/`・マシン側はファイル単位で差し替え)/ `addMedia("photo.png")`(データセットのフォルダの画像 jpg/jpeg/png/heic/gif・動画 mp4/mov を写真ライブラリへ入れる。iOS Simulator と Android だけ・iOS 実機は失敗・入れたものを消すコマンドは無い)/ `httpRequest(url, method:, headers:, body:, waitSeconds:)`(テストデータを API で準備する。応答の `status` / `text` / `json` を `thisIs` で検証。localhost へはそのまま届く・外部の宛先はその Mac の `sandbox.allowedDomains` に載っているものだけ) |
 | 記録 | `screenshot(filename?)`(ファイル名はラベル無し)(現在の画面を撮り、このステップ直後にレポートへ埋め込む) |
 | 前後処理 | テストクラスに `func beforeEach()` / `func afterEach()`(引数なし)を書くと各 `@Test` の前後で自動実行 |
 
@@ -84,7 +84,7 @@ fleetest-scenario スキル(SKILL.md)のステップ3「シナリオ .swift を�
   同じ行にあるスイッチ)。方向は `right` / `left` / `above` / `below`、型別接尾辞は
   `Button` / `Input` / `Label` / `Image` / `Switch` / `Widget`。
   引数で序数(`数量:right(2)` = 近い順2番目)や任意フィルタ(`#a:below(.button&&項目)`)も書け、
-  `見出し:right:belowButton` と連鎖もできる。基準は `<...>` で囲んでもよい(Shirates 正典形。
+  `見出し:right:belowButton` と連鎖もできる。基準は `<...>` で囲んでもよい(
   `<変更&&.button>:right(数量)`。囲みは任意で、パース結果は囲まない形と同じ)。
   規則は3つだけ:
   ①候補の中心が基準の帯(right/left なら y 範囲、above/below なら x 範囲)に入る
@@ -96,7 +96,7 @@ fleetest-scenario スキル(SKILL.md)のステップ3「シナリオ .swift を�
 - **綴り誤り・未対応記法は実行前にエラー**になる(`:near` `:parent` 等の他ツール記法、未知の
   フィルタ名 `textContans=`、型名の `=`、`[abc]`、閉じない括弧)。
   黙ってラベル扱いにはならないので、通れば構文は正しい
-- `A||B` — **候補の和集合**(Shirates 準拠)。`tap` は節の順で最初の候補に着地するので
+- `A||B` — **候補の和集合**。`tap` は節の順で最初の候補に着地するので
   「id 優先・ラベルは代替」の書き方はそのまま通る。`countIs` は**和の総数**(同じ要素が複数の節に
   当たっても1度だけ)。例: `tap("#login_btn||ログイン||.button")`
 - `(a|b)` — **フィルタ内 OR**。`保存||OK` と等価(`.button&&(許可|項目)` のように型と併用できる)。

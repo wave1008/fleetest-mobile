@@ -479,7 +479,7 @@ public enum DSLCommandIndex {
 
         // MARK: data (account / test data datasets, and outbound HTTP)
         .init("account", "data", "account(longKey) / account(datasetName, attributeName)",
-              "Returns a value of the account dataset, written as \"[account1].password\" (as in Shirates). Reads"
+              "Returns a value of the account dataset, written as \"[account1].password\". Reads"
                   + " <project>/dataset/accounts.json, overridden per attribute by"
                   + " ~/.config/fleetest/dataset/<project name>/accounts.json. Not masked by default; with"
                   + " redactAccountValues: true in the machine's ~/.config/fleetest/config.json, every attribute of the"
