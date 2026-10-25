@@ -220,7 +220,7 @@ public final class WebViewDelegatingDriver: AppDriver {
     /// ランナーに問い合わせないまま数秒置いた直後の座標イベントを **200 を返しつつ届け損なう**
     /// (実測: アイドル ~3.5s で ~14%・~1s でも数%。SUT の JS プローブで「ページは pointerdown
     /// すら見ていない」を確認)。直前にランナーへ木を1回読ませると 0/25(A/B は
-    /// docs/verification/ §interop WebView)。**時間閾値にしない** —— 短いギャップでも
+    /// docs/verification/triage.md「interop WebView」)。**時間閾値にしない** —— 短いギャップでも
     /// 確率的に落ちる実測があり、安全な境界を引けない。機構(testmanagerd の何が冷えるのか)は
     /// 非公開で特定できておらず、この接続確認は観測に立脚した防御
     /// 実行プロファイル iosPreActionPing(既定 true)。OFF は FT_PRE_ACTION_PING=0 で届く

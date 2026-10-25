@@ -9,7 +9,7 @@ fleetest の Swift DSL は **Shirates(Classic)に準拠**している(コマン�
 
 - 読者は**保守者**(利用者向けの全コマンド説明は docs/commands.md)
 - **この文書が準拠状況の正典**。コマンドを足す・名前を変える・意図的に持たないと決めたときは
-  ここを更新する。docs/design/「Shirates(Classic) 準拠の方針と承認済みの差分」は
+  ここを更新する。docs/design/dsl-syntax.md「Shirates(Classic) 準拠の方針と承認済みの差分」は
   **理由の説明が要る代表例**を抜き出した表で、全リストではない(理由の詳述はあちらを参照)
 - Shirates 側の出典は `~/github/wave1008/shirates-core`(迷ったらソースを読む)
 
@@ -253,7 +253,7 @@ fleetest の Swift DSL は **Shirates(Classic)に準拠**している(コマン�
 | `clipboard` / `readClipboard` / `writeClipboard` | — | ⏳ **足す**(2026-08-21 判定。基準①)。コピー・ペースト機能そのものを検証する画面でだけ要る。**足す条件**: そういう画面が受け手に出たとき(それまでは無くても回る) |
 | `disableCache` / `refreshCache` / `syncCache` / `onDirectAccess` 等 | 内部で自動管理(利用者に露出しない) | ➖ 露出すると生成側が性能問題を誤った手段で解こうとする |
 | `disableHandler` / `enableHandler` / `suppressHandler` / `useHandler` | 同名4つ | ✅ 2026-08-21。**両方要る**: ブロック形は出口で必ず戻る一方、**1つの CAE ブロックの内側にしか置けない** —— `condition` で止めて `expectation` で戻す形は命令形でしか書けない(ユーザー指摘)。入れ子可・抑止したまま落ちたら注記に出る |
-| `withContext` | — | ➖ **概念ごと要らない**(2026-08-21 判定)。Appium の native/web コンテキスト切替に相当するが、fleetest は**WebView を透過的に扱う**(木は a11y、足りなければ DOM。docs/design/ §木はどこから来るか)ので、利用者が切り替える場面が無い |
+| `withContext` | — | ➖ **概念ごと要らない**(2026-08-21 判定)。Appium の native/web コンテキスト切替に相当するが、fleetest は**WebView を透過的に扱う**(木は a11y、足りなければ DOM。docs/design/webview.md「木はどこから来るか」)ので、利用者が切り替える場面が無い |
 
 ## セレクタ記法
 
@@ -291,7 +291,7 @@ fleetest の Swift DSL は **Shirates(Classic)に準拠**している(コマン�
 
 | コマンド | 差 |
 |---|---|
-| `hideKeyboard()` | Android・iOS とも対応(冪等)。iOS は木から「何もない点」を選んでタップし(撃つ前に in-app ブリッジの `/tapprobe` で確認)、閉じなければ Enter を送って注記する。詳細は docs/commands.md・docs/design/「キーボードの観測と `hideKeyboard`」 |
+| `hideKeyboard()` | Android・iOS とも対応(冪等)。iOS は木から「何もない点」を選んでタップし(撃つ前に in-app ブリッジの `/tapprobe` で確認)、閉じなければ Enter を送って注記する。詳細は docs/commands.md・docs/design/dsl-syntax.md「キーボードの観測と `hideKeyboard`」 |
 | `back()` | iOS は**スワイプバック対応のナビ**(NavigationStack 等)を持つ画面でのみ戻れる。独自ナビのアプリではアプリ内の戻るボタンを `tap` する。Android はキーボードが開いていると1回目がキーボードを閉じるのに消費される(OS 仕様) |
 | `keyboardIsShown` / `keyboardIsNotShown` | 取得元が OS で違う(iOS xcuitest = AX ツリーの `.keyboard` / iOS in-app = `UITextEffectsWindow` の可視判定 / Android = ホストが `dumpsys` の `InputMethod` window を見る)。**IME が別プロセスの window でアプリの a11y ツリーに出ない**ため |
 | `clearInput(sel)` | **Flutter の iOS は in-app ブリッジでは消せず XCUITest ブリッジ経由**になる(自動フォールバック。1〜2秒)。Flutter engine への editing state 配送は3回実測して不採用(design/) |

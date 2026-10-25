@@ -391,7 +391,7 @@ connection was lost」で落ちる(そのデバイスは never joined = 準備�
 
 Simulator のアプリのプロセスの描画が崩れている(アプリの領域が一色・形は描けて文字だけ無い。木は正常)。**一度崩れると
 アプリを起動し直すまで戻らず、Mac の状態が悪いと E2E でも崩れ続ける**。崩れるのは自前描画(Compose・Flutter)だけで、
-SwiftUI・RN は描ける(docs/design/「描画崩壊の検査」・MN-90)。
+SwiftUI・RN は描ける(docs/design/dsl-execution.md「描画崩壊の検査」・MN-90)。
 
 - **E2E の規模では崩れない**: 再起動の後のフル E2E・E2E-CMP の iOS 1プロファイル(58 本)は崩壊 0(2026-10-19)
 - **負荷テストの規模で崩れ始める**: Simulator 10・Emulator 8・実機・ファズ・配信を同時に掛けると、再起動の後でも約 8 分で再発した
@@ -956,7 +956,7 @@ pointerdown すら見ない(JS プローブ)・inapp モード限定(xcuitest �
 
 **修正**: `WebViewDelegatingDriver.pingDelegatedBeforeEvent` —— domInterop の委譲イベント
 (tap / press / type の focus タップ / clearInput)直前にランナーへ木を1回読ませる。
-実行プロファイル `iosPreActionPing`(既定 true)で止められる(docs/design/ §プロファイル)。
+実行プロファイル `iosPreActionPing`(既定 true)で止められる(docs/design/profiles.md「プロファイル」)。
 **時間閾値にしない**(短いギャップでも確率的に落ち、安全な境界を引けない)。
 コスト実測: 該当画面のイベント1回 +約0.4s・当該シナリオ +3.0s(16.1→19.1s)・
 **スイート全体は差なし**(88.9s vs 90.0s。10レーン並列に隠れる)。

@@ -332,7 +332,7 @@ public enum StepNote: String, Sendable, Codable, CaseIterable {
     case keyboardAppearedLate = "keyboard-appeared-late"
 
     /// 容器の外にあると判定した対象を、掴み直しと追加の送りを上限まで行っても外のまま**操作した**
-    /// (止めないのは設計どおり = docs/design/「スクロール残像(ghost)は拒否せず、警告して撃つ」)。
+    /// (止めないのは設計どおり = docs/design/history.md「スクロール残像(ghost)は拒否せず、警告して撃つ」)。
     /// ステップは緑のまま。**後段の検証が無いシナリオでは、これだけが「別の物に当たったかもしれない」
     /// 痕跡**になる(実測: iPhone 13 LAN で撃った後、後段の textIs が selected=- で赤。
     /// それまでは説明文の括弧書きにしか残らず run 横断で数えられなかった)。

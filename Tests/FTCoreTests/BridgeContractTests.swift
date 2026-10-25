@@ -157,7 +157,7 @@ final class BridgeContractTests: XCTestCase {
             "Runner/FleetestRunnerUITests/DisplayHeartbeat.swift": "c62c30a45e842d5ec7aff60210284d679b76f6e44358a3f4c97429fe918e5ffa",
             "Runner/FleetestRunnerUITests/DisplayRouting.swift": "4c2a45c043a5915ffacfb174dc7af5c6561c0fa3223d08779a4956a825e1891c",
             "Runner/FleetestRunnerUITests/FleetestBridgeTests.swift": "1a799c33e09a7ea451b36c58d9906d28b03fca7e84b6a02b598fca92e81c3b3c",
-            "Runner/FleetestRunnerUITests/InterruptionGuard.swift": "7d528114565758db257235d135ec9d5941beb278b77a4f5295c3546156c4fb48",
+            "Runner/FleetestRunnerUITests/InterruptionGuard.swift": "60dc220563f46545e117eadab67c9cfa797d2bdb98e911eb97eba44bc1378438",
             "Runner/FleetestRunnerUITests/ObjCExceptionCatcher.h": "5a98cdbeefb031137a985b2f4430a5e12fec447a492599f8f4da1bd2c7101edc",
             "Runner/FleetestRunnerUITests/ObjCExceptionCatcher.m": "8b41a8a81bc8199bca13a364717614684f8003999c7675d9a63242c8e74c26be",
             "Runner/FleetestRunnerUITests/QuiescenceWait.swift": "8d4518d0ac149af39218344f16c713dd44b72bff14bfd5d17092fb01c27e52c7",

@@ -4,7 +4,7 @@
 // 入れ物に SET_TEXT / ACTION_IME_ENTER を撃てば拒否、「空」と読めば黙って成功になるので、
 // フォーカス欄を使う経路(ref なしの clear / type / IME Enter)は `focusedEditable`
 // (編集可能でなければ木から isFocused && isEditable を探す)を通す。
-// **新しい経路が素の findFocus を書いたら落ちる**(docs/design/ §Android のテキスト注入の規律)。
+// **新しい経路が素の findFocus を書いたら落ちる**(docs/design/history.md「Android のテキスト注入の規律」)。
 
 import XCTest
 

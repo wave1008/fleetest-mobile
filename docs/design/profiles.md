@@ -389,8 +389,7 @@ Android 実機はグローバル設定が**永続的に**書き換わるので�
 直前に、ランナーへ木を1回読ませてから撃つ**(`WebViewDelegatingDriver.pingDelegatedBeforeEvent`)。
 attach したままの XCUITest セッションは、ランナーに問い合わせないまま数秒置いた直後の
 座標イベントを **200 を返しつつ届け損なう**(実測 約13%。ページは pointerdown すら見ない。
-機構は非公開で特定できておらず、観測に立脚した防御。A/B と経緯は docs/verification/
-§interop WebView)。時間閾値にしないのは、短いギャップでも確率的に落ちる実測があり安全な
+機構は非公開で特定できておらず、観測に立脚した防御。A/B と経緯は docs/verification/triage.md「interop WebView」)。時間閾値にしないのは、短いギャップでも確率的に落ちる実測があり安全な
 境界を引けないため。false は `FT_PRE_ACTION_PING=0` として注入される(`FTCore.RunEnvironment`
 が唯一の定義元 —— ProfileRunner / ApiRunCommand の profile 有無2経路 / Fleetest.swift の
 profile 無し経路と、fleetest-mcp の resolveProfileTarget から呼ばれる)。**効くのは inapp モードの

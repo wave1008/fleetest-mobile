@@ -40,7 +40,7 @@ tag 定数は `src/tags.ts` に集約する(値は共通契約の表と byte 一
 `other`・非 scrollable)に付き、実際にスクロールするノードは**同 frame の別要素**に割れる。
 Android は `scrollView id=list_rows scroll` の理想形でそのまま出る。
 → **ホスト側で「同一 frame の id 付きラッパー + 匿名 scroll ノード」を統合する正規化**を入れて
-両モード・両 OS で吸収している(docs/design/ の「スコープ `祖先 >> 子孫`」参照)。SUT 側の対処は不要。
+両モード・両 OS で吸収している(docs/design/dsl-syntax.md「スコープ `祖先 >> 子孫`」参照)。SUT 側の対処は不要。
 
 ### B. Android は Pressable の内側 Text が別ノードとして出る(ツール側で畳み込み済み)
 

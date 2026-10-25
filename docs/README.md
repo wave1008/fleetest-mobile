@@ -2,7 +2,7 @@
 
 | 種別 | 範囲 | 読む場面 | 扱わないこと |
 |---|---|---|---|
-| 索引・規約 | docs/ 直下の保守者向け文書の一覧と、その書き方 | 文書を探すとき・文書を足す/直すとき | 利用者向けの文書(→ [user-docs/index_ja.md](user-docs/index_ja.md))・作業の規則(→ CLAUDE.md) |
+| 索引・規約 | docs/ の保守者向け文書(分割したフォルダを含む)の一覧と、その書き方 | 文書を探すとき・文書を足す/直すとき | 利用者向けの文書(→ [user-docs/index_ja.md](user-docs/index_ja.md))・作業の規則(→ CLAUDE.md) |
 
 保守者向けの文書を、読む場面ごとに引けるように並べる。後半の「書き方」は、人と AI の両方が同じ形で
 読めるようにするための規約。
@@ -78,7 +78,6 @@
 | [sandbox-seatbelt.md](sandbox-seatbelt.md) | 記録 | シナリオのサンドボックスに許可を足す/調べるとき |
 | [response-measurement.md](response-measurement.md) | 記録 | レスポンス計測の設計を変えるとき |
 | [poc-fm-occlusion-guard.md](poc-fm-occlusion-guard.md) | 記録 | テキストの可視性検証(FM)の判定の根拠を確かめるとき |
-| [performance-tuning/records.md](performance-tuning/records.md) | 記録 | ドライバ改良の効果の実測を確かめるとき |
 
 ## 書き方
 
@@ -89,7 +88,7 @@ H1 の直後に次の表を置き、その下に1〜2文の導入を書く(こ�
 | 種別 | 範囲 | 読む場面 | 扱わないこと |
 |---|---|---|---|
 
-- **種別**は索引と同じ4つから選ぶ。正典と記録を1ファイルに混ぜない
+- **種別**は「索引」の冒頭に挙げた5つから選ぶ(「索引」はフォルダの目次だけに使う)。正典と記録を1ファイルに混ぜない
 - **扱わないこと**には参照先を書く(読み手が別のファイルへ移れるように)
 
 ### 大きさ
@@ -114,7 +113,6 @@ H1 の直後に次の表を置き、その下に1〜2文の導入を書く(こ�
 | `DS` | design |
 | `RR` | remote-runner |
 | `PT` | performance-tuning |
-| `VF` | verification |
 | `FD` | framework-differences |
 | `SB` | sandbox-seatbelt |
 | `RM` | response-measurement |

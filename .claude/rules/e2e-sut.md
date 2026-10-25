@@ -73,7 +73,7 @@ CLAUDE.md から移した規則(本文は移設前と同一)。この領域の�
   落ちた `command`・`failureKind`・文言の断片・注記・`appCrash` まで固定する(赤なら何でも ✅ にしない)。
   iOS の権限アラートはボタンで答えるまで消えない(アプリを止めても権限をリセットしても残る)ので、アラートを出す対照には
   `resetPhotos` を付ける(前後で補助シナリオ `98_写真の権限アラートを閉じる` が閉じる)。表の順序も崩さない。
-  載せ忘れは `vscode-fleetest/test/negativeControls.test.mjs` が落とす。経緯は docs/verification/ §陽性対照スイート
+  載せ忘れは `vscode-fleetest/test/negativeControls.test.mjs` が落とす。経緯は docs/verification/detection-and-tests.md「陽性対照スイート」
 
 - **E2EY(`E2EYApp*` / `TestProjects/E2EY-*`)の SUT の「罠」は意図して残す性質で、SUT 側で回避しない**
   (契約 `E2EYAppCMP/docs/ui-contract.md` の各画面の「罠」)。赤を消すために罠を消す直し(離した速さを見ない
