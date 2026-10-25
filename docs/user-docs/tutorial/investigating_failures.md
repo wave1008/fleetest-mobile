@@ -12,7 +12,8 @@ To practice investigating, temporarily change an expected value in the add-to-ca
 ### Prompt for the AI
 
 ```text
-In the first test of the "add-to-cart test" (AddToCart.swift) of the fleetest test project project1, temporarily change just one expected value, the one that checks the product name in the cart, to a product name that does not exist.
+In the first test of AddToCart.swift in project1, temporarily change just one expected value, the one that checks the product name in the cart,
+to the nonexistent product name "Phantom Product A".
 Then run it on iOS (ios-run) and report only pass or fail. Don't fix it.
 ```
 
@@ -26,7 +27,7 @@ Expected result:
 ### Prompt for the AI
 
 ```text
-Summarize the latest run of the fleetest test project project1. If anything failed, list the failed scenarios and the steps where they failed.
+Summarize the latest run of project1. If anything failed, list the failed scenarios and the steps where they failed.
 ```
 
 <details>
@@ -49,9 +50,9 @@ Expected result:
 ### Prompt for the AI
 
 ```text
-Use the reports to find out why scenarios failed in the latest run of the fleetest test project project1, and report back.
-For each one, say whether it looks like an app bug or a problem with how the test is written.
-Don't fix the scenarios yet (and don't make them pass by adjusting expected values to match the app).
+Use the reports to find out why scenarios failed in the latest run of project1, and report back.
+Tell apart whether it is an app bug or a problem with how the test is written.
+Don't fix the scenarios yet.
 ```
 
 - Always add "don't fix them". If you ask for investigation and a fix at once, a test that failed because of an app bug may get made to pass by adjusting the expected value to match the app.
@@ -69,7 +70,7 @@ Expected result:
 ### Prompt for the AI
 
 ```text
-In the "add-to-cart test" (AddToCart.swift) of the fleetest test project project1, restore the expected value to the original product name, and re-run only the scenarios that failed on iOS last time.
+In AddToCart.swift in project1, restore the expected value to the original product name, and re-run only the scenarios that failed on iOS last time.
 ```
 
 <details>
@@ -87,11 +88,6 @@ Results are recorded per profile, so run it with the same profile as last time.
 Expected result:
 
 - Only the one test that had failed runs, and it passes.
-
-More details:
-
-- [Test result files](../reference/testclass/test_result_files.md)
-- [Analyzing results](../reference/running/results_analysis.md)
 
 <br>
 

@@ -11,9 +11,9 @@ This suits your first test. It creates one test for the normal flow only (add er
 ### Prompt for the AI
 
 ```text
-In the fleetest test project project1, create one "add-to-cart test" for SUT Store. Name the file AddToCart.swift.
-It is a happy-path test (the normal flow): search for a product on the search screen (narrowing by category is fine), open it, add it to the cart, and check that the product is in the cart. No login is needed.
-When it is ready, run it on iOS (ios-run) to confirm.
+In project1, create AddToCart.swift as a test.
+As a happy-path test, search for "watch" on the search screen, open the product, add it to the cart, and check that the product is in the cart.
+Run it on iOS (ios-run) to confirm.
 ```
 
 The AI assistant compiles it, verifies it without a device (dry-run), runs it on a device, and reports the result.
@@ -21,24 +21,23 @@ The AI assistant compiles it, verifies it without a device (dry-run), runs it on
 Expected result:
 
 - `scenarios/AddToCart.swift` is created.
-- The compile, the dry-run, and the run with ios-run are reported, and they succeed.
+- The test runs, and its history is added to the Test Sessions tab.
 
-<img src="../images/tutorial/en/ai_workflow.png" width="720" alt="Operate and read the screen, write the scenario, compile, dry-run, run on a device, report the result">
-
-## 2. Add to an existing test
+## 2. Add a test to an existing test file
 
 ### Prompt for the AI
 
 ```text
-In the fleetest test project project1, add a second test to the "add-to-cart test" (AddToCart.swift):
-without logging in, set the quantity to 3 in the product details and add it to the cart. Don't create a new file.
-Check that the quantity of that product in the cart is 3. When it is ready, run it on iOS (ios-run) to confirm.
+Add a second test to AddToCart.swift in project1.
+Search for "scarf" on the search screen, set the quantity to 3 in the product details, add it to the cart,
+and check that the quantity of that product in the cart is 3.
+Run it on iOS (ios-run) to confirm.
 ```
 
 Expected result:
 
-- A second `@Test` is added to the same file.
-- Both tests pass.
+- A test scenario is added to the same file.
+- The test runs, and its history is added to the Test Sessions tab.
 
 <details>
 <summary><b>If you do it manually (click to show details)</b></summary>

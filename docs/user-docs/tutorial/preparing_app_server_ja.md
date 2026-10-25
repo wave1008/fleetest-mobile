@@ -10,24 +10,24 @@ SUT Store のサーバー(サーバー + PostgreSQL)は、クイックスター�
 ### AIへの指示文
 
 ```text
-fleetest のテストプロジェクト project1 の TestProjects/project1/workspace/scripts/compose.yaml を読んで、
-どんなサーバーが宣言されているか、アプリはどこへ接続するか(iOS Simulator と Android Emulator それぞれ)を説明して。
-ファイルは変更しないで。
+project1 で使用するサーバーの情報を教えて。
 ```
 
 期待する結果:
 
-- サーバーと PostgreSQL の2つが宣言されます。
-- アプリの接続先は iOS Simulator が 127.0.0.1:8090・Android Emulator が 10.0.2.2:8090 だと説明されます。
+- server, dbに関する情報が表示されます。
 
 ## 2. 起動して確かめる
 
 ### AIへの指示文
 
 ```text
-fleetest services up --project project1 --profile ios-run でサーバーを起動して、公開ポートの /health が ok を返すことを確かめて。
-確かめたら services down して、結果を報告して。
+project1 で使用するサーバーを起動して。
+公開ポートの /health が ok を返すことを確かめて。
+services down して、結果を報告して。
 ```
+
+- MCPの許可ダイアログが表示された場合は許可してください。
 
 <details>
 <summary><b>手動で実行する場合(クリックで詳細表示)</b></summary>
@@ -43,8 +43,7 @@ curl http://127.0.0.1:8090/health     # 印字された公開ポートへ
 
 期待する結果:
 
-- `services up` が公開ポートを印字し、`healthcheck` が通るまで待ってから戻ります。
-- `/health` は `{"status":"ok","db":"up"}` を返します。
+- 指示通りに実行されて結果が報告されます。
 
 関連:
 

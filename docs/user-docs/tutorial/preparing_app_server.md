@@ -11,24 +11,24 @@ start automatically on every `fleetest run` and stop when it ends. The details a
 ### Prompt for the AI
 
 ```text
-Read TestProjects/project1/workspace/scripts/compose.yaml of the fleetest test project project1 and explain
-which servers are declared and where the app connects to them (for the iOS Simulator and the Android Emulator separately).
-Don't change the file.
+Tell me about the servers project1 uses.
 ```
 
 Expected result:
 
-- The explanation names two declared services (the server and PostgreSQL).
-- It says the app connects to 127.0.0.1:8090 on the iOS Simulator and 10.0.2.2:8090 on the Android Emulator.
+- Information about the server and the db is shown.
 
 ## 2. Start it and check
 
 ### Prompt for the AI
 
 ```text
-Start the server with fleetest services up --project project1 --profile ios-run and confirm that /health on the published port returns ok.
-When confirmed, run services down and report the result.
+Start the servers project1 uses.
+Confirm that /health on the published port returns ok.
+Run services down and report the result.
 ```
+
+- If an MCP permission dialog appears, allow it.
 
 <details>
 <summary><b>If you do it manually (click to show details)</b></summary>
@@ -44,8 +44,7 @@ curl http://127.0.0.1:8090/health     # at the published port that was printed
 
 Expected result:
 
-- `services up` prints the published port and returns after the `healthcheck` passes.
-- `/health` returns `{"status":"ok","db":"up"}`.
+- The steps run as instructed and the result is reported.
 
 Related:
 

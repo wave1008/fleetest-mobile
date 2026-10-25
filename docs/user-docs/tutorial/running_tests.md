@@ -2,15 +2,14 @@
 
 [in Japanese(日本語)](running_tests_ja.md)
 
-Run the tests you created. AI is not used for the run itself (scenarios are replayed deterministically as code).
-This page runs the tests you made in the Quick Start and in "Creating tests" on iOS.
+Run all the tests you have created in project1 so far.
 
-## 1. Run (in parallel on three devices)
+## 1. Run
 
 ### Prompt for the AI
 
 ```text
-Run all scenarios in the fleetest test project project1 on iOS (ios-run) and report the results when it's done.
+Run project1 on iOS (ios-run) and report the results when it's done.
 ```
 
 <details>
@@ -35,17 +34,9 @@ In VSCode, select a scenario in the Test Explorer and click "Run" (choose the ru
 
 Expected result:
 
-- `ios-run` has the three devices you set up in the Quick Start and [Preparing devices](preparing_devices.md), so the scenarios are distributed to all three automatically.
-- The three devices in the Device Monitor run different scenarios at the same time.
-- A list of pass/fail appears when it finishes (no change to the scenarios is needed).
+- `ios-run` defines several devices. The scenarios are distributed to them automatically and run in parallel.
 
 <img src="../images/tutorial/en/parallel_run.png" width="640" alt="Example: fleetest distributes six scenarios across three devices automatically">
-
-More details:
-
-- [Running scenarios (fleetest run)](../reference/running/running_scenarios.md)
-- [Dry-run](../reference/running/dry_run.md)
-- [Parallel execution](../reference/running/parallel_execution.md)
 
 <br>
 

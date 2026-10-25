@@ -10,7 +10,7 @@
 ### AIへの指示文
 
 ```text
-fleetest のテストプロジェクト project1 の scenarios/ の下に smoke フォルダを作って、商品詳細を開く.swift を移して。カートに追加する.swift は移さないで。
+project1 の scenarios/ の下に smoke フォルダを作って、商品詳細を開く.swift を移して。カートに追加する.swift は移さないで。
 移したらコンパイルが通ることを確かめて。
 ```
 
@@ -37,7 +37,7 @@ mv TestProjects/project1/scenarios/商品詳細を開く.swift TestProjects/proj
 ### AIへの指示文
 
 ```text
-fleetest のテストプロジェクト project1 の ios-run プロファイルで、smoke フォルダのシナリオだけを実行して。
+project1 の ios-run プロファイルで、smoke フォルダのシナリオだけを実行して。
 ```
 
 <details>
@@ -62,7 +62,7 @@ fleetest のテストプロジェクト project1 の ios-run プロファイル�
 ### AIへの指示文
 
 ```text
-fleetest のテストプロジェクト project1 の ios-run プロファイルで、全部のシナリオを実行して。
+project1 の ios-run プロファイルで、全部のシナリオを実行して。
 ```
 
 期待する結果:

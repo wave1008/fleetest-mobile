@@ -2,15 +2,14 @@
 
 [in English](running_tests.md)
 
-作ったテストを実行します。実行そのものに AI は使いません(シナリオはコードとして決定的に再生されます)。
-ここでは、クイックスタートと「テストを作る」で作ったテストを iOS で回します。
+ここまでの手順で project1 に作成したテストをまとめて実行します。
 
-## 1. 実行する(3台で並列に)
+## 1. 実行する
 
 ### AIへの指示文
 
 ```text
-fleetest のテストプロジェクト project1 のシナリオを全部 iOS(ios-run)で実行し、終わったら成否を報告して。
+project1 を iOS(ios-run)で実行し、終わったら成否を報告して。
 ```
 
 <details>
@@ -35,17 +34,9 @@ VSCode では Test Explorer でシナリオを選び、「実行」をクリッ�
 
 期待する結果:
 
-- `ios-run` にはクイックスタートと[デバイスを用意する](preparing_devices_ja.md)で3台を入れたので、シナリオが3台へ自動で振り分けられます。
-- デバイスモニターの3台がそれぞれ別のシナリオを同時に動かします。
-- 終わると成否の一覧が出ます(シナリオ側の変更は要りません)。
+- `ios-run` には複数台のデバイスが定義されています。シナリオはそれらのデバイスに自動で振り分けら、並列に実行されます。
 
 <img src="../images/tutorial/ja/parallel_run.png" width="640" alt="例: 6本のシナリオを fleetest が3台のデバイスへ自動で振り分ける">
-
-もっと詳しく:
-
-- [シナリオの実行(fleetest run)](../reference/running/running_scenarios_ja.md)
-- [dry-run](../reference/running/dry_run_ja.md)
-- [並列実行](../reference/running/parallel_execution_ja.md)
 
 <br>
 
