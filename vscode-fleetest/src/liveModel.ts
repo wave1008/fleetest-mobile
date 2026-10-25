@@ -160,10 +160,10 @@ export interface LiveActionDsl {
 
 /** 操作の列(「タップ: Apple マップ」)に、DSL の行が対象に書いたセレクタを `("…")` で添える。
  * **ラベルの末尾(要素名 = live.opLabel.* の `{target}`)がそのセレクタなら添えない**(要素名が id のとき =
- * 「ダブルタップ: #Viewport」に同じ文字列を重ねない)。部分一致で見ない —— `#ok` と「タップ: #okButton」を同じと読む。
- * セレクタが無い(座標の行等)ならラベルのまま */
+ * 「ダブルタップ: #Viewport」に同じ文字列を重ねない)。`{target}` 全体との一致で見る(直前の `": "` まで含める)——
+ * 素の末尾一致だと「タップ: Not OK」と `OK` を同じと読む。セレクタが無い(座標の行等)ならラベルのまま */
 export function withDslSelector(label: string, selector: string | null | undefined): string {
-  if (!selector || label.endsWith(selector)) {
+  if (!selector || label.endsWith(`: ${selector}`)) {
     return label;
   }
   return `${label}(${JSON.stringify(selector)})`;

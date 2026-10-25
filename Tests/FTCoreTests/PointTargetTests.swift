@@ -78,6 +78,19 @@ final class PointTargetTests: XCTestCase {
     func testPositionSensitiveTypesAreNotTargets() {
         let slider = element(1, "slider", id: "volume", 20, 100, 360, 30)
         XCTAssertNil(PointTarget.element(atX: 300, y: 110, in: [slider]))
+        // 2 段目(型を問わない)にも戻らない —— `tap("#volume")` は中心 = 50% を押す
+        XCTAssertNil(PointTarget.writableSelector(atX: 300, y: 110, in: tree([slider])))
+    }
+
+    /// 2 段目は、中心を押してもその要素自身に当たるときだけ。容器の余白を押した行が中央のボタンを押す形にしない
+    func testAreaFallbackNeedsItsCentreToHitItself() {
+        let host = element(1, "other", id: "nav_host_fragment", 0, 80, 400, 640)
+        let centreButton = element(2, "button", id: "submit", 150, 380, 100, 40)
+        XCTAssertNil(PointTarget.writableSelector(atX: 50, y: 150, in: tree([host, centreButton])))
+        // 中心が空いていれば写す
+        let cornerButton = element(3, "button", id: "help", 300, 600, 80, 40)
+        XCTAssertEqual(PointTarget.writableSelector(atX: 50, y: 150, in: tree([host, cornerButton]))?.selector,
+                       "#nav_host_fragment")
     }
 
     /// 名前の無い小さい要素でも、その要素のセレクタ(SelectorNaming の格付けつき)を書く。

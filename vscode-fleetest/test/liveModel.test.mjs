@@ -262,6 +262,8 @@ test("withDslSelector: 操作の列にセレクタを添える。ラベルに同
   assert.equal(withDslSelector("タップ: (120, 340)", null), "タップ: (120, 340)");
   // 部分一致で「書かれている」と読まない(別の id の前方一致)
   assert.equal(withDslSelector("タップ: #okButton", "#ok"), 'タップ: #okButton("#ok")');
+  // 要素名の末尾だけが一致しても同じと読まない
+  assert.equal(withDslSelector("タップ: Not OK", "OK"), 'タップ: Not OK("OK")');
   assert.equal(withDslSelector("入力: abc", undefined), "入力: abc");
   // セレクタの中の引用符はそのまま貼れる形(JSON の文字列)で出す
   assert.equal(withDslSelector("タップ: OK", '"OK"'), 'タップ: OK("\\"OK\\"")');

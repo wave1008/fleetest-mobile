@@ -2,7 +2,7 @@
 
 [in Japanese(日本語)](quick-start_ja.md)
 
-The shortest path to installing fleetest and trying out creating and running test scenarios for a sample app.
+The shortest path to installing fleetest and trying out writing and running test scenarios against a sample app.
 
 ## 1. Environment
 

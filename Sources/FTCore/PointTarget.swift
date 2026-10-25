@@ -6,14 +6,15 @@
 //  1. 点を含む**操作可能な型**(`BridgeSnapshotThinning.operableTypes`)のうちいちばん小さいもの —— ずれても結果は同じ
 //     (`pressesThePoint == true`)。これが在るのに書けるセレクタが無ければ、より大きい要素へは繰り上げない(座標の行)
 //  2. 1 が無ければ、点を含むいちばん小さい要素(型を問わない。地図・キャンバス等)—— 中心を押すと結果が変わり得るので、
-//     呼び手は押した点を但し書きに残す(`pressesThePoint == false`)。**画面全体を覆う要素は除く**(中心を押す行が意味を持たない)。
-//     **安定したセレクタが書けるときだけ**(索引形・相対形なら座標の行)
+//     呼び手は押した点を但し書きに残す(`pressesThePoint == false`)。**画面全体を覆う要素・押した位置で結果が変わる型は除く**。
+//     **中心を押してもその要素自身に当たるときだけ**(中心に、より小さい要素が在れば座標の行 = 余白を押した容器の行が
+//     中央のボタンを押す形にしない)。**安定したセレクタが書けるときだけ**(索引形・相対形なら座標の行)
 
 import Foundation
 
 public enum PointTarget {
 
-    /// 操作可能な型のうち、**押した位置で結果が変わる**もの(中心を押すと別の値になる)。1 段目に採らない
+    /// 操作可能な型のうち、**押した位置で結果が変わる**もの(中心を押すと別の値になる)。どちらの段にも採らない
     static let positionSensitiveTypes: Set<String> = ["slider"]
 
     public struct Target: Equatable {
@@ -38,13 +39,15 @@ public enum PointTarget {
             return naming.graded(for: operable, in: snapshot)
                 .map { Target(selector: $0.selector, durability: $0.durability, pressesThePoint: true) }
         }
-        let area = smallest(atX: x, y: y, in: snapshot.elements.filter {
-            !TapTargetGeometry.contains($0.frame, snapshot.screen)
-        })
+        guard let area = smallest(atX: x, y: y, in: snapshot.elements.filter {
+            !TapTargetGeometry.contains($0.frame, snapshot.screen) && !positionSensitiveTypes.contains($0.type)
+        }) else { return nil }
+        // 中心に別の(より小さい)要素が在れば、セレクタの行はそちらを押す(Android の `#nav_host_fragment` の余白 等)
+        let centre = (x: area.frame.x + area.frame.width / 2, y: area.frame.y + area.frame.height / 2)
+        guard smallest(atX: centre.x, y: centre.y, in: snapshot.elements)?.ref == area.ref else { return nil }
         // 2 段目は**安定したセレクタ(一意な #id・ラベル)が書けるときだけ**写す —— 中心を押すとずれ得る弱さに
         // 索引形・相対形の壊れやすさまで重なると座標の行より悪い(実測: Apple マップで `#Maps.Application >> .other[22]`)
-        guard let graded = area.flatMap({ naming.graded(for: $0, in: snapshot) }),
-              graded.durability == .stable else { return nil }
+        guard let graded = naming.graded(for: area, in: snapshot), graded.durability == .stable else { return nil }
         return Target(selector: graded.selector, durability: graded.durability, pressesThePoint: false)
     }
 

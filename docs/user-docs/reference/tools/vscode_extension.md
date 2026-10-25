@@ -82,9 +82,7 @@ polling (screenshots at a fixed interval); the choice is remembered per workspac
 - The Grid View and the Run Log View show **only the devices selected in the Line View**. Clicking
   anywhere on a tile toggles its selection; clicking outside the tiles clears the selection. With
   nothing selected both views say "Select a device" (provisioning progress during a run still appears
-  in the Run Log View). With exactly one device selected, that device's run log still appears in the Run Log View below
-  (it does not fold itself).
-  A column to the right of the enlarged screen then stacks **Back**, **Home**, **App Switcher**, **Zoom in** and **Zoom out** buttons, so you
+  in the Run Log View). With exactly one device selected, a column to the right of the enlarged screen stacks **Back**, **Home**, **App Switcher**, **Zoom in** and **Zoom out** buttons, so you
   can operate that device in place (**Back** leaves the single-device view: it restores the selection you had before
   "Select only this device", or clears the selection if there was none). On the screen, **click taps**, **Command(⌘)+click double-taps**,
   **holding 500ms or more long-presses**, **dragging swipes** and **Option(⌥)+drag traces the exact finger
@@ -94,9 +92,10 @@ polling (screenshots at a fixed interval); the choice is remembered per workspac
   element list appears after your first operation or Refresh (or right away when "Show bounding boxes" is on; that switch starts off each time the panel opens). The operation log is kept per device. Its right-hand column shows the DSL line
   for each operation as you would write it in a scenario; click it to copy. Pressing a button or another operable element gives a
   selector line (`tap("#login")` and so on), and the operation column shows that selector too (`Tap: Log in("#login")`). Pressing a
-  wide element such as a map gives that element's selector line with the pressed point as a comment (the selector form presses the
-  element's centre, which can differ from where you pressed). Pressing an empty spot, or an element no stable selector can name,
-  gives a coordinate line with a trailing comment asking you to replace it with a selector.
+  non-interactive element such as a map gives that element's selector line with the pressed point as a comment (the selector form presses the
+  element's centre, which can differ from where you pressed). This happens only when a stable selector can name the element and
+  nothing else sits at its centre. Otherwise, such as an empty spot inside a screen region with buttons at its centre, you get a
+  coordinate line with a trailing comment asking you to replace it with a selector.
   A double-click on the screen is two taps, so to toggle the selection
   double-click outside the screen (the device name row or the margin). On a foldable device (the iPhone Duo
   Simulator or a foldable Android Emulator) **Fold** and **Unfold** buttons appear as well (never for physical devices).
