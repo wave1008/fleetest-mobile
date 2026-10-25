@@ -31,6 +31,18 @@ final class StaleLedgerSweepTests: XCTestCase {
         XCTAssertEqual(stale, [.endpoint, .device])
     }
 
+    /// (c') 実機の in-app ブリッジ(.pid 無し・.inapp が待受)の .endpoint/.device は残す(token を消すと起こし直しが落ちる)。
+    /// 待受していなければ .inapp と一緒に消す
+    func testEndpointAndDeviceOfAListeningInAppBridgeAreKept() {
+        XCTAssertEqual(StaleLedgerSweep.decide(inputs(
+            hasInApp: true, inappListening: true, hasEndpoint: true, hasDevice: true)), [])
+        XCTAssertEqual(StaleLedgerSweep.decide(inputs(
+            hasInApp: true, inappListening: false, hasEndpoint: true, hasDevice: true)), [.inapp, .endpoint, .device])
+        XCTAssertEqual(StaleLedgerSweep.decide(inputs(
+            hasPid: true, pidAlive: false, hasInApp: true, inappListening: true, hasEndpoint: true)), [.pid],
+            "死んだ .pid は消すが、待受している in-app の endpoint は残す")
+    }
+
     /// (d) .pid 生存 → 全部残す
     func testAlivePidKeepsEverything() {
         let stale = StaleLedgerSweep.decide(inputs(

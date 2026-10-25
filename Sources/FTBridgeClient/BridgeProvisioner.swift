@@ -214,16 +214,14 @@ enum StaleLedgerSweep {
     ///   .pid と .endpoint/.device(実機ランナーの到達先記録)を削除する
     /// - .inapp: .pid の有無と独立に判定する(in-app ブリッジは pid ファイルを持たない)。
     ///   LISTEN していなければ削除、していれば残す
-    /// - .endpoint/.device: .pid が無い(対になる実機ランナーが存在しない)ときは削除する
+    /// - .endpoint/.device: そのポートのブリッジ(.pid の生きたランナー、または待受している in-app)が無いときは削除する。
+    ///   **実機の in-app ブリッジは .pid を持たず .inapp + .endpoint(token)+ .device を持つ** —— .pid だけを見ると、別の供給の
+    ///   掃除が稼働中の実機 in-app の token を消し、シナリオの起こし直し(token を台帳から読む)が全部落ちる(実測)
     static func decide(_ inputs: Inputs) -> Set<Ledger> {
         var stale: Set<Ledger> = []
-        if inputs.hasPid {
-            if !inputs.pidAlive {
-                stale.insert(.pid)
-                if inputs.hasEndpoint { stale.insert(.endpoint) }
-                if inputs.hasDevice { stale.insert(.device) }
-            }
-        } else {
+        if inputs.hasPid, !inputs.pidAlive { stale.insert(.pid) }
+        let bridgeAlive = (inputs.hasPid && inputs.pidAlive) || (inputs.hasInApp && inputs.inappListening)
+        if !bridgeAlive {
             if inputs.hasEndpoint { stale.insert(.endpoint) }
             if inputs.hasDevice { stale.insert(.device) }
         }

@@ -189,7 +189,14 @@ public struct InAppLauncher: Sendable {
                                             token: token, endpoint: endpoint, setupMs: copyMs)
         }
         // 初回(供給・親): 署名(か発行側の署名済みの写し)→ データコンテナへ配置 → iproxy トンネル → 起動 → 到達待ち
-        guard let appBundle else { throw InAppLauncherError.launchFailed("no app bundle to sign the in-app dylib against") }
+        guard let appBundle else {
+            // 起こし直し(シナリオ)なら供給の記録が欠けたときにだけ来る。初回の供給からも来るので帰属は言わず、無い記録だけを並べる
+            let missing = [FileManager.default.fileExists(atPath: signed.path) ? nil : "the signed dylib \(signed.lastPathComponent)",
+                           BridgeEndpoint.recorded(port: port, repoRoot: repoRoot)?.token != nil ? nil
+                               : "the bridge endpoint with its token (.fleetest/bridge-\(port).endpoint)"].compactMap { $0 }
+            throw InAppLauncherError.launchFailed("no app bundle to sign the in-app dylib against"
+                + (missing.isEmpty ? "" : " — relaunch records not found: " + missing.joined(separator: ", ")))
+        }
         let info = InAppCodeSign.inspect(appBundle: appBundle,
                                          sourceDigest: try? BridgeSourceSet.inApp.digest(repoRoot: repoRoot))
         let clock = ContinuousClock()
@@ -411,7 +418,7 @@ public enum InAppLauncherError: Error, LocalizedError {
             return "could not boot the simulator (simctl bootstatus -b):\n\(tail)"
         case .launchFailed(let tail):
             return "the injected app launch failed"
-                + " (the install was verified during provisioning, so look for simulator trouble "
+                + " (the install was verified during provisioning, so look for device trouble "
                 + "or an app crash):\n\(tail)"
         case .notReady(let detail):
             return "the in-app bridge did not respond in time: \(detail)"

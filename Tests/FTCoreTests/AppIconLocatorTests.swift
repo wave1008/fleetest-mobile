@@ -163,4 +163,60 @@ final class AppIconLocatorTests: XCTestCase {
         XCTAssertTrue(AppIconLocator.shouldStopSearch(consecutiveUnchanged: 0, attempts: 8, maxAttempts: 8))
         XCTAssertFalse(AppIconLocator.shouldStopSearch(consecutiveUnchanged: 0, attempts: 7, maxAttempts: 8))
     }
+
+    // MARK: - 名前の無い行・カテゴリのフォルダ(実測 10/25 -06 の木)
+
+    private func el(_ ref: Int, _ type: String, id: String? = nil, label: String? = nil, value: String? = nil,
+                    _ x: Double, _ y: Double, _ w: Double, _ h: Double) -> ElementInfo {
+        ElementInfo(ref: ref, type: type, identifier: id, label: label, value: value, placeholder: nil, enabled: true,
+                    frame: FTRect(x: x, y: y, width: w, height: h), depth: 2)
+    }
+
+    private func tree(_ elements: [ElementInfo]) -> SnapshotResponse {
+        SnapshotResponse(sessionBundleID: nil, screen: FTRect(x: 0, y: 0, width: 402, height: 874),
+                         elements: elements, truncatedCount: 0)
+    }
+
+    private var searchBar: ElementInfo { el(1, "other", id: "dewey-search-bar", 0, 0, 402, 162) }
+
+    func testUnnamedRowIsDetectedOnlyInsideTheVisibleList() {
+        let named = el(2, "icon", id: "FT E2E", label: "FT E2E", 24, 316, 52, 52)
+        let unnamed = el(3, "icon", 24, 460, 52, 52)
+        XCTAssertTrue(AppIconLocator.appLibraryListHasUnnamedRow(in: tree([searchBar, named, unnamed])))
+        XCTAssertFalse(AppIconLocator.appLibraryListHasUnnamedRow(in: tree([searchBar, named])))
+        XCTAssertFalse(AppIconLocator.appLibraryListHasUnnamedRow(in: tree([searchBar, el(4, "icon", 24, 900, 52, 52)])),
+                       "画面の外の行は数えない")
+        XCTAssertFalse(AppIconLocator.appLibraryListHasUnnamedRow(in: tree([searchBar, el(5, "icon", 24, 50, 52, 52)])),
+                       "検索バーの下に潜った行は数えない")
+        XCTAssertFalse(AppIconLocator.appLibraryListHasUnnamedRow(in: tree([searchBar, el(6, "clickable", 0, 450, 402, 72)])),
+                       "アイコン以外の名前の無い要素は数えない")
+    }
+
+    func testCancelButtonIsTheButtonInsideTheSearchBar() {
+        let cancel = el(9, "button", label: "キャンセル", 296, 97, 80, 33)
+        let other = el(8, "button", label: "x", 296, 500, 80, 33)
+        XCTAssertEqual(AppIconLocator.appLibrarySearchCancelButton(in: tree([other, searchBar, cancel]))?.ref, 9)
+        XCTAssertNil(AppIconLocator.appLibrarySearchCancelButton(in: tree([other, cancel])), "検索バーが無ければ探さない")
+    }
+
+    func testFolderButtonsShareTheCategoryPodIdentifier() {
+        let elements = [
+            el(1, "icon", id: "Other", label: "Other", 24, 168, 168, 191),
+            el(2, "icon", id: "SampleApp", label: "SampleApp", 112, 180, 68, 68),
+            el(3, "icon", id: "Other", label: "Otherフォルダ", value: "17個のアプリ", 112, 256, 68, 68),
+            el(4, "icon", id: " System", label: " System", 209, 168, 168, 191),
+            el(5, "icon", id: " System", label: " Systemフォルダ", value: "19個のアプリ", 297, 256, 68, 68),
+            el(6, "icon", id: "カレンダー", label: "カレンダー", value: "10月25日", 36, 400, 68, 68),
+        ]
+        XCTAssertEqual(AppIconLocator.appLibraryFolderButtonIDs(in: tree(elements)), ["Other", " System"],
+                       "value を持っていても枠と識別子を共有しないアイコン(カレンダー)はフォルダではない")
+    }
+
+    func testFolderDismissPointIsAboveTheTopIcon() {
+        let folder = tree([el(1, "icon", id: "A", label: "A", 10, 269, 103, 90), el(2, "staticText", label: "7:06", 54, 21, 38, 21)])
+        let point = AppIconLocator.appLibraryFolderDismissPoint(in: folder)
+        XCTAssertEqual(point?.x, 201)
+        XCTAssertEqual(point?.y ?? 0, 134.5, accuracy: 0.01)
+        XCTAssertNil(AppIconLocator.appLibraryFolderDismissPoint(in: tree([el(1, "icon", label: "A", 0, 0, 60, 60)])))
+    }
 }

@@ -173,7 +173,10 @@ public enum AndroidHealthProbe {
                 return false
             }
             try? await Task.sleep(nanoseconds: dwellNs)
-            if await !probeBlank(serial: serial) { return true }
+            // **撮れなければ直ったとは言わない**(probeBlank は撮れないとき「blank ではない」に倒す = 除外の安全側。
+            // ここで同じ畳み込みを使うと、居ない serial にも repaired: true を返す)
+            guard let frame = await probeFrame(serial: serial) else { return false }
+            if !frame.uniform { return true }
         }
         return false
     }

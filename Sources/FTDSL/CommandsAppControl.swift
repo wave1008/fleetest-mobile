@@ -473,6 +473,49 @@ public func tapAppIcon(_ appIconName: String? = nil,
                 + "on this device, so nothing was tapped")
         }
 
+        // 条件を満たす木が来るまで読み直す(上限 waitSeconds)。来なければ最後の木と false
+        func readUntil(_ condition: (SnapshotResponse) -> Bool) async throws -> (SnapshotResponse, Bool) {
+            let deadline = Date().addingTimeInterval(waitSeconds)
+            var backoff = PollBackoff()
+            while true {
+                try Task.checkCancellation()
+                let tree = try await driver.snapshot()
+                if condition(tree) { return (tree, true) }
+                if Date() >= deadline { return (tree, false) }
+                try await Task.sleep(for: backoff.nextDelay())
+            }
+        }
+
+        // 検索中の App ライブラリ(list)から取り消してライブラリの画面へ戻り、カテゴリのフォルダを1つずつ開いて探す。
+        // 撃てたら true。戻れない・閉じられないときは探すのをやめて false(呼び手が見つからないと言う)
+        func tapInAppLibraryFolders(_ list: SnapshotResponse) async throws -> Bool {
+            guard let cancel = AppIconLocator.appLibrarySearchCancelButton(in: list) else { return false }
+            try await driver.tap(ref: cancel.ref)
+            var (library, ready) = try await readUntil { !AppIconLocator.appLibraryFolderButtonIDs(in: $0).isEmpty }
+            guard ready else { return false }
+            for folderID in AppIconLocator.appLibraryFolderButtonIDs(in: library) {
+                guard let button = library.elements.first(where: {
+                    $0.identifier == folderID && !($0.value ?? "").isEmpty
+                }) else { continue }
+                try await driver.tap(ref: button.ref)
+                let (folder, opened) = try await readUntil { AppIconLocator.appLibrarySearchField(in: $0) == nil }
+                guard opened else { return false }
+                if let icon = AppIconLocator.findIcon(appIconName, in: folder) {
+                    let (settled, _) = try await settledIcon(from: icon)
+                    if let settled {
+                        try await driver.tap(ref: settled.ref)
+                        try await afterTap(settled)
+                        return true
+                    }
+                }
+                guard let point = AppIconLocator.appLibraryFolderDismissPoint(in: folder) else { return false }
+                try await driver.tap(x: point.x, y: point.y)
+                (library, ready) = try await readUntil { AppIconLocator.appLibrarySearchField(in: $0) != nil }
+                guard ready else { return false }
+            }
+            return false
+        }
+
         try await driver.home()
         if platform == "ios" { try await driver.home() }
 
@@ -526,7 +569,9 @@ public func tapAppIcon(_ appIconName: String? = nil,
                     var listSignature = AppIconLocator.signature(of: list)
                     var listUnchanged = 0
                     var drags = 0
+                    var sawUnnamedRow = false
                     while true {
+                        sawUnnamedRow = sawUnnamedRow || AppIconLocator.appLibraryListHasUnnamedRow(in: list)
                         if let row = AppIconLocator.findIcon(appIconName, in: list) {
                             let (settled, latest) = try await settledIcon(from: row)
                             if let settled, let latest, AppIconLocator.isTappableInAppLibraryList(settled, in: latest) {
@@ -548,8 +593,13 @@ public func tapAppIcon(_ appIconName: String? = nil,
                         listSignature = signature
                         if listUnchanged >= 2 { break }
                     }
+                    // 一覧に名前の無い行があったときだけ(AppIconLocator.appLibraryListHasUnnamedRow の doc)、カテゴリの
+                    // フォルダを上から順に開いて探す。見えているカテゴリだけ・開いたフォルダの中も見えている分だけ(どちらも送らない)
+                    if sawUnnamedRow, try await tapInAppLibraryFolders(list) { return }
                     throw FTCommandError.message("App icon not found.(\(appIconName)) — not on the home screen pages "
-                        + "nor in the App Library list")
+                        + "nor in the App Library list"
+                        + (sawUnnamedRow ? " (the list had rows without a name; the visible category folders "
+                            + "were opened too)" : ""))
                 }
                 throw FTCommandError.message("App icon not found.(\(appIconName))")
             }

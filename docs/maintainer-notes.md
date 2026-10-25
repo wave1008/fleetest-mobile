@@ -5423,3 +5423,31 @@ worktree の run がそれらの端末を「別のワークスペースのブリ
 - 範囲は**シナリオの開始前に残っている分だけ**。途中で出た分は割り込みとしてシナリオ側(`iosAlertHandler`)
 - **続けて出る選択の実物は未観測**(直した時点でアラートが消えていた)。文言(`あとで通知` / `Remind Me Later`)は iOS の通常の表記。
   外れていればシナリオのログに「押した後も残っている」とボタンの並びが出るので、それで足す
+
+## 105. 2時間負荷テストで見つけた不具合(2026-10-25)
+
+台帳は ~/github/wave1008/lt-harness-20261025/ledger.md。
+
+### 105.1 別の供給の台帳掃除が、稼働中の実機 in-app ブリッジの token を消した
+- SE3(inapp モード)の run で、1本目は緑・2本目以降の `launch` が全部「the injected app launch failed …: no app bundle to sign the in-app dylib against」
+- 同時刻に MCP の自動回復が別の Simulator のブリッジを起こし直し、その供給の `sweepStaleLedgers` が `StaleLedgerSweep.decide` で
+  「.pid の無い port の `.endpoint`/`.device` は残骸」と判定していた。**実機の in-app ブリッジは .pid を持たず `.inapp` + `.endpoint`(token)+
+  `.device` を持つ**ので、待受中のブリッジの token が消え、シナリオの起こし直し(token を台帳から読む)が初回の経路へ落ちて appBundle 無しで落ちた
+- 直し: `.endpoint`/`.device` は「そのポートのブリッジが生きているか」(.pid が生きている、または `.inapp` が待受している)で判断する。
+  `.toolchain`/`.ready` の孤児判定(`toolchainIsOrphan` / `readyIsOrphan`)と `sweepTunnelOnlyPorts` は元から `.inapp` を見ていた = 同型はここだけ
+- 対照(SE3): 1本目の後に別の Simulator へ `bridge up` を撃つ(どの供給も掃除を走らせる)→ 旧版は 8131 の `.endpoint`/`.device` が消えて3本目が赤・直し後は残って 3/3 緑
+- 文言も直した: 実機でも「simulator trouble を疑え」と言っていた → device。appBundle が無いときは無い記録(署名済み dylib・token 入りの endpoint)を並べる
+  (初回の供給からも同じ所へ来るので「供給が残した記録が消えた」とは言わない)
+
+### 105.2 tapAppIcon が App ライブラリの名前の無い行を見落とした
+- -06 の名前順一覧で「FT E2E iOS」の行がラベルも id も空のまま描かれ、一覧を送って戻しても空。カテゴリのフォルダ(「Other」)を開くと名前付きで並ぶ
+- 直し: 一覧に名前の無い行があったときだけ、取り消してライブラリの画面へ戻り、見えているカテゴリのフォルダを上から開いて探す。
+  フォルダを開くボタンは「カテゴリの枠と識別子を共有し value を持つ小さいアイコン」、取り消しは「検索バーの中のボタン」、閉じるのは一番上のアイコンより上の背景
+  (名前・文言は表示言語で変わるので使わない)。ライブラリの画面も開いたフォルダの中も送らない
+- **デバイス上の対照は取れていない**: 直前に起動したアプリは「Other」の枠に最近使ったアプリとして名前付きで出るので、元の状態(ライブラリにしか無く、
+  枠にも出ず、一覧の行が無名)を作り直せなかった
+
+### 105.3 `api repair-display` が居ない serial にも `repaired: true` を返した
+- `AndroidHealthProbe.repairBlankDisplay` が wake 後の確認を `probeBlank` で行っていた。`probeBlank` は撮れないとき「blank ではない」に倒す
+  (検知を誤って発火させない側)ので、それを修復の確認に使うと「撮れない = 直った」になる
+- 直し: 確認のスクショが撮れなければ false。拡張は ok をログの文言にしか使わない(段の進行は次の観測で決まる)ので、破壊的な処置は増えない

@@ -50,6 +50,50 @@ public enum AppIconLocator {
         return (x, band.top + span * 0.8, x, band.top + span * 0.2)
     }
 
+    /// 名前順一覧に名前の無い行があるか。**SpringBoard はアプリの名前を欠いたまま行を描くことがある**(実測:
+    /// 行もアイコンもラベル・id が空のまま、一覧を送って戻しても空。同じアプリはカテゴリのフォルダの中では名前付きで並ぶ)
+    public static func appLibraryListHasUnnamedRow(in snapshot: SnapshotResponse) -> Bool {
+        let band = appLibraryListBand(in: snapshot)
+        return snapshot.elements.contains { element in
+            guard element.type == "icon", (element.label ?? "").isEmpty, (element.identifier ?? "").isEmpty else { return false }
+            let point = centre(of: element)
+            return point.y > band.top && TapTargetGeometry.isPointOnScreen(x: point.x, y: point.y, screen: snapshot.screen)
+        }
+    }
+
+    /// 検索中の App ライブラリの取り消しボタン(検索バーの中のボタン。文言は表示言語で変わるので型と位置で取る)
+    public static func appLibrarySearchCancelButton(in snapshot: SnapshotResponse) -> ElementInfo? {
+        guard let bar = snapshot.elements.first(where: { $0.identifier == appLibrarySearchBarID })?.frame else { return nil }
+        return snapshot.elements.first { element in
+            guard element.type == "button" else { return false }
+            let point = centre(of: element)
+            return point.x >= bar.x && point.x <= bar.x + bar.width && point.y >= bar.y && point.y <= bar.y + bar.height
+        }
+    }
+
+    /// App ライブラリのカテゴリのフォルダを開くボタンの識別子(上から順)。カテゴリの枠(大きいアイコン)と同じ識別子を持ち
+    /// value(「17個のアプリ」等)を持つ小さいアイコン。名前は表示言語で変わるので識別子の共有で取る
+    public static func appLibraryFolderButtonIDs(in snapshot: SnapshotResponse) -> [String] {
+        let icons = snapshot.elements.filter { $0.type == "icon" }
+        let buttons = icons.filter { button in
+            guard let id = button.identifier, !id.isEmpty, !(button.value ?? "").isEmpty else { return false }
+            return icons.contains { pod in
+                pod.identifier == id && pod.frame.width > button.frame.width && pod.frame.height > button.frame.height
+            }
+        }
+        var seen = Set<String>()
+        return buttons.sorted { ($0.frame.y, $0.frame.x) < ($1.frame.y, $1.frame.x) }
+            .compactMap { $0.identifier }.filter { seen.insert($0).inserted }
+    }
+
+    /// 開いたカテゴリのフォルダを閉じる点: 一番上のアイコンより上の背景の中ほど(閉じるボタンは無い。外を押すと閉じる)。
+    /// アイコンが無い・一番上のアイコンが画面の上端に付いていれば nil
+    public static func appLibraryFolderDismissPoint(in snapshot: SnapshotResponse) -> (x: Double, y: Double)? {
+        guard let top = snapshot.elements.filter({ $0.type == "icon" }).map({ $0.frame.y }).min(),
+              top > snapshot.screen.y else { return nil }
+        return (snapshot.screen.x + snapshot.screen.width / 2, snapshot.screen.y + (top - snapshot.screen.y) / 2)
+    }
+
     public static func centre(of icon: ElementInfo) -> (x: Double, y: Double) {
         (icon.frame.x + icon.frame.width / 2, icon.frame.y + icon.frame.height / 2)
     }

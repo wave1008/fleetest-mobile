@@ -37,9 +37,21 @@
 
 ## デバイスで赤のまま・原因未調査
 
+- **SE3(実機・inapp モード)の in-app ブリッジが走行中に応答しなくなり、以後の起こし直しも届かない**(2026-10-25 の負荷テスト・1 回)
+  - 症状: `scrollTo` の途中で「Connection to the driver was refused … (reached over the USB tunnel)」→ 同じ run の残り3本の `launch` が
+    全部「the in-app bridge did not respond in time: connection refused」(各 30 秒)
+  - 確かめた範囲: 端末側にクラッシュ・Jetsam の記録なし。相方の XCUITest ランナー(8127)のログは失敗時刻に何もしていない。同時刻の MCP・ライブ操作・CLI の
+    ファズは SE3 に触れていない。同じ5本を単独で 2/2 緑。この文言は iproxy のトンネルが消えても同じになるので、アプリが消えたのかトンネルが切られたのかを分けられていない
+  - 要る材料: 次に起きたときの、失敗時刻の `iproxy-<port>.pid` の pid の生死と端末側のプロセス一覧(`devicectl device info processes`)
+
 - **頻度の低い赤(2026-10-22 の回帰・負荷テスト。いずれも再現の材料なし)**
   - E2EX-Flutter Android「スワイプで行を削除」S0010(`Dismissible`): 3/58(10/5〜)。Android の注入は終点の MOVE を UP の前に撃つので上の型とは別
   - E2EX-Flutter iOS XCUITest のグリッド S0010: 上への探索が cell_46 を見つけた後、慣性で流れ去って解決できない(1/63)
+  - E2EY-RN iOS XCUITest「入れ子の横の一覧の画面外のカードへ届くこと」S0010(2026-10-25・M1Max の4台同時で 1/12。単独 3/3 緑):
+    `tap("#card_7_12")` の横の探索が 8 回の送りを使い切り、失敗時の木では段 7 がカード 7-01〜03(ほぼ先頭)のまま。緑の回も
+    13 秒前後と「見えている部分を押した / 整定前に撮った」注記付きの 22 秒前後の2群に割れる
+  - E2EY-Flutter iOS XCUITest「スクロールで隠れるバーを扱えること」S0020(同じ条件で 1/12・単独 3/3 緑): `tap("#row_h_40")` の後の
+    `textIs "#txt_bars_state" == "bars=hidden"` が `bars=shown`
 
 - **AppleAVE の一時的な失敗(-17691)が 60 秒で戻る型と、その 2〜3 分後に Compose Multiplatform の iOS アプリが白紙を描く型**
   (2026-10-18 の負荷テスト・M2 Ultra・3 回)
