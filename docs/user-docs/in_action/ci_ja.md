@@ -34,13 +34,13 @@ CI では拡張・MCP は不要です。CI 機でテストプロジェクトを 
 [テストプロジェクトを共有し、2人目が回すまで](sharing_project_ja.md)を見てください。
 
 ```bash
-git clone https://github.com/wave1008/foundation-tester.git ../foundation-tester
+git clone https://github.com/wave1008/fleetest-mobile.git ../fleetest-mobile
 ```
 
 次のコマンドは冪等で、2回目以降はほぼ skip します。
 
 ```bash
-bash ../foundation-tester/Scripts/install.sh --work-dir "$PWD" --skip-extension --skip-mcp --no-doctor
+bash ../fleetest-mobile/Scripts/install.sh --work-dir "$PWD" --skip-extension --skip-mcp --no-doctor
 ```
 
 ### AIへの指示文
@@ -58,7 +58,7 @@ install.sh で fleetest を導入して。拡張と MCP は不要で、冪等に
 
 ```bash
 # 実行: --quiet でステップ行を抑制、--junit で JUnit XML を書く
-../foundation-tester/.build/debug/fleetest run --profile ios-run --quiet --junit reports/junit.xml
+../fleetest-mobile/.build/debug/fleetest run --profile ios-run --quiet --junit reports/junit.xml
 ```
 
 ### AIへの指示文
@@ -108,10 +108,10 @@ pipeline {
   agent { label 'mac' }   // ログイン済み GUI セッションのユーザーで動くエージェント
   stages {
     stage('Install / update') {
-      steps { sh 'bash ../foundation-tester/Scripts/install.sh --work-dir "$PWD" --skip-extension --skip-mcp --no-doctor' }
+      steps { sh 'bash ../fleetest-mobile/Scripts/install.sh --work-dir "$PWD" --skip-extension --skip-mcp --no-doctor' }
     }
     stage('Run scenarios') {
-      steps { sh '../foundation-tester/.build/debug/fleetest run --profile ios-run --quiet --junit reports/junit.xml' }
+      steps { sh '../fleetest-mobile/.build/debug/fleetest run --profile ios-run --quiet --junit reports/junit.xml' }
     }
   }
   post {

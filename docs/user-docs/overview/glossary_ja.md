@@ -13,7 +13,7 @@ fleetest 固有の用語を五十音順に並べました。英字で始まる�
 - **仮想デバイス** — Simulator(iOS)と Emulator(Android)の総称です。実機とは区別します。 詳しくは [フリートの考え方](../fleet/concepts_ja.md)。
 - **型付きセレクタ(Sel)** — セレクタ記法を型で書けるようにしたものです(例: `.id("login_btn").or(.text("ログイン"))`)。文字列版に併設され、綴り誤りをコンパイラで捕まえられます。 詳しくは [型付きセレクタ(Sel)](../reference/selector/typed_selector_ja.md)。
 - **結果 JSON** — `results/runs/<YYYY-MM>/<runID>/` に残る機械可読な記録です。run 全体は `run.json`、シナリオ1本ごとは `scenarios/<シナリオID>.json` で、CI のゲート判定やダッシュボードの情報源になります。 詳しくは [テスト結果ファイル](../reference/testclass/test_result_files_ja.md)。
-- **作業フォルダ** — `TestProjects/` があるフォルダです。fleetest を使うあなたのフォルダで、foundation-tester のクローンは既定ではその隣に置きます。 詳しくは [クイックスタート](../quick-start_ja.md)。
+- **作業フォルダ** — `TestProjects/` があるフォルダです。fleetest を使うあなたのフォルダで、fleetest-mobile のクローンは既定ではその隣に置きます。 詳しくは [クイックスタート](../quick-start_ja.md)。
 - **サンドボックス(Seatbelt)** — シナリオを常に入れて実行する macOS のサンドボックス(Seatbelt)です。秘密の読み取り・任意の書き込み・許可していない宛先への通信などを OS が断ります。デバイス操作と外部への通信は、枠の外の fleetest 本体が代行・中継します。 詳しくは [サンドボックスを確かめて、必要な穴をあける](../security/sandbox_ja.md)。
 - **サービス(compose.yaml)** — テスト対象のアプリが依存する DB・API・スタブサーバーなどです。`scripts/compose.yaml` に宣言すると、fleetest が run ごとに起動して終わったら止めます。探索用には `fleetest services up` で手で上げます。 詳しくは [アプリが依存するサービス(compose.yaml)](../reference/writing/services_ja.md)。
 - **シナリオ** — AIアシスタントが書く Swift のファイルです(1ファイルに複数のテストが入ります)。個々のテスト(`@Test` メソッド)を指すこともあり、実行時のシナリオ ID は `クラス名.メソッド名` です。 詳しくは [テストクラスの作成](../reference/testclass/creating_testclass_ja.md)。

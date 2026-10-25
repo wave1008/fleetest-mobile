@@ -31,8 +31,8 @@ Details: [Environment](docs/user-docs/overview/environments.md)
 Open a new folder for your tests in VSCode, start your AI assistant and tell it:
 
 ```text
-Clone https://github.com/wave1008/foundation-tester next to this folder and set it up by following
-../foundation-tester/.claude/skills/fleetest-setup/SKILL.md.
+Clone https://github.com/wave1008/fleetest-mobile next to this folder and set it up by following
+../fleetest-mobile/.claude/skills/fleetest-setup/SKILL.md.
 ```
 
 The step-by-step guide, including running a sample app, is the [Quick start](docs/user-docs/quick-start.md).

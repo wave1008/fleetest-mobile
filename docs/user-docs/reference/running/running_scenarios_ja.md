@@ -10,12 +10,12 @@ FM を呼ぶのは実行プロファイルの `fmTextVisibilityCheck` / `screenL
 
 ## CLI の呼び方
 
-以降の `fleetest` は、作業フォルダの隣に foundation-tester をクローンした既定の構成では
-`../foundation-tester/.build/debug/fleetest` です。foundation-tester のクローン内で作業している場合は
+以降の `fleetest` は、作業フォルダの隣に fleetest-mobile をクローンした既定の構成では
+`../fleetest-mobile/.build/debug/fleetest` です。fleetest-mobile のクローン内で作業している場合は
 `swift run fleetest` でも同じです。
 
 ```bash
-../foundation-tester/.build/debug/fleetest run --profile ios-run
+../fleetest-mobile/.build/debug/fleetest run --profile ios-run
 ```
 
 ## 主なオプション

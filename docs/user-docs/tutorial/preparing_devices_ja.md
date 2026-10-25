@@ -22,7 +22,7 @@ fleetest のテストプロジェクト project1 の実行プロファイル ios
 CLI では次のとおりです。`--count` は、実行プロファイルの該当 OS のデバイスを全部で N 台にします(今ある分を含みます)。
 
 ```bash
-../foundation-tester/.build/debug/fleetest profile setup --project project1 --platform ios --app-id com.sutec.mobile.ios --auto-device --count 3
+../fleetest-mobile/.build/debug/fleetest profile setup --project project1 --platform ios --app-id com.sutec.mobile.ios --auto-device --count 3
 ```
 
 </details>

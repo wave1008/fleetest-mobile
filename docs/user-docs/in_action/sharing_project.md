@@ -56,13 +56,13 @@ TestProjects/*/workspace/apps/
 ## 2. Commit and push
 
 When the clone sits next to the work folder, the `.package(path:)` in `Package.swift` is written as the relative path
-`../foundation-tester` (this assumes the second person also clones it next to the work folder). If you put the clone elsewhere,
+`../fleetest-mobile` (this assumes the second person also clones it next to the work folder). If you put the clone elsewhere,
 it is an absolute path (`/Users/<you>/...`), so change it before you commit to a form that resolves on the second person's Mac.
 
 ### Prompt for the AI
 
 ```text
-If the .package(path:) in Package.swift is an absolute path, change it to ../foundation-tester. Pick only what should go in from git status and commit it. Leave out results/, reports/ and workspace/apps/. Don't push yet; show me what the commit contains.
+If the .package(path:) in Package.swift is an absolute path, change it to ../fleetest-mobile. Pick only what should go in from git status and commit it. Leave out results/, reports/ and workspace/apps/. Don't push yet; show me what the commit contains.
 ```
 
 Once you have checked the contents, tell it to push.
@@ -88,24 +88,24 @@ so they set up with the same prompt as step 3 of the Quick Start.
 ### Prompt for the AI
 
 ```text
-Clone https://github.com/wave1008/foundation-tester next to this folder and
-set it up following ../foundation-tester/.claude/skills/fleetest-setup/SKILL.md.
+Clone https://github.com/wave1008/fleetest-mobile next to this folder and
+set it up following ../fleetest-mobile/.claude/skills/fleetest-setup/SKILL.md.
 ```
 
-When setup is done, check that the `.package(path:)` in `Package.swift` points at your own clone (`../foundation-tester` if you cloned it next to the work folder).
+When setup is done, check that the `.package(path:)` in `Package.swift` points at your own clone (`../fleetest-mobile` if you cloned it next to the work folder).
 
 <details>
 <summary><b>If you do it manually (click to show details)</b></summary>
 
 ```bash
-../foundation-tester/.build/debug/fleetest project list
+../fleetest-mobile/.build/debug/fleetest project list
 ```
 
 If you did not share `Package.swift`, run `project sync` first. It scans `TestProjects/` and regenerates the marker section of `Package.swift`
 (also needed after a manual copy or a `git pull`; "Managing projects" in [Creating a test project](../reference/project/creating_project.md)).
 
 ```bash
-../foundation-tester/.build/debug/fleetest project sync
+../fleetest-mobile/.build/debug/fleetest project sync
 ```
 
 </details>
@@ -142,9 +142,9 @@ For the device, pick the newest-OS Simulator available on this Mac.
 <summary><b>If you do it manually (click to show details)</b></summary>
 
 ```bash
-../foundation-tester/.build/debug/fleetest profile setup --platform ios --app-id <bundle ID> \
+../fleetest-mobile/.build/debug/fleetest profile setup --platform ios --app-id <bundle ID> \
   --app-ref ios-app --run ios-run-mine --auto-device
-../foundation-tester/.build/debug/fleetest profile list
+../fleetest-mobile/.build/debug/fleetest profile list
 ```
 
 `--auto-device` picks a Simulator / Emulator that fits this Mac, creating one if there is none.
@@ -166,7 +166,7 @@ Run all the scenarios with the fleetest ios-run-mine profile.
 <summary><b>If you do it manually (click to show details)</b></summary>
 
 ```bash
-../foundation-tester/.build/debug/fleetest run --profile ios-run-mine
+../fleetest-mobile/.build/debug/fleetest run --profile ios-run-mine
 ```
 
 </details>
@@ -201,7 +201,7 @@ Run all scenarios with the fleetest ios-run profile on M1Max. If M1Max is in use
 In two terminals, type the following at nearly the same time.
 
 ```bash
-../foundation-tester/.build/debug/fleetest run --profile ios-run --runner M1Max --wait-lock 600
+../fleetest-mobile/.build/debug/fleetest run --profile ios-run --runner M1Max --wait-lock 600
 ```
 
 </details>

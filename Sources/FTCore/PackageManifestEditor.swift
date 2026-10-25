@@ -50,14 +50,14 @@ public enum PackageManifestEditor {
 
     /// 1 プロジェクト分の executableTarget エントリ(targets 配列内、8 スペースインデント)。
     /// external = true(fleetest init が生成する受け手のパッケージ)では FTScenarioRunner/FTDSL を
-    /// 内部ターゲット参照ではなく `.product(name:..., package: "foundation-tester")` で引く。
+    /// 内部ターゲット参照ではなく `.product(name:..., package: "fleetest-mobile")` で引く。
     public static func targetEntry(for name: String, external: Bool = false) -> String {
         // deps は literal に補間されるため 8 スペースのストリップ対象外。最終ファイルの
         // フィールド(12 スペース)に合わせ .product を 16、閉じ ] を 12 スペースで直書きする。
         let deps = external
             ? "[\n"
-                + "                .product(name: \"FTScenarioRunner\", package: \"foundation-tester\"),\n"
-                + "                .product(name: \"FTDSL\", package: \"foundation-tester\"),\n"
+                + "                .product(name: \"FTScenarioRunner\", package: \"fleetest-mobile\"),\n"
+                + "                .product(name: \"FTDSL\", package: \"fleetest-mobile\"),\n"
                 + "            ]"
             : #"["FTScenarioRunner", "FTDSL"]"#
         return """

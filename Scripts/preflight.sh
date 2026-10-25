@@ -9,7 +9,7 @@
 #
 # 既定モード: **カレントディレクトリ(または --work-dir)だけを判定対象**にする(どこで実行したかが
 # 答えを変えるため)。
-# --runner モード: `<base>/foundation-tester`(クローン)・`<base>/work`(WORK_DIR)を判定対象にする
+# --runner モード: `<base>/fleetest-mobile`(クローン)・`<base>/work`(WORK_DIR)を判定対象にする
 # (RR-14「構成」)。**sudo を使わない・何も書き換えない** — FileVault・
 # 自動ログイン・スリープ・sshd の有効化はここでは行わず、人間がやる手順を案内するだけ。
 #
@@ -216,7 +216,7 @@ PMSET_OUT
   check_container_runtime
 
   # ---- ツール本体・作業場所(RR-14「構成」)。未導入は `fleetest remote setup` が作るので情報のみ ----
-  tool_root="$BASE/foundation-tester"
+  tool_root="$BASE/fleetest-mobile"
   work_dir="${WORK_DIR_ARG:-$BASE/work}"
   kv tool_root "$tool_root"
   kv work_dir "$work_dir"
@@ -308,13 +308,13 @@ missing=()
 
 # ---- 構成の判定(SKILL ステップ0 の再実行ガード / 0.5 の構成判定) ---------------
 # clone 構成 = Package.swift と Sources/FTScenarioRunner が揃う(この2つが揃うのはクローンだけ)
-# 外部パッケージ構成 = Package.swift の中身に fleetest マーカーか foundation-tester 依存がある
+# 外部パッケージ構成 = Package.swift の中身に fleetest マーカーか fleetest-mobile 依存がある
 # 無関係パッケージ = Package.swift はあるがどちらも無い(fleetest init が拒否する)
 layout="external-new"
 if [ -f "$WORK_DIR/Package.swift" ]; then
   if [ -d "$WORK_DIR/Sources/FTScenarioRunner" ]; then
     layout="clone"
-  elif grep -q "fleetest projects begin\|foundation-tester" "$WORK_DIR/Package.swift" 2>/dev/null; then
+  elif grep -q "fleetest projects begin\|fleetest-mobile" "$WORK_DIR/Package.swift" 2>/dev/null; then
     layout="external-installed"
   else
     layout="foreign-package"
@@ -325,7 +325,7 @@ kv work_dir "$WORK_DIR"
 kv layout "$layout"
 
 # ---- TOOL_ROOT(ツール本体のクローン) ------------------------------------------
-# clone 構成ならカレント。外部構成は既定で隣(../foundation-tester)。既存なら版と汚れも出す
+# clone 構成ならカレント。外部構成は既定で隣(../fleetest-mobile)。既存なら版と汚れも出す
 tool_root=""
 case "$layout" in
   clone) tool_root="$WORK_DIR" ;;
@@ -333,7 +333,7 @@ case "$layout" in
     # 導入済みなら Package.swift の .package(path:) が正(既定の隣とは限らない)。
     # 見つからなければ既定の隣を候補として見る
     declared="$(sed -n 's/.*\.package(path: *"\([^"]*\)".*/\1/p' "$WORK_DIR/Package.swift" 2>/dev/null | awk 'NR==1')"
-    for candidate in "$declared" "../foundation-tester"; do
+    for candidate in "$declared" "../fleetest-mobile"; do
       [ -n "$candidate" ] || continue
       case "$candidate" in /*) : ;; *) candidate="$WORK_DIR/$candidate" ;; esac
       if [ -d "$candidate/Sources/FTScenarioRunner" ]; then
@@ -354,7 +354,7 @@ if [ -n "$tool_root" ]; then
   fi
   [ -x "$tool_root/.build/debug/fleetest" ] && kv cli_built yes || kv cli_built no
 else
-  kv tool_root "$WORK_DIR/../foundation-tester"
+  kv tool_root "$WORK_DIR/../fleetest-mobile"
   kv tool_root_exists no
   kv cli_built no
 fi

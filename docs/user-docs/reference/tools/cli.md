@@ -7,15 +7,15 @@ This page is a map for finding which command exists and where to read more.
 
 ## How to call it
 
-In this documentation, `fleetest` stands for `../foundation-tester/.build/debug/fleetest` in the default layout where
-foundation-tester is cloned next to your work folder (see the [Quick start](../../quick-start.md)).
-If you work inside the foundation-tester clone, `swift run fleetest` is equivalent.
+In this documentation, `fleetest` stands for `../fleetest-mobile/.build/debug/fleetest` in the default layout where
+fleetest-mobile is cloned next to your work folder (see the [Quick start](../../quick-start.md)).
+If you work inside the fleetest-mobile clone, `swift run fleetest` is equivalent.
 
 ```bash
-../foundation-tester/.build/debug/fleetest --help                  # list of subcommands
-../foundation-tester/.build/debug/fleetest help run                # detailed help for a subcommand
-../foundation-tester/.build/debug/fleetest help bridge up          # detailed help for a child command
-../foundation-tester/.build/debug/fleetest bridge --help           # list of child commands
+../fleetest-mobile/.build/debug/fleetest --help                  # list of subcommands
+../fleetest-mobile/.build/debug/fleetest help run                # detailed help for a subcommand
+../fleetest-mobile/.build/debug/fleetest help bridge up          # detailed help for a child command
+../fleetest-mobile/.build/debug/fleetest bridge --help           # list of child commands
 ```
 
 `fleetest help <subcommand>` shows every option of that subcommand with its default.

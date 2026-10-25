@@ -310,8 +310,8 @@ ft_verify が**直す材料を返す場面が1度も無かった**。wall と to
 (期待どおり。対照として残す)。**直した中身**は全 run で正解の差分だけだった(検証を削った run は0。
 `mustContain` の判定とは別に最終ファイルを目で確かめた)。
 
-**台本の罠を2つ踏んだ**: ①worktree のディレクトリ名が `foundation-tester` でないと `fleetest init` が
-`unknown package 'foundation-tester'` で落ちる(SPM はパス依存を名前で識別する。台本が名指しで止める)
+**台本の罠を2つ踏んだ**: ①worktree のディレクトリ名が `fleetest-mobile` でないと `fleetest init` が
+`unknown package 'fleetest-mobile'` で落ちる(SPM はパス依存を名前で識別する。台本が名指しで止める)
 ②**計測中に台本を編集した**(bash は実行中のスクリプトを少しずつ読むので、書き換えると途中から
 壊れた位置を読む)。ビルド段で気付いて止め、起動し直した。**計測中は台本に触らない**。
 

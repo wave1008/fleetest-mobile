@@ -35,7 +35,7 @@ function guideScript() {
 /** 与えた入口ファイルの内容(null = ファイル無し)に対してステップ7.6 を1回流す。
  *  kind = "body"(AGENTS.md の本文)/ "import"(CLAUDE.md の `@AGENTS.md`) */
 function run(initial, { fileName = "AGENTS.md", kind = "body" } = {}) {
-  // 作業フォルダ <dir>/work とクローン <dir>/foundation-tester を隣に置く(既定の外部構成と同じ並び)
+  // 作業フォルダ <dir>/work とクローン <dir>/fleetest-mobile を隣に置く(既定の外部構成と同じ並び)
   const dir = mkdtempSync(path.join(tmpdir(), "ft-entry-md-"));
   try {
     const script = path.join(dir, "guide.py");
@@ -44,7 +44,7 @@ function run(initial, { fileName = "AGENTS.md", kind = "body" } = {}) {
     mkdirSync(work);
     const target = path.join(work, fileName);
     if (initial !== null) writeFileSync(target, initial);
-    const toolRoot = path.join(dir, "foundation-tester");
+    const toolRoot = path.join(dir, "fleetest-mobile");
     const verb = execFileSync("python3", [script, target, kind, toolRoot], { encoding: "utf8" });
     return { verb, text: existsSync(target) ? readFileSync(target, "utf8") : null };
   } finally {
@@ -70,10 +70,10 @@ test("ファイルが無ければ作り、2回目は変えない(冪等)", () =>
   // 向けの手順書・手引きの**入口ファイルからの相対パス**(作業フォルダは git に入って別の機械で
   // clone されうるので、絶対パスはそこで通じない)の両方が要る
   assert.ok(first.text.includes("`/fleetest-scenario`"), "スキルの呼び出し記法が / でない");
-  assert.ok(first.text.includes("`../foundation-tester/.claude/skills/fleetest-scenario/SKILL.md`"), first.text);
-  assert.ok(first.text.includes("`../foundation-tester/docs/user-docs/reference/tools/agent_guide.md`"), first.text);
+  assert.ok(first.text.includes("`../fleetest-mobile/.claude/skills/fleetest-scenario/SKILL.md`"), first.text);
+  assert.ok(first.text.includes("`../fleetest-mobile/docs/user-docs/reference/tools/agent_guide.md`"), first.text);
   // CLI は PATH に無い。場所を書かないとエージェントは案内の素の `fleetest …` を撃ってからバイナリを探して数手使う
-  assert.ok(first.text.includes("`../foundation-tester/.build/debug/fleetest …`"), first.text);
+  assert.ok(first.text.includes("`../fleetest-mobile/.build/debug/fleetest …`"), first.text);
   assert.ok(!first.text.includes(tmpdir()), "入口に絶対パスが残っている");
 });
 

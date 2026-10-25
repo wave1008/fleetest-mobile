@@ -49,7 +49,7 @@ usage() {
   cat <<'EOF'
 Usage: update-check.sh [--tool-root <dir>] [--notes]
 
-  --tool-root <dir>  Location of the foundation-tester clone (resolved from the current directory when omitted)
+  --tool-root <dir>  Location of the fleetest-mobile clone (resolved from the current directory when omitted)
   --notes            Print the release notes (newest first) of the releases newer than this clone's version, then exit
                      (release channel only; exit 0 = printed or none / 1 = could not fetch). Does not touch the clone's .git
   -h, --help         This help
@@ -125,7 +125,7 @@ elif [ -d "$WORK_DIR/Sources/FTScenarioRunner" ]; then
   tool_root="$WORK_DIR"                       # clone 構成
 else                                          # 外部パッケージ構成
   declared="$(sed -n 's/.*\.package(path: *"\([^"]*\)".*/\1/p' "$WORK_DIR/Package.swift" 2>/dev/null | head -1)"
-  for candidate in "$declared" "../foundation-tester"; do
+  for candidate in "$declared" "../fleetest-mobile"; do
     [ -n "$candidate" ] || continue
     case "$candidate" in /*) : ;; *) candidate="$WORK_DIR/$candidate" ;; esac
     if [ -d "$candidate/Sources/FTScenarioRunner" ]; then
@@ -137,7 +137,7 @@ fi
 
 if [ -z "$tool_root" ]; then
   kv tool_root ""
-  finish unknown 1 "no foundation-tester clone found"
+  finish unknown 1 "no fleetest-mobile clone found"
 fi
 kv tool_root "$tool_root"
 

@@ -37,7 +37,7 @@
 set -euo pipefail
 
 # FLEETEST_REPO_URL はフォーク・ローカル検証用の差し替え口(既定は本家)
-REPO_URL="${FLEETEST_REPO_URL:-https://github.com/wave1008/foundation-tester.git}"
+REPO_URL="${FLEETEST_REPO_URL:-https://github.com/wave1008/fleetest-mobile.git}"
 # FLEETEST_REF は**保守者が未マージのブランチを受け手経路で検証するための口**(タグ・ブランチ・SHA)。
 # 受け手向けの版固定手段としては案内しない。与えると clone の fleetest.channel を消す(明示指示が勝つ)。
 # タグ・SHA は以後 pinned(detached + channel 無し)として留まり、ブランチは外部構成なら次の REF 無しの実行で
@@ -74,7 +74,7 @@ Usage: install.sh [options]
   --work-dir <dir>   Consumer directory that holds TestProjects/ (default: current directory)
   --name <name>      Create a project with this name (letters, digits, _ and -). Optional: without it no project is
                      created (only an empty TestProjects/); /fleetest-profiles creates TestProjects/project1 later
-  --tool-root <dir>  Location of the foundation-tester clone (default: <work-dir>/../foundation-tester)
+  --tool-root <dir>  Location of the fleetest-mobile clone (default: <work-dir>/../fleetest-mobile)
   --no-clone         Do not clone when missing (an existing clone is required)
   --no-pull          Do not update an existing clone (to pin a version, or while developing the tool)
   --skip-extension   Do not install the VSCode extension
@@ -403,7 +403,7 @@ elif [ -n "$SELF_ROOT" ]; then
 elif [ -n "$DECLARED_ROOT" ]; then
   TOOL_ROOT_RAW="$DECLARED_ROOT"
 else
-  TOOL_ROOT_RAW="$WORK_DIR/../foundation-tester"
+  TOOL_ROOT_RAW="$WORK_DIR/../fleetest-mobile"
 fi
 
 if [ -d "$TOOL_ROOT_RAW/.git" ] || [ -f "$TOOL_ROOT_RAW/Package.swift" ]; then
@@ -618,7 +618,7 @@ else
 fi
 
 [ -f "$TOOL_ROOT/Package.swift" ] && [ -d "$TOOL_ROOT/Sources/FTScenarioRunner" ] \
-  || die "clone" "$TOOL_ROOT is not a foundation-tester clone" 0.5
+  || die "clone" "$TOOL_ROOT is not a fleetest-mobile clone" 0.5
 
 # ---- pull で自分自身が新しくなったら、新版で実行し直す ------------------------
 # **bash は実行中にファイルが差し替わっても古い内容を最後まで実行する**(git は rename で
@@ -723,7 +723,7 @@ elif [ "$LAYOUT" = "clone" ]; then
   record "project" ok "TestProjects/$PROJECT_NAME"
 elif [ -f "$WORK_DIR/Package.swift" ]; then
   # fleetest と無関係の既存パッケージへの導入は事故になる(init も拒否する)
-  grep -q "fleetest projects begin\|foundation-tester" "$WORK_DIR/Package.swift" \
+  grep -q "fleetest projects begin\|fleetest-mobile" "$WORK_DIR/Package.swift" \
     || die "project" "$WORK_DIR/Package.swift is not an fleetest package (run this in an empty, test-only directory)" 0
   # 受け手パッケージは確立済み。プロジェクトだけ追加する
   echo "==> fleetest project create $PROJECT_NAME"

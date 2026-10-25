@@ -15,13 +15,13 @@ description: 既に fleetest をセットアップ済みの受け手が、新し
 
 **構成は setup と同じ2通り。まず判定する(ステップ0):**
 
-- **clone 構成**: foundation-tester クローンの中で直接使う。ツールも TestProjects も同じ場所。
-- **外部パッケージ構成(既定)**: 自分のパッケージ(`fleetest init` 済み)が横の `../foundation-tester`
+- **clone 構成**: fleetest-mobile クローンの中で直接使う。ツールも TestProjects も同じ場所。
+- **外部パッケージ構成(既定)**: 自分のパッケージ(`fleetest init` 済み)が横の `../fleetest-mobile`
   クローンを SPM 依存として引く。ツール更新は TOOL_ROOT を pull+build し、受け手側は依存を反映して再ビルドする。
 
-用語(setup と共通): **TOOL_ROOT** = foundation-tester クローン(最新リリースへ移す(clone 構成は git pull) / swift build / 拡張ビルドを
+用語(setup と共通): **TOOL_ROOT** = fleetest-mobile クローン(最新リリースへ移す(clone 構成は git pull) / swift build / 拡張ビルドを
 行う場所。CLI は `TOOL_ROOT/.build/debug/fleetest`)、**WORK_DIR** = 自分の `TestProjects/` が住むディレクトリ。
-外部構成では TOOL_ROOT = `../foundation-tester`・WORK_DIR = 自分のパッケージ。clone 構成では両者は同一。
+外部構成では TOOL_ROOT = `../fleetest-mobile`・WORK_DIR = 自分のパッケージ。clone 構成では両者は同一。
 
 ## 進め方の原則
 
@@ -163,7 +163,7 @@ cd <TOOL_ROOT>/vscode-fleetest && PATH="$(brew --prefix node@26)/bin:$PATH" npm 
 
 - VSCode で `Developer: Reload Window`（インストールだけでは旧版のまま動く）。外部構成では **WORK_DIR を
   開いている窓**で行う。`fleetest.binaryPath` が TOOL_ROOT の CLI
-  （`../foundation-tester/.build/debug/fleetest` 等）を指しているか併せて確認。
+  （`../fleetest-mobile/.build/debug/fleetest` 等）を指しているか併せて確認。
 - デバイスモニター等のパネルは**開き直す**（retainContextWhenHidden で古い HTML が残るため）。
 - スキルのコピーが更新された場合（0.7 の出力に再起動案内が出る）は **エージェントの再起動**
   （再起動するまでスキルは旧版のまま読まれる）。

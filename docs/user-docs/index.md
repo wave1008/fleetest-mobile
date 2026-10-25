@@ -7,7 +7,7 @@ Claude Code in natural language.
 
 ## Repository
 
-- [foundation-tester](https://github.com/wave1008/foundation-tester)
+- [fleetest-mobile](https://github.com/wave1008/fleetest-mobile)
 
 ## Overview
 

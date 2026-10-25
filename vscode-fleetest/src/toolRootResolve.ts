@@ -1,6 +1,6 @@
-// foundation-tester クローン(TOOL_ROOT)の解決(vscode 非依存。node --test から直接検証可)。
+// fleetest-mobile クローン(TOOL_ROOT)の解決(vscode 非依存。node --test から直接検証可)。
 // clone 構成 = ワークスペース自身。外部パッケージ構成 = Package.swift の .package(path:) が指す先、
-// 無ければ既定の隣(../foundation-tester)。
+// 無ければ既定の隣(../fleetest-mobile)。
 //
 // 契約: 解決規則は Scripts/preflight.sh / Scripts/update-check.sh と同じ。片方だけ変えない。
 
@@ -40,7 +40,7 @@ export function resolveToolRoot(workspaceRoot: string): string | undefined {
   } catch {
     // Package.swift が無い/読めない。既定の隣だけ見る。
   }
-  candidates.push(path.join("..", "foundation-tester"));
+  candidates.push(path.join("..", "fleetest-mobile"));
 
   for (const candidate of candidates) {
     const abs = path.isAbsolute(candidate) ? candidate : path.join(workspaceRoot, candidate);

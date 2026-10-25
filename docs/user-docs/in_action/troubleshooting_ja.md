@@ -37,7 +37,7 @@ fleetest の開発者へ不具合を報告するときは `fleetest doctor --bun
 **zip にはアプリの画面の文字(ステップの説明・要素一覧)が含まれることがある**ので、共有する前に
 中身を確認してください。
 
-報告先は GitHub の Issues(<https://github.com/wave1008/foundation-tester/issues>)です。
+報告先は GitHub の Issues(<https://github.com/wave1008/fleetest-mobile/issues>)です。
 
 ### Link
 - [index](../index_ja.md)

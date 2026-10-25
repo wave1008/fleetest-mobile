@@ -34,13 +34,13 @@
 ```
 発行側の Mac(手元)                     ランナー機
 fleetest run --runner mac2 …             ~/fleetest-runner/               ← 専用ベースディレクトリ
-  ├ 適合チェック(rev・Xcode)   ssh     ├── foundation-tester/          ← ツール本体のクローン(名前固定・共有)
+  ├ 適合チェック(rev・Xcode)   ssh     ├── fleetest-mobile/          ← ツール本体のクローン(名前固定・共有)
   ├ 転送(rsync: シナリオ・設定) ────>  └── users/<issuerId>/work/      ← あなたの作業場所(発行者ごと)
   ├ 出力を受け取って表示                     ├── TestProjects/<プロジェクト>/
   └ 成果物を回収 <───────────────────      └── .build/
 ```
 
-**ランナー機がそのマシン自身のために持っている foundation-tester(あれば)には一切触らない。**
+**ランナー機がそのマシン自身のために持っている fleetest-mobile(あれば)には一切触らない。**
 リモートランナーは `~/fleetest-runner/` 配下だけで完結する。
 
 ## ランナー機の前提
@@ -193,8 +193,8 @@ fleetest remote setup <ユーザー>@<ホスト> --project <プロジェクト�
 - 撤去は `fleetest remote teardown <ランナー>`(確認あり。`--yes` で無確認)
 
 > 手で入れたい場合は、上の install ステップと同じことを ssh して実行すればよい:
-> `bash install.sh --work-dir ~/fleetest-runner/users/<issuerId>/work --tool-root ~/fleetest-runner/foundation-tester --name <プロジェクト名> --skip-extension --skip-mcp --skip-entry-point --no-next-steps --track-branch`(`--track-branch` が無いとクローンが最新リリースタグへ移る。その後 `fleetest remote setup` と同じく手元のコミットへ揃える)。
-> クローン先の**ディレクトリ名 `foundation-tester` は変えない**(SPM がパッケージ名をディレクトリ名から決めるため)。
+> `bash install.sh --work-dir ~/fleetest-runner/users/<issuerId>/work --tool-root ~/fleetest-runner/fleetest-mobile --name <プロジェクト名> --skip-extension --skip-mcp --skip-entry-point --no-next-steps --track-branch`(`--track-branch` が無いとクローンが最新リリースタグへ移る。その後 `fleetest remote setup` と同じく手元のコミットへ揃える)。
+> クローン先の**ディレクトリ名 `fleetest-mobile` は変えない**(SPM がパッケージ名をディレクトリ名から決めるため)。
 
 ## ステップ3: 版を揃える
 
@@ -770,7 +770,7 @@ FileVault 有効のランナーは**再起動のたびに誰かが解錠+ログ�
 | `could not tell which installed Xcode to dispatch with: none of the …` | ランナーに**手元と一致する Xcode が1つも無い**(メッセージが入っている Xcode を全部並べる) | その製品版の Xcode をランナーの `/Applications` に(既存を消さず)追加で入れる。**pin しても直らない** —— pin した Xcode の指紋が手元と違えば toolchain 照合で止まる |
 | `fleetest binary not found on remote` | ビルドされていない | ランナー機で `swift build --product fleetest` |
 | `Cannot code-sign the bridge runner for a physical device on this Mac` / `the keychain holding the signing key is locked in this session` | **実機 iOS をランナー機で回すとき**。ssh セッションはキーチェーンがロックされたまま始まるので、XCUITest ランナーの codesign が署名鍵を使えない。fleetest はビルド前に**検索リスト(`security list-keychains -d user`)の各キーチェーン**を空パスワードで解錠しようとするが、署名鍵を持つキーチェーンにパスワードがあると効かない | **署名鍵を空パスワードの専用キーチェーンへ移し、検索リストに載せる**(ログインキーチェーンのパスワードは変えずに済む): ランナー機で `security create-keychain -p "" ~/Library/Keychains/fleetest-signing.keychain-db` → ログインキーチェーンから署名 ID を `security export`/`import` で移す → `security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "" <新キーチェーン>` → `security set-keychain-settings <新キーチェーン>`(引数なし = 自動ロックなし)→ `security list-keychains -d user -s <新キーチェーン> ~/Library/Keychains/login.keychain-db`。それが許されない運用なら、実機 iOS の run はランナー機の GUI セッション(画面共有)から起こす。シミュレータだけのランナーには無関係(署名しない) |
-| `unknown package` | クローンのディレクトリ名を変えた | `~/fleetest-runner/foundation-tester` に戻す |
+| `unknown package` | クローンのディレクトリ名を変えた | `~/fleetest-runner/fleetest-mobile` に戻す |
 | `no running emulator for AVD …` | `--profile` の run が Android のエミュレータを起動しようとして失敗した | AVD が存在するか・ディスクとメモリに空きがあるかを見て、ステップ6 の `devices up` で単体で起こして原因を見る |
 | `no runner workspace at …`(exit 91) | あなたの issuerId の作業場所がまだ無い(未 setup / issuerId が変わった) | `fleetest remote setup <ランナー>` を1回。issuerId は明示設定にする(「複数人でフリートを共有する」) |
 | シナリオが0本 / 見つからない | プロジェクト名が手元と違う | ステップ2 の `--name` を手元と揃える |
@@ -791,7 +791,7 @@ FileVault 有効のランナーは**再起動のたびに誰かが解錠+ログ�
 ```bash
 ssh <ホスト>
 cd ~/fleetest-runner/users/<自分の issuerId>/work
-~/fleetest-runner/foundation-tester/.build/debug/fleetest run --profile <実行プロファイル>
+~/fleetest-runner/fleetest-mobile/.build/debug/fleetest run --profile <実行プロファイル>
 ```
 
 ## 関連

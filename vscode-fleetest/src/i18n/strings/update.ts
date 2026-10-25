@@ -67,8 +67,8 @@ export const updateStrings = {
     en: "Could not check for updates: {reason}",
   },
   "update.manual.noToolRoot": {
-    ja: "foundation-tester のクローンが見つかりません(未導入か、既定の場所にありません)。",
-    en: "No foundation-tester clone was found (not installed, or not in the expected location).",
+    ja: "fleetest-mobile のクローンが見つかりません(未導入か、既定の場所にありません)。",
+    en: "No fleetest-mobile clone was found (not installed, or not in the expected location).",
   },
   "update.manual.noScript": {
     ja: "このクローンには Scripts/update-check.sh がありません(更新チェックより前の版です)。先に /fleetest-update で更新してください。",

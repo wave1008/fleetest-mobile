@@ -1016,7 +1016,7 @@ struct RunScenarios: AsyncParsableCommand {
     }
 
     /// `--runner` または(自動)全台が居るリモートの機械: ローカルビルド・実行をせず、対等ピア
-    /// (SSH 到達可能な foundation-tester clone)に丸ごとディスパッチする
+    /// (SSH 到達可能な fleetest-mobile clone)に丸ごとディスパッチする
     /// (RR-3・RR-7・Phase 1)。デバイス割当競合を避けるためリモート1本での
     /// 実行のみサポートし、ローカル専用オプションは併用不可にする
     private func dispatchToRemoteHost(_ dispatch: EffectiveDispatchTarget) async throws {

@@ -411,7 +411,7 @@ public enum InAppLauncherError: Error, LocalizedError {
             return "the in-app bridge dylib was not found (build it with InAppBridge/build.sh): \(path)"
         case .repoRootInvalid(let root):
             return "\(root) has no InAppBridge/build.sh. "
-                + "This must be the root of the tool itself (the foundation-tester clone)"
+                + "This must be the root of the tool itself (the fleetest-mobile clone)"
                 + " — not the root of the scenario package. "
                 + "If it cannot be resolved, set the clone root via the FT_TOOL_ROOT environment variable"
         case .buildFailed(let tail):

@@ -47,7 +47,7 @@ function merge(initial, toolRoot) {
 }
 
 test(".mcp.json は bash -c(ログインシェルでない)で mcp-server.sh を絶対パスで exec する", () => {
-  const root = "/Users/someone/dev/foundation-tester";
+  const root = "/Users/someone/dev/fleetest-mobile";
   const { out, json } = merge(null, root);
   assert.equal(out, "OK");
   const entry = json.mcpServers.fleetest;

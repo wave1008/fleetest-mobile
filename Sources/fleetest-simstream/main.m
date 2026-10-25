@@ -594,7 +594,7 @@ int main(int argc, char **argv) {
     dispatch_source_t attachPingSrc = NULL;
     if (gCodecH264) {
         dispatch_queue_t pingQueue =
-            dispatch_queue_create("com.foundation-tester.fleetest-simstream.attach-ping",
+            dispatch_queue_create("com.fleetest-mobile.fleetest-simstream.attach-ping",
                                   DISPATCH_QUEUE_SERIAL);
         attachPingSrc = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, pingQueue);
         dispatch_source_set_timer(attachPingSrc, dispatch_time(DISPATCH_TIME_NOW, 0),
@@ -715,7 +715,7 @@ int main(int argc, char **argv) {
     ftRequireResp(gDesc, "setPowerState:completionQueue:completionHandler:");
 
     gColorSpace = CGColorSpaceCreateWithName(kCGColorSpaceSRGB);
-    gQueue = dispatch_queue_create("com.foundation-tester.fleetest-simstream.callback", DISPATCH_QUEUE_SERIAL);
+    gQueue = dispatch_queue_create("com.fleetest-mobile.fleetest-simstream.callback", DISPATCH_QUEUE_SERIAL);
     gFrameCbUUID = [NSUUID UUID];
     gIoCbUUID = [NSUUID UUID];
 
@@ -784,7 +784,7 @@ int main(int argc, char **argv) {
     // **タイマーは if の外の変数で持つ**(ブロック内の変数だと ARC がブロックの終わりで手放し、一度も発火しない = 実測)
     dispatch_source_t watchSrc = nil;
     if (largeDisplays >= 2) {
-        dispatch_queue_t watchQueue = dispatch_queue_create("com.foundation-tester.fleetest-simstream.display-watch",
+        dispatch_queue_t watchQueue = dispatch_queue_create("com.fleetest-mobile.fleetest-simstream.display-watch",
                                                             DISPATCH_QUEUE_SERIAL);
         watchSrc = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, watchQueue);
         dispatch_source_set_timer(watchSrc,

@@ -116,7 +116,7 @@ SSH 側のプロセスからでもユーザーの launchd ドメインのサー�
   `--delete` が相手の `Scenarios`/`profiles` を消す・レポート回収が相手のローカル実行分まで
   引き込む・クローンと `.build` の共用で SPM ビルドロック競合と results 混在)。
   この時点では**リモートに専用ベースディレクトリ1つ**(`--remote-dir`。既定 `~/fleetest-runner`)を
-  置き、その配下で完結させた(**2026-07-31 時点の配置**。現在は `<base>/foundation-tester` + `<base>/users/<issuer>/work` = RR-14・RR-18.6):
+  置き、その配下で完結させた(**2026-07-31 時点の配置**。現在は `<base>/fleetest-mobile` + `<base>/users/<issuer>/work` = RR-14・RR-18.6):
 
   ```
   <base>/          ← --remote-dir(既定 ~/fleetest-runner。チルダは $HOME で解決)
@@ -127,7 +127,7 @@ SSH 側のプロセスからでもユーザーの launchd ドメインのサー�
   当時の実行は `cd <base>/work && <base>/tool/.build/debug/fleetest …`。`packageRoot()`(cwd から
   Package.swift を探す)が work を、`RepoRoot.find()`(実行バイナリの位置)が tool を
   独立に解決するため、**既存の外部構成の仕組みでそのまま成立する**(新しい解決規則を
-  作っていない)。マシン自身の `~/foundation-tester` や `TestProjects/` には一切触れない
+  作っていない)。マシン自身の `~/fleetest-mobile` や `TestProjects/` には一切触れない
 - アプリバイナリは転送しない(rsync 対象はシナリオ・プロファイルのみ。dispatch 開始時に
   注記を1行出す)。appPath はリモート側で有効なパスであることが前提
 - results DB の**マージ**(ローカルの集計に混ぜる)は行わない(Phase 3 の課題)。**録画と run ログ
@@ -144,9 +144,9 @@ SSH 側のプロセスからでもユーザーの launchd ドメインのサー�
 
 **localhost E2E で見つかり修正した実装上の罠(2026-07-31。いずれも単体テストでは出ない)**:
 
-- **クローンのディレクトリ名は `foundation-tester` 固定**(`<base>/tool` にしていた)。SPM は
+- **クローンのディレクトリ名は `fleetest-mobile` 固定**(`<base>/tool` にしていた)。SPM は
   パス依存のパッケージ名を**ディレクトリ名から導出**するため、受け手 Package.swift の
-  `package: "foundation-tester"` と一致せず `unknown package` でマニフェストが壊れた
+  `package: "fleetest-mobile"` と一致せず `unknown package` でマニフェストが壊れた
 - **非対話 ssh の PATH は `/usr/bin:/bin:/usr/sbin:/sbin` だけ**で Homebrew が入らない。
   `node` 等が見えず落ちるため、リモートコマンドの先頭で
   `export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"` を明示する

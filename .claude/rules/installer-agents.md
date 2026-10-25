@@ -58,7 +58,7 @@ CLAUDE.md から移した規則(本文は移設前と同一)。この領域の�
     「→ SKILL.md ステップ N」を出す)。**片方だけ変えない**
     (`installStepSync.test.mjs` が「install.sh が指すステップが SKILL.md に実在するか」を検出)
   - **導入は「クローンを隣に置き、その SKILL.md を読ませる」1本**(どのエージェントも同じ。依頼文は
-    「<リポジトリ> を隣に clone して ../foundation-tester/.claude/skills/fleetest-setup/SKILL.md に
+    「<リポジトリ> を隣に clone して ../fleetest-mobile/.claude/skills/fleetest-setup/SKILL.md に
     従ってセットアップして」)。スキルは**クローンのローカルの `Scripts/`(SKILL.md の3つ上)を `bash` で呼ぶ**
     —— 手順書とスクリプトが同じ版になるので新しい引数が必ず通じる。**`curl … | bash` に戻さない**
     (エージェントの安全確認に止められ、導入の最初で詰まる)。

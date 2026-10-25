@@ -8,13 +8,13 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/wave1008/foundation-tester.git",
+    "url": "https://github.com/wave1008/fleetest-mobile.git",
     "directory": "vscode-fleetest"
   },
   "bugs": {
-    "url": "https://github.com/wave1008/foundation-tester/issues"
+    "url": "https://github.com/wave1008/fleetest-mobile/issues"
   },
-  "homepage": "https://github.com/wave1008/foundation-tester/tree/main/vscode-fleetest#readme",
+  "homepage": "https://github.com/wave1008/fleetest-mobile/tree/main/vscode-fleetest#readme",
   "engines": {
     "vscode": "^1.90.0"
   },

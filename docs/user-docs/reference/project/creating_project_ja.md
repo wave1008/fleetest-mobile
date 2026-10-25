@@ -26,13 +26,13 @@ TestProjects/SampleApp/
 
 ## 2つのパッケージ構成
 
-このプロジェクトの `Package.swift` が foundation-tester を参照する形には2種類あります。
+このプロジェクトの `Package.swift` が fleetest-mobile を参照する形には2種類あります。
 
 - **外部パッケージ構成**(`/fleetest-setup` の既定): 作業フォルダ自身が
-  foundation-tester のクローンに SPM 経由で依存する `Package.swift` を持ちます(`fleetest init`)。
+  fleetest-mobile のクローンに SPM 経由で依存する `Package.swift` を持ちます(`fleetest init`)。
   `TestProjects/` の資産は作業フォルダ側にあり、ツールのクローンとは分かれているため、
   ツールの更新がシナリオやプロファイルに触れることはありません。
-- **クローン構成**: foundation-tester のクローンの中で直接作業し、`TestProjects/` もその中に
+- **クローン構成**: fleetest-mobile のクローンの中で直接作業し、`TestProjects/` もその中に
   置かれます。主にツール本体の開発時に使う構成です。
 
 `fleetest init` は外部パッケージ構成(`Package.swift` + 最初のテストプロジェクト)を生成します。
@@ -77,7 +77,7 @@ let fleetestScenarioDependencies: [String: [Target.Dependency]] = [
 let package = Package(
     ...
     dependencies: [
-        .package(path: "../foundation-tester"),
+        .package(path: "../fleetest-mobile"),
         .package(url: "https://github.com/<owner>/SwiftOTP", from: "<version>"),
     ],
     ...

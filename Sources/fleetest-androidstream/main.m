@@ -473,7 +473,7 @@ int main(int argc, char **argv) {
     }
 
     gColorSpace = CGColorSpaceCreateWithName(kCGColorSpaceSRGB);
-    gQueue = dispatch_queue_create("com.foundation-tester.fleetest-androidstream.frame", DISPATCH_QUEUE_SERIAL);
+    gQueue = dispatch_queue_create("com.fleetest-mobile.fleetest-androidstream.frame", DISPATCH_QUEUE_SERIAL);
     gBuf = [NSMutableData data];
 
     NSTask *task = [[NSTask alloc] init];

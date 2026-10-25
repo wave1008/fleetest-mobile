@@ -245,7 +245,7 @@ protocol AppDriver {
 ## DS-3 リポジトリ構成
 
 ```
-foundation-tester/
+fleetest-mobile/
 ├── Package.swift                  # CLI とライブラリ (macOS 26+。視覚系のみ 27+)。マーカー区間にプロジェクト毎の
 │                                  # executableTarget を自動生成(DS-11。fleetest project create/sync)
 ├── Sources/

@@ -58,9 +58,9 @@ test("parseOrphanPids: 相対パス(.build/debug/fleetest)を抽出する", () =
   assert.deepEqual(parseOrphanPids(psOutput), [111]);
 });
 
-test("parseOrphanPids: 絶対パス(/Users/x/foundation-tester/.build/debug/fleetest)を抽出する", () => {
+test("parseOrphanPids: 絶対パス(/Users/x/fleetest-mobile/.build/debug/fleetest)を抽出する", () => {
   const psOutput =
-    "  111     1 /Users/x/foundation-tester/.build/debug/fleetest api live serve --platform android --serial emulator-5554";
+    "  111     1 /Users/x/fleetest-mobile/.build/debug/fleetest api live serve --platform android --serial emulator-5554";
   assert.deepEqual(parseOrphanPids(psOutput), [111]);
 });
 
@@ -76,7 +76,7 @@ test("parseOrphanPids: PPID=1 の `remote exec <machine> -- api device-stream` �
 
 test("parseOrphanPids: PPID=1 の fleetest-androidstream(絶対パス前置)を抽出する", () => {
   const psOutput =
-    "  666     1 /Users/x/foundation-tester/.build/debug/fleetest-androidstream --serial emulator-5554 --fps 8 --max-width 800";
+    "  666     1 /Users/x/fleetest-mobile/.build/debug/fleetest-androidstream --serial emulator-5554 --fps 8 --max-width 800";
   assert.deepEqual(parseOrphanPids(psOutput), [666]);
 });
 
@@ -91,7 +91,7 @@ test("parseOrphanPids: PPID=1 の fleetest-devicepoll / fleetest-simstream(パ�
 test("parseOrphanPids: PPID が 1 でない配信プロセスは除外する", () => {
   const psOutput = [
     "  555  4321 .build/debug/fleetest remote exec M1Max -- api device-stream --device-machine local --platform ios --name iPhone-01",
-    "  666  4321 /Users/x/foundation-tester/.build/debug/fleetest-androidstream --serial emulator-5554",
+    "  666  4321 /Users/x/fleetest-mobile/.build/debug/fleetest-androidstream --serial emulator-5554",
     "  777  4321 fleetest-devicepoll --platform ios --port 8127",
   ].join("\n");
   assert.deepEqual(parseOrphanPids(psOutput), []);

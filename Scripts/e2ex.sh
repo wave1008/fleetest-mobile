@@ -57,7 +57,7 @@ for h in json.load(sys.stdin).get("hosts", []):
     if h.get("machine") == m: print(h["host"]); break' "$MACHINE")
   [ -n "$HOST" ] || { echo "❌ 登録簿に $MACHINE が無い(fleetest remote machines)" >&2; exit 2; }
   # ランナーのクローン(fleetest remote align が揃える場所)。dist/ は gitignore なので align で消えない
-  REMOTE_CLONE="~/fleetest-runner/foundation-tester"
+  REMOTE_CLONE="~/fleetest-runner/fleetest-mobile"
   echo "==> $MACHINE($HOST)で回す: Scripts/e2ex.sh $*"
   # ログイン shell(zsh -lc)で起こす = ~/.zprofile の PATH(fleetest-tools)と非対話 ssh の PATH 補正を兼ねる(-lc は ~/.zshrc を読まない)
   exec ssh -tt -o BatchMode=yes "$HOST" "zsh -lc 'cd $REMOTE_CLONE && Scripts/e2ex.sh $*'"

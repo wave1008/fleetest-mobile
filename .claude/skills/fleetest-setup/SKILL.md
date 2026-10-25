@@ -21,14 +21,14 @@ description: fleetest を使いたい受け手を、自分の iOS/Android アプ
 - **外部パッケージ構成(既定・テスト専用の受け手ディレクトリ)**: いま開いているこの
   ディレクトリを fleetest テストパッケージにする。**テストプロジェクト(`TestProjects/<name>/`)は
   この受け手ディレクトリに作られる**(セットアップでは作らず、空の `TestProjects/` だけ置く。プロジェクトと
-  プロファイルは後から `/fleetest-profiles` が作る)。foundation-tester は「ツール(CLI・拡張)」として横に
+  プロファイルは後から `/fleetest-profiles` が作る)。fleetest-mobile は「ツール(CLI・拡張)」として横に
   clone+build するだけで、Projects はここに住む。作成は `fleetest init --no-project`。
-- **clone 構成(foundation-tester クローンの中で直接作業する保守者/PoC)**: Projects はクローンの
+- **clone 構成(fleetest-mobile クローンの中で直接作業する保守者/PoC)**: Projects はクローンの
   `TestProjects/` に作る。作成は `fleetest project create`。
 
-以降、**TOOL_ROOT** = foundation-tester クローン(swift build / doctor / 拡張ビルドを行う場所。CLI は
+以降、**TOOL_ROOT** = fleetest-mobile クローン(swift build / doctor / 拡張ビルドを行う場所。CLI は
 `TOOL_ROOT/.build/debug/fleetest`)、**WORK_DIR** = `TestProjects/` が住む作業ディレクトリ、と呼ぶ。
-外部構成では WORK_DIR = このカレント・TOOL_ROOT = clone 先(**既定は隣の `../foundation-tester`**。
+外部構成では WORK_DIR = このカレント・TOOL_ROOT = clone 先(**既定は隣の `../fleetest-mobile`**。
 ユーザーが指定すればそのパス)。clone 構成では両者は同一(クローン)。
 
 ## 進め方の原則
@@ -92,7 +92,7 @@ bash <SCRIPTS>/preflight.sh
 **無い**場合、導入の前に `Package.swift` の**中身**で二分する(ファイルの有無だけで判定しない —
 受け手が自分のアプリの既存リポジトリで実行したケースと区別がつかない):
 
-- **fleetest マーカー(`// === fleetest projects begin`)か foundation-tester への `.package` 依存が無い** =
+- **fleetest マーカー(`// === fleetest projects begin`)か fleetest-mobile への `.package` 依存が無い** =
   fleetest と無関係の Swift パッケージ。ここには導入できない(`fleetest init` が拒否する)。**中止**して、
   テスト専用の新規ディレクトリで実行し直すよう 🧑 に案内する。
 - **ある** = 外部パッケージ構成が確立済み。このセットアップは**実行済み。ここで中止**し、
@@ -130,23 +130,23 @@ clone 構成(両方ある)の再実行は従来どおり冪等スキップで続
 ### 0.5 入り方の判定と TOOL_ROOT の取得
 
 カレントか祖先に `Package.swift` と `Sources/FTScenarioRunner/` の**両方**があるかで判定する
-(この2つが揃うのは foundation-tester クローンだけ):
+(この2つが揃うのは fleetest-mobile クローンだけ):
 
-- **両方ある = clone 構成**: いま foundation-tester クローンの中にいる。TOOL_ROOT = WORK_DIR =
+- **両方ある = clone 構成**: いま fleetest-mobile クローンの中にいる。TOOL_ROOT = WORK_DIR =
   そのディレクトリ。取得不要でステップ2へ。
 - **無い = 外部パッケージ構成(既定)**: WORK_DIR = このカレント(ここに TestProjects/ を作る)。
-  ツールを供給するため foundation-tester を**兄弟ディレクトリ**に clone+build する(受け手の
+  ツールを供給するため fleetest-mobile を**兄弟ディレクトリ**に clone+build する(受け手の
   ディレクトリの中にネストさせない):
 
 ```
-git clone https://github.com/wave1008/foundation-tester.git ../foundation-tester
+git clone https://github.com/wave1008/fleetest-mobile.git ../fleetest-mobile
 ```
 
   ※ **clone 自体はステップ0.7 のインストーラが行う**ので、ここでは clone 先(TOOL_ROOT)を決めるだけでよい
   (既に clone 済みならそれを使う)。上のコマンドはインストーラを使わないときの手順。
 
-  → TOOL_ROOT = `../foundation-tester`。**ステップ0で clone 先の指定があればそちらへ clone し、
-  以降この runbook の `../foundation-tester` はそのパスに読み替える**(指定先に clone 済みならスキップして
+  → TOOL_ROOT = `../fleetest-mobile`。**ステップ0で clone 先の指定があればそちらへ clone し、
+  以降この runbook の `../fleetest-mobile` はそのパスに読み替える**(指定先に clone 済みならスキップして
   それを TOOL_ROOT にする)。WORK_DIR 配下へのネストは非推奨(init の .gitignore 整備の対象外で
   git ノイズになる)。build / doctor / 拡張ビルドは TOOL_ROOT で、`fleetest init` と
   プロファイル設定は WORK_DIR(カレント)で行う。**カレントに `Package.swift` があってはいけない**
@@ -248,7 +248,7 @@ MCP のデバイス操作・`/fleetest-scenario` のシナリオ作成・dry-run
   TOOL_ROOT を SPM のローカルパス依存として引く:
 
 ```
-../foundation-tester/.build/debug/fleetest init --no-project --fleetest-path ../foundation-tester
+../fleetest-mobile/.build/debug/fleetest init --no-project --fleetest-path ../fleetest-mobile
 ```
 
   → WORK_DIR に `Package.swift`(空マーカー区間 + fleetest 依存)と**空の** `TestProjects/`、
@@ -259,11 +259,11 @@ MCP のデバイス操作・`/fleetest-scenario` のシナリオ作成・dry-run
   (VSCode 拡張も、`TestProjects/` があって `project1` が無ければ起動時に自動で作る)。
   ローカルパス依存なので `swift build` はネットワーク不要・
   TOOL_ROOT を `git pull` すれば fleetest 側も更新される。git 依存にしたい場合のみ `--fleetest-url
-  https://github.com/wave1008/foundation-tester.git` を使う(`--fleetest-path` と排他。追従先は `main`。
+  https://github.com/wave1008/fleetest-mobile.git` を使う(`--fleetest-path` と排他。追従先は `main`。
   **git 依存では `.vscode/settings.json` の `fleetest.binaryPath` が自動設定されない** — CLI・拡張は
   ローカル clone からのビルドが別途必要なので、拡張を使うなら path 依存を推奨し、git 依存を選んだら
   binaryPath の手動設定を 🧑 に案内する)。
-  以降このスキル内で `fleetest ...` と書いたら `../foundation-tester/.build/debug/fleetest ...` を実行する。
+  以降このスキル内で `fleetest ...` と書いたら `../fleetest-mobile/.build/debug/fleetest ...` を実行する。
 
 - **clone 構成**: プロジェクトは作らない(クローンの `TestProjects/` に既にあるものを使う。要るときは
   `/fleetest-profiles` が `swift run fleetest project create project1` で作る)。
@@ -293,7 +293,7 @@ node は書き換えず、このコマンドの中でだけ PATH の先頭に置
 
 ```
 brew install node@26
-cd ../foundation-tester/vscode-fleetest && PATH="$(brew --prefix node@26)/bin:$PATH" npm install && PATH="$(brew --prefix node@26)/bin:$PATH" npm run install-local
+cd ../fleetest-mobile/vscode-fleetest && PATH="$(brew --prefix node@26)/bin:$PATH" npm install && PATH="$(brew --prefix node@26)/bin:$PATH" npm run install-local
 ```
 
 （clone 構成なら `cd vscode-fleetest && ...`。）`install-local` はパッケージ→インストール→到達確認まで
@@ -314,7 +314,7 @@ products 未宣言でも `swift build --product fleetest-mcp` は暗黙 product 
   以下は書く内容（**claude CLI 不要**・ただの JSON ファイル）。
   TOOL_ROOT を**絶対パス**で埋める（受け手がどの cwd で開いても解決できる）:
 
-  1. `ABS_TOOL_ROOT=$(cd ../foundation-tester && pwd)` で絶対パスを得る。
+  1. `ABS_TOOL_ROOT=$(cd ../fleetest-mobile && pwd)` で絶対パスを得る。
   2. WORK_DIR の `.mcp.json` に次の `fleetest` サーバを書く（既存 `.mcp.json` があれば
      `mcpServers.fleetest` キーは**この TOOL_ROOT の値で上書き**し、他のサーバは温存する。
      既存の `fleetest` が**別のパス**を指していたら、上書きした旨と旧パスを 🧑 に報告する —
@@ -468,7 +468,7 @@ Claude Code 以外のエージェントは、このコピーを使わずクロ�
 （「完了しましたか?」のような確認質問でフローを塞がない。問題があれば教えてください、で締める）:
 
 - VSCode で **WORK_DIR** を開く（外部構成: あなたのテストパッケージのフォルダ。clone 構成:
-  `foundation-tester` フォルダ）
+  `fleetest-mobile` フォルダ）
 - `Developer: Reload Window` を実行（インストール・設定だけでは反映されない）
 - 左下のステータスバーの **fleetest mobile** からデバイスモニターを開く
 - **Claude Code 以外の AIアシスタント**のときだけ: ステップ7.7 で登録したなら「AIアシスタントを再起動して、
@@ -484,7 +484,7 @@ Claude Code 以外のエージェントは、このコピーを使わずクロ�
 
 拡張の設定操作は原則不要（外部パッケージ構成では `fleetest init` が `.vscode/settings.json` に
 `fleetest.binaryPath` を生成済み（`fleetest.project` は書かない。プロジェクトは後から作る）。init が「マージできず未更新」警告を出していた場合のみ
-手動設定を案内: `fleetest.binaryPath` = `../foundation-tester/.build/debug/fleetest` または絶対パス。
+手動設定を案内: `fleetest.binaryPath` = `../fleetest-mobile/.build/debug/fleetest` または絶対パス。
 clone 構成では既定 `.build/debug/fleetest` のままでよい）。プロジェクトが複数あるなら設定
 設定 `fleetest.project` で指定するか、拡張の選択で選ぶことも添える。
 

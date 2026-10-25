@@ -33,8 +33,8 @@ Install the following.
 3. Start your AI assistant (the Claude Code extension, for example) and give it this instruction (takes about 5 minutes):
 
 ```text
-Clone https://github.com/wave1008/foundation-tester next to this folder, then set it up by
-following ../foundation-tester/.claude/skills/fleetest-setup/SKILL.md.
+Clone https://github.com/wave1008/fleetest-mobile next to this folder, then set it up by
+following ../fleetest-mobile/.claude/skills/fleetest-setup/SKILL.md.
 ```
 
 4. If you use an **AI assistant other than Claude Code**, the setup asks whether to register the MCP server; choose to register it.
@@ -48,7 +48,7 @@ following ../foundation-tester/.claude/skills/fleetest-setup/SKILL.md.
 7. Give your AI assistant this instruction and confirm that no errors are reported
 
 ```text
-Run ../foundation-tester/.build/debug/fleetest doctor and report the result.
+Run ../fleetest-mobile/.build/debug/fleetest doctor and report the result.
 A ❌ on the Apple Intelligence (On-device model) row only stops features you are not using (screenLooksLike and the text visibility check), so ignore it.
 Confirm that there is no other ❌.
 ```
@@ -133,11 +133,11 @@ Go back to your work folder and run the following. The profiles are created in t
 
 ```bash
 # iOS
-../foundation-tester/.build/debug/fleetest profile setup --platform ios --app-id com.sutec.mobile.ios --auto-device --count 2 --app-name "SUT Store" \
+../fleetest-mobile/.build/debug/fleetest profile setup --platform ios --app-id com.sutec.mobile.ios --auto-device --count 2 --app-name "SUT Store" \
   --app-path ../sut-ec-mobile/build/ios-sim/Build/Products/Debug-iphonesimulator/iosApp.app
 
 # Android
-../foundation-tester/.build/debug/fleetest profile setup --platform android --app-id com.sutec.mobile.android --auto-device --count 2 --app-name "SUT Store" \
+../fleetest-mobile/.build/debug/fleetest profile setup --platform android --app-id com.sutec.mobile.android --auto-device --count 2 --app-name "SUT Store" \
   --app-path ../sut-ec-mobile/androidApp/build/outputs/apk/debug/androidApp-debug.apk
 ```
 
@@ -190,8 +190,8 @@ To write it yourself, see [Creating a test class](reference/testclass/creating_t
 Start the server by hand, create the test, and stop it when you are done.
 
 ```bash
-../foundation-tester/.build/debug/fleetest services up --profile ios-run
-../foundation-tester/.build/debug/fleetest services down --profile ios-run
+../fleetest-mobile/.build/debug/fleetest services up --profile ios-run
+../fleetest-mobile/.build/debug/fleetest services down --profile ios-run
 ```
 
 </details>
@@ -220,7 +220,7 @@ Expected result:
 <summary><b>If you do it manually (click to show details)</b></summary>
 
 ```bash
-../foundation-tester/.build/debug/fleetest run --profile ios-run
+../fleetest-mobile/.build/debug/fleetest run --profile ios-run
 ```
 
 `--profile` takes the name of the run profile from step 5 (`ios-run`, or `android-run` for Android).

@@ -9,7 +9,7 @@ Fleetest のアンインストールの手順です。
 AIアシスタントへ次のように指示すると、下の手順をまとめて行います。
 
 ```text
-../foundation-tester/docs/user-docs/uninstall_ja.md の手順で fleetest をアンインストールして。
+../fleetest-mobile/docs/user-docs/uninstall_ja.md の手順で fleetest をアンインストールして。
 ```
 
 ## 0. ランナー機(使っている場合)
@@ -17,7 +17,7 @@ AIアシスタントへ次のように指示すると、下の手順をまとめ
 リモートのランナー機を使っているときは、手元の fleetest を消す前に、ランナー機の作業場所を消します。
 
 ```bash
-../foundation-tester/.build/debug/fleetest remote teardown <マシン名>
+../fleetest-mobile/.build/debug/fleetest remote teardown <マシン名>
 ```
 
 iOS 実機のために、ランナー機に署名用のキーチェーンを作った場合は、ランナー機でそれも消します
@@ -37,8 +37,8 @@ VSCode の拡張ビューからアンインストールし、`Developer: Reload 
 `scripts/compose.yaml` のサービスを使っていたなら、プロセスを止める前に(作業フォルダとクローンが残っているうちに)サービスを止めて消します。
 
 ```bash
-../foundation-tester/.build/debug/fleetest services down     # 作業フォルダのサービスを止める
-../foundation-tester/.build/debug/fleetest services reset    # コンテナ・ネットワーク・名前付きボリューム・控えを消す
+../fleetest-mobile/.build/debug/fleetest services down     # 作業フォルダのサービスを止める
+../fleetest-mobile/.build/debug/fleetest services reset    # コンテナ・ネットワーク・名前付きボリューム・控えを消す
 ```
 
 常駐の `services up` が残っていれば `services reset --force` にします。
@@ -56,7 +56,7 @@ pkill  -f 'fleetest-mcp|/fleetest (api|run|bridge|devices)|fleetest-(simstream|a
 
 ## 3. 作業フォルダとクローン
 
-VSCode を終了してから、作業フォルダと fleetest のクローン(既定では作業フォルダの隣の `foundation-tester`。
+VSCode を終了してから、作業フォルダと fleetest のクローン(既定では作業フォルダの隣の `fleetest-mobile`。
 ビルドフォルダを含めて数 GB あります)を Finder や `rm` で削除します。
 削除しても `.build` が復活する場合は、fleetest のプロセスが残っています(手順2)。
 

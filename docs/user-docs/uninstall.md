@@ -9,7 +9,7 @@ How to uninstall Fleetest.
 Ask your AI assistant as follows, and it carries out the steps below for you.
 
 ```text
-Uninstall fleetest by following ../foundation-tester/docs/user-docs/uninstall.md.
+Uninstall fleetest by following ../fleetest-mobile/docs/user-docs/uninstall.md.
 ```
 
 ## 0. Runner machines (if you use them)
@@ -17,7 +17,7 @@ Uninstall fleetest by following ../foundation-tester/docs/user-docs/uninstall.md
 If you use remote runner machines, delete the work area on each runner machine before removing fleetest from your Mac:
 
 ```bash
-../foundation-tester/.build/debug/fleetest remote teardown <machine>
+../fleetest-mobile/.build/debug/fleetest remote teardown <machine>
 ```
 
 If you created a signing keychain on a runner machine for physical iPhones, delete it on the runner machine too (it
@@ -37,8 +37,8 @@ extension (while the extension is running, it restarts the fleetest processes yo
 If you used the services in `scripts/compose.yaml`, stop and remove them before stopping the processes (while the work folder and the clone still exist).
 
 ```bash
-../foundation-tester/.build/debug/fleetest services down     # stop this work folder's services
-../foundation-tester/.build/debug/fleetest services reset    # remove containers, networks, named volumes and the records
+../fleetest-mobile/.build/debug/fleetest services down     # stop this work folder's services
+../fleetest-mobile/.build/debug/fleetest services reset    # remove containers, networks, named volumes and the records
 ```
 
 If a resident `services up` is still running, use `services reset --force`.
@@ -56,7 +56,7 @@ pkill  -f 'fleetest-mcp|/fleetest (api|run|bridge|devices)|fleetest-(simstream|a
 
 ## 3. Work folder and clone
 
-Quit VSCode, then delete the work folder and the fleetest clone (by default `foundation-tester`
+Quit VSCode, then delete the work folder and the fleetest clone (by default `fleetest-mobile`
 next to your work folder; with its build folder it takes a few GB) via Finder or `rm`.
 If `.build` reappears after you delete them, fleetest processes are still running (step 2).
 

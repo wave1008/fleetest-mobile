@@ -357,7 +357,7 @@ window/transition/animator の `*_scale` はチューニングノブではなく
     **切り分け**: `sample <pid> 10` の Binary Images に `libclang_rt.*san` が居ないか見る。
     プロセスの起動時刻(`ps -o lstart=`)とバイナリの mtime を比べれば、掴んでいるイメージが
     古いことも分かる(`otool -L` は**ディスク上の現在のファイル**を見るので判定に使えない)
-  - **別クローンから起動した常駐プロセスも混ざる**(実害: `~/Downloads/foundation-tester` の
+  - **別クローンから起動した常駐プロセスも混ざる**(実害: `~/Downloads/fleetest-mobile` の
     monitor が 1 日以上稼働し 3.6% を消費)。`ps` で**実行ファイルのパスまで**確認する
 - ブリッジは単一スレッドなので、整定待ち中(最大 2s)はモニターの /screenshot が
   順番待ちになる(ベストエフォート表示のため許容している。仕様)

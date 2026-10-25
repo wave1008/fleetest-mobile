@@ -24,7 +24,7 @@
 <summary><b>手動で実行する場合(クリックで詳細表示)</b></summary>
 
 ```bash
-../foundation-tester/.build/debug/fleetest run --profile ios-run
+../fleetest-mobile/.build/debug/fleetest run --profile ios-run
 ```
 
 </details>
@@ -55,7 +55,7 @@
 ```bash
 ls TestProjects/project1/reports/ | tail -3
 ls -d TestProjects/project1/results/runs/*/* | tail -1
-../foundation-tester/.build/debug/fleetest results log latest
+../fleetest-mobile/.build/debug/fleetest results log latest
 ```
 
 `results log latest` は、直近の run のシナリオごとの実行ログを表示します。ステップの行に、タップしたラベルや
@@ -89,7 +89,7 @@ accounts.json は作らなくていい(値は私が書く)。
 次に、伏せない状態で実行し、パスワードがそのまま残ることを確かめます。
 
 ```bash
-../foundation-tester/.build/debug/fleetest run --profile ios-run
+../fleetest-mobile/.build/debug/fleetest run --profile ios-run
 grep -rl 'パスワードの値' TestProjects/project1/reports/ TestProjects/project1/results/ | head
 ```
 
@@ -131,7 +131,7 @@ fleetest doctor --bundle fleetest-diag.zip で診断の zip を作って、unzip
 <summary><b>手動で実行する場合(クリックで詳細表示)</b></summary>
 
 ```bash
-../foundation-tester/.build/debug/fleetest doctor --bundle fleetest-diag.zip
+../fleetest-mobile/.build/debug/fleetest doctor --bundle fleetest-diag.zip
 unzip -l fleetest-diag.zip
 unzip -p fleetest-diag.zip | grep -a -c 'ログイン'    # 画面の文字(アプリのラベル)を数える
 ```
@@ -162,8 +162,8 @@ fleetest clean --dry-run で消える量を見せて。問題なければ fleete
 <summary><b>手動で実行する場合(クリックで詳細表示)</b></summary>
 
 ```bash
-../foundation-tester/.build/debug/fleetest clean --dry-run
-../foundation-tester/.build/debug/fleetest clean
+../fleetest-mobile/.build/debug/fleetest clean --dry-run
+../fleetest-mobile/.build/debug/fleetest clean
 ```
 
 </details>

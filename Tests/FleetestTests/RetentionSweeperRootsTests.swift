@@ -17,7 +17,7 @@ final class RetentionSweeperRootsTests: XCTestCase {
         let base = FileManager.default.temporaryDirectory
             .appendingPathComponent("retention-roots-\(UUID().uuidString)", isDirectory: true)
         package = base.appendingPathComponent("work", isDirectory: true)
-        tool = base.appendingPathComponent("foundation-tester", isDirectory: true)
+        tool = base.appendingPathComponent("fleetest-mobile", isDirectory: true)
         let fm = FileManager.default
         // 受け手のパッケージ: プロジェクトのレポートと、install.sh のログ
         try fm.createDirectory(at: package.appendingPathComponent("TestProjects/app/reports"),

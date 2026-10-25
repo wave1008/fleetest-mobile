@@ -130,7 +130,7 @@ Create a fleetest run profile android-response that uses the Android physical de
 Run in the work folder (`--serial` is the identifier from step 1).
 
 ```bash
-../foundation-tester/.build/debug/fleetest profile setup --platform android --app-id com.sutec.mobile.android \
+../fleetest-mobile/.build/debug/fleetest profile setup --platform android --app-id com.sutec.mobile.android \
   --app-name "SUT Store" --app-ref android-physical-app --run android-response \
   --serial R5CT1234ABC --device-name "Pixel 8" \
   --app-path ../sut-ec-mobile/build/android-physical/androidApp-debug.apk
@@ -172,7 +172,7 @@ Run the login scenario created in the Quick start with the fleetest android-resp
 <summary><b>If you do it manually (click to show details)</b></summary>
 
 ```bash
-../foundation-tester/.build/debug/fleetest run --profile android-response --scenario <ClassName>
+../fleetest-mobile/.build/debug/fleetest run --profile android-response --scenario <ClassName>
 ```
 
 `<ClassName>` is the file name (without extension) of the scenario in `TestProjects/project1/scenarios/`.
@@ -223,7 +223,7 @@ List the fleetest response measurement results per step, with the median and the
 <summary><b>If you do it manually (click to show details)</b></summary>
 
 ```bash
-../foundation-tester/.build/debug/fleetest results response
+../fleetest-mobile/.build/debug/fleetest results response
 ```
 
 </details>

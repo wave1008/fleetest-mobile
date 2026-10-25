@@ -36,8 +36,8 @@
 #
 # `--tool-root <dir>` で測る対象のクローンを差し替える(既定はこの台本のクローン)。変更前の
 # コミットを worktree に出して渡せば、同じタスク・同じ台本で前後を比べられる:
-#   git worktree add /tmp/before/foundation-tester <commit>   # 名前は foundation-tester 固定
-#   Scripts/mcp-bench.sh --task ios-authoring-fix-drift --repeat 5 --tool-root /tmp/before/foundation-tester
+#   git worktree add /tmp/before/fleetest-mobile <commit>   # 名前は fleetest-mobile 固定
+#   Scripts/mcp-bench.sh --task ios-authoring-fix-drift --repeat 5 --tool-root /tmp/before/fleetest-mobile
 #
 # 前提: `claude` CLI と、タスクが要求するデバイス/アプリ。デバイスは各タスクの
 # `requires` に書いてあるものを**先に用意しておくこと**(この台本は用意しない ——
@@ -144,8 +144,8 @@ git -C "$CWD" rev-parse --show-toplevel >/dev/null 2>&1 \
 ISOLATION_SETTINGS='{"autoMemoryEnabled":false}'
 
 # ---- 作成フローの作業場所 ----
-# `fleetest init` の Package.swift はツールを `package: "foundation-tester"` で参照し、SPM は
-# パス依存をディレクトリ名で識別する = worktree も `…/foundation-tester` という名前で作る
+# `fleetest init` の Package.swift はツールを `package: "fleetest-mobile"` で参照し、SPM は
+# パス依存をディレクトリ名で識別する = worktree も `…/fleetest-mobile` という名前で作る
 # 作業場所は git の外(上の①)。測る対象のクローンごとに分ける(前後の比較で依存先が違う)
 PKG="$BENCH_HOME/authoring-pkg/$(printf '%s' "$TOOL_ROOT" | shasum | cut -c1-12)/authoring-pkg"
 PKG_PROJECT=BenchAuthoring
@@ -176,8 +176,8 @@ for id in "${TASKS[@]}"; do
     has_authoring=1
   fi
 done
-[ "$has_authoring" = 0 ] || [ "$(basename "$TOOL_ROOT")" = foundation-tester ] \
-  || die "--tool-root のディレクトリ名は foundation-tester にする(SPM がパス依存を名前で識別する): $TOOL_ROOT"
+[ "$has_authoring" = 0 ] || [ "$(basename "$TOOL_ROOT")" = fleetest-mobile ] \
+  || die "--tool-root のディレクトリ名は fleetest-mobile にする(SPM がパス依存を名前で識別する): $TOOL_ROOT"
 # 外部パッケージは一度作れば使い回す(.build が温まる)。`fleetest init` は受け手向けに
 # .claude/(スキル・許可)と .vscode/ を置くが、**まっさらな読み手**には要らないので消す
 if [ "$has_authoring" = 1 ] && [ "$DRY_RUN" = 0 ] && [ ! -f "$PKG/Package.swift" ]; then

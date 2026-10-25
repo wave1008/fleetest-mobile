@@ -37,7 +37,7 @@ same version is covered on that page too.
   (`dyld[…]: Symbol not found` / `Library not loaded`) appears, the VSCode extension and the install and
   update scripts spot it and show the fix below.
 - After Xcode matches, rebuild everything. `<TOOL_ROOT>` is the fleetest clone (by default
-  `foundation-tester` next to your work folder).
+  `fleetest-mobile` next to your work folder).
 
   ```bash
   rm -rf <TOOL_ROOT>/.build <work-folder>/.build

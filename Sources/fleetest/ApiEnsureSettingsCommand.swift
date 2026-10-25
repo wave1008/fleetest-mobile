@@ -17,7 +17,7 @@ struct ApiEnsureSettingsCommand: AsyncParsableCommand {
     @Option(help: "Root of the consumer package (where TestProjects/ lives; defaults to the current directory)")
     var workDir: String?
 
-    @Option(help: "Location of the foundation-tester clone (used for the absolute paths of the allowed commands)")
+    @Option(help: "Location of the fleetest-mobile clone (used for the absolute paths of the allowed commands)")
     var toolRoot: String?
 
     func run() async throws {

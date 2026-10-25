@@ -7,7 +7,7 @@
 **受け手の配布口は「最新リリース」**。リリース = `X.Y.Z`(`v` 無しの semver)の git タグ、最新 = semver 最大。
 `main` は開発線で、受け手には直接届かない(壊れた途中状態を受け手が引かないため)。
 
-- 導入はプロンプト(「隣に clone して `../foundation-tester/.claude/skills/fleetest-setup/SKILL.md` に
+- 導入はプロンプト(「隣に clone して `../fleetest-mobile/.claude/skills/fleetest-setup/SKILL.md` に
   従ってセットアップして」)。clone 直後は `main` だが、SKILL.md ステップ0 の最初に
   `install.sh --align-release-only` を実行し、クローンを最新リリースへ移してから**手順書を読み直す**
   (手順書・スクリプト・ビルドを同じリリースに揃える。`main` の手順書のまま進むと、リリースの
@@ -62,7 +62,7 @@ git push origin 0.1.0
 ## 発行後の確認
 
 ```bash
-git clone https://github.com/wave1008/foundation-tester.git /tmp/fleetest-check
+git clone https://github.com/wave1008/fleetest-mobile.git /tmp/fleetest-check
 cd /tmp/fleetest-check && git checkout <version> && swift build && .build/debug/fleetest --help | head -3
 git tag -l --format='%(contents)' <version>   # 注釈がリリースノートとして読めること
 # (update-check.sh --notes はリリース追従のクローン = fleetest.channel=release でしか注釈を出さない)
@@ -78,8 +78,8 @@ git tag -l --format='%(contents)' <version>   # 注釈がリリースノート�
 揃えないと **手順書はブランチ・clone は最新リリース** になり、「直したはずの挙動を確認できない」。
 
 ```bash
-git clone --branch feat/my-branch https://github.com/wave1008/foundation-tester.git ../foundation-tester
-FLEETEST_REF=feat/my-branch bash ../foundation-tester/Scripts/install.sh --work-dir <作業フォルダ>
+git clone --branch feat/my-branch https://github.com/wave1008/fleetest-mobile.git ../fleetest-mobile
+FLEETEST_REF=feat/my-branch bash ../fleetest-mobile/Scripts/install.sh --work-dir <作業フォルダ>
 ```
 
 ## 壊れたリリースを出したとき

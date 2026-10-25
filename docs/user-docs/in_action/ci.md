@@ -34,13 +34,13 @@ The extension and MCP aren't needed in CI. Check out the test project on the CI 
 [Sharing the test project until a second person runs it](sharing_project.md).
 
 ```bash
-git clone https://github.com/wave1008/foundation-tester.git ../foundation-tester
+git clone https://github.com/wave1008/fleetest-mobile.git ../fleetest-mobile
 ```
 
 The next command is idempotent — a second run is mostly a no-op.
 
 ```bash
-bash ../foundation-tester/Scripts/install.sh --work-dir "$PWD" --skip-extension --skip-mcp --no-doctor
+bash ../fleetest-mobile/Scripts/install.sh --work-dir "$PWD" --skip-extension --skip-mcp --no-doctor
 ```
 
 ### Prompt for the AI
@@ -58,7 +58,7 @@ Expected result:
 
 ```bash
 # Run: --quiet suppresses per-step lines, --junit writes JUnit XML
-../foundation-tester/.build/debug/fleetest run --profile ios-run --quiet --junit reports/junit.xml
+../fleetest-mobile/.build/debug/fleetest run --profile ios-run --quiet --junit reports/junit.xml
 ```
 
 ### Prompt for the AI
@@ -109,10 +109,10 @@ pipeline {
   agent { label 'mac' }   // an agent that runs as a logged-in GUI session user
   stages {
     stage('Install / update') {
-      steps { sh 'bash ../foundation-tester/Scripts/install.sh --work-dir "$PWD" --skip-extension --skip-mcp --no-doctor' }
+      steps { sh 'bash ../fleetest-mobile/Scripts/install.sh --work-dir "$PWD" --skip-extension --skip-mcp --no-doctor' }
     }
     stage('Run scenarios') {
-      steps { sh '../foundation-tester/.build/debug/fleetest run --profile ios-run --quiet --junit reports/junit.xml' }
+      steps { sh '../fleetest-mobile/.build/debug/fleetest run --profile ios-run --quiet --junit reports/junit.xml' }
     }
   }
   post {

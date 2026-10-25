@@ -129,7 +129,7 @@ fleetest に、USB でつないでいる Android の実機を使う実行プロ�
 作業フォルダで実行します(`--serial` はステップ 1 の識別子)。
 
 ```bash
-../foundation-tester/.build/debug/fleetest profile setup --platform android --app-id com.sutec.mobile.android \
+../fleetest-mobile/.build/debug/fleetest profile setup --platform android --app-id com.sutec.mobile.android \
   --app-name "SUT Store" --app-ref android-physical-app --run android-response \
   --serial R5CT1234ABC --device-name "Pixel 8" \
   --app-path ../sut-ec-mobile/build/android-physical/androidApp-debug.apk
@@ -171,7 +171,7 @@ fleetest の android-response プロファイルで、クイックスタート�
 <summary><b>手動で実行する場合(クリックで詳細表示)</b></summary>
 
 ```bash
-../foundation-tester/.build/debug/fleetest run --profile android-response --scenario <クラス名>
+../fleetest-mobile/.build/debug/fleetest run --profile android-response --scenario <クラス名>
 ```
 
 `<クラス名>` は、`TestProjects/project1/scenarios/` にあるシナリオのファイル名(拡張子なし)です。
@@ -222,7 +222,7 @@ fleetest のレスポンス計測の結果を、ステップごとに中央値�
 <summary><b>手動で実行する場合(クリックで詳細表示)</b></summary>
 
 ```bash
-../foundation-tester/.build/debug/fleetest results response
+../fleetest-mobile/.build/debug/fleetest results response
 ```
 
 </details>

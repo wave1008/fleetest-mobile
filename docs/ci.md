@@ -28,7 +28,7 @@
 
 ```bash
 # 導入(冪等。2回目以降はほぼ skip)。CI では拡張・MCP は不要
-bash foundation-tester/Scripts/install.sh --work-dir "$PWD" --skip-extension --skip-mcp --no-doctor
+bash fleetest-mobile/Scripts/install.sh --work-dir "$PWD" --skip-extension --skip-mcp --no-doctor
 
 # 実行: --quiet でステップ行を抑制、--junit で JUnit XML を書く
 fleetest run --profile ios-xcuitest --quiet --junit reports/junit.xml
@@ -61,10 +61,10 @@ pipeline {
   agent { label 'mac' }   // ログイン済み GUI セッションのユーザーで動くエージェント
   stages {
     stage('Install / update') {
-      steps { sh 'bash ../foundation-tester/Scripts/install.sh --work-dir "$PWD" --skip-extension --skip-mcp --no-doctor' }
+      steps { sh 'bash ../fleetest-mobile/Scripts/install.sh --work-dir "$PWD" --skip-extension --skip-mcp --no-doctor' }
     }
     stage('Run scenarios') {
-      steps { sh '../foundation-tester/.build/debug/fleetest run --profile ios-xcuitest --quiet --junit reports/junit.xml' }
+      steps { sh '../fleetest-mobile/.build/debug/fleetest run --profile ios-xcuitest --quiet --junit reports/junit.xml' }
     }
   }
   post {

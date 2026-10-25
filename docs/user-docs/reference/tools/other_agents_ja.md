@@ -22,16 +22,16 @@ fleetest の中核は**エージェント固有ではありません**。Claude 
 テスト専用の新規フォルダを VSCode で開き、エージェントを起動して次のように指示します:
 
 ```text
-https://github.com/wave1008/foundation-tester をこのフォルダの隣に clone して
-../foundation-tester/.claude/skills/fleetest-setup/SKILL.md の手順でセットアップして。
+https://github.com/wave1008/fleetest-mobile をこのフォルダの隣に clone して
+../fleetest-mobile/.claude/skills/fleetest-setup/SKILL.md の手順でセットアップして。
 ```
 
 エージェントを介さず手で進めたいときは、ツールを clone してから同じ機械作業をインストーラで実行します(冪等):
 
 ```bash
 mkdir -p ~/my-app-tests && cd ~/my-app-tests
-git clone https://github.com/wave1008/foundation-tester.git ../foundation-tester
-bash ../foundation-tester/Scripts/install.sh
+git clone https://github.com/wave1008/fleetest-mobile.git ../fleetest-mobile
+bash ../fleetest-mobile/Scripts/install.sh
 ```
 
 インストーラは Claude Code 向けの生成物(`.mcp.json`・`.claude/settings.json`・スキルの写し)も
@@ -59,7 +59,7 @@ codex mcp add fleetest --env FT_TOOL_ROOT=<ABS_TOOL_ROOT> -- bash -c 'exec "<ABS
 
 `fleetest-mcp` は標準の stdio MCP サーバーなので、**MCP に対応したクライアントならどれでも**
 使えます。設定の書き方は各クライアントに従い、起動コマンドとして次を渡します
-(`<ABS_TOOL_ROOT>` は `foundation-tester` クローンの絶対パス。2箇所とも同じ値):
+(`<ABS_TOOL_ROOT>` は `fleetest-mobile` クローンの絶対パス。2箇所とも同じ値):
 
 ```json
 "fleetest": {
@@ -154,7 +154,7 @@ Simulator や実機の駆動。結果の履歴や録画を残す本番の実行�
 (VSCode の Codex で確認。起動のしかたを変える必要はありません)。
 
 **fleetest 本体のクローンは、既定のサンドボックスで読み取り専用に保たれます。** `workspace-write` では
-作業フォルダの外へ書けないので、隣の `foundation-tester` への書き込みは、編集ツール(apply_patch)も
+作業フォルダの外へ書けないので、隣の `fleetest-mobile` への書き込みは、編集ツール(apply_patch)も
 シェル(`sed -i`・リダイレクト・python)も拒否されます。拒否された操作は
 「サンドボックスの外で実行してよいか」の確認になります。**許可するのは導入・更新の手順(install.sh・update.sh・
 `swift build`)だけにしてください。** それ以外でクローンを書き換えようとしていたら断ります。

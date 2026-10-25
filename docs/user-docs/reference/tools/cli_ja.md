@@ -7,15 +7,15 @@
 
 ## 呼び方
 
-このドキュメントの `fleetest` は、作業フォルダの隣に foundation-tester をクローンした既定の構成では
-`../foundation-tester/.build/debug/fleetest` です([クイックスタート](../../quick-start_ja.md)参照)。
-foundation-tester のクローン内で作業している場合は `swift run fleetest` でも同じです。
+このドキュメントの `fleetest` は、作業フォルダの隣に fleetest-mobile をクローンした既定の構成では
+`../fleetest-mobile/.build/debug/fleetest` です([クイックスタート](../../quick-start_ja.md)参照)。
+fleetest-mobile のクローン内で作業している場合は `swift run fleetest` でも同じです。
 
 ```bash
-../foundation-tester/.build/debug/fleetest --help                  # サブコマンドの一覧
-../foundation-tester/.build/debug/fleetest help run                # サブコマンドの詳しいヘルプ
-../foundation-tester/.build/debug/fleetest help bridge up          # 子コマンドの詳しいヘルプ
-../foundation-tester/.build/debug/fleetest bridge --help           # 子コマンドの一覧
+../fleetest-mobile/.build/debug/fleetest --help                  # サブコマンドの一覧
+../fleetest-mobile/.build/debug/fleetest help run                # サブコマンドの詳しいヘルプ
+../fleetest-mobile/.build/debug/fleetest help bridge up          # 子コマンドの詳しいヘルプ
+../fleetest-mobile/.build/debug/fleetest bridge --help           # 子コマンドの一覧
 ```
 
 `fleetest help <サブコマンド>` で、そのサブコマンドの全オプションと既定値が出ます。

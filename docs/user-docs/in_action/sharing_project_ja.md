@@ -55,14 +55,14 @@ TestProjects/*/workspace/apps/
 
 ## 2. commit して push する
 
-`Package.swift` の `.package(path:)` は、クローンが作業フォルダの隣にあれば `../foundation-tester` の相対パスで書かれています
+`Package.swift` の `.package(path:)` は、クローンが作業フォルダの隣にあれば `../fleetest-mobile` の相対パスで書かれています
 (2人目も隣に clone する前提)。クローンを別の場所に置いた場合は絶対パス(`/Users/<あなた>/...`)なので、commit する前に
 2人目の Mac でも解ける形に直してください。
 
 ### AIへの指示文
 
 ```text
-Package.swift の .package(path:) が絶対パスなら ../foundation-tester に直して。git status で入れてよいものだけを選んで commit して。results/ と reports/ と workspace/apps/ は入れないで。push はまだしないで、commit の内容を見せて。
+Package.swift の .package(path:) が絶対パスなら ../fleetest-mobile に直して。git status で入れてよいものだけを選んで commit して。results/ と reports/ と workspace/apps/ は入れないで。push はまだしないで、commit の内容を見せて。
 ```
 
 内容を確かめたら、push を指示します。
@@ -88,25 +88,25 @@ git push
 ### AIへの指示文
 
 ```text
-https://github.com/wave1008/foundation-tester をこのフォルダの隣に clone して
-../foundation-tester/.claude/skills/fleetest-setup/SKILL.md の手順でセットアップして。
+https://github.com/wave1008/fleetest-mobile をこのフォルダの隣に clone して
+../fleetest-mobile/.claude/skills/fleetest-setup/SKILL.md の手順でセットアップして。
 ```
 
-セットアップが終わったら、`Package.swift` の `.package(path:)` が自分のクローン(隣に clone したなら `../foundation-tester`)を
+セットアップが終わったら、`Package.swift` の `.package(path:)` が自分のクローン(隣に clone したなら `../fleetest-mobile`)を
 指しているか確かめます。
 
 <details>
 <summary><b>手動で実行する場合(クリックで詳細表示)</b></summary>
 
 ```bash
-../foundation-tester/.build/debug/fleetest project list
+../fleetest-mobile/.build/debug/fleetest project list
 ```
 
 `Package.swift` を共有しなかった場合は、先に `project sync` を実行します。`TestProjects/` を走査して `Package.swift` のマーカー区間を作り直します
 (手動コピーや `git pull` の後にも必要です。[テストプロジェクトの作成](../reference/project/creating_project_ja.md)の「プロジェクトの管理」)。
 
 ```bash
-../foundation-tester/.build/debug/fleetest project sync
+../fleetest-mobile/.build/debug/fleetest project sync
 ```
 
 </details>
@@ -143,9 +143,9 @@ Android は、その AVD を起こそうとして 3 回失敗してから(数分
 <summary><b>手動で実行する場合(クリックで詳細表示)</b></summary>
 
 ```bash
-../foundation-tester/.build/debug/fleetest profile setup --platform ios --app-id <bundle ID> \
+../fleetest-mobile/.build/debug/fleetest profile setup --platform ios --app-id <bundle ID> \
   --app-ref ios-app --run ios-run-mine --auto-device
-../foundation-tester/.build/debug/fleetest profile list
+../fleetest-mobile/.build/debug/fleetest profile list
 ```
 
 `--auto-device` は、この Mac に合う Simulator / Emulator を選び、無ければ作ります。
@@ -167,7 +167,7 @@ fleetest の ios-run-mine プロファイルで、すべてのシナリオを実
 <summary><b>手動で実行する場合(クリックで詳細表示)</b></summary>
 
 ```bash
-../foundation-tester/.build/debug/fleetest run --profile ios-run-mine
+../fleetest-mobile/.build/debug/fleetest run --profile ios-run-mine
 ```
 
 </details>
@@ -202,7 +202,7 @@ fleetest の ios-run プロファイルで、すべてのシナリオを M1Max �
 2つのターミナルで、ほぼ同時に次を打ちます。
 
 ```bash
-../foundation-tester/.build/debug/fleetest run --profile ios-run --runner M1Max --wait-lock 600
+../fleetest-mobile/.build/debug/fleetest run --profile ios-run --runner M1Max --wait-lock 600
 ```
 
 </details>

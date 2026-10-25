@@ -34,7 +34,7 @@ usage() {
 Usage: update.sh [options]
 
   --work-dir <dir>   Consumer directory that holds TestProjects/ (default: current directory)
-  --tool-root <dir>  Location of the foundation-tester clone (default: <work-dir>/../foundation-tester)
+  --tool-root <dir>  Location of the fleetest-mobile clone (default: <work-dir>/../fleetest-mobile)
   --no-pull          Do not update the clone (to pin a version, or while developing the tool)
   --force            Run everything even without an update (to redo a broken install)
   --skip-extension   Do not reinstall the VSCode extension
@@ -78,7 +78,7 @@ resolve_tool_root() {
   if [ -d "$WORK_DIR/Sources/FTScenarioRunner" ]; then printf '%s' "$WORK_DIR"; return; fi
   local declared
   declared="$(sed -n 's/.*\.package(path: *"\([^"]*\)".*/\1/p' "$WORK_DIR/Package.swift" 2>/dev/null | head -1)"
-  for candidate in "$declared" "../foundation-tester"; do
+  for candidate in "$declared" "../fleetest-mobile"; do
     [ -n "$candidate" ] || continue
     case "$candidate" in /*) : ;; *) candidate="$WORK_DIR/$candidate" ;; esac
     if [ -d "$candidate/Sources/FTScenarioRunner" ]; then (cd "$candidate" && pwd); return; fi
@@ -86,7 +86,7 @@ resolve_tool_root() {
 }
 TOOL_ROOT="$(resolve_tool_root)"
 if [ -z "$TOOL_ROOT" ]; then
-  echo "❌ No foundation-tester clone found (WORK_DIR=$WORK_DIR)." >&2
+  echo "❌ No fleetest-mobile clone found (WORK_DIR=$WORK_DIR)." >&2
   echo "   If not installed yet: /fleetest-setup (or Scripts/install.sh). If it lives elsewhere, pass --tool-root." >&2
   echo "   **Do not go hunting through nearby directories** — ask the human instead." >&2
   exit 1

@@ -74,7 +74,7 @@ final class TunnelOnlyPortSweepTests: XCTestCase {
         XCTAssertTrue(PortHolder.tunnelHasLiveRunner(
             tunnelCommand: tunnel, port: 8150,
             processCommands: ["/sbin/launchd", runner(udid: "00008110-000260242EEB801E",
-                                                      clone: "/Users/u/fleetest-runner/foundation-tester")]))
+                                                      clone: "/Users/u/fleetest-runner/fleetest-mobile")]))
         // 大文字小文字の違いは同じデバイス
         XCTAssertTrue(PortHolder.tunnelHasLiveRunner(
             tunnelCommand: tunnel, port: 8150,

@@ -25,11 +25,11 @@ description: fleetest のアプリプロファイル・実行プロファイル�
   ステップ1・2でプラットフォームとアプリIDが決まった後、`fleetest project create project1`
   を実行してからステップ3以降へ進む(シナリオもプロファイルも書かない = プロファイルはステップ3以降の
   `profile setup` が作る)(プロジェクト名は以降 `project1`)。
-  WORK_DIR に fleetest のパッケージ(`Package.swift` に fleetest の依存か `foundation-tester` の記述)が無ければ
+  WORK_DIR に fleetest のパッケージ(`Package.swift` に fleetest の依存か `fleetest-mobile` の記述)が無ければ
   作らず `/fleetest-setup` を案内する。
 - **fleetest CLI の在り処**: clone 構成は `swift run fleetest ...`、外部パッケージ構成は
   `<TOOL_ROOT>/.build/debug/fleetest ...`(TOOL_ROOT は WORK_DIR/Package.swift の `.package(path:)` から
-  解決。無ければ既定の `../foundation-tester`。判定は `Sources/FTScenarioRunner/` の有無)。
+  解決。無ければ既定の `../fleetest-mobile`。判定は `Sources/FTScenarioRunner/` の有無)。
   以降 `fleetest` はこれを指す。
 - **原則**: 各書き込みの後に検証ゲート(`fleetest profile list`)を通す。🧑 は停止して確認する。
   **既に分かっている値は聞き直さない** — 依頼文や会話でプロジェクト名・アプリ表示名・アプリID・

@@ -97,7 +97,7 @@ public enum ProjectScaffold {
     /// 受け手のパッケージにセットアップスキル `.claude/skills/fleetest-setup/SKILL.md` を書く
     /// (fleetest init から呼ぶ)。受け手が自分のプロジェクトをエージェントで開いて
     /// `/fleetest-setup` で残りのセットアップ(デバイス定義・アプリパス・実行)を駆動できる
-    /// ようにする。clone 構成の foundation-tester 同梱スキルは受け手のパッケージには
+    /// ようにする。clone 構成の fleetest-mobile 同梱スキルは受け手のパッケージには
     /// 届かないため、init で scaffold する。
     ///
     /// 置き場所は `AgentIntegration.skillsDirectory`。**シンボリックリンクにしない** ——
@@ -281,7 +281,7 @@ public enum ProjectScaffold {
     /// 受け手のパッケージの .gitignore に SwiftPM ビルド成果物と実行レポートの ignore を冪等に足す
     /// (fleetest init から呼ぶ)。無ければ作成、あれば欠けている行だけ追記。戻り値は追記した行(全部揃って
     /// いれば空 = 何も書かない)
-    /// `fleetest init` が Package.swift に書く `.package(path:)` の値。クローンが作業フォルダの隣(`../foundation-tester`)か
+    /// `fleetest init` が Package.swift に書く `.package(path:)` の値。クローンが作業フォルダの隣(`../fleetest-mobile`)か
     /// 中にあれば相対パス(git で共有した2人目の Mac でもそのまま解決する)、それ以外は絶対パス。
     /// 相対を作業フォルダ基準で解く読み手: install.sh / preflight.sh / update.sh / toolRootResolve.ts / BuildFingerprint
     public static func dependencyPath(toolRoot: URL, packageRoot: URL) -> String {
@@ -355,12 +355,12 @@ public enum ProjectScaffold {
 
         # fleetest セットアップ(このパッケージ)
 
-        このパッケージは `fleetest init` で作られた fleetest テストプロジェクト。fleetest CLI は foundation-tester
+        このパッケージは `fleetest init` で作られた fleetest テストプロジェクト。fleetest CLI は fleetest-mobile
         を clone して `swift build` 済みであることが前提(未ビルドなら
-        `git clone https://github.com/wave1008/foundation-tester.git ../foundation-tester` して
+        `git clone https://github.com/wave1008/fleetest-mobile.git ../fleetest-mobile` して
         `swift build`。clone 先は任意 — 既定はこのパッケージの**隣**で、パッケージの下にネストさせない)。
         TOOL_ROOT = Package.swift の `.package(path:)` が指す clone。以降 `fleetest ...` は
-        `<TOOL_ROOT>/.build/debug/fleetest ...`(既定 `../foundation-tester/.build/debug/fleetest ...`)を
+        `<TOOL_ROOT>/.build/debug/fleetest ...`(既定 `../fleetest-mobile/.build/debug/fleetest ...`)を
         指す(PATH 登録は不要)。
         自分のアプリのシナリオを書いて実行できる状態まで仕上げる。
 
@@ -440,7 +440,7 @@ public enum ProjectScaffold {
         ### 6. MCP サーバの登録(Claude Code から ft_* ツールを使う。任意)
         Claude Code がアプリを直接操作してシナリオを生成したいとき登録する(VSCode 拡張とは別の消費面)。
         このパッケージのルートに `.mcp.json` を書く(claude CLI 不要・ただの JSON)。`<CLONE_ABS>` は
-        clone した foundation-tester の**絶対パス**(`cd <clone> && pwd` で得る)に置換。既存 `.mcp.json` が
+        clone した fleetest-mobile の**絶対パス**(`cd <clone> && pwd` で得る)に置換。既存 `.mcp.json` が
         あれば `mcpServers.fleetest` キーだけマージする:
 
         ```json
@@ -461,7 +461,7 @@ public enum ProjectScaffold {
         MCP を初回に承認確認する → 許可すると `ft_*` ツールが使え、`/fleetest-scenario` が MCP 経由で動く。
 
         ## 更新(新しい版が出たとき)
-        clone した foundation-tester で `git pull` して `swift build` し直す(配布口は main の1本。
+        clone した fleetest-mobile で `git pull` して `swift build` し直す(配布口は main の1本。
         Package.swift の依存は clone のパスか main 追従なので、版を書き換える作業は無い)。
         """
     }
@@ -478,11 +478,11 @@ public enum ProjectScaffold {
         # fleetest セットアップ(このパッケージ)
 
         このパッケージは `fleetest init --no-project` で作られた fleetest テストパッケージ。**テストプロジェクトはまだ無い**
-        (`TestProjects/` は空)。fleetest CLI は foundation-tester を clone して `swift build` 済みであることが前提
-        (未ビルドなら `git clone https://github.com/wave1008/foundation-tester.git ../foundation-tester` して
+        (`TestProjects/` は空)。fleetest CLI は fleetest-mobile を clone して `swift build` 済みであることが前提
+        (未ビルドなら `git clone https://github.com/wave1008/fleetest-mobile.git ../fleetest-mobile` して
         `swift build`。clone 先は任意 — 既定はこのパッケージの**隣**で、パッケージの下にネストさせない)。
         TOOL_ROOT = Package.swift の `.package(path:)` が指す clone。以降 `fleetest ...` は
-        `<TOOL_ROOT>/.build/debug/fleetest ...`(既定 `../foundation-tester/.build/debug/fleetest ...`)を
+        `<TOOL_ROOT>/.build/debug/fleetest ...`(既定 `../fleetest-mobile/.build/debug/fleetest ...`)を
         指す(PATH 登録は不要)。
 
         ## 原則
@@ -520,7 +520,7 @@ public enum ProjectScaffold {
         ```
 
         ## 更新(新しい版が出たとき)
-        clone した foundation-tester で `git pull` して `swift build` し直す(配布口は main の1本)。
+        clone した fleetest-mobile で `git pull` して `swift build` し直す(配布口は main の1本)。
         """
     }
 

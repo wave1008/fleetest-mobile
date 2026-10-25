@@ -2,7 +2,7 @@
 // 実装は Scripts/preflight.sh / Scripts/update.sh / Scripts/update-check.sh / Scripts/install.sh /
 // src/toolRootResolve.ts の5箇所にあり、CLAUDE.md が「片方だけ変えない」と定めている。
 // 規則そのもの(clone 構成 = カレント / 外部構成 = Package.swift の .package(path:) →
-// 無ければ既定の隣 ../foundation-tester / クローン判別は Sources/FTScenarioRunner の有無)を
+// 無ければ既定の隣 ../fleetest-mobile / クローン判別は Sources/FTScenarioRunner の有無)を
 // 構成する 3 つの語が全実装に出ることを見る。
 //
 // install.sh は curl 形(SELF_ROOT が採れない = $0 がファイルではない)のときだけ
@@ -26,9 +26,9 @@ const ROOT = path.join(process.cwd(), "..");
 // TS の Package.swift 抽出は正規表現なのでメタ文字がエスケープされる)ため、substring ではなく
 // 正規表現で見る。
 const RULE_TOKENS = {
-  // 末尾を固定しないと改名(foundation-tester-x など)が接頭辞一致で素通りする。
+  // 末尾を固定しないと改名(fleetest-mobile-x など)が接頭辞一致で素通りする。
   "クローン判別マーカー": /Sources.{0,20}FTScenarioRunner(?![\w-])/s,
-  "既定の隣": /\.\.["'/,\s]*foundation-tester(?![\w-])/,
+  "既定の隣": /\.\.["'/,\s]*fleetest-mobile(?![\w-])/,
   "Package.swift の宣言": /\\?\.package\\?\(path:/,
 };
 

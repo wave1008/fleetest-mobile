@@ -923,9 +923,9 @@ trigger)は CLI エントリでしか分からないため、`RunRecorder` を C
 ## DS-15 外部パッケージ配布と mint 配布の履歴
 
 **現状(正典)**: onboarding の既定は**外部パッケージ構成**(受け手ディレクトリを `fleetest init` で
-テストパッケージ化し、Projects は受け手側に住む。foundation-tester は横に clone した「ツール」=
+テストパッケージ化し、Projects は受け手側に住む。fleetest-mobile は横に clone した「ツール」=
 TOOL_ROOT)。clone 構成(クローンの中で直接シナリオを管理)は保守者/PoC 向け。入口は**全エージェント共通の
-プロンプト導入**(「<リポジトリ> を隣に clone して ../foundation-tester/.claude/skills/fleetest-setup/SKILL.md に
+プロンプト導入**(「<リポジトリ> を隣に clone して ../fleetest-mobile/.claude/skills/fleetest-setup/SKILL.md に
 従ってセットアップして」)。エージェントはクローンの SKILL.md を読み、クローンの `Scripts/install.sh` を実行する。
 Claude Code のスキル(`/fleetest-scenario` 等。名前空間なし)は install.sh のステップ7.8 が作業フォルダの
 `.claude/skills/` へ**コピー**する(リンクにしない)。プラグイン配布と curl 取得の導入器は無い
@@ -979,11 +979,11 @@ false green になる。
 そのブランチに揃える保守者の口。受け手には案内しない。指定すると `fleetest.channel` が外れる)。
 以下は外部パッケージ構成(`fleetest init`)の実装詳細。
 
-受け手が foundation-tester を clone せず、**自分の Swift パッケージが fleetest を SPM 依存として引いて**
+受け手が fleetest-mobile を clone せず、**自分の Swift パッケージが fleetest を SPM 依存として引いて**
 自分のアプリのシナリオを書ける構成(以下「外部パッケージ構成」)。clone してその中でシナリオを管理する構成を「clone 構成」と呼ぶ。
 
 - **公開 products**: `Package.swift` の `products:` に `.library`(FTScenarioRunner / FTDSL / FTCore)と
-  `.executable`(fleetest)。受け手のシナリオターゲットはこれを `.product(package: "foundation-tester")` で引く。
+  `.executable`(fleetest)。受け手のシナリオターゲットはこれを `.product(package: "fleetest-mobile")` で引く。
 - **`fleetest init`**: 受け手の Package.swift(空マーカー区間 + fleetest 依存。言語モードは tools-version 6.0 の既定 = Swift 6)を書き、
   `ProjectScaffold.createAndRegister` が最初のプロジェクトを登録。**`--no-project` ではプロジェクトを作らず空の
   `TestProjects/` だけ置く**(`fleetest.project` も `.vscode/settings.json` に書かない・受け手スキルも名前を焼かない。

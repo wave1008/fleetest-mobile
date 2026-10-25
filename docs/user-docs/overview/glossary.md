@@ -46,7 +46,7 @@ The terms specific to fleetest, in alphabetical order. At the end of each entry 
 - **Text visibility check** — A check that confirms, for an element matched in the tree, that its text is really drawn on the screen by looking at a screenshot, and fails when it is not visible. It decides by combining OCR and FM. See [How the text visibility check decides](../reference/testclass/text_visibility_check.md).
 - **Typed selector (Sel)** — The selector notation written with types (for example `.id("login_btn").or(.text("Log in"))`). It sits beside the string form, and the compiler catches spelling mistakes. See [Typed Selector (`Sel`)](../reference/selector/typed_selector.md).
 - **Virtual device** — The collective name for Simulators (iOS) and Emulators (Android). It is distinguished from a physical device. See [Fleet concepts](../fleet/concepts.md).
-- **Work folder** — The folder that contains `TestProjects/`. It is your own folder for using fleetest; by default the foundation-tester clone sits next to it. See [Quick start](../quick-start.md).
+- **Work folder** — The folder that contains `TestProjects/`. It is your own folder for using fleetest; by default the fleetest-mobile clone sits next to it. See [Quick start](../quick-start.md).
 - **Worker** — The unit that takes scenarios within a run. Each device of the run profile becomes one worker and the scenarios are distributed among them. The degree of parallelism is the number of workers (the number of devices after resolution). See [Parallel execution](../reference/running/parallel_execution.md).
 - **Workspace** — The `workspace/` folder of a test project (the staging place for app bundles, `compose.yaml` and data). Not the same thing as a VSCode workspace.
 

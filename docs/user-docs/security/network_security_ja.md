@@ -234,7 +234,7 @@ cat ~/.config/fleetest/config.json
 #### AIへの指示文
 
 ```text
-閉域網の設定が効いているか確かめたい。git の insteadOf の設定と、github.com の foundation-tester への git ls-remote と、raw.githubusercontent.com / github.com / registry.npmjs.org / dl.google.com への HTTPS の到達(状態コード)を調べて、結果を教えて。設定は変えないで。
+閉域網の設定が効いているか確かめたい。git の insteadOf の設定と、github.com の fleetest-mobile への git ls-remote と、raw.githubusercontent.com / github.com / registry.npmjs.org / dl.google.com への HTTPS の到達(状態コード)を調べて、結果を教えて。設定は変えないで。
 ```
 
 <details>
@@ -242,7 +242,7 @@ cat ~/.config/fleetest/config.json
 
 ```bash
 git config --global --get-regexp '^url\..*\.insteadof$'
-git ls-remote https://github.com/wave1008/foundation-tester.git HEAD
+git ls-remote https://github.com/wave1008/fleetest-mobile.git HEAD
 for h in raw.githubusercontent.com github.com registry.npmjs.org dl.google.com; do
   curl -sS -m 10 -o /dev/null -w "$h %{http_code}\n" https://$h/
 done

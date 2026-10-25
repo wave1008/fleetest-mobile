@@ -17,7 +17,7 @@ import {
 test("classifyResident: 各種別を正しく判定する", () => {
   const cases = [
     [
-      "/Applications/Xcode_27_beta_3.app/Contents/Developer/usr/bin/xcodebuild test-without-building -xctestrun /Users/w/foundation-tester/.fleetest/DerivedData/Build/Products/FleetestRunner_iphonesimulator27.0.xctestrun -destination id=2C4FBE2E-5358-48CD-B32A-964B8EB817B4",
+      "/Applications/Xcode_27_beta_3.app/Contents/Developer/usr/bin/xcodebuild test-without-building -xctestrun /Users/w/fleetest-mobile/.fleetest/DerivedData/Build/Products/FleetestRunner_iphonesimulator27.0.xctestrun -destination id=2C4FBE2E-5358-48CD-B32A-964B8EB817B4",
       "bridge",
     ],
     [
@@ -118,7 +118,7 @@ test("classifyResident: 新規 fleetest-<name> helper を汎用に fleetest 種�
 });
 
 test("classifyResident: binaryDir 配下の実行ファイルは名前を問わず拾う(もれ防止)", () => {
-  const binaryDir = "/Users/w/foundation-tester/.build/debug";
+  const binaryDir = "/Users/w/fleetest-mobile/.build/debug";
   const cmd = `${binaryDir}/ftbridge-daemon --port 9000`;
   assert.equal(classifyResident(cmd), null); // binaryDir 無しなら未分類
   const r = classifyResident(cmd, { binaryDir });
@@ -160,7 +160,7 @@ test("parseResidentProcesses: ポートを bridge=xctestrun名 / sim-runner=同�
   const inappUdid = "E38DCA93-95F2-4DDF-B1FE-29527205D3EE";
   const psOutput = [
     // 実機採取形式: -xctestrun .../FleetestRunner-<port>.xctestrun -destination platform=iOS Simulator,id=<UDID>
-    `  36328     1 S /Applications/Xcode.app/Contents/Developer/usr/bin/xcodebuild test-without-building -xctestrun /Users/w/foundation-tester/.fleetest/DerivedData/Build/Products/FleetestRunner-8128.xctestrun -destination platform=iOS Simulator,id=${udid}`,
+    `  36328     1 S /Applications/Xcode.app/Contents/Developer/usr/bin/xcodebuild test-without-building -xctestrun /Users/w/fleetest-mobile/.fleetest/DerivedData/Build/Products/FleetestRunner-8128.xctestrun -destination platform=iOS Simulator,id=${udid}`,
     `  36795 35891 S /Users/w/Library/Developer/CoreSimulator/Devices/${udid}/data/Containers/Bundle/Application/AA/FleetestRunnerUITests-Runner.app/FleetestRunnerUITests-Runner`,
     `  40000 39000 S /Users/w/Library/Developer/CoreSimulator/Devices/${inappUdid}/data/Containers/Bundle/Application/BB/SampleApp.app/SampleApp`,
     "  50000     1 S .build/debug/fleetest-mcp",

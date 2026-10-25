@@ -33,8 +33,8 @@ fleetest をインストールし、サンプルアプリを対象に、テス�
 3. AIアシスタント(Claude Code 拡張など)を起動して次のように指示します（所要時間：約5分）
 
 ```text
-https://github.com/wave1008/foundation-tester をこのフォルダの隣に clone して
-../foundation-tester/.claude/skills/fleetest-setup/SKILL.md の手順でセットアップして。
+https://github.com/wave1008/fleetest-mobile をこのフォルダの隣に clone して
+../fleetest-mobile/.claude/skills/fleetest-setup/SKILL.md の手順でセットアップして。
 ```
 
 4. **Claude Code 以外の AIアシスタント**を使う場合は、セットアップの途中で MCP を登録するか聞かれるので、登録してください
@@ -48,7 +48,7 @@ https://github.com/wave1008/foundation-tester をこのフォルダの隣に clo
 7. AIアシスタントへ次のように指示し、エラーが出ないことを確かめます
 
 ```text
-../foundation-tester/.build/debug/fleetest doctor を実行して結果を報告して。
+../fleetest-mobile/.build/debug/fleetest doctor を実行して結果を報告して。
 Apple Intelligence(On-device model)の行の ❌ は、使わない機能(screenLooksLike・テキストの可視性検証)が止まるだけなので無視してよい。
 それ以外に ❌ が無いことを確かめて。
 ```
@@ -133,11 +133,11 @@ xcodebuild -project iosApp/iosApp.xcodeproj -scheme iosApp -configuration Debug 
 
 ```bash
 # iOS
-../foundation-tester/.build/debug/fleetest profile setup --platform ios --app-id com.sutec.mobile.ios --auto-device --count 2 --app-name "SUT Store" \
+../fleetest-mobile/.build/debug/fleetest profile setup --platform ios --app-id com.sutec.mobile.ios --auto-device --count 2 --app-name "SUT Store" \
   --app-path ../sut-ec-mobile/build/ios-sim/Build/Products/Debug-iphonesimulator/iosApp.app
 
 # Android
-../foundation-tester/.build/debug/fleetest profile setup --platform android --app-id com.sutec.mobile.android --auto-device --count 2 --app-name "SUT Store" \
+../fleetest-mobile/.build/debug/fleetest profile setup --platform android --app-id com.sutec.mobile.android --auto-device --count 2 --app-name "SUT Store" \
   --app-path ../sut-ec-mobile/androidApp/build/outputs/apk/debug/androidApp-debug.apk
 ```
 
@@ -189,8 +189,8 @@ fleetest のテストプロジェクト project1 で、SUT Store の「商品詳
 サーバーを手で起こしてからテストを作り、終わったら止めます。
 
 ```bash
-../foundation-tester/.build/debug/fleetest services up --profile ios-run
-../foundation-tester/.build/debug/fleetest services down --profile ios-run
+../fleetest-mobile/.build/debug/fleetest services up --profile ios-run
+../fleetest-mobile/.build/debug/fleetest services down --profile ios-run
 ```
 
 </details>
@@ -219,7 +219,7 @@ fleetest のテストプロジェクト project1 のシナリオを ios-run プ�
 <summary><b>手動で実行する場合(クリックで詳細表示)</b></summary>
 
 ```bash
-../foundation-tester/.build/debug/fleetest run --profile ios-run
+../fleetest-mobile/.build/debug/fleetest run --profile ios-run
 ```
 
 `--profile` には、ステップ5で用意した実行プロファイルの名前(`ios-run`。Android なら `android-run`)を渡します。

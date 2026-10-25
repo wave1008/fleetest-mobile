@@ -44,7 +44,7 @@ With the ios-run profile of the fleetest test project project1, run only the sce
 <summary><b>If you do it manually (click to show details)</b></summary>
 
 ```bash
-../foundation-tester/.build/debug/fleetest run --project project1 --profile ios-run --folder smoke
+../fleetest-mobile/.build/debug/fleetest run --project project1 --profile ios-run --folder smoke
 ```
 
 Give `--folder` the name of a subfolder directly under `scenarios/`. It can be repeated, and it can be combined with `--scenario` and `--failed`.

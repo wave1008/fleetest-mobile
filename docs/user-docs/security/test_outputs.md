@@ -24,7 +24,7 @@ Run the scenario I created in the Quick Start on iOS.
 <summary><b>If you do it manually (click to show details)</b></summary>
 
 ```bash
-../foundation-tester/.build/debug/fleetest run --profile ios-run
+../fleetest-mobile/.build/debug/fleetest run --profile ios-run
 ```
 
 </details>
@@ -55,7 +55,7 @@ List where the files from this run were left. Open one report and show me the li
 ```bash
 ls TestProjects/project1/reports/ | tail -3
 ls -d TestProjects/project1/results/runs/*/* | tail -1
-../foundation-tester/.build/debug/fleetest results log latest
+../fleetest-mobile/.build/debug/fleetest results log latest
 ```
 
 `results log latest` prints the per-scenario execution log of the latest run. The step lines show the labels that were tapped and
@@ -89,7 +89,7 @@ Don't create accounts.json (I will write the values).
 Next, run it unmasked and confirm that the password stays in the output as it is.
 
 ```bash
-../foundation-tester/.build/debug/fleetest run --profile ios-run
+../fleetest-mobile/.build/debug/fleetest run --profile ios-run
 grep -rl 'the-password-value' TestProjects/project1/reports/ TestProjects/project1/results/ | head
 ```
 
@@ -131,7 +131,7 @@ Make a diagnostic zip with fleetest doctor --bundle fleetest-diag.zip and list i
 <summary><b>If you do it manually (click to show details)</b></summary>
 
 ```bash
-../foundation-tester/.build/debug/fleetest doctor --bundle fleetest-diag.zip
+../fleetest-mobile/.build/debug/fleetest doctor --bundle fleetest-diag.zip
 unzip -l fleetest-diag.zip
 unzip -p fleetest-diag.zip | grep -a -c 'Login'    # count occurrences of text from the app's screen (a label)
 ```
@@ -162,8 +162,8 @@ Show me how much fleetest clean --dry-run would delete. If that looks fine, run 
 <summary><b>If you do it manually (click to show details)</b></summary>
 
 ```bash
-../foundation-tester/.build/debug/fleetest clean --dry-run
-../foundation-tester/.build/debug/fleetest clean
+../fleetest-mobile/.build/debug/fleetest clean --dry-run
+../fleetest-mobile/.build/debug/fleetest clean
 ```
 
 </details>

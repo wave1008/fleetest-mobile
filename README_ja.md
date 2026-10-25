@@ -30,8 +30,8 @@ CI に向きます。すべてを手元で動かせるので、クラウドを�
 テスト用の新しいフォルダを VSCode で開き、AIアシスタントを起動して次のように指示します。
 
 ```text
-https://github.com/wave1008/foundation-tester をこのフォルダの隣に clone して、
-../foundation-tester/.claude/skills/fleetest-setup/SKILL.md の手順でセットアップして。
+https://github.com/wave1008/fleetest-mobile をこのフォルダの隣に clone して、
+../fleetest-mobile/.claude/skills/fleetest-setup/SKILL.md の手順でセットアップして。
 ```
 
 サンプルアプリでの実行までの手順は[クイックスタート](docs/user-docs/quick-start_ja.md)にあります。

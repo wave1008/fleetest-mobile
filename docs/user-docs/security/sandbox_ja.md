@@ -97,7 +97,7 @@ class サンドボックス確認 {
 実行します(`--profile` はクイックスタートのステップ5で用意した実行プロファイル)。
 
 ```bash
-../foundation-tester/.build/debug/fleetest run --profile ios-run --scenario サンドボックス確認
+../fleetest-mobile/.build/debug/fleetest run --profile ios-run --scenario サンドボックス確認
 ```
 
 1本だけ回すときは `--scenario サンドボックス確認.S0030` のように `クラス名.メソッド名` を渡します。
@@ -145,7 +145,7 @@ class サンドボックス確認 {
 <summary><b>手動で実行する場合(クリックで詳細表示)</b></summary>
 
 ```bash
-../foundation-tester/.build/debug/fleetest run --profile ios-run --scenario サンドボックス確認.S0030
+../fleetest-mobile/.build/debug/fleetest run --profile ios-run --scenario サンドボックス確認.S0030
 ```
 
 </details>
@@ -190,7 +190,7 @@ class サンドボックス確認 {
 ```
 
 ```bash
-../foundation-tester/.build/debug/fleetest run --profile ios-run --scenario サンドボックス確認.S0040
+../fleetest-mobile/.build/debug/fleetest run --profile ios-run --scenario サンドボックス確認.S0040
 ```
 
 </details>
@@ -251,7 +251,7 @@ DEMO_TOKEN=dummy を付けて fleetest run で iOS の S0050 を実行して、�
 ```
 
 ```bash
-DEMO_TOKEN=dummy ../foundation-tester/.build/debug/fleetest run --profile ios-run --scenario サンドボックス確認.S0050
+DEMO_TOKEN=dummy ../fleetest-mobile/.build/debug/fleetest run --profile ios-run --scenario サンドボックス確認.S0050
 ```
 
 </details>
@@ -318,7 +318,7 @@ iOS で S0060 を実行して、結果を見せて。
 ```
 
 ```bash
-../foundation-tester/.build/debug/fleetest run --profile ios-run --scenario サンドボックス確認.S0060
+../fleetest-mobile/.build/debug/fleetest run --profile ios-run --scenario サンドボックス確認.S0060
 ```
 
 </details>
@@ -367,7 +367,7 @@ mkdir -p ~/fleetest-demo-secrets && echo hello > ~/fleetest-demo-secrets/note.tx
 ```
 
 ```bash
-../foundation-tester/.build/debug/fleetest run --profile ios-run --scenario サンドボックス確認.S0070
+../fleetest-mobile/.build/debug/fleetest run --profile ios-run --scenario サンドボックス確認.S0070
 ```
 
 </details>
@@ -410,7 +410,7 @@ mkdir -p ~/fleetest-demo-secrets && echo hello > ~/fleetest-demo-secrets/note.tx
 <summary><b>手動で実行する場合(クリックで詳細表示)</b></summary>
 
 ```bash
-../foundation-tester/.build/debug/fleetest run --profile ios-run --scenario サンドボックス確認.S0010
+../fleetest-mobile/.build/debug/fleetest run --profile ios-run --scenario サンドボックス確認.S0010
 rm ~/Desktop/fleetest-sandbox-check.txt
 ```
 

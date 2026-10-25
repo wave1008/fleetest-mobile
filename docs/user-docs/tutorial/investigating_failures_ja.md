@@ -76,7 +76,7 @@ project1 の カートに追加する.swift の期待値を元の商品名に戻
 <summary><b>手動で実行する場合(クリックで詳細表示)</b></summary>
 
 ```bash
-../foundation-tester/.build/debug/fleetest run --project project1 --profile ios-run --failed
+../fleetest-mobile/.build/debug/fleetest run --project project1 --profile ios-run --failed
 ```
 
 結果はプロファイルごとに記録されるので、前回と同じプロファイルで回します。

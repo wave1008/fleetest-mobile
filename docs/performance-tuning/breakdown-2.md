@@ -866,7 +866,7 @@ OCR の段も FM のテキストの可視性検証も切った run でも起こ�
 - **時間の 8 割は AI の段で、その 6 割はモデル**(テストを作る2段だけで 694〜821 秒 = 回ごとの振れが改善幅より大きい)。`run` の固定費は
   サービスの起動 3.3s・停止 2.6s・書き換えたシナリオのビルド 約 9s・切り出し 約 8s で、どれも削れる塊ではない
 - **効いた**: `ft_list_devices` に実行プロファイルを渡したとき「台数を足すなら `<CLI の実体> profile setup … --auto-device --count <total>` を1回」と
-  添える(`DeviceInventory.addDevicesHint`)+ 入口(AGENTS.md)に「CLI は PATH に無い・`../foundation-tester/.build/debug/fleetest` で撃つ」。
+  添える(`DeviceInventory.addDevicesHint`)+ 入口(AGENTS.md)に「CLI は PATH に無い・`../fleetest-mobile/.build/debug/fleetest` で撃つ」。
   台数追加の段 113s(10 ターン)→ 39s(6 ターン)。CLI の場所が無いと、素の `fleetest` を撃って場所探しに約 40 秒使った
 - **効かなかった**: スキル(fleetest-profiles)への「あと N 台追加」の案内だけ —— その回の AI はスキルを読まず ToolSearch と `ft_list_devices` に頼った
 - **見送り**: `ft_launch` の bundleId の省略(減るのは1ターン)・MCP の応答の素の `fleetest …`(約 40 か所。入口の1行で場所が分かるので個別には直さない)

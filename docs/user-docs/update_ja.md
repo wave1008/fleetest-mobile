@@ -75,11 +75,11 @@ fleetest を最新にして。
 拡張の「更新する」が実行しているのも、このスクリプトです。
 
 ```bash
-bash ../foundation-tester/Scripts/update.sh
+bash ../fleetest-mobile/Scripts/update.sh
 ```
 
 - 更新が無ければ「Up to date」と表示して何もせずに終わります。壊れた導入を入れ直したいときだけ `--force` を付けます。
-- クローンが作業フォルダの隣の `foundation-tester` ではないときは `--tool-root <クローンのパス>`、作業フォルダが
+- クローンが作業フォルダの隣の `fleetest-mobile` ではないときは `--tool-root <クローンのパス>`、作業フォルダが
   カレントでないときは `--work-dir <作業フォルダ>` を付けます。
 
 </details>

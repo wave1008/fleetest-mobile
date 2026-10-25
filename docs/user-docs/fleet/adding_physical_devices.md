@@ -265,7 +265,7 @@ A physical device connected to a runner machine works with the same steps. **Do 
    a different device.
    ```bash
    cd ~/fleetest-runner/users/<your issuerId>/work
-   ~/fleetest-runner/foundation-tester/.build/debug/fleetest run --profile <run profile> --scenario <scenario ID>
+   ~/fleetest-runner/fleetest-mobile/.build/debug/fleetest run --profile <run profile> --scenario <scenario ID>
    ```
    `issuerId` is the name you set in `~/.config/fleetest/config.json` on your Mac. If you have not set one, it is
    `<user name>@<host name>` of your Mac. You can also check with `ls ~/fleetest-runner/users/` on the runner machine.

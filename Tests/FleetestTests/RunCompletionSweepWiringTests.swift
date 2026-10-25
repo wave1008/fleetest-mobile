@@ -64,7 +64,7 @@ final class RunCompletionSweepWiringTests: XCTestCase {
     /// 子の環境: `FT_PARENT_PID` を抜き、他の変数は引き継ぎ、**親が決めた2つの場所を固定する**
     func testChildEnvironmentDropsTheParentPIDAndPinsBothRoots() {
         let roots = RetentionSweeper.Roots(package: URL(fileURLWithPath: "/work/app"),
-                                           tool: URL(fileURLWithPath: "/tools/foundation-tester"))
+                                           tool: URL(fileURLWithPath: "/tools/fleetest-mobile"))
         let env = RunCompletionSweep.childEnvironment(
             roots: roots, base: ["FT_PARENT_PID": "123", "PATH": "/usr/bin",
                                  "DEVELOPER_DIR": "/Applications/X.app",
@@ -74,7 +74,7 @@ final class RunCompletionSweepWiringTests: XCTestCase {
         XCTAssertEqual(env["DEVELOPER_DIR"], "/Applications/X.app")
         // 受け手の外部構成では2つが別の場所。子に解決し直させると取り違える
         XCTAssertEqual(env["FT_PACKAGE_ROOT"], "/work/app", "掃除がプロジェクトの場所を取り違える")
-        XCTAssertEqual(env["FT_TOOL_ROOT"], "/tools/foundation-tester")
+        XCTAssertEqual(env["FT_TOOL_ROOT"], "/tools/fleetest-mobile")
     }
 
     /// 子の作業フォルダはプロジェクトの場所(ツールの場所ではない)

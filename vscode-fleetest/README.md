@@ -64,14 +64,14 @@ fleetest(Swift 製の iOS/Android UI テストツール。リポジトリルー�
 ## 前提
 
 この拡張は `fleetest` CLI(Swift 製)を spawn して動きます。CLI とシナリオ資産は
-`foundation-tester` リポジトリのワークスペースから来るため、**拡張を入れた VS Code で
+`fleetest-mobile` リポジトリのワークスペースから来るため、**拡張を入れた VS Code で
 そのリポジトリのルートを開いている**ことが前提です(拡張は `Package.swift` を含むフォルダで
 起動し、`TestProjects/*/scenarios/**/*.swift` を読みます)。
 
 **使う(配布された .vsix を入れて動かす)ために必要なもの:**
 
 - macOS(iOS ならさらに Xcode / `simctl`、Android ならさらに Android SDK / `adb`)
-- `foundation-tester` リポジトリを clone 済みで、VS Code でそのルートを開けること
+- `fleetest-mobile` リポジトリを clone 済みで、VS Code でそのルートを開けること
 - リポジトリルートでビルド済みの `fleetest` バイナリ(`swift build --product fleetest`。
   下記クイックスタート参照)
 
@@ -83,11 +83,11 @@ fleetest(Swift 製の iOS/Android UI テストツール。リポジトリルー�
 
 `.vsix` ファイルだけを受け取った人はこの手順で動かせます(拡張のソースやビルド環境は不要)。
 
-1. `foundation-tester` リポジトリを clone し、リポジトリルートで `fleetest` CLI をビルドします。
+1. `fleetest-mobile` リポジトリを clone し、リポジトリルートで `fleetest` CLI をビルドします。
 
    ```bash
-   git clone https://github.com/wave1008/foundation-tester.git
-   cd foundation-tester
+   git clone https://github.com/wave1008/fleetest-mobile.git
+   cd fleetest-mobile
    swift build --product fleetest   # → .build/debug/fleetest
    ```
 
@@ -101,7 +101,7 @@ fleetest(Swift 製の iOS/Android UI テストツール。リポジトリルー�
    publisher 未検証(marketplace 未公開)による警告が出ることがありますが、ローカル
    インストールでは無視して問題ありません。
 
-3. VS Code で **この `foundation-tester` リポジトリのルート**(`Package.swift` があるフォルダ)を
+3. VS Code で **この `fleetest-mobile` リポジトリのルート**(`Package.swift` があるフォルダ)を
    開きます。`fleetest.binaryPath` の既定 `.build/debug/fleetest` が手順1のバイナリを指すので、
    そのまま Test Explorer にシナリオが表示されます。別の場所にビルドした場合のみ
    `.vscode/settings.json` で `fleetest.binaryPath` を上書きしてください。
@@ -113,7 +113,7 @@ fleetest(Swift 製の iOS/Android UI テストツール。リポジトリルー�
 1. リポジトリルートで fleetest CLI をビルドします。
 
    ```bash
-   cd ..   # リポジトリルート(foundation-tester/)へ
+   cd ..   # リポジトリルート(fleetest-mobile/)へ
    swift build --product fleetest
    ```
 
@@ -141,7 +141,7 @@ fleetest(Swift 製の iOS/Android UI テストツール。リポジトリルー�
    VS Code の既定の「拡張機能の開発」構成が使えます。`Run Extension` が無ければ
    `Extension Development Host` を選択してください)。
 
-5. 起動した Extension Development Host 側で、この `foundation-tester` リポジトリの
+5. 起動した Extension Development Host 側で、この `fleetest-mobile` リポジトリの
    ルートフォルダ(`Package.swift` があるフォルダ)を開きます。
 
 ### パッケージ化して .vsix をインストールする
@@ -166,7 +166,7 @@ npm run package        # vsce package → vscode-fleetest-<version>.vsix
 code --install-extension vscode-fleetest-<version>.vsix
 ```
 
-インストール後は Extension Development Host のときと同様、`foundation-tester` リポジトリの
+インストール後は Extension Development Host のときと同様、`fleetest-mobile` リポジトリの
 ルートフォルダを開けば動作します。
 
 ## 設定一覧(`fleetest.*`)
@@ -877,7 +877,7 @@ F5 で Extension Development Host を起動した状態(またはパッケージ
 通常の `npm test` では skip されるので、明示的に実行する。
 
 ```bash
-cd ..                        # リポジトリルート(foundation-tester/)へ
+cd ..                        # リポジトリルート(fleetest-mobile/)へ
 swift build --product fleetest
 cd vscode-fleetest
 node esbuild.mjs --tests      # out-test/*.test.mjs を更新(npm test の前半と同じ)
@@ -965,7 +965,7 @@ vscode-fleetest/
 │   ├── adbWifiRepair.ts          # MonitorHealthWatchdog の Wi-Fi 修復コマンド実行(vscode 非依存)
 │   ├── monitorUpdateController.ts # 「設定」タブ「更新」セクション本体。判定は update-check.sh、取り込みは update.sh に委譲する
 │   ├── updateCheck.ts            # 起動時(1日1回まで)の更新チェックと fleetest.checkForUpdate コマンドの手動チェック(取り込みはしない)
-│   ├── toolRootResolve.ts        # foundation-tester クローン(TOOL_ROOT)の解決(preflight.sh/update-check.sh と同じ規則。vscode 非依存)
+│   ├── toolRootResolve.ts        # fleetest-mobile クローン(TOOL_ROOT)の解決(preflight.sh/update-check.sh と同じ規則。vscode 非依存)
 │   ├── remoteHostsController.ts  # リモートホスト登録簿(`fleetest api remote-machines`)の CLI 越しの読み書き
 │   ├── remoteRunArgs.ts          # リモートホスト登録簿の正規化・解決・差分計算と、デバイス候補取得のマシン指定引数組み立て(vscode 非依存)
 │   ├── remoteCompatGate.ts       # `fleetest api remote-compat` の結果から確認ダイアログ表示の要否を決める純粋関数(vscode 非依存)

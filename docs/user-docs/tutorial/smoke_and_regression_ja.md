@@ -44,7 +44,7 @@ project1 の ios-run プロファイルで、smoke フォルダのシナリオ�
 <summary><b>手動で実行する場合(クリックで詳細表示)</b></summary>
 
 ```bash
-../foundation-tester/.build/debug/fleetest run --project project1 --profile ios-run --folder smoke
+../fleetest-mobile/.build/debug/fleetest run --project project1 --profile ios-run --folder smoke
 ```
 
 `--folder` には `scenarios/` 直下のサブフォルダの名前を渡します。複数回指定できます。`--scenario`・`--failed` とも併用できます。

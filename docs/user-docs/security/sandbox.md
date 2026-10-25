@@ -97,7 +97,7 @@ class SandboxCheck {
 Run it (`--profile` is the run profile prepared in step 5 of the Quick start).
 
 ```bash
-../foundation-tester/.build/debug/fleetest run --profile ios-run --scenario SandboxCheck
+../fleetest-mobile/.build/debug/fleetest run --profile ios-run --scenario SandboxCheck
 ```
 
 To run just one, pass `class.method`, such as `--scenario SandboxCheck.S0030`.
@@ -147,7 +147,7 @@ Run only S0030 of SandboxCheck on iOS and show me the result.
 <summary><b>If you do it manually (click to show details)</b></summary>
 
 ```bash
-../foundation-tester/.build/debug/fleetest run --profile ios-run --scenario SandboxCheck.S0030
+../fleetest-mobile/.build/debug/fleetest run --profile ios-run --scenario SandboxCheck.S0030
 ```
 
 </details>
@@ -192,7 +192,7 @@ Add this to the `SandboxCheck` class.
 ```
 
 ```bash
-../foundation-tester/.build/debug/fleetest run --profile ios-run --scenario SandboxCheck.S0040
+../fleetest-mobile/.build/debug/fleetest run --profile ios-run --scenario SandboxCheck.S0040
 ```
 
 </details>
@@ -254,7 +254,7 @@ Add this to the `SandboxCheck` class.
 ```
 
 ```bash
-DEMO_TOKEN=dummy ../foundation-tester/.build/debug/fleetest run --profile ios-run --scenario SandboxCheck.S0050
+DEMO_TOKEN=dummy ../fleetest-mobile/.build/debug/fleetest run --profile ios-run --scenario SandboxCheck.S0050
 ```
 
 </details>
@@ -323,7 +323,7 @@ Add this to the `SandboxCheck` class.
 ```
 
 ```bash
-../foundation-tester/.build/debug/fleetest run --profile ios-run --scenario SandboxCheck.S0060
+../fleetest-mobile/.build/debug/fleetest run --profile ios-run --scenario SandboxCheck.S0060
 ```
 
 </details>
@@ -372,7 +372,7 @@ Add this to the `SandboxCheck` class.
 ```
 
 ```bash
-../foundation-tester/.build/debug/fleetest run --profile ios-run --scenario SandboxCheck.S0070
+../fleetest-mobile/.build/debug/fleetest run --profile ios-run --scenario SandboxCheck.S0070
 ```
 
 </details>
@@ -417,7 +417,7 @@ Run only S0010 of SandboxCheck on iOS and show me the result.
 <summary><b>If you do it manually (click to show details)</b></summary>
 
 ```bash
-../foundation-tester/.build/debug/fleetest run --profile ios-run --scenario SandboxCheck.S0010
+../fleetest-mobile/.build/debug/fleetest run --profile ios-run --scenario SandboxCheck.S0010
 rm ~/Desktop/fleetest-sandbox-check.txt
 ```
 

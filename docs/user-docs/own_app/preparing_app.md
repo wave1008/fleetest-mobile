@@ -40,10 +40,10 @@ Build the app first (the [Quick start](../quick-start.md) has an `xcodebuild` ex
 build React Native apps in the Release configuration), then run these in the work folder.
 
 ```bash
-../foundation-tester/.build/debug/fleetest project create myshop
-../foundation-tester/.build/debug/fleetest profile setup --project myshop --platform ios --app-id com.example.myshop \
+../fleetest-mobile/.build/debug/fleetest project create myshop
+../fleetest-mobile/.build/debug/fleetest profile setup --project myshop --platform ios --app-id com.example.myshop \
   --app-name "My Shop" --auto-device --app-path ~/builds/MyShop.app
-../foundation-tester/.build/debug/fleetest profile setup --project myshop --platform android --app-id com.example.myshop.android \
+../fleetest-mobile/.build/debug/fleetest profile setup --project myshop --platform android --app-id com.example.myshop.android \
   --app-name "My Shop" --auto-device --app-path ~/builds/myshop-debug.apk
 ```
 

@@ -87,14 +87,14 @@ accept incoming connections.
 ```
 Your Mac                                Runner machine
 fleetest run --runner mac2 …             ~/fleetest-runner/               ← dedicated base directory
-  ├ version check (fleetest, Xcode)  ssh ├── foundation-tester/          ← clone of fleetest itself (fixed name, shared)
+  ├ version check (fleetest, Xcode)  ssh ├── fleetest-mobile/          ← clone of fleetest itself (fixed name, shared)
   ├ send (scenarios/config) ───────────> └── users/<issuerId>/work/     ← your work area (per user)
   ├ display output                             ├── TestProjects/<project>/
   └ collect artifacts <──────────────────      └── .build/
 ```
 
 Remote runs only use `~/fleetest-runner/` on the runner. If the runner has its own copy of
-foundation-tester elsewhere, it is never touched.
+fleetest-mobile elsewhere, it is never touched.
 
 ## What it can do
 

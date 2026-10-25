@@ -74,8 +74,8 @@ public enum RemoteSetupPlan {
 
     /// `Scripts/install.sh` へ渡す引数列(RR-14「構成」の並びのまま)。
     /// **`--tool-root` を明示する**(RR-18.6: work が `<base>/users/<issuer>/work` へ2階層深くなり、
-    /// install.sh の既定 `<work-dir>/../foundation-tester` が `RemoteLayout.toolRoot`
-    /// (`<base>/foundation-tester`)と一致しなくなったため)
+    /// install.sh の既定 `<work-dir>/../fleetest-mobile` が `RemoteLayout.toolRoot`
+    /// (`<base>/fleetest-mobile`)と一致しなくなったため)
     public static func installArgs(workDir: String, projectName: String, toolRoot: String) -> [String] {
         [
             "--work-dir", workDir,

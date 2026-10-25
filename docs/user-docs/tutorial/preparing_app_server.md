@@ -34,9 +34,9 @@ Run services down and report the result.
 <summary><b>If you do it manually (click to show details)</b></summary>
 
 ```bash
-../foundation-tester/.build/debug/fleetest services up --project project1 --profile ios-run
+../fleetest-mobile/.build/debug/fleetest services up --project project1 --profile ios-run
 curl http://127.0.0.1:8090/health     # at the published port that was printed
-../foundation-tester/.build/debug/fleetest services down --project project1 --profile ios-run
+../fleetest-mobile/.build/debug/fleetest services down --project project1 --profile ios-run
 ```
 
 </details>

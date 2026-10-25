@@ -251,7 +251,7 @@ On a closed network, check that either Option A (allow the destinations) or Opti
 #### Prompt for the AI
 
 ```text
-I want to check that the closed-network setup works. Check git's insteadOf settings, a git ls-remote of foundation-tester on github.com, and HTTPS reachability (status codes) of raw.githubusercontent.com, github.com, registry.npmjs.org and dl.google.com, and tell me the results. Do not change any settings.
+I want to check that the closed-network setup works. Check git's insteadOf settings, a git ls-remote of fleetest-mobile on github.com, and HTTPS reachability (status codes) of raw.githubusercontent.com, github.com, registry.npmjs.org and dl.google.com, and tell me the results. Do not change any settings.
 ```
 
 <details>
@@ -259,7 +259,7 @@ I want to check that the closed-network setup works. Check git's insteadOf setti
 
 ```bash
 git config --global --get-regexp '^url\..*\.insteadof$'
-git ls-remote https://github.com/wave1008/foundation-tester.git HEAD
+git ls-remote https://github.com/wave1008/fleetest-mobile.git HEAD
 for h in raw.githubusercontent.com github.com registry.npmjs.org dl.google.com; do
   curl -sS -m 10 -o /dev/null -w "$h %{http_code}\n" https://$h/
 done

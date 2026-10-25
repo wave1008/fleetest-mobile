@@ -255,7 +255,7 @@ fleetest run --profile <実行プロファイル> --scenario <シナリオID>
    もう一度実行すれば通ります)。端末を別のものに替えたときも、もう一度必要です。
    ```bash
    cd ~/fleetest-runner/users/<あなたの issuerId>/work
-   ~/fleetest-runner/foundation-tester/.build/debug/fleetest run --profile <実行プロファイル> --scenario <シナリオID>
+   ~/fleetest-runner/fleetest-mobile/.build/debug/fleetest run --profile <実行プロファイル> --scenario <シナリオID>
    ```
    `issuerId` は、手元の `~/.config/fleetest/config.json` に書いた名前です。書いていなければ、手元の
    `<ユーザー名>@<ホスト名>` になります。ランナー機で `ls ~/fleetest-runner/users/` を実行しても確かめられます。

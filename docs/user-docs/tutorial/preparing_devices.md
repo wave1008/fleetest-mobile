@@ -22,7 +22,7 @@ In the **Profiles** tab of the Device Monitor, press the run profile's "Add devi
 From the CLI, run the following. `--count` makes the run profile hold N devices of that OS in total (the existing ones included).
 
 ```bash
-../foundation-tester/.build/debug/fleetest profile setup --project project1 --platform ios --app-id com.sutec.mobile.ios --auto-device --count 3
+../fleetest-mobile/.build/debug/fleetest profile setup --project project1 --platform ios --app-id com.sutec.mobile.ios --auto-device --count 3
 ```
 
 </details>

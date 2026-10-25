@@ -7,7 +7,7 @@ E2E テストツールです。
 
 ## リポジトリ
 
-- [foundation-tester](https://github.com/wave1008/foundation-tester)
+- [fleetest-mobile](https://github.com/wave1008/fleetest-mobile)
 
 ## 概要
 

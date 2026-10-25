@@ -151,8 +151,8 @@ test("isCheckDue: 時計が巻き戻っても永久に黙らない", () => {
 
 test("declaredPackagePath: 最初の .package(path:) を返す", () => {
   assert.equal(
-    declaredPackagePath('dependencies: [.package(path: "../foundation-tester")]'),
-    "../foundation-tester",
+    declaredPackagePath('dependencies: [.package(path: "../fleetest-mobile")]'),
+    "../fleetest-mobile",
   );
   assert.equal(declaredPackagePath('.package(url: "https://x/y.git", from: "1.0.0")'), undefined);
 });
@@ -230,7 +230,7 @@ test("checkFleetestUpdate: off・未導入・間隔内では実行も記録も�
 
 test("resolveToolRoot: clone 構成 / 外部構成 / 未導入", () => {
   const base = mkdtempSync(path.join(tmpdir(), "fleetest-toolroot-"));
-  const clone = path.join(base, "foundation-tester");
+  const clone = path.join(base, "fleetest-mobile");
   mkdirSync(path.join(clone, "Sources", "FTScenarioRunner"), { recursive: true });
 
   // clone 構成: ワークスペース自身がクローン。
@@ -239,12 +239,12 @@ test("resolveToolRoot: clone 構成 / 外部構成 / 未導入", () => {
   // 外部構成: Package.swift の .package(path:) が正(既定の隣とは限らない)。
   const work = path.join(base, "my-tests");
   mkdirSync(work, { recursive: true });
-  writeFileSync(path.join(work, "Package.swift"), '.package(path: "../foundation-tester")');
-  assert.equal(resolveToolRoot(work), path.join(work, "..", "foundation-tester"));
+  writeFileSync(path.join(work, "Package.swift"), '.package(path: "../fleetest-mobile")');
+  assert.equal(resolveToolRoot(work), path.join(work, "..", "fleetest-mobile"));
 
   // 宣言が無くても既定の隣を見る。
   writeFileSync(path.join(work, "Package.swift"), "// no dependencies");
-  assert.equal(resolveToolRoot(work), path.join(work, "..", "foundation-tester"));
+  assert.equal(resolveToolRoot(work), path.join(work, "..", "fleetest-mobile"));
 
   // 未導入(隣にクローンが無い)。
   const lonely = path.join(base, "elsewhere", "my-tests");

@@ -3,7 +3,7 @@
 // .package(path:) 宣言を優先する)に従うことの回帰テスト。
 //
 // 実害: install.sh は SELF_ROOT(BASH_SOURCE[0] がファイルであること = on-disk 実行)が
-// 取れないとき、Package.swift の宣言を見ずにいきなり既定の隣(../foundation-tester)へ倒していた。
+// 取れないとき、Package.swift の宣言を見ずにいきなり既定の隣(../fleetest-mobile)へ倒していた。
 // curl 形(BASH_SOURCE[0] が空になる)では常にこの経路を通るため、`--tool-root <custom>` で
 // 導入済みの受け手が引数無しで curl 形を再実行すると、既存のクローンを無視して
 // 別の場所へ新しく clone しようとしていた。
@@ -118,7 +118,7 @@ test("curl 形: 宣言も既存クローンも無ければ既定の隣へ倒す(
   mkdirSync(workDir, { recursive: true }); // Package.swift 無し
 
   const resolved = resolveCurlForm({ workDir });
-  assert.equal(resolved, `${workDir}/../foundation-tester`);
+  assert.equal(resolved, `${workDir}/../fleetest-mobile`);
 });
 
 test("on-disk 形: 自分自身(SELF_ROOT)が Package.swift の宣言より優先される", (t) => {
@@ -159,5 +159,5 @@ test("on-disk 形: .git の無い置き場から未導入の WORK_DIR へは既�
   mkdirSync(workDir, { recursive: true });
 
   const resolved = resolveOnDiskForm({ selfCloneDir: path.join(dir, "plugin-cache"), workDir, isGitClone: false });
-  assert.equal(resolved, `${workDir}/../foundation-tester`);
+  assert.equal(resolved, `${workDir}/../fleetest-mobile`);
 });

@@ -23,11 +23,11 @@ struct InitCommand: AsyncParsableCommand {
     var name: String?
 
     @Option(name: .customLong("fleetest-path"),
-            help: "Path to a local foundation-tester (depends via .package(path:); for PoCs)")
+            help: "Path to a local fleetest-mobile (depends via .package(path:); for PoCs)")
     var fleetestPath: String?
 
     @Option(name: .customLong("fleetest-url"),
-            help: "git URL of foundation-tester (depends via .package(url:branch:); mutually exclusive with --fleetest-path)")
+            help: "git URL of fleetest-mobile (depends via .package(url:branch:); mutually exclusive with --fleetest-path)")
     var fleetestURL: String?
 
     // 配布口は main の1本(docs/releasing.md)。タグを指す `from:` 依存は案内しない導線だったので

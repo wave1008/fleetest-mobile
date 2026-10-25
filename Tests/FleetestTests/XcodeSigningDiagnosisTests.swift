@@ -280,15 +280,15 @@ final class XcodeSigningDiagnosisTests: XCTestCase {
 final class XcodeSigningDiagnosisRealLogTests: XCTestCase {
 
     private let realLog = """
-        CodeSign /Users/wave1008/fleetest-runner/foundation-tester/.fleetest/DerivedData-device/Build/Products/Debug-iphoneos/FleetestRunnerApp.app/FleetestRunnerApp.debug.dylib (in target 'FleetestRunnerApp' from project 'FleetestRunner')
-            cd /Users/wave1008/fleetest-runner/foundation-tester/Runner
+        CodeSign /Users/wave1008/fleetest-runner/fleetest-mobile/.fleetest/DerivedData-device/Build/Products/Debug-iphoneos/FleetestRunnerApp.app/FleetestRunnerApp.debug.dylib (in target 'FleetestRunnerApp' from project 'FleetestRunner')
+            cd /Users/wave1008/fleetest-runner/fleetest-mobile/Runner
 
             Signing Identity:     "Apple Development: Nobuhiro Senba (73YMA2YH5T)"
             Provisioning Profile: "iOS Team Provisioning Profile: *"
                                   (e3102005-61a1-4e96-96d9-d0cb684a1c68)
 
-            /usr/bin/codesign --force --sign 7BC7602764D57D07304ED7FCE30BA7A6528EEE05 --timestamp\\=none --generate-entitlement-der /Users/wave1008/fleetest-runner/foundation-tester/.fleetest/DerivedData-device/Build/Products/Debug-iphoneos/FleetestRunnerApp.app/FleetestRunnerApp.debug.dylib
-        /Users/wave1008/fleetest-runner/foundation-tester/.fleetest/DerivedData-device/Build/Products/Debug-iphoneos/FleetestRunnerApp.app/FleetestRunnerApp.debug.dylib: errSecInternalComponent
+            /usr/bin/codesign --force --sign 7BC7602764D57D07304ED7FCE30BA7A6528EEE05 --timestamp\\=none --generate-entitlement-der /Users/wave1008/fleetest-runner/fleetest-mobile/.fleetest/DerivedData-device/Build/Products/Debug-iphoneos/FleetestRunnerApp.app/FleetestRunnerApp.debug.dylib
+        /Users/wave1008/fleetest-runner/fleetest-mobile/.fleetest/DerivedData-device/Build/Products/Debug-iphoneos/FleetestRunnerApp.app/FleetestRunnerApp.debug.dylib: errSecInternalComponent
         Command CodeSign failed with a nonzero exit code
         ** TEST BUILD FAILED **
         """

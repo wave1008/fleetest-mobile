@@ -1,5 +1,5 @@
 // fleetest CLI バイナリパスの解決(vscode 非依存。config.ts が使う。node --test から直接検証可)。
-// clone 構成(foundation-tester を開く)は .build/debug/fleetest、外部パッケージ構成(受け手のパッケージを開く)は
+// clone 構成(fleetest-mobile を開く)は .build/debug/fleetest、外部パッケージ構成(受け手のパッケージを開く)は
 // グローバル導入した fleetest を PATH から解決する。
 
 import * as fs from "node:fs";

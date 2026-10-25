@@ -38,7 +38,7 @@ file. It does not stop or restart any bridge, and nothing is sent anywhere by th
 **The bundle can contain on-screen text from your app** (step labels, element lists) — review it
 before sharing.
 
-Report problems on GitHub Issues: <https://github.com/wave1008/foundation-tester/issues>.
+Report problems on GitHub Issues: <https://github.com/wave1008/fleetest-mobile/issues>.
 
 ### Link
 - [index](../index.md)

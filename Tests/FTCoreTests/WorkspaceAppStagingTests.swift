@@ -59,7 +59,7 @@ final class WorkspaceAppStagingTests: XCTestCase {
     /// リモートの子はローカルとは違う repoRoot から自分自身の workspaceRoot を組み立てる
     /// (RR-17)。名前空間が絶対パス由来だとここで食い違う
     func testInstallPathRelativeSuffixIsStableAcrossDifferentWorkspaceRoots() {
-        let localWorkspace = URL(fileURLWithPath: "/Users/local/github/foundation-tester/TestProjects/E2E-iOS/workspace")
+        let localWorkspace = URL(fileURLWithPath: "/Users/local/github/fleetest-mobile/TestProjects/E2E-iOS/workspace")
         let remoteWorkspace = URL(fileURLWithPath: "/Users/runner/fleetest-runner/work/TestProjects/E2E-iOS/workspace")
         let declared = "E2EAppIOS/dist/ios-simulator/FTE2EIOS.app"
         let local = WorkspaceAppStaging.installPath(declared: declared, workspaceRoot: localWorkspace)

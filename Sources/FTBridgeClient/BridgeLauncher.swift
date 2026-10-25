@@ -1418,7 +1418,7 @@ private final class BundleToken {}
 
 public enum RepoRoot {
     /// ブリッジ資産(Runner/・InAppBridge/・Sources/FTCore/BridgeDTO.swift など)を持つルートを返す。
-    /// = ツール本体(foundation-tester)のソースルート。シナリオがビルドされる受け手のパッケージ
+    /// = ツール本体(fleetest-mobile)のソースルート。シナリオがビルドされる受け手のパッケージ
     /// (ScenarioHost.packageRoot())とは別物で、外部パッケージ構成では両者が食い違う。
     public static func find() throws -> URL {
         // 0. 明示指定(FT_TOOL_ROOT)。cwd も実行ファイルの位置も当てにできない起動経路
@@ -1431,12 +1431,12 @@ public enum RepoRoot {
                 throw LauncherError.commandFailed(
                     "repo root detection",
                     "FT_TOOL_ROOT=\(override) has no bridge assets (Runner/FleetestRunner.xcodeproj/project.xcproj). "
-                        + "Point it at the root of the foundation-tester clone")
+                        + "Point it at the root of the fleetest-mobile clone")
             }
             return dir
         }
         // 1. clone 構成: 実行ディレクトリの上方に Package.swift + Runner/ があればそれ(ツール repo 内実行)。
-        //    外部パッケージ構成: 受け手パッケージ(Runner/ 無し)なら、その SPM checkout に foundation-tester が
+        //    外部パッケージ構成: 受け手パッケージ(Runner/ 無し)なら、その SPM checkout に fleetest-mobile が
         //    展開されているのでそれを使う(.build/checkouts/*/Runner/。fleetest CLI がどこでビルドされたかに
         //    依らず解決可 = ビルド元のソースツリーが既に無い場合でも #filePath に頼らず済む)。
         //    ※ path 依存(.package(path:))では checkouts が作られないので 2 で解決する。
@@ -1460,7 +1460,7 @@ public enum RepoRoot {
         if let toolRoot = toolSourceRoot() { return toolRoot }
         throw LauncherError.commandFailed(
             "repo root detection",
-            "bridge assets (Runner/) not found. The foundation-tester sources are required"
+            "bridge assets (Runner/) not found. The fleetest-mobile sources are required"
                 + " (in the external-package layout, the consumer package .build/checkouts or the --fleetest-path sources are used). "
                 + "The clone root can also be set explicitly via the FT_TOOL_ROOT environment variable")
     }

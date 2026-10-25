@@ -51,7 +51,7 @@ function fixture({ cloneAfterRelease = false } = {}) {
   const base = mkdtempSync(path.join(tmpdir(), "ft-release-track-"));
   const seed = path.join(base, "seed");
   const upstream = path.join(base, "upstream.git");
-  const receiver = path.join(base, "foundation-tester");
+  const receiver = path.join(base, "fleetest-mobile");
   const work = path.join(base, "work");
   mkdirSync(seed);
   mkdirSync(work);

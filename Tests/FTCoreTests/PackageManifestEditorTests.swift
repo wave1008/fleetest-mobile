@@ -115,7 +115,7 @@ final class PackageManifestEditorTests: XCTestCase {
     /// 受け手の雛形に依存を足して SwiftPM に評価させる(生成した式が型検査を通り、依存がターゲットに載る)
     func testRecipientManifestPassesExtraDependenciesToTheScenarioTarget() throws {
         let manifest = ProjectScaffold.externalManifest(
-            packageName: "Recipient", dependencyLine: ".package(path: \"../foundation-tester\"),")
+            packageName: "Recipient", dependencyLine: ".package(path: \"../fleetest-mobile\"),")
             .replacingOccurrences(
                 of: "[String: [Target.Dependency]] = [:]",
                 with: "[String: [Target.Dependency]] = [\n    \"Demo\": [\"Helpers\"],\n]")

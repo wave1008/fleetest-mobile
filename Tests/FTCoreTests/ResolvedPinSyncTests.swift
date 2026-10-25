@@ -52,12 +52,12 @@ final class ResolvedPinSyncTests: XCTestCase {
         let base = FileManager.default.temporaryDirectory
             .appendingPathComponent("ResolvedPinSyncTests-\(UUID().uuidString)", isDirectory: true)
         defer { try? FileManager.default.removeItem(at: base) }
-        let tool = base.appendingPathComponent("foundation-tester")
+        let tool = base.appendingPathComponent("fleetest-mobile")
         let work = base.appendingPathComponent("work")
         try FileManager.default.createDirectory(at: tool, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: work, withIntermediateDirectories: true)
         try resolved([("swift-syntax", "603.0.2")]).write(to: tool.appendingPathComponent("Package.resolved"))
-        try #"let package = Package(dependencies: [.package(path: "../foundation-tester"),])"#
+        try #"let package = Package(dependencies: [.package(path: "../fleetest-mobile"),])"#
             .write(to: work.appendingPathComponent("Package.swift"), atomically: true, encoding: .utf8)
 
         XCTAssertTrue(try ResolvedPinSync.sync(packageRoot: work))

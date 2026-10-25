@@ -35,7 +35,7 @@ docs/commands.md・docs/user-docs/reference/(testclass/・selector/)。ここは
   既存のテストに足す・書き方を合わせるときは読む。アプリの振る舞いは、画面(`ft_snapshot` / `ft_screenshot`)・依頼文・
   プロジェクトの仕様書(`TestProjects/<プロジェクト>/docs/testbases/`)から得て、それでも決まらないことは人に聞く(選択ダイアログ)。
   fleetest の仕様は docs から得る。docs はクローン(`.fleetest/state.json` の TOOL_ROOT。外部構成なら作業フォルダの隣の
-  `../foundation-tester`)にある:
+  `../fleetest-mobile`)にある:
 
   | 知りたいこと | 読む場所 |
   |---|---|
@@ -81,7 +81,7 @@ docs/commands.md・docs/user-docs/reference/(testclass/・selector/)。ここは
 - **プロジェクトと WORK_DIR**: シナリオは `WORK_DIR/TestProjects/<プロジェクト>/scenarios/` に住む。
   TestProjects/ が1つならそれ。複数なら🧑どれかを確認する。
 - **fleetest CLI の在り処**: clone 構成は `swift run fleetest ...`、外部パッケージ構成は
-  `../foundation-tester/.build/debug/fleetest ...`(判定は `Sources/FTScenarioRunner/` の有無)。
+  `../fleetest-mobile/.build/debug/fleetest ...`(判定は `Sources/FTScenarioRunner/` の有無)。
   以降 `fleetest` はこれを指す。MCP(`ft_*`)が使えるならそちらを優先。
 - **プラットフォーム**: iOS か Android か。**両対応なら platform は書かない**(同じコードが
   `--profile ios-run` と `--profile android-run` の両方で走る)。片方の OS でしか意味を持たないときだけ
@@ -162,7 +162,7 @@ docs/commands.md・docs/user-docs/reference/(testclass/・selector/)。ここは
 ### 3. シナリオ .swift を書く
 
 **書く直前に `<クローン>/.claude/skills/fleetest-scenario/dsl-reference.md` を Read で読む**(構造・コマンドの表・
-セレクタ式・セレクタ選定の罠。`<クローン>` は fleetest 本体のクローン = 外部構成なら作業フォルダの隣の `../foundation-tester`、
+セレクタ式・セレクタ選定の罠。`<クローン>` は fleetest 本体のクローン = 外部構成なら作業フォルダの隣の `../fleetest-mobile`、
 クローン構成ならリポジトリの直下)。探索の段では要らないので、ここで初めて読む。
 `TestProjects/<proj>/scenarios/<日本語可のファイル名>.swift` に、そのリファレンスに従って書く。
 命名: クラス名は日本語可、@Test メソッドは `S0010`, `S0020`, …(10刻み)。@Test の説明は「〜できる」。

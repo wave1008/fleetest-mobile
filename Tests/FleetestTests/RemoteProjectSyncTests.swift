@@ -8,7 +8,7 @@ final class RemoteProjectSyncTests: XCTestCase {
         XCTAssertEqual(
             RemoteProjectSync.localProjectsDir(
                 resolvedProjectRoot: URL(fileURLWithPath: "/Users/r/dev/E2E-app/TestProjects/E2E-app"),
-                repoRoot: URL(fileURLWithPath: "/Users/r/dev/foundation-tester")),
+                repoRoot: URL(fileURLWithPath: "/Users/r/dev/fleetest-mobile")),
             "/Users/r/dev/E2E-app/TestProjects",
             "外部パッケージ構成: プロジェクトは受け手パッケージ側にあり、クローンの TestProjects/ には無い")
     }

@@ -23,16 +23,16 @@ of a session.
 Open a new, test-only folder in VSCode, start your agent there, and ask it:
 
 ```text
-Clone https://github.com/wave1008/foundation-tester next to this folder, then set it up by
-following ../foundation-tester/.claude/skills/fleetest-setup/SKILL.md.
+Clone https://github.com/wave1008/fleetest-mobile next to this folder, then set it up by
+following ../fleetest-mobile/.claude/skills/fleetest-setup/SKILL.md.
 ```
 
 To go through it by hand without an agent, clone the tool and run the same mechanical work with the installer (idempotent):
 
 ```bash
 mkdir -p ~/my-app-tests && cd ~/my-app-tests
-git clone https://github.com/wave1008/foundation-tester.git ../foundation-tester
-bash ../foundation-tester/Scripts/install.sh
+git clone https://github.com/wave1008/fleetest-mobile.git ../fleetest-mobile
+bash ../fleetest-mobile/Scripts/install.sh
 ```
 
 The installer also writes the Claude Code artefacts (`.mcp.json`, `.claude/settings.json`, and
@@ -60,7 +60,7 @@ To write the configuration yourself, use the following form.
 
 `fleetest-mcp` is a plain stdio MCP server, so **any MCP-capable client can use it**. Follow that
 client's own configuration format and give it this launch command (`<ABS_TOOL_ROOT>` is the
-absolute path of the `foundation-tester` clone; both occurrences are the same value):
+absolute path of the `fleetest-mobile` clone; both occurrences are the same value):
 
 ```json
 "fleetest": {
@@ -159,7 +159,7 @@ asks whether it can run the command outside the sandbox; allow it and the instal
 carries on (confirmed with Codex in VSCode — no special launch option is needed).
 
 **The default sandbox keeps the fleetest clone read-only.** `workspace-write` cannot write outside the work
-folder, so writes to the neighbouring `foundation-tester` are denied both through the editing tool (apply_patch)
+folder, so writes to the neighbouring `fleetest-mobile` are denied both through the editing tool (apply_patch)
 and through the shell (`sed -i`, redirection, python). A denied operation turns into a
 request to run it outside the sandbox. **Approve that only for the install and update steps (install.sh,
 update.sh, `swift build`)**, and decline it when the assistant is trying to change the clone for anything else.

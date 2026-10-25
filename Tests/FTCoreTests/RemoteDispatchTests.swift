@@ -67,9 +67,9 @@ final class RemoteDispatchTests: XCTestCase {
 
     func testRemoteLayoutToolRootWorkDirBinary() {
         let layout = RemoteLayout(base: "/Users/x/fleetest-runner", issuer: "alice", home: "/Users/x")
-        XCTAssertEqual(layout.toolRoot, "/Users/x/fleetest-runner/foundation-tester")
+        XCTAssertEqual(layout.toolRoot, "/Users/x/fleetest-runner/fleetest-mobile")
         XCTAssertEqual(layout.workDir, "/Users/x/fleetest-runner/users/alice/work")
-        XCTAssertEqual(layout.binary, "/Users/x/fleetest-runner/foundation-tester/.build/debug/fleetest")
+        XCTAssertEqual(layout.binary, "/Users/x/fleetest-runner/fleetest-mobile/.build/debug/fleetest")
     }
 
     /// ツールクローンはホスト共有のまま(base 基準)。work だけが発行者ごとに分かれる
@@ -697,7 +697,7 @@ final class RemoteDispatchTests: XCTestCase {
             layout: layout,
             fleetestArgs: ["run", "--project", "E2E", "--profile", "ios-inapp-boost", "--quiet"])
         let workDir = "/Users/ci/fleetest-runner/users/alice/work"
-        let binary = "/Users/ci/fleetest-runner/foundation-tester/.build/debug/fleetest"
+        let binary = "/Users/ci/fleetest-runner/fleetest-mobile/.build/debug/fleetest"
         XCTAssertEqual(command,
             "cd '\(workDir)' 2>/dev/null && test -f Package.swift || "
             + "{ echo \"no runner workspace at \(workDir) — run: fleetest remote setup"
@@ -1437,7 +1437,7 @@ final class RemoteDispatchTests: XCTestCase {
     /// 最終的に手元の TestProjects/<project>/reports/ を指すこと(報告パスが手元に無いパスを指していた実害の再現)
     func testTwoStageRewriteProducesALocalReportsPath() {
         let remoteRoot = "/Users/ci/fleetest-runner/users/alice/work"
-        let localRoot = "/Users/wave1008/github/wave1008/foundation-tester"
+        let localRoot = "/Users/wave1008/github/wave1008/fleetest-mobile"
         let remoteLine = "report: \(remoteRoot)/.fleetest/dispatch/20260816-130735-24451/reports/S0010.md"
         let stage1 = RemoteReportLink.rewriteDispatchReportPaths(
             remoteLine, stamp: "20260816-130735-24451", project: "E2E-iOS")
@@ -1499,7 +1499,7 @@ final class RemoteDispatchTests: XCTestCase {
         let layout = RemoteLayout(base: "/Users/ci/fleetest-runner", issuer: "alice", home: "/Users/ci")
         let command = RemoteShell.remoteExecCommand(layout: layout, args: ["doctor", "--fm-only"])
         let workDir = "/Users/ci/fleetest-runner/users/alice/work"
-        let binary = "/Users/ci/fleetest-runner/foundation-tester/.build/debug/fleetest"
+        let binary = "/Users/ci/fleetest-runner/fleetest-mobile/.build/debug/fleetest"
         XCTAssertEqual(command,
             "cd '\(workDir)' 2>/dev/null && test -f Package.swift || "
             + "{ echo \"no runner workspace at \(workDir) — run: fleetest remote setup"
@@ -1541,16 +1541,16 @@ extension RemoteDispatchTests {
     /// ネームスペースを足したときに追随し損ねていた)
     func testRelayRewriteMapsTheRunnerWorkDirOntoTheLocalRepoRoot() {
         let layout = RemoteLayout(base: "/Users/u/fleetest-runner", issuer: "u", home: "/Users/u")
-        let localRoot = "/Users/u/github/foundation-tester"
+        let localRoot = "/Users/u/github/fleetest-mobile"
         let line = #"{"reportPath":"/Users/u/fleetest-runner/users/u/work/TestProjects/P/reports/x.md"}"#
 
         XCTAssertEqual(
             RemotePathRewrite.rewrite(line, remoteRoot: layout.workDir, localRoot: localRoot),
-            #"{"reportPath":"/Users/u/github/foundation-tester/TestProjects/P/reports/x.md"}"#)
+            #"{"reportPath":"/Users/u/github/fleetest-mobile/TestProjects/P/reports/x.md"}"#)
 
         XCTAssertEqual(
             RemotePathRewrite.rewrite(line, remoteRoot: layout.base, localRoot: localRoot),
-            #"{"reportPath":"/Users/u/github/foundation-tester/users/u/work/TestProjects/P/reports/x.md"}"#,
+            #"{"reportPath":"/Users/u/github/fleetest-mobile/users/u/work/TestProjects/P/reports/x.md"}"#,
             "base を渡すと壊れる(この形を出さないための witness)")
     }
 }

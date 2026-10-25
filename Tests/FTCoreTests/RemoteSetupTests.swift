@@ -14,10 +14,10 @@ final class RemoteSetupTests: XCTestCase {
         XCTAssertEqual(
             RemoteSetupPlan.installArgs(
                 workDir: "/Users/ci/fleetest-runner/users/alice/work", projectName: "E2E",
-                toolRoot: "/Users/ci/fleetest-runner/foundation-tester"),
+                toolRoot: "/Users/ci/fleetest-runner/fleetest-mobile"),
             [
                 "--work-dir", "/Users/ci/fleetest-runner/users/alice/work",
-                "--tool-root", "/Users/ci/fleetest-runner/foundation-tester",
+                "--tool-root", "/Users/ci/fleetest-runner/fleetest-mobile",
                 "--name", "E2E",
                 "--skip-extension",
                 "--skip-mcp",
@@ -28,15 +28,15 @@ final class RemoteSetupTests: XCTestCase {
     }
 
     /// `--tool-root` を明示する — work が `<base>/users/<issuer>/work` へ2階層深くなり、
-    /// install.sh の既定 `<work-dir>/../foundation-tester` が RemoteLayout.toolRoot と
+    /// install.sh の既定 `<work-dir>/../fleetest-mobile` が RemoteLayout.toolRoot と
     /// もう一致しないため(RR-18.6)
     func testInstallArgsIncludesToolRoot() {
         let args = RemoteSetupPlan.installArgs(workDir: "/x/users/alice/work", projectName: "E2E",
-                                                toolRoot: "/x/foundation-tester")
+                                                toolRoot: "/x/fleetest-mobile")
         guard let index = args.firstIndex(of: "--tool-root") else {
             return XCTFail("--tool-root が無い: \(args)")
         }
-        XCTAssertEqual(args[index + 1], "/x/foundation-tester")
+        XCTAssertEqual(args[index + 1], "/x/fleetest-mobile")
     }
 
     // MARK: - RemoteSetupPlan.preflightArgs / preflightVerdict
@@ -190,9 +190,9 @@ final class RemoteSetupTests: XCTestCase {
                 + "ft_align_helper='/tmp/fleetest-remote-align.12345678/fleetest'; "
                 + "ft_align_helper_dir='/tmp/fleetest-remote-align.12345678'; "
                 + #"trap 'rm -f -- "$ft_align_helper"; rmdir -- "$ft_align_helper_dir"' EXIT; "#
-                + #"chmod 700 "$ft_align_helper" && cd '/Users/ci/fleetest-runner/foundation-tester' && git fetch origin && "#
+                + #"chmod 700 "$ft_align_helper" && cd '/Users/ci/fleetest-runner/fleetest-mobile' && git fetch origin && "#
                 + #""$ft_align_helper" api fm-align "#
-                + "--target-executable '/Users/ci/fleetest-runner/foundation-tester/.build/debug/fleetest' "
+                + "--target-executable '/Users/ci/fleetest-runner/fleetest-mobile/.build/debug/fleetest' "
                 + #"--build-command 'git checkout '\''9655a21'\'' && swift build --product fleetest"#
                 + " && swift build --product fleetest-simstream"
                 + " && swift build --product fleetest-androidstream"

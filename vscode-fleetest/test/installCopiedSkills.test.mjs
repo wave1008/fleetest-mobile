@@ -50,7 +50,7 @@ function placeSnippet() {
 const CANONICAL = ["fleetest-setup", "fleetest-update", "fleetest-profiles", "fleetest-scenario"];
 
 function makeToolRoot(base, names = CANONICAL) {
-  const toolRoot = path.join(base, "foundation-tester");
+  const toolRoot = path.join(base, "fleetest-mobile");
   mkdirSync(toolRoot, { recursive: true });
   for (const name of names) {
     const dir = path.join(toolRoot, ".claude/skills", name);

@@ -1,6 +1,6 @@
 ---
 name: fleetest-mcp
-description: foundation-tester の MCP サーバ(fleetest-mcp)だけをエージェントに登録し、ft_* ツール(アプリを直接操作・スナップショット・シナリオ実行)を使える状態にする。VSCode 拡張・プロジェクト作成・プロファイル設定は行わない。未クローンなら clone → fleetest-mcp をビルド → 登録先(Claude Code は .mcp.json、他のエージェントはその設定ファイル)をマージ → 承認案内までを検証付きで実行する。「MCP だけ入れて」「ft_* ツールを使えるようにして」「MCP サーバを登録して」等の依頼で使う。フル導入は /fleetest-setup。
+description: fleetest-mobile の MCP サーバ(fleetest-mcp)だけをエージェントに登録し、ft_* ツール(アプリを直接操作・スナップショット・シナリオ実行)を使える状態にする。VSCode 拡張・プロジェクト作成・プロファイル設定は行わない。未クローンなら clone → fleetest-mcp をビルド → 登録先(Claude Code は .mcp.json、他のエージェントはその設定ファイル)をマージ → 承認案内までを検証付きで実行する。「MCP だけ入れて」「ft_* ツールを使えるようにして」「MCP サーバを登録して」等の依頼で使う。フル導入は /fleetest-setup。
 ---
 
 # fleetest MCP 登録 runbook
@@ -35,21 +35,21 @@ rebuild-on-start なので更新後も版ズレしない)。ここは登録に�
 ### 0.5 構成判定と TOOL_ROOT の取得
 
 カレントか祖先に `Package.swift` と `Sources/FTScenarioRunner/` の**両方**があるかで判定する
-(この2つが揃うのは foundation-tester クローンだけ):
+(この2つが揃うのは fleetest-mobile クローンだけ):
 
-- **両方ある = clone 構成**: いま foundation-tester クローンの中にいる。TOOL_ROOT = WORK_DIR = このディレクトリ。
+- **両方ある = clone 構成**: いま fleetest-mobile クローンの中にいる。TOOL_ROOT = WORK_DIR = このディレクトリ。
   `.mcp.json` は追跡していない(同梱しない)ので、この構成でも**ステップ2で書く**。
 
-- **無い = 外部パッケージ構成(既定)**: WORK_DIR = このカレント。ツールを供給するため foundation-tester を
+- **無い = 外部パッケージ構成(既定)**: WORK_DIR = このカレント。ツールを供給するため fleetest-mobile を
   clone する。**clone 先は既定で兄弟ディレクトリ**(受け手ディレクトリの中にネストさせない)。
-  ユーザーが clone 先を指定していればそちらへ(以降の `../foundation-tester` はそのパスに読み替える)。
+  ユーザーが clone 先を指定していればそちらへ(以降の `../fleetest-mobile` はそのパスに読み替える)。
   既にあればスキップ:
 
 ```
-git clone https://github.com/wave1008/foundation-tester.git ../foundation-tester
+git clone https://github.com/wave1008/fleetest-mobile.git ../fleetest-mobile
 ```
 
-  → TOOL_ROOT = clone 先(既定 `../foundation-tester`)。以降 `ABS_TOOL_ROOT=$(cd <TOOL_ROOT> && pwd)` で
+  → TOOL_ROOT = clone 先(既定 `../fleetest-mobile`)。以降 `ABS_TOOL_ROOT=$(cd <TOOL_ROOT> && pwd)` で
   **絶対パス**を得ておく(受け手がどの cwd で Claude Code を開いても解決できるように)。
 
 ### 0.7 インストーラで一括実行(**まずこれを試す**)
@@ -183,7 +183,7 @@ exit 0 で、**ツール本体 = TOOL_ROOT / シナリオのパッケージ = WO
 
 エージェントでは代行不可。ユーザーに依頼する:
 
-- Claude Code を **WORK_DIR** で開く(外部構成: このカレント。clone 構成: foundation-tester フォルダ)。
+- Claude Code を **WORK_DIR** で開く(外部構成: このカレント。clone 構成: fleetest-mobile フォルダ)。
   既に開いているなら **`.mcp.json` を読ませるためウィンドウを再読込**(`Developer: Reload Window`)。
 - Claude Code が **fleetest MCP サーバの承認**を求めたら**許可する**。
 - 承認後、`ft_status` などが応答すれば疎通完了。以後 `ft_tap`/`ft_screenshot`/`ft_snapshot`/`ft_run_scenario`

@@ -17,11 +17,11 @@ project1 を iOS(ios-run)で実行し、終わったら成否を報告して。
 
 ```bash
 # 全部
-../foundation-tester/.build/debug/fleetest run --project project1 --profile ios-run
+../fleetest-mobile/.build/debug/fleetest run --project project1 --profile ios-run
 
 # クラス(ファイル)単位・1本単位
-../foundation-tester/.build/debug/fleetest run --project project1 --profile ios-run --scenario <クラス名>
-../foundation-tester/.build/debug/fleetest run --project project1 --profile ios-run --scenario <クラス名>.<メソッド名>
+../fleetest-mobile/.build/debug/fleetest run --project project1 --profile ios-run --scenario <クラス名>
+../fleetest-mobile/.build/debug/fleetest run --project project1 --profile ios-run --scenario <クラス名>.<メソッド名>
 ```
 
 `<クラス名>` はシナリオのクラス名(`scenarios/` 配下の Swift ファイルの中にあります)です。

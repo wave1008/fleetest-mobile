@@ -71,8 +71,8 @@ const LEGACY_SLUGS = [];
 /** 裸の `<owner>/<repo>` 形。URL 形と別に見る必要がある。 */
 function bareSlugRegex(repoName) {
   const escaped = repoName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  // owner の直前がパス区切り・英数字なら**ファイルシステムのパス**(`~/github/foundation-tester`・
-  // `/tmp/x/foundation-tester`・`../foundation-tester`・`$BASE/foundation-tester`)であって
+  // owner の直前がパス区切り・英数字なら**ファイルシステムのパス**(`~/github/fleetest-mobile`・
+  // `/tmp/x/fleetest-mobile`・`../fleetest-mobile`・`$BASE/fleetest-mobile`)であって
   // 座標ではない。URL 形は SLUG_RE が見るので、ここで拾うのは行中に素で置かれた形だけ。
   return new RegExp(`(?<![\\w./$-])([A-Za-z0-9][A-Za-z0-9_.-]*)\\/${escaped}(?![A-Za-z0-9_.-])`, "g");
 }

@@ -77,7 +77,7 @@ In AddToCart.swift in project1, restore the expected value to the original produ
 <summary><b>If you do it manually (click to show details)</b></summary>
 
 ```bash
-../foundation-tester/.build/debug/fleetest run --project project1 --profile ios-run --failed
+../fleetest-mobile/.build/debug/fleetest run --project project1 --profile ios-run --failed
 ```
 
 Results are recorded per profile, so run it with the same profile as last time.

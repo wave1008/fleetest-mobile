@@ -78,14 +78,14 @@ fleetest では、テストを実行するデバイス(仮想デバイス、実�
 ```
 手元の Mac                               ランナー機
 fleetest run --runner mac2 …             ~/fleetest-runner/               ← 専用ベースディレクトリ
-  ├ 版の確認(fleetest・Xcode)   ssh     ├── foundation-tester/          ← fleetest 本体のクローン(名前固定・共有)
+  ├ 版の確認(fleetest・Xcode)   ssh     ├── fleetest-mobile/          ← fleetest 本体のクローン(名前固定・共有)
   ├ 送信(シナリオ・設定) ──────────>  └── users/<issuerId>/work/      ← あなたの作業場所(利用者ごと)
   ├ 出力を受け取って表示                     ├── TestProjects/<プロジェクト>/
   └ 成果物を回収 <───────────────────      └── .build/
 ```
 
 リモート実行で使うのは、ランナー機の `~/fleetest-runner/` の中だけです。
-ランナー機に foundation-tester が別に入っていても、それには一切触りません。
+ランナー機に fleetest-mobile が別に入っていても、それには一切触りません。
 
 ## できること
 

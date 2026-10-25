@@ -8,7 +8,7 @@ import PackageDescription
 let fleetestScenarioDependencies: [String: [Target.Dependency]] = [:]
 
 let package = Package(
-    name: "foundation-tester",
+    name: "fleetest-mobile",
     platforms: [
         // FoundationModels 本体(テキスト生成・Generable)は macOS 26+。
         // マルチモーダル(Attachment)だけが macOS 27+ なので、その呼び出しは
@@ -17,7 +17,7 @@ let package = Package(
         .macOS("26.0"),
     ],
     // 外部パッケージ(fleetest init が生成する受け手の Package.swift)が依存する公開 product。
-    // 受け手のシナリオターゲットは .product(name: "FTScenarioRunner"/"FTDSL", package: "foundation-tester")
+    // 受け手のシナリオターゲットは .product(name: "FTScenarioRunner"/"FTDSL", package: "fleetest-mobile")
     // を dependencies に持つ(対向: Sources/FTCore/PackageManifestEditor.swift の external モード)。
     // FTScenarioRunner が FTCore/FTBridgeClient/FTFoundationModels/FTAndroid を、FTDSL が FTDSLMacros を
     // 推移的に引くため、公開が要るのはこの3つだけ。fleetest は CLI ツール本体。

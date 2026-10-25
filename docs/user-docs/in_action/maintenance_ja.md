@@ -36,7 +36,7 @@ Simulator の掃除は、fleetest を通して起動したときだけ走りま�
   fleetest のプログラムが起動した直後に dyld のエラーで落ちます。このエラー(`dyld[…]: Symbol not found` /
   `Library not loaded`)が出ると、VSCode 拡張とインストール・更新のスクリプトが見つけて、下の直し方を表示します。
 - Xcode を揃えたら、ビルド済みのものを作り直します。`<TOOL_ROOT>` は fleetest のクローン
-  (既定では作業フォルダの隣の `foundation-tester`)です。
+  (既定では作業フォルダの隣の `fleetest-mobile`)です。
 
   ```bash
   rm -rf <TOOL_ROOT>/.build <作業フォルダ>/.build
