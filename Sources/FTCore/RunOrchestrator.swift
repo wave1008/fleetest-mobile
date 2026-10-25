@@ -584,7 +584,7 @@ public enum ScenarioOutcome: Sendable, Equatable {
 enum EnvironmentFault {
     /// XCUITest の a11y 基盤が一時的に応答しない。**ブリッジ供給直後・アプリ入れ替え直後**に
     /// 同時刻クラスタで出て、再実行で必ず消える(2回・8件と6件を手で判定した)。
-    /// docs/verification/constraints.md「同時刻クラスタは環境要因(kAXErrorAPIDisabled)」
+    /// docs/verification/judgment.md「デバイス基盤の一過性エラーは「テストの失敗」と数えない」
     static let markers = ["kAXErrorAPIDisabled"]
 
     static func matches(_ detail: String?) -> Bool {

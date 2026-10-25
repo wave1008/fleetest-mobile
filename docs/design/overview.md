@@ -343,6 +343,26 @@ foundation-tester/
   (`FMServeTests.testOnlyTheFMProcessAndAuthoringToolsCreateSessions` が集合を等号で固定)。
   出力の実例・運用知見は DS-8.6。
 
+### DS-5.4 FM が死んでいる run の公表
+
+FM が死んでいると screenLooksLike は素通りし、テキストの可視性検証(occlusion-guard)は OCR だけで判定する
+(`OCROnlyVisibility`。OCR が判定できない形は素通り・`ocrTextVisibilityCheck` が off なら全部素通り)。その run の緑は
+守りが効いた緑ではない。**合否は変えず**(FM と無関係な失敗を隠す方が危険)、事実を出す:
+
+- run のまとめに 2 行(根拠が別なので両方出す):
+  ①`⚠️ FM unavailable: N scenario(s) ran with screenLooksLike skipped …` —— FM の呼び出しが 1 件以上あり、その全部が失敗した
+  シナリオの数(FM を使っていない run では出さない = 出しすぎると誰も読まなくなる)
+  ②`⚠️ FM is dead on this machine (<経路>): …` —— 機械の死活台帳 `FTCore.FMLiveness` から(ブレーカが落ちて 1 回も呼ばなかった
+  run は①が 0 のまま沈黙するため)
+- 同じ事実は run 開始前(`ProfileRunner.warnIfFMDegraded`)・run.json の `fmDead`・モニターの FM 行(呼び出し 0 件でも ✕)・
+  `ft_status` にも出る
+- ステップ単位は `notes` の `visibility-guard-skipped`(FM に訊いて判定が返らなかったステップ)。幾何の段(中心が画面外なら不可視)は
+  FM が死んでいても効く。幾何の段の陽性対照は `TestProjects/E2E-iOS/scenarios/_disabled/95_可視性の幾何.swift`
+  (プロファイル `ios-fpc`。`text visibility check failed (offscreen)` で落ちるのが正常)
+- availability は available を返したまま死ぬことがある(Apple 側。FB 報告済み)。
+  `SystemLanguageModel(guardrails: .permissiveContentTransformations)` でも回避できない
+- この行が出ている run の読み方と切り分けは docs/verification/triage.md「FM(Foundation Models)が全滅したら」
+
 ---
 
 ## DS-6 CLI UX

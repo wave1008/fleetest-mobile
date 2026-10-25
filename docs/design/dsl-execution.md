@@ -158,8 +158,11 @@ DS-10 の前半は dsl-syntax.md。
   ラッパードライバは実行側の値へ転送する(既定 false は安全側だが二重読み返しの固定費が乗る)
 - **run の開始前に「画面だけ死んだ」仮想デバイスを弾く**(`BlankWorkerTriage`)。
   Android は `ProfileWorkerFactory.excludeOrRepairBlankScreenWorkers` が同じ位置で**修復まで**行うが、
-  **iOS には軽い修復手段が無い**(確認できているのは `simctl shutdown`→`boot` だけ)ので
-  除外して復旧コマンドをログに出す。**iOS(BlankWorkerTriage)**の判定は恒常 blank
+  **iOS には軽い修復手段が無い**(確認できているのは `simctl shutdown`→`boot` だけ)ので、
+  `recover:` に注入した `ProfileWorkerFactory.recoverFrozenIOSWorkers`(そのデバイスのブリッジを先に止めてから
+  `simctl shutdown` → `SimulatorBoot.ensureBooted`・2 台ずつ・`recoveryAttempts` = 2)で**全機が戻るまで開始しない**
+  (ユーザー指示 2026-08-09。弾くだけだと凍結が多発した run はレーンが半分で走る)。戻らない個体だけレーンから外し、
+  復旧コマンドをログに出す。**iOS(BlankWorkerTriage)**の判定は恒常 blank
   (2.5s 間隔で5連続。約10秒の観測窓)に加え、一様が続いた機だけ画面を必ず変える入力を送る
   能動プローブ(`nudge`)で仕分ける ——「描画要求が無いだけの黒画面」(入力で戻る)と
   「本物の wedge」(戻らない)は受動観測では原理的に区別できない(拍動では

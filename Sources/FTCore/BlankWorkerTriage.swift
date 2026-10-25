@@ -4,8 +4,8 @@
 // Android には同じものが既にある(`ProfileWorkerFactory.excludeOrRepairBlankScreenWorkers`。
 // あちらは sleep/wake と guest reboot で**修復**まで行う)。**iOS には無かった**ため、
 // E2E-CMP の `-06` が「画面は真っ黒・a11y ツリーは健全・タップだけ届かない」
-// 状態になったとき、9/9 の失敗が**無警告でテストの失敗として記録された**(docs/verification/
-// 「iOS シミュレータも『画面だけ死ぬ』」)。失敗して初めて分かるのでは遅い。
+// 状態になったとき、9/9 の失敗が**無警告でテストの失敗として記録された**(docs/verification/triage.md
+// 「iOS シミュレータも「画面だけ死ぬ」」)。失敗して初めて分かるのでは遅い。
 //
 // **修復そのものはここに持たない**(iOS で確認できている回復手段は `simctl shutdown`→`boot`
 // だけで、ブリッジごと作り直しになる)。代わりに**回復を呼び出し側から注入できる**ようにしてある

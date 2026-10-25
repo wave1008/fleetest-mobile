@@ -191,7 +191,7 @@ export function constraintsMissingEnv(text) {
 
 test("制約と回避の各節は確認環境の行を持つ", () => {
   const text = readFileSync(path.join(DOCS, "verification/constraints.md"), "utf8");
-  assert.ok((text.match(/^### /gm) ?? []).length >= 10, "制約の節が読めない");
+  assert.ok((text.match(/^### /gm) ?? []).length >= 5, "制約の節が読めない");
   assert.deepEqual(constraintsMissingEnv(text), [], "確認環境の行が無い(版を上げたとき見直す対象を選べない)");
   assert.deepEqual(constraintsMissingEnv("### A\n\n確認環境: 未記録\n### B\n本文\n"), ["B"]);
 });

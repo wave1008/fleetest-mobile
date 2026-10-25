@@ -6,43 +6,13 @@
 
 症状から引く。各節は「何を見るか」から始まる。
 
-## 既知の間欠失敗(2026-08-13 時点)
+## 「クリアが失敗した」と読める文言は、直前の入力が届かなかったことを指すことがある
 
-**単発の失敗を「退行」と読む前にここを見る。** どれも**実装の退行ではない**と反復で確かめてある。
-
-| シナリオ | 頻度 | 症状 | 判定 |
-|---|---|---|---|
-| `E2E-iOS / フリックが正しく動くこと.S0010` | 並列負荷時 1/3 程度 | `flickRightToLeft(the screen did not settle)` → `scrollLeft ×3` → `#tag_01` not found。横カルーセルが戻り切らない | 既知。単独実行では 5/5 成功 |
-| `E2E-RN / 待機とタイムアウトが正しく効くこと.S0010` | **1/10**(2026-08-13 に実測) | `#btn_delay_1` タップ後の `exist "#txt_delayed"` が 5s で落ちる | **flake**。同じ周の別シーンでは同じ操作が成功しており決定的ではない |
-
-| `E2E-CMP / テキスト入力が正しくechoされること.S0040`(android) | **2/7**(08-12)+ 1/4(08-13) | step 5 の `type (replace)` が `clearInput reported success but the value remained: "単一行"` で落ちる。同じログに `Another window is in front of the app: InputMethod` | **既知の Android テキスト注入の間欠失敗**。**ただしメッセージは原因を取り違えている**(下記) |
-| `E2E-CMP / 否定と個数と方向セレクタが正しく動くこと.S0010` | 凍結機が居る間だけ 4/5 | `#btn_delay_1` タップ後の `exist "#txt_delayed"` が 5s で落ちる。同じログに `-01 dropped out because of a frozen screen` | **凍結機**。下の「退行に見えた」を読むこと |
-
-**「クリアが失敗した」と読める文言が、実際には「直前の入力が届かなかった」を指すことがある**
-(2026-08-13)。上の CMP/android の1件がそれ —— `clearInput reported success but the value
-remained: "単一行"` と出るが、**「単一行」はこの欄のヒント文字列**であって残留した入力ではない。
-step 4 の `type "abc"` が IME に飲まれて届かず、欄が**空のまま**(= `value` にヒントが見えている)
-だったので、`clearInput` は空の欄に対して正しく何もしていない。
-`residualClearValue` は `before != placeholder` で守っているが、**Android の CMP は
-`placeholder` を送らない**ので素通りする。**この文言を見たら、まず直前の入力が届いたかを疑う**。
-**空の欄の `value` にヒント・ラベルが見えていた実体はブリッジのテキスト昇格**(2026-10-01)——
-名前の無いクリック可能な入れ物に子孫の文字を写す処理が入力欄にも効き、子のヒント/ラベルの TextView を
-値として写していた(生の a11y では `text=''`)。Android ブリッジ v85 で入力欄を対象外にしたので、空の欄は
-空と読まれる。**この型の間欠失敗は以後、clearInput ではなく後の検証(echo の `textIs` 等)で落ちる**
-(同日の E2E で S0020 が `clearInput` 緑・`textIs "password="` 赤の形で1回出た。修正あり・HEAD とも
-6台×3周で 0/18 = 帰属は決まらず)。
-
-**「A では落ちて B では通る」を、順序を反転せずに退行と読まない**(2026-08-13)。上の CMP の1本は
-変更後のツリーで 4/5 落ち、HEAD のツリーでは 4/4 通ったので**退行に見えた**。
-**順序を反転したら HEAD のほうが同じ形で落ちた** —— 先に走ったほうが凍結機
-(`-01`)を引き、**その run が凍結を記録するので後続はその機を避けて通る**。
-交互に回すと**先攻が負ける**だけの構図で、コードは無関係だった。
-**A/B の前に、A と B を入れ替えた対照を取る**(片方向だけの比較は、共有資源の状態を
-「変更の効果」として読む)。
-
-**RN の iOS in-app は全ステップが `activate 不発 → 合成タッチ` に退化する**(ログに毎回出る)。
-合成タッチはタイミングに弱く、上の flake の温床と見られる。**落ちる位置は毎回同じではない**
-(フル実行ではステップ7・反復ではステップ14)ので、**「特定のステップが壊れている」と読まない**。
+`clearInput reported success but the value remained: "<文字列>"` の残っている値が**その欄のヒント・ラベル**なら、
+欄は空で、clearInput は空の欄に対して正しく何もしていない。**まず直前の `type` が届いたかを疑う**。
+Android の CMP は `placeholder` を送らないので `residualClearValue` の守り(`before != placeholder`)を素通りする。
+空の欄にヒントが値として見えていたのはブリッジのテキスト昇格で、Android ブリッジ v85 で入力欄を対象外にした
+(以後この型は clearInput ではなく後の検証 = echo の `textIs` 等で落ちる)。
 
 ## ブリッジの「誤った赤」を疑う手順(成功しているのに失敗と報告される)
 
@@ -93,7 +63,7 @@ step 4 の `type "abc"` が IME に飲まれて届かず、欄が**空のまま*
 | **C. 座標も正しく、イベントも受理され、アプリが反応しない** | A でも B でもない。注記も付かない | **真の未解明**。ただし混入していた環境要因が1つ判明(下記) |
 
 **C を追う前に環境を疑うこと**(2026-08-05 の教訓): C だと思っていた失敗のうち、
-**iOS シミュレータの画面凍結**(下記の節。真っ黒なのに a11y は健全でタップだけ届かない)が
+**iOS シミュレータの画面凍結**(下記「iOS シミュレータも「画面だけ死ぬ」」。真っ黒なのに a11y は健全でタップだけ届かない)が
 混ざっていた。今は失敗レポートに blank frame 警告が出るので、まずそこを見る。
 
 既知の原因は次のとおり。
@@ -144,6 +114,41 @@ been swallowed)` を添える(`StepExecutor.tapDiagnosisHint`)。
 xcuitest は座標でタップするので、**片方だけ落ちるならタップ経路の問題**、両方落ちるならアプリ側か
 セレクタの問題と切り分けられる(スクロール直後のタップの機序特定で決め手になった)。
 
+## 長く生きた XCUITest ランナーは AX 照会のたびに数秒待つ状態に落ちることがある
+
+同じ 1 シナリオがデバイスによって 6 秒と 22 秒に割れたら(tap 0.5 秒 → 4 秒)、そのデバイスのランナーのログに
+`Ignoring failure to get hierarchy for remote element in process <pid>` が**約 3.7 秒おき**に並んでいないかを見る。
+引けなくなった SpringBoard の remote element を参照し続け、照会のたびに待つ状態(隣のデバイスでは同じ行が 0.03 秒)。
+**1 シナリオだけの実行が遅い、と見えたら先にこれを疑う**(単発実行は常に同じデバイスを選ぶので「経路が遅い」に見える)。
+
+- **ツールが測って回復する**: 再利用の入口で `GET /systemalert` を 1 問測り、`RunnerAccessibilityHealth.slowProbeSeconds`
+  (2 秒)以上なら起動し直す。run の途中も、素の xcuitest レーン(シミュレータ)で緑のシナリオの直後にステップの
+  snapshot が 2 秒以上だったときだけ測り直す(`RunnerMidRunRecheck`)
+- **起動し直しても遅いままの形がある**: 新しいランナーでも遅ければ「the slowness is not in the runner process」と 1 行出し、
+  そのプロセスでは起動し直さない(`RunnerRestartFutility`)。この形はシミュレータの再起動で戻る(2.7〜3.0 秒 → 0.03 秒)
+- **1 問にも答えないデバイス**(`ProbeOutcome.noAnswer`)は供給から離脱し、次の run の供給でシミュレータ再起動 →
+  初期化(erase)→ `wipeDidNotHelp` で終端(印は `.fleetest/slow-runner-<udid>.json`。MN-98)
+- **他のセッションが使っているデバイスのランナーは起動し直さない**(`hasForeignLeaseUnlessOwnRun`。MN-70.1)
+- 手で確かめる: `curl -w '%{time_total}' 127.0.0.1:<port>/systemalert` をデバイスごとに数回(アイドルでも 3 秒ならデバイスの側)。
+  配線の陽性対照は `FT_FAKE_SLOW_RUNNER_PORTS=<port>`
+
+## iOS シミュレータも「画面だけ死ぬ」——a11y は健全・タップだけ届かない
+
+スクリーンショットは全面一様(黒)なのに a11y ツリーは健全な画面を返し、**タップだけが 1 つも届かない**。
+失敗は「タップの空振り」に化ける(`scrollTo … not found after 15 scroll(s)`・遷移したはずの画面の題名が前のまま)。
+`simctl shutdown` → `boot` で戻る。Android の表示凍結と同じ病理。
+
+- **失敗が 1 台に集中していたら、まずこれを疑い、その個体を shutdown/boot してから裁定する**。
+  稀な事象の率を測る前に凍結機を除く(除かずに測ると、環境の率をそのクラスの率として記録する)
+- ファイルサイズでは検出できない(黒一色でも PNG 42KB)。効くのは画素をサンプルする `BlankFrameDetector.isUniformBlank` だけ
+- ツールの扱い: 失敗時の証跡が一様なら `deviceFrozen` として 1 回だけ再キュー(`MAX_FREEZE_RETRIES`)し、上限に達したものは
+  `skipped`。run 前は `BlankWorkerTriage` が見つけ、iOS は `ProfileWorkerFactory.recoverFrozenIOSWorkers`(そのデバイスの
+  ブリッジを先に止めてから `simctl shutdown` → `SimulatorBoot.ensureBooted`・2 台ずつ)で戻してから始め、戻らない個体だけ
+  レーンから外す。供給口は `ProfileSupplyLanes.ios` の 1 つ(`BlankWorkerRecoveryWiringTests`)
+- 誤検知が狭い理由: ブリッジのスクショは画面全体なので、健全ならステータスバーが写って一様にならない
+- **この挙動は維持する**(ユーザー決定 2026-08-06)。「警告のみに戻す」「同じワーカーで 2 回続いたときだけ凍結扱い」は、
+  利用者から全面一様の正当な画面の報告が出るまで実装しない(再提案しない)
+
 ## FM(Foundation Models)が全滅したら
 
 screenLooksLike は FM 失敗時に nil を返して**素通りする**(呼び出し側が握りつぶす。
@@ -152,9 +157,10 @@ occlusion-guard は **OCR の読み(読めなければインク量)だけで判�
 空白・全面の覆い・別の文字は赤にできるが、**OCR が判定できない形(読めない × インクが多い = 図形・
 WebView・一部だけ残った文字)は素通り**で、`ocrTextVisibilityCheck` が off なら読みが無いので全部素通り。
 実測(OCR が判定不能にした見えない標本 72 件は FM なら全部赤)は OG-5.19。
-run 終了時の「FM 呼び出しが全て失敗しました」警告と結果 JSON の `fm` フィールド、それに
+run 終了時の `⚠️ Every FM call failed (N).` 警告と結果 JSON の `fm` フィールド、それに
 ステップ単位の `notes: ["visibility-guard-skipped"]`(occlusion-guard だけ)が手がかり。
 
+- run のまとめに出る警告と `fmDead` の仕様は DS-5.4。FM の死活を時間で追うなら `Scripts/fm-flap-monitor.swift`(再開手順はスクリプトの冒頭)
 - **切り分けの起点は `fleetest doctor`**。availability は「端末が対応しているか」しか見ておらず、
   資産側の理由で全滅していても `available` を返すので、**実呼び出し(checkLive)の結果で判断する**
 - **FM 依存の変更は「FM を呼ぶシナリオ」で検証する**。まず前提として、テキストの可視性検証
@@ -173,32 +179,15 @@ run 終了時の「FM 呼び出しが全て失敗しました」警告と結果 
   記録の必要性を説明したコメント自身に一致して一度素通りした)。
   作成時の経路(FMDoctor / TestbaseDrafter)は run の実績ではないので免除リスト
 
-### Vision(画像特徴量)まで死ぬことがある —— 画像に依存する E2E は判定に使えない(2026-09-19)
+### Vision(画像特徴量)まで死ぬことがある —— 画像に依存する E2E は判定に使えない
 
-同じ機械状態(ANE の破綻)で、FM だけでなく Vision の `GenerateImageFeaturePrintRequest` も死ぬ。経過は2相:
-①**異なる画像に同一の特徴量が返る縮退**(全候補が距離 0.000。Vision の失敗としては記録されない)→
-②要求が 30 秒後に `Building espresso plan [espresso error: -1]` で落ちる(ホストの単体テストも同じ)。
-①は `FindImage.isDegenerate`(白紙との距離 0)が失敗にする。①ほど極端でない異常(普段 0.002 前後で見つかる見本が
-0.33〜0.43 で「見つからない」になった。2026-09-19 負荷テスト)は `FindImage.isConsistent`(同じ見本を取り直して
-控えと一致するか。健全なら 4 機 1,200 回とも距離 0)が失敗にする。**この間、findImage / imageIs / checkIsON の
-分類器の E2E(各 SUT の 08・20・21)は赤でも緑でも判定に使えない**。切り分けは
-`swift test --filter FindImageTests`(ホストで特徴量を実際に作る。0.5 秒で終わるはずが 30 秒かかって落ちる)。
-**見本の採取(`fleetest vision capture`)とブリッジの鮮度の確認は Vision を使わないので、この間も進められる**。
-復旧は再起動(ブートごとの当たり外れ)。経緯は MN-37。
+FM が死ぬ機械状態(ANE の破綻)では、Vision の `GenerateImageFeaturePrintRequest` も死ぬことがある。この間、
+findImage / imageIs / checkIsON の分類器の E2E(各 SUT の 08・20・21)は赤でも緑でも判定に使えない。
 
-### FM が全滅している間の E2E は「弱い緑」(2026-08-03)
-
-FM(オンデバイスモデル)が死んでいると、**occlusion-guard(`exist` の既定 `requireVisible`)・
-`screenLooksLike` が実質無効のまま緑になる**(失敗は飲み込まれて pass 扱い。自己修復は FM を
-呼ばないため対象外)。
-run のログに `Every FM call failed` が出ていたら、その run は**誤った緑(覆われているのに exist が
-通る)を検出できていない**と読むこと。`fleetest doctor` の「On-device model」で確認できる。
-
-根本原因は Apple 側(`modelmanagerd` が安全性モデルを ANE にロードできない。FB 報告済み)で、
-availability は available と嘘をつく。**`SystemLanguageModel(guardrails:
-.permissiveContentTransformations)` で回避できないことは 2026-08-03 に確定**した
-(全滅中のプローブが `tvp` = permissive も同じエラーで落ちる)。
-監視は `Scripts/fm-flap-monitor.swift`(再開手順はスクリプト冒頭)。
+- 切り分けは `swift test --filter FindImageTests`(ホストで特徴量を実際に作る。0.5 秒で終わるはずが 30 秒かかって
+  `espresso error: -1` で落ちる)
+- 異なる画像に同じ特徴量が返る縮退は `FindImage.isDegenerate` / `isConsistent` が失敗にする
+- 見本の採取(`fleetest vision capture`)とブリッジの鮮度の確認は Vision を使わないので進められる。復旧は再起動。経緯は MN-37
 
 ### FM 経路の検証は `Scripts/fm-verify.sh`(2026-07-30。2026-09-15 に screenLooksLike/occlusion のみへ縮小)
 
@@ -473,27 +462,11 @@ FM は**ホスト全体で共有される資源**。2026-07-22 時点の実測�
 - **A/B は1回の再起動では取れない**。片方の実行で FM を殺すと、もう片方が死んだ状態から
   始まってしまう(FM は一度落ちるとプロセスを変えても回復しない)。**アーム毎に再起動する**こと
 
-### 検証結果(2026-07-27): **直列化では FM の全滅を防げない**
+### 直列化では FM の全滅を防げない
 
-導入の動機だった「積み降ろしの連発 → 全滅」という因果は**反証された**。積み降ろしは全滅の
-随伴現象であって原因ではない。アーム毎に再起動して全 SUT の E2E を回した実測:
-
-| プロファイル(実行順) | 直列化 ON | 直列化 OFF |
-|---|---|---|
-| 1本目 | 21 calls / 0 失敗 | 21 calls / 0 失敗 |
-| 2本目 | 9 calls / **9 失敗** | 21 calls / **21 失敗** |
-| 3本目以降 | 全て 0% | 全て 0% |
-
-**ロックは正しく効いていた**(空振りではない)ことを次で確認済み:
-FM 呼び出しの時間的な重なりがゼロ(別プロセスが 1.5〜3 秒間隔で順番待ち)/
-p50 レイテンシ 2416ms → 1675ms(−31%)/ ロック待ちによる skip は 0 件。
-
-**崩壊のトリガーは時間でも並列度でもない**。再起動から E2E 開始まで 43 分あって FM は生きており
-(時間ではない)、直列化で並列度を 1 に落としても崩壊した(並列度でもない)。両アームとも
-**累積 20〜30 回の呼び出しで尽きる**ように見えるが、2 標本からの推測で確証はない。
-
-直列化は**この目的では効果が無かった**が、実測で害が無く p50 が下がるため残している。
-全滅そのものへの対策は**サーキットブレーカ**(下記)側で行う。
+枠 1(直列化)でも FM の全滅は起きた(2026-07-27、アームごとに再起動した A/B で両アームとも崩壊。FM の常駐プロセスと
+暖機の導入前)。直列化は害が無く p50 が下がる(2416ms → 1675ms)ので残している。全滅そのものへの対策は下の
+サーキットブレーカと、常駐プロセスがモデルを載せたままにする暖機(DS-5.1)。
 
 ## サーキットブレーカ(FMBreaker)
 
