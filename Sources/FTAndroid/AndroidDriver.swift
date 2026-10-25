@@ -533,7 +533,7 @@ public final class AndroidDriver: AppDriver {
         return value
     }
 
-    /// InputInjector が ACTION_SET_TEXT のたび自前で読み返す(DS-8.7「Android のテキスト注入の規律」)
+    /// InputInjector が ACTION_SET_TEXT のたび自前で読み返す(DS-4.5「Android のテキスト注入の規律」)
     public var verifiesTypedText: Bool { true }
 
     static let bottomGestureBandFallbackDp = BottomGestureBandTap.maxBandHeightDp

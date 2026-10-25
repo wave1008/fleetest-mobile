@@ -145,7 +145,7 @@ final class SharedResourceOwnershipParityTests: XCTestCase {
         "ProfileWorkerFactory.recoverFrozenIOSWorkers",
         // ①この run 自身のレーン(run-lease を自分が持つデバイス)の、止まった表示の回復。呼び手は
         // RunOrchestrator.checkLaneDisplay = そのレーンのワーカーだけ(実機は DisplayFreezeWatch.key(of:) で除外)。
-        // 他プロセスのデバイスは触らない(docs/design/「run の途中で「表示が止まった」仮想デバイスを見つけて再起動する」)
+        // 他プロセスのデバイスは触らない(docs/design/dsl-execution.md「run の途中で「表示が止まった」仮想デバイスを見つけて再起動する」)
         "DisplayFreezeWatch.productionRepair",
         "DisplayFreezeWatch.repairEmulator",
         // ②Emulator の停止と起動の実体(関数分割の内側)。呼び手は2つで、どちらも持ち主を確かめた後にだけ呼ぶ ——

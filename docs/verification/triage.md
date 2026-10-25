@@ -372,7 +372,7 @@ connection was lost」で落ちる(そのデバイスは never joined = 準備�
 **まず XCUITest ランナーのクラッシュを疑う**(2026-07-28 に真因確定・修正済み)。
 `~/Library/Logs/DiagnosticReports/FleetestRunnerUITests-Runner-*.ips` が積まれていれば確定。
 スタックが `Issue.record` → `Event.post` → `SwiftTestingInteropRecordHandler` の**再帰**で
-数千段になっていれば、XCUI の操作失敗を起点にしたツールチェーン不具合(../design/history.md「XCUITest ランナーは「操作の失敗」でプロセスごと落ちる」)。
+数千段になっていれば、XCUI の操作失敗を起点にしたツールチェーン不具合(../design/bridge.md「XCUITest ランナーは「操作の失敗」でプロセスごと落ちる」)。
 
 - **ホスト側の症状は2種**。`The request timed out` / `The network connection was lost`
   (ランナー死=処理中の HTTP が返らない)と、**離脱せずに「12 回スクロールしても見つかりません」**

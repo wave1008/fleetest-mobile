@@ -256,6 +256,72 @@ DS-10 の前半は dsl-syntax.md。
   記録は `select` では消さない(`tap → select → textIs` が失敗の定型)。
   機構・署名の作り方・誤検知の向きは docs/verification/traps.md「操作は ✅ なのに画面が変わらないとき」
 
+- **スクロール残像(ghost)は拒否せず、警告して撃つ**(`RefGuard.ghostWarning`)。Compose iOS は容器の外へ出た行をフルフレームで木に残し、`ios-xcuitest` はそれを座標で叩く
+  (実測: 下部タブへ遷移して "tap done" を返した。`ios-inapp` は要素起動なので当たる = モードで割れる)。**応答に「何に当たったかもしれないか」を添え**、一覧の行にも
+  `⚠️scroll-leftover` を出す(`MCPServer.ghostNote` / `ghostFlags`。先頭の注記だけでは、行から ref をコピーする動作に届かない)。
+  - **印は2種類に割る**: `⚠️scroll-leftover` は「撃つと別の物に当たる」(沈黙した誤操作)、`⚠️offscreen` は「今そこに無い」だけ。**割る基準は打ち手ではなく危険度** ——
+    どちらも対処は `ft_scroll_to` で出し直すことだが、同じ重さで並べると本物の残骸が埋もれる(実測: Apple マップの経路詳細で、`y=-59` の行まで「別の物に当たるかも」と警告された)。
+    判定は `TapTargetGeometry.offscreenAdvisory`(中心が画面の外)で、**画面外を先に見る**(`RefGuard.preTapWarnings` の優先順位と同じ。同じ要素について**ツールごとに言うことが変わらない**ため)。
+    `⚠️offscreen` の一覧注記は方向まで言う(`MCPServer.offscreenDirection`): 中心のはみ出し量が大きい軸で方向グループに分け、`ft_scroll_to` の `direction:` へそのまま渡せる語(down/up/right/left)を添える。
+    左右方向の offscreen があり、かつ画面に `pageIndicator` が居るときだけ、横ページャが1ページずつしか描画しないこと・`ft_scroll_to` で届くことを1文添える(`ghostNote` の `pageIndicatorHint`)
+  - **当てる相手**は `OcclusionGeometry.occluder`(中心を覆う別要素。実体は FTCore で DSL のタップ前警告と共有・`RefGuard` は転送)。**遮蔽と数えないものが7つ**ある(外すと起きることはすべて実報告):
+    ① 相手自身が ghost(描かれていないものは何も覆えない。設定アプリの「閉じる」が画面外のリスト行に弾かれる)/
+    ② 何も描いていない葉コンテナ(label も value も子も無い `other`。起動直後の「スキップ」が全幅・非 clickable の `#compass_container` に弾かれる)/
+    ③ 自分を丸ごと包む**画面規模の**相手(全画面の暗幕・toolbar は遮蔽でなく容器)/ ④ 自分の祖先と子孫(「自分より深いものだけ」に絞ると残像に重なる下部タブ(浅い)を見落とす)/
+    ⑤ **奥に描かれている相手**(`drawnAbove`。Apple マップの `#MapsSearchBar` が中の `#userProfileButton` を覆う扱いになる)/
+    ⑥ **矩形がぴったり同じ相手**(同寸同位置はラッパーか入れ替わり。本物の積み重なりは `stackedRefs` が見る)/
+    ⑦ **いちばん内側の入れ物より外の枠**(`enclosesAnInnerWrapper`。z が無いブリッジだけ。`#HomeView` が `#MapsSearchTextField` を覆う扱いになる)。
+    **⑤の「奥/手前」はブリッジの申告(`ElementInfo.z`)が最優先で、無ければツリー順へ落ちる**。ツリー順は production で裏返る(Google マップは地図の chrome をシートより後に出すのに描画はシートが手前で、
+    シートの裏の `#mylocation_button` を無警告でタップして Chrome が起動した)。Android は `getDrawingOrder()` を根から積んで `SnapshotBuilder.assignPaintOrder` が通し番号にして送る
+    (段ごとの値ではホストで合成できない —— 出力ツリーは中間ノードを間引くので共通祖先が残っていない)。iOS は描画順を読む API が無いのでツリー順のままで、⑦の推測が要る。
+    **z があるときは⑥⑦を使わない**(真値がある場に当て推量を混ぜると真値を打ち消す)。
+    **①を③より先に見る**(③の包含判定は 1pt の差で外れるほど際どい: 閉じる `y483..521` 対 残像 `y484..536`)。本物の遮蔽は一部しか重ならないことが多い。
+    **③に「画面規模」の条件が付くのは、包含を無条件に容器と読むと逆側へ倒れるから**: app bar の下へ潜り込んだ行はまさに「丸ごと包まれる」形で、除外するとタップしても何も起きないのに警告も出ない。
+    面積が画面の `fullScreenContainerAreaRatio`(0.5)以上のものだけを容器とみなす(暗幕・全画面 toolbar は 100%、app bar は 12%)。**②と③は表と裏**(②を足すと鳴りすぎが止まり、③を緩めると黙りすぎが止まる)
+    なので、片方だけ動かすと残る側が悪化する
+  - **これでも誤検知は残る**。木の幾何だけでは「実際に描かれているか」を決められない(最後に出たのはキーボードの下にある普通の行。キーボードはスナップショットから丸ごと除外していて frame すら取れない)。
+    だから**拒否ではなく警告**にしてある。**ここを再びブロックへ戻さない**。教訓: `isOutsideContainer` は DSL では「掴み直して送り直す」= やり直しの合図で、外れても次の周回で回復する。
+    **同じ判定を拒否へ格上げすると、外れがそのまま機能の喪失になる**。強度を変えて再利用するときは、外れたときの損害が同じかを確かめる。
+    誤検知5形とも利用者の実アプリで出た(4 SUT 全画面(84画面)の掃討では0件)。同日の実アプリ(Google マップ)でも3種類出たが自前 SUT 掃討は0件 ——
+    **この検知系で「自前 SUT の誤検知0」は production を代表しない**。掃討は `Tests/Fixtures/RealAppSnapshots/` の固定コーパス(`SweepHarnessTests`)で実アプリにも当てる
+- **容器の中に居ても別の物に当たる2形**(`RefGuard.overlapWarning`)。上の ghost 判定は `isOutsideContainer` を入口条件にするため、この2形を捕まえない:
+  ① **上に描かれた overlay に覆われている**(`overlayCovering`): E2E-iOS のホームで `#nav_heal` (16,788 370x62) が下部タブ `#tab_controls` の下で、ref タップがコントロールタブへ遷移して "tap done"。
+  `occluder` のうち**木の順序で後ろ**にあるものだけ(先に並ぶ大きな背景パネルを遮蔽と読むと誤検知に逆戻りする)/
+  ② **同一矩形に積まれている**(`stackedRefs`): スクロール画面で `行 09`〜`行 40` の staticText 29個が全部 `行 01` の位置にあり、ref タップが `selected=row_01`。同じ矩形を共有するもののうち
+  **label か value を持つものが3つ以上**。**入れ子の一本鎖は数えない**(Android のダイアログは `action_bar_root`→…→`custom` が全部同じ矩形)。数えるのを「中身を持つもの」に限るのは、
+  件数だけだと普通の木が鳴るため(Android の同一 bounds のラッパー連鎖が可視ボトムシートで積み重なり扱いされた)。
+  どちらも**拒否せず警告**。積み重なりは一覧にも `⚠️scroll-leftover` を出す(原因も打ち手も ghost と同じなので**印を2種類に割らない**)。
+  **例外はキーボード被覆**(決定: ユーザー 2026-09-14。`MCPServer.keyboardRefusal`): 中心がソフトキーボードの下にある要素への ref 操作(tap / long_press / type / clear / double_tap・batch の1手目)は
+  **両ブリッジとも断る**。結果が確実で副作用がある(XCUITest はキーの上に指が落ちて焦点の欄に文字が入り(実機 SE3・`#tab_about` で「o」)、in-app は 422 で断っていた = ブリッジで割れていた)。
+  判定は ref 形・DSL と同じ `KeyboardOcclusion`(chrome 除外済み)。**座標形は断らない**(キーを押す意図があり得る。`keyboardCoordinateWarning` で警告)。**DSL の tap は据え置き**(注記)
+- **自分の子孫が中心を横取りする形**(`TapTargetGeometry.nestedActionCoveringCentre`)。`occluder` は祖先と子孫を除外する(親子の重なりは正常な入れ子)ので、この形を捕まえない。
+  実測(Apple マップの検索候補): `#Maps.PlaceTableViewCell` の中心が同じセル内の `#FeaturedInMultipleGuidesContextLineItem` の内側にあり、ref タップは場所カードでなくガイド一覧を開いて無警告で "done"。
+  条件は「親が対話的」「子孫も対話的」「面積比 < `nestedActionAreaRatio`(0.25)」の3つ。比の上限は行を包み直すだけのラッパー(同セル内の無名 button は 0.99)と行の主ラベル
+  (`#MultiTextView` は 0.31〜0.49 で、押しても行と同じ場所が開く)を外し、**行の中に別の遷移先を持つ小さな帯**だけを残す値。コーパス全数(18枚)で発火は `#PinnedItemSection` ← `#PinnedTile` の1件だけ(真陽性)。
+  非対話の容器は `missesItsOwnContent` の担当なので**排他**(二重に言わない)。警告のみ
+- **申告されたスクロール容器の外へ送り出された行**(`TapTargetGeometry.outsideDeclaredScroller`)。ghost 判定は容器を木の並びから**推測**するので、申告のある UIKit/SwiftUI では推測が中間ノードに当たって nil に落ちる。
+  実測(Apple マップの場所カード): `#MUScrollableStackView` の上へ抜けた行が frame ごと木に残り、`link "ウィキペディア"` (16,-2 85x18) への ref タップが "done" を返して実際には中心がステータスバーに当たりカードが先頭へ飛んだ。
+  こちらは推測せず **`scrollable` を申告している祖先だけ**を見る。**ただし depth からの祖先復元はブリッジの間引きで嘘になる**(Google マップの検索結果で本文10件を誤検知)ので、`clippingContainer` と同じ
+  「その depth の兄弟が2つ以上、容器の中に居る」を条件に足す。一覧の印は ghost と同じ `⚠️scroll-leftover`(**印を割らない**)
+- **細帯(sliver)の注記**: 幅・高さのどちらかが 10 以下の極端に細いラベル付き要素(実測: 右端で 9x137 に切れたタブ「サンライズ瀬戸」)は掴めないことが多いので `ft_snapshot` が note で名指しする。
+  判定は `TapTargetGeometry.isClippedSliver`(ラベル2文字以上 + 細い辺 ≤10 かつ対辺 ≥30。アイコン 9x13 等は対辺条件で除外)。**判定は要素自身の細さだけ**(縁で切れた結果か元々細いかは見ない)
+- **ソフトキーボードの遮蔽は木からは原理的に判定できない**。iOS xcuitest は `.keyboard`/`.key` サブツリーを木から除外し、残る外側コンテナ(`inputView`)は子孫ゼロの空葉になって空葉除外(誤検知対策)に正しく弾かれる。
+  Android は IME が別プロセスの別ウィンドウで木に出ない。実害は両 OS で実測済み: iOS はキーボード下の候補行への ref タップが顔文字キーに化けて検索欄を汚し、Android は Gboard のレイアウト選択シート下の候補タップが
+  IME の「QWERTY」選択に化けた(どちらも無警告)。だから**ブリッジが `SnapshotResponse.keyboardFrame` で実矩形を申告する**:
+  iOS xcuitest = 走査中に見た `.keyboard` ノードの frame / iOS in-app = `keyboardWillChangeFrame` 通知の最新値(**TextEffects window の frame を使ってはいけない** —— 開いていても全画面が返り上部の要素まで誤警告する。
+  `UIInputSetHostView` のクラス名走査も iOS 27 で不発。通知値が無ければ frame は申告しない = 誤検知側に倒さない)/ Android = `UiAutomation.getWindows()` の TYPE_INPUT_METHOD の bounds
+  (要 `FLAG_RETRIEVE_INTERACTIVE_WINDOWS`。ブリッジ起動時に恒久で立てる副作用があり、`getWindows()` は毎 snapshot 叩く = dumpsys と違い a11y 内 API で安い)。
+  判定は `TapTargetGeometry.keyboardCoveredAdvisory`(中心が keyboardFrame 内)の1箇所で、DSL はステップ注記・MCP はタップ警告 + `ft_snapshot` / `ft_scroll_to` の note に使う
+  (note は覆う矩形を常に申告し、その下に操作対象が居るときだけ ref を列挙する)。**警告のみで拒否しない**(新しい検知は警告から)。旧ブリッジは申告しない = 黙って従来どおり
+- **iOS の `keyboardFrame` はキー面だけで、実際に覆う面積より狭い**。`.keyboard` ノードの frame は上のサジェストバー(`SystemInputAssistantView`)と地球儀/Dictate 行を含む `inputView` の下端を含まない
+  (実測: iPhone 17 Pro / 402x874 で申告 y=583..816 に対し木の chrome は y=538..874。実機 iPhone 15 Pro でも上45pt・下58pt が欠ける)。中心点判定は正しいのに矩形が狭いせいで隠れた要素を見落とす。
+  **中心点判定は変えない**(矩形が1pt重なっただけの入力欄まで警告すると誤検知)—— `FTCore.KeyboardOcclusion` が申告と木の chrome(`inputView`/`SystemInputAssistantView`。**申告と交差するものだけ**)を
+  足し込んで実効矩形を作り、MCP/DSL の呼び手(MCPServer+Snapshot / MCPServer+Hints / MCPServer+GesturesTools の ftDoubleTap / StepExecutor+Actions)全員がこの型を通す。
+  chrome が木に無ければ申告どおり(Android は既に画面下端まで届いており対象外。ブラウザの WebView 内キーボードも chrome が木に出ないため対象外)。
+  **広げるだけでは雑音になる**: キーボード自身の部品(地球儀キー・変換候補バー)まで「隠れている」に該当し、注記は先頭8件しか名指ししないので本命が押し出される。
+  chrome 自身とその部分木(木は親→子順+`depth`)は除外する(覆っている側を「覆われている」とは言えない)。実測(`ios-maps_suggest_keyboard`): 16件(見落とし)→ 30件(広げただけ)→ **20件**(除外後)で、
+  増分4は本当にキーボードに隠れた5件目の検索結果。**拾い直しが要る**: `SystemInputAssistantView` は申告矩形と縁が接するだけで交差しないので最初の走査に入らない —— 実効矩形で chrome を引き直さないと、その部分木が除外から漏れる
+
 ### 描画崩壊の検査(iOS Simulator のみ・ユーザー決定)
 
 iOS Simulator ではアプリのプロセスの描画が壊れ、アプリを起動し直すまで戻らないことがある(触らずに置いた壊れた Compose が

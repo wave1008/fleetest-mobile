@@ -963,7 +963,7 @@ fi
 # 「このアプリのテスト書いて」と言われたエージェントの手掛かりはスキルの description だけになる。
 # 実害は3つに絞られる(素の XCTest を書き始める / 新しい ft_* に気づかない /
 # DSL コマンドを推測で書く)ので、**使い方の解説は書かず入口だけ**置く
-# —— 解説を置くとツール説明と二重管理になり必ずズレる(docs/design/「契約は1箇所」)。
+# —— 解説を置くとツール説明と二重管理になり必ずズレる(.claude/rules/installer-agents.md「使い方の解説は書かない」)。
 # 受け手の資産なので**マーカーの内側だけ**差し替える。嫌うなら --skip-entry-point。
 #
 # **本文は AGENTS.md、CLAUDE.md には読み込み(`@AGENTS.md`)だけ**(AgentIntegration.entryPointFile /

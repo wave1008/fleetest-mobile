@@ -150,7 +150,7 @@ final class BridgeContractTests: XCTestCase {
         .xcuitest: [
             "Runner/FleetestRunnerUITests/BridgeHTTPServer.swift": "ef8c6573ab25f9cbdfed21e483ce74f1eb5d1a4345bc57a2d5b9ed2eb86b860e",
             "Runner/FleetestRunnerUITests/BridgeRouter+Snapshot.swift": "55f5bdc9607198d489299ee946d4c2521802836219e3f9d2712bc06adace4334",
-            "Runner/FleetestRunnerUITests/BridgeRouter+TextInput.swift": "ff402a7f3b41f6421068e3e69d4a942730f811896d955607d95d451610c599e3",
+            "Runner/FleetestRunnerUITests/BridgeRouter+TextInput.swift": "dcb0933d10c2f49bd59ba2d4e8c03bdd26deaf1a43cd34b6213c1d854b7f65a8",
             "Runner/FleetestRunnerUITests/BridgeRouter.swift": "7019d570bab4b3f3f8256b1668d6f0014c676e58816e57bd03603f9c4367dd46",
             "Runner/FleetestRunnerUITests/BridgingHeader.h": "f7ff424d9283644d0e7a0c6e202911ecbf2d9c12d469eea330d91471c4788272",
             "Runner/FleetestRunnerUITests/CoordinatePinch.swift": "b4034f271fc9c321ea8f1afca227ef5a9bce91dc1367fb35560785dbf5547100",

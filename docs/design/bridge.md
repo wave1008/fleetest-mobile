@@ -6,6 +6,11 @@
 
 ブリッジのエンドポイント表は `BridgeDocRouteSyncTests` が実態と照合する。
 
+## 目次
+
+- DS-4 アプリ操作ブリッジ(自作)設計
+- DS-16 エミュレータ操作の gRPC 制御
+
 ## DS-4 アプリ操作ブリッジ(自作)設計
 
 WebDriverAgent と同じ原理を最小構成で自作する(iOS)。Android にも同じプロトコルで
@@ -223,7 +228,7 @@ Android の整定判定は**スナップショットの画面サイズ**で行�
 
 | status | 意味 | ホストの反応 |
 |---|---|---|
-| `501` / `404`(本文 `not found:`) | このブリッジでは**原理的に不可** | XCUITest へフォールバック(DS-10 の「in-app で不可・XCUITest で可」) |
+| `501` / `404`(本文 `not found:`) | このブリッジでは**原理的に不可** | XCUITest へフォールバック(DS-4.3 末尾の「in-app で不可・XCUITest で可」) |
 | `404`(ref 不明) | スナップショット取り直しが要る本物の失敗 | 失敗(フォールバックしない。本文前置で 501 系と区別) |
 | `409` | 一時的競合(キーウィンドウ不在・セッション消失) | セッション消失だけ `SessionRecoveryDriver` が張り直す。**フォールバック判定に使わない** |
 | `422` + `reason: "stale-ref"`(XCUITest ランナー。`ErrorResponse.reason`) | ref が指していた要素が、撃つ時点でもう同じ場所に居ない(`/type` `/clear` は撃つ直前の撮り直しで、全 ref 操作はホストの `expect` との identifier・型の矛盾で)。**何も撃っていない**ことの保証 | `DriverError.staleRef` に写し、`StepExecutor.executeActionRetryingStaleRef` が木を撮り直して引き直し、`waitSeconds` の予算内で撃ち直す。**この断りだけが撃ち直してよい**(他の 422 は届いたかもしれない)。in-app・Android は未対応 |
@@ -246,6 +251,63 @@ Android の整定判定は**スナップショットの画面サイズ**で行�
 再ビルドしなければ**古いバイナリが注入され続ける**(ios-inapp / ios-heal だけ
 「checked が取れない」「switch 型が出ない」で落ち続けた実害がある)。`InAppLauncher.buildIfNeeded` は**存在ではなく鮮度**(`InAppBridge/Sources/*` +
 `build.sh` + 共有 DTO の mtime)で判定する — 存在チェックに戻してはいけない。
+
+- **inapp は Compose Multiplatform / Flutter(iOS)のジェスチャ目的の swipe・press を駆動できない**(2026-07-22 切り分け確定。
+  `tap`/`type` は通る)。`/swipe` の主経路は `UIScrollView.contentOffset` の直接操作で、自前描画の画面にある無関係な
+  UIScrollView を動かして**黙って空振り**になる。合成タッチ(`FTSynthSwipe`/`FTSynthPress`)へ向け直しても受理されない
+  (ランループを回す・HID マスクに RANGE|TOUCH を足す・静止 moved を刻む、はいずれも効果なし)。単発 down/up の `FTSynthTap` だけが通る。
+  UIKit/SwiftUI の経路は変えない。対処は3層:
+  1. **ブリッジ**: ジェスチャ目的の `/swipe` と `/press` は **501**(`InAppBridge.handleSwipe`/`handlePress`。判定は `/status` と同じ
+     `compose-resources` / `Flutter.framework` マーカー)。**409 ではなく 501**: 409 はキーウィンドウ不在等の一時競合にも使われ、
+     フォールバック判定に使うと「アプリが前面に無い」を隠して別画面を操作しかねない。スクロール目的(`SwipeRequest.scroll`)は
+     UIAccessibility の scroll アクション経由で in-app のまま通る(dsl-syntax.md の「Compose/Flutter のスクロールは UIAccessibility の scroll アクションで駆動する」)
+  2. **事前ルーティング**: 起動時プローブの `/status.unsupportedActions` に該当し typeDriver があれば最初から typeDriver
+     (`AppAttachDriver`)へ回す(`StepExecutor.typeDriverGestures`)。申告は現在 `["press"]` だけ(swipe は目的と画面で可否が割れ、
+     一律申告できないので `handleSwipe` に一本化)
+  3. **事後 501 キャッチ**: プローブ不達の安全網。1回受けたらラッチして以降は直接 typeDriver へ(`scrollTo` は maxSwipes 回まわる)。
+     press は ref がブリッジごとの別名前空間なので typeDriver 側で snapshot し直して再解決する(`pressViaTypeDriver`)
+
+  効果: E2E-CMP の `ios-inapp` が 18/18・37.3s(導入前は3シナリオ失敗・93.9s)。409 が表面化するのは typeDriver が無い構成
+  (XCUITest ブリッジ無し)だけで、メッセージが xcuitest プロファイルへ誘導する。`type` の事前ルーティングは置かない
+  (Compose でも in-app の type が可能で速い: 266ms 対 attach 1.0〜1.3s。ジェスチャは不可能なので事前ルーティングが常に得)
+- **「in-app で不可・XCUITest で可」は常に XCUITest へ回す**(決定: ユーザー 2026-07-28)。判定は `DriverError.isBridgeIncapable` の1箇所:
+  **501 と「ルート不明の 404」(本文 `not found:` 前置)だけ**(409 は含めない。in-app の 404 には ref 不明もあるので本文で見分ける)。対象:
+  - `home` / `appSwitcher`: in-app は自プロセス外を触れないので原理的に不可。最初から XCUITest へ直行する(`FTDriveCore.systemDriver`)。
+    XCUITest 側の `/home`・`/appswitcher` はセッション不要なので attach も activate も挟まない
+  - `drag`(スクロール探索直後の**空打ち極小ドラッグ**): in-app は実装しない。回さないと Compose の容器がタッチを1回吸ったままになり
+    直後の tap が空振りする。**ラッチは swipe と共有しない**(`dragFallbackLatched`。共有すると drag の 501 だけで全 swipe が実スワイプ化し、
+    バウンス由来の flake を持ち込む)。空打ちは補助なので両経路の失敗はステップの失敗にしない
+  - `swipe` / `press`: 上の事前申告+事後キャッチ
+
+  **入力系(`pressEnter` / `type(ref: nil)` / `clearInput(ref: nil)`)だけは別の判定で 409 も回す**(`DriverError.isTextInputFallback` = 409 /
+  `isClearInputFallback` = 409 + 422 + isBridgeIncapable。XCUITest ランナーは同じ事情に 422 を使う)。DSL(`StepExecutor`)と
+  `HybridFallbackDriver`(ライブ操作)が同じ判定を通る —— 片方だけがインラインで持つと、同じ操作がシナリオでは通りライブ操作では 409 で落ちる(MN-45.1)。
+  **`withFallback` の既定は変えない**(tap/swipe/hideKeyboard を含む14操作と共有で、hideKeyboard は 409 では回さない)。
+  **`ref` ありは回さない**(ref はブリッジごとに別名前空間で、この層に取り直す手段が無い。DSL は `typeViaTypeDriver` が取り直す)
+- **XCUITest ランナーは「操作の失敗」でプロセスごと落ちる**(Xcode 27 beta のツールチェーン不具合。2026-07-28 にクラッシュレポートで確定)。
+  XCUI の失敗は `_XCUIFailWithError` が issue を記録するが、ハンドラは main queue 上 = テストメソッドのスタックの外
+  (`BridgeHTTPServer.dispatchToMain`)で動くため `XCTFallbackIssueHandler` へ回り、XCTest↔swift-testing 相互運用が無限再帰して SIGSEGV する。
+  `continueAfterFailure` も `FTCatchObjCException` も効かない。ランナーが死ぬとブリッジが消え、その run のワーカーが離脱して振り直しになる。対処は3層:
+  1. **ランナー**: 操作系(tap/type/pressEnter/swipe/drag/press)は `requireLiveApp()` で `app.state` を確認し、起動していなければ XCUI に触れず
+     **503**(409 はセッション消失専用・501/404 はフォールバック判定に使用済み)。snapshot/screenshot には入れない(`state` は IPC で毎回コスト・取得系は issue を出さない)
+  2. **ランナーのテストは XCUI の失敗を記録しない**(`FleetestBridgeTests.record(_:)` はログにだけ残す。v119)。記録すると1件でも Tear Down して
+     ランナーが消える(2026-09-19: 入力途中に WebView の中身を止め、消えた欄への typeText 1件で毎回再現。上書き後は同手順5回で生存)。
+     操作の失敗は各ハンドラが HTTP のエラーで返す。消去(`/clear`)は触る直前に `exists` で確かめ、消えていれば 422(`requirePresent`)
+  3. **ホスト**: `AppAttachDriver` が ref 無し操作の前に `ensureAttached()` で**セッションを自分の bundleID へ揃える**(1インスタンス=1シナリオにつき1回)。
+     ブリッジは run 内で使い回されるため、前のプロジェクトのアプリを指したまま来ることがある(E2E-iOS の次に回った E2E-Flutter の `scrollTo` が
+     未起動のアプリを掴んで落ちた)。409/503 は activate +1回再試行
+
+  効果: `--ios --ios-inapp` フル構成で離脱 2回中2件 → 0件・run 時間に有意差なし(3 SUT 合計 ±1s 以内)。トリガは他にもあり得る
+  (hittable でない等の XCUI 失敗)。恒久対策はランナーから swift-testing を外せるかの調査(未着手)
+- **XCUITest のセッション消失は snapshot 境界でだけ自動回復する**(`SessionRecoveryDriver`)。この経路の 409 はセッション消失専用
+  (投げる箇所が1つ)なので status だけで判定でき、`activate`(**`launch` ではない** —— launch はナビ状態を飛ばす)で張り直す。
+  **ref を使う操作(tap/type/press の ref 指定)は再試行しない**: セッション確立は `refFrames` をクリアするので、同じ ref の再試行は別要素を操作しかねない。
+  張り直しだけして 409 を返し、次のステップの snapshot で ref が振り直される(実損は最大1ステップ)。ref を使わない操作
+  (snapshot/screenshot/swipe/座標 tap/press/drag/home/appSwitcher)だけ1回再試行する。inapp モードの経路には入れない(InAppDriver の 409 は意味が違う)
+- **in-app ブリッジは注入先アプリのプロセス内常駐**なので、アプリのクラッシュ/終了で HTTP が `DriverError.bridgeConnectionRefused` になる
+  (xcuitest/Android はブリッジが別プロセスで起きない = inapp 固有)。切断時に `InAppDriver` がホストの `~/Library/Logs/DiagnosticReports` から
+  対象 bundleID の直近 `.ips` を探し(`SimulatorCrashReport`。JSON 形式優先・旧テキスト形式も解析)、エラー行にレポートのパスと終了理由を1行添える。
+  見つからないときは「OS 終了/メモリ圧/自発終了・混在実行の suspend の可能性」を切り分け文言として添える(クラッシュ以外の切断と区別する)
 
 ### DS-4.4 スナップショットの圧縮(4K コンテキストへの最重要対策)
 
@@ -569,6 +631,216 @@ UIKit の Switch(`id=sw_notify 61x28` と無名の `63x28`)/ `UIAlertController`
 **ラベルが違えば落とさない** —— 同じ矩形へクランプされた行(`行 09`〜`行 40` が `行 01` の
 位置に畳まれる形)は重複ではなく「描かれていない残骸」で、扱いは MCP 側の警告(§MCP)。
 
+- **in-app の木は可視な窓を全部歩く**(別 UIWindow に載るモーダル = アプリ内メッセージ SDK 等)。キーウィンドウ1枚だけだと、画面を覆っているのに
+  テストは何も失敗しない —— タップは `activate`・スクロールは `contentOffset` 直書きで**どちらも hitTest を経由しない**ので覆いが障害物にならず、
+  `irregularHandler` も照合対象が無く発動しない(誤った緑。受け手報告・`bridgeProtocolVersion` 75 で修正)。`UIAlertController` は自分の窓を
+  key にするので以前から載っていた。載らなかったのは key にしない窓で、そこが SDK 系オーバーレイの形。
+  並びは **windowLevel の昇順**(ホストの遮蔽判定が「後に出るものが上」を前提にする)。**キーボードの窓だけは除く**(キーが大量に写り込む。
+  表示判定と実矩形は `keyboardIsVisible` / `keyboardFrameIfVisible` が別に申告する)。**覆われた要素は落とす**(`InAppSnapshot.isCovered`。
+  判定は**その位置で手前の窓がタッチを受けるか** = `hitTest`)。**「手前の窓だけ見せる」にはしない** —— 画面の一部だけを覆う形(上部バナー・ハーフシート)で
+  触れる背面まで消えるか、バナー自体が見えず `irregularHandler` で閉じられなくなる(2026-08-20 に両形で確認)。
+  限界: 判定は「タッチが届くか」で「目に見えるか」ではない(`isUserInteractionEnabled = false` の不透明な飾り窓は背面を残す)。
+  witness は `E2EAppIOS` の `OverlayWindow`(全画面モーダル / 上部バナー)と `TestProjects/E2E-iOS/scenarios/15_別ウィンドウのモーダル.swift`
+- **操作の宛先も窓で決める**(版 76)。木だけ複数窓にすると「見えているのに閉じられない」が残る(`activate` が不発で合成タッチへ落ちた瞬間に
+  キーウィンドウ = 背面のアプリへ撃つため)。ref を持つ操作は**その要素が載っている窓**(`InAppBridge.window(of:)`。`accessibilityContainer` を辿る。
+  **`value(forKey:)` は使わない** —— 未定義キーの例外は Swift で捕まえられず対象アプリを落とす)、座標だけの操作とスクロールは**いま指が当たる窓**
+  (`frontmostTouchableWindow`)へ送る。スクリーンショットも可視な窓を重ねて描く(キーウィンドウ1枚だと「モーダルが写っていない証跡」を残す)
+
+**MCP(`ft_*`)の iOS の構成と応答の規律**(MCP が撃つ・読む経路の設計。判定を DSL と共有するものは dsl-execution.md の「失敗時に返す情報」)
+
+- **MCP の iOS は常に XCUITest**(決定: ユーザー。in-app は使わない。in-app を主にした合成 `HybridFallbackDriver` を使うのはライブ操作だけ)。
+  profile 無しで in-app のポートに繋いでも `ExploreDriverResolver` が同じデバイスの XCUITest へ振り替え(用意できなければ in-app へは落とさず断る)、
+  udid だけの呼び出しは XCUITest のポートを先に採る(`MCPServer.explorationOrder`)。profile ありもモードを xcuitest に差し替えて供給する
+  (`resolveProfileTarget`)。理由: in-app の合成タッチは注入される前提で作られていないアプリ(Apple マップの経路カード)で効かないまま ok を返し、
+  別アプリ・システムアラートの扱いでもブリッジを意識させた。システムアラートは `ft_tap alertButton:`(SpringBoard へ向けて押し、`attach` で戻る)。
+  このため `profile` 無しではダブルタップ(Compose)・ピンチ(Flutter)が効かず、応答に切り分けを添える(`MCPServer.iosModeHint`。表と実測は docs/commands.md)
+- **宛先そのものも探す**(`BridgeDiscovery`)。`port` 未指定で既定 8123 が無応答なら範囲(8123〜8154)を走査し、**生きているブリッジが1本だけなら自動採用**
+  (採用理由を stderr へ)・**複数ならデバイス名付きで列挙してエラー**(別デバイスを黙って操作させない)・0本なら `fleetest bridge up` を案内する。
+  `bridge up` が別ポートを選ぶ(稼働中ブリッジの再利用・pid ファイルの残り)と既定固定では全ツールがタイムアウトするため。**`port` を明示したときは探索しない**。
+  Android の `serial` 未指定も同じ規律(`AndroidSerialResolver`。1台なら自動採用・複数なら AVD 名付きで列挙。`-s` 無しの adb は複数台でエラー)。
+  `ft_run_scenario` の `profile` 無し経路も同じ解決を通す(片方だけ賢いと食い違う)
+- **タイムアウトは確かめてから断定する**(`MCPServer.connectionLostHint`)。接続拒否(`bridgeConnectionRefused`)は「誰も待受していない」が確定なので即断するが、
+  タイムアウト(`bridgeUnreachable`)は「未起動 / 遅い / suspend」の3択を並べるだけにしない。判定の順序が要: **先に当のポートを `BridgeDiscovery.isBound` で見る**。
+  bound のときの言い分は**ブリッジで分ける**(`bridgeBusyHint(connection:bridge:)`)—— xcuitest は busy(整定待ちは実測 33.7s・/status 無応答 > interaction timeout 20s)なので
+  「まだ繋がっている・リトライせよ」、**in-app は suspend でも kernel が handshake を返すので bound のまま** = リトライは永遠に当たらない助言になるため
+  「ft_launch で前面へ戻すか、その機の xcuitest ポートを使え」。どちらも `forgetConnection` はしない。bound でないときだけ全ポートを走査し、消えていれば
+  死亡と言い切って忘れる(走査を先にすると busy なブリッジは /status に出ず「exited」と誤診し、健全なブリッジの再構築へ誘導する)。
+  唯一の判定点は `bridgeUnreachableVerdict`(純粋関数・テストで固定)。掴んでいるポートは `connectedPorts` に持つ
+- **宛先は port だけでなく udid まで書く**(`MCPServer.connectionLabel`)。ブリッジは落ちても monitor が別ポートで起動し直すので同じセッション中にポートが動く
+  (実測: -03 が 8128→8126、-07 が 8136→8147)。udid を申告しない旧ブリッジでは port だけ。**先頭は必ず `port `**(表示の整形規則)。
+  iOS/Android の判別はこの文字列からではなく `connectedPorts`/`connectedAndroidSerials` の記録で行う(次項)
+- **「応答しない」を「死んだ」と読まない**(`BridgeDiscovery.isBound`)。XCUITest は整定待ちでブリッジのスレッドを数十秒ブロックするが、カーネルは accept する。
+  待受があるうちは乗り換えず「今は忙しい・少し待て」を返す。緩めると自動採用が防ぐはずの別デバイスへの取り違えを自分で作る
+- **接続断からの回復は表示ラベルでなく記録で振り分ける**(`connectedPorts` / `connectedAndroidSerials`)。`profile:` 経由のラベル
+  (例 `"iPhone wave(実機) port 8144"`)は "port"/"serial " のどちらの接頭辞にも一致せず、回復機構(`forgetConnection`)に一度も入らなかった。
+  **表示文字列で制御を分岐しない**(表記を整えるたびに判定が壊れる)。`connectedPorts[key]` は `probePort ?? provisioned.port`(`probePort` は実機で常に nil)。
+  純粋関数・単体テストが緑でも、その配線の手前で弾かれていれば何も改善しない
+- **未インストールのアプリを launch させない**(`MCPServer.installedVerdict` が材料を集め、可否は `FTBridgeClient.InstalledAppCheck.launchGuard` の1箇所。
+  ライブ操作 `api live serve` の launch/activate と共有 → DS-13.3)。`XCUIApplication.launch()` が未インストールで失敗すると issue が main queue 上
+  (テストのスタック外)で記録され**ランナーごと落ちる**(`requireLiveApp` が防ぐのと同じ経路。実測: 遊休ブリッジへ未インストールの bundleID で
+  `POST /session` すると約5秒後、10秒以内にランナーが消える)。**判定できないときは素通し**(実機・同名デバイス複数・simctl/adb 不調)。
+  システムアプリ(springboard/Safari)は `get_app_container` が runtime のパスを返すので弾かれない
+- **inapp モードでも別 bundle(springboard・他アプリ)を開いたら読み書きごと XCUITest へ寄せる**。**in-app ブリッジは自分のプロセスの中しか見えない**ので、
+  `ft_launch com.apple.springboard` が「Launched」と成功を返したうえで続く snapshot がアプリ自身の古い木を返していた。寄せ先は `AppAttachDriver` では駄目
+  (固定 bundle への attach 専用で `launch` が意図的に no-op)。**セッションを張れる素の BridgeClient** を別に持たせる(`foreignApp`)。自分のアプリへ launch し直すと in-app 主へ戻る。
+  モードを inapp に固定しても直らないので、モードの選択では解けない
+- **ホーム画面・システム UI は `ft_launch com.apple.springboard` で読む**(XCUITest 経路のみ)。セッションはアプリに閉じているので、未起動での `ft_snapshot` は 409、
+  `ft_navigate home` 後は木の読みの前面確認(`requireForegroundApp`)の 422 になる。`BridgeRouter.handleLaunch` は springboard を**起動せず参照だけ張る**特別扱いを持つ。
+  409 には `MCPServer.springboardHint`、home の後は `backgroundingNavigationNote` が案内し、422 はランナーの本文自身が読み方を言う
+- **MCP の snapshot は必ずキャッシュを捨てて撮る**(`MCPServer.freshSnapshot`)。Android の a11y ノードはキャッシュ供給で、Compose のスクロール後は木が古いまま固まる
+  (実測 E2E-CMP / Pixel 9・Android 15: `ft_swipe` 後の画面が行08〜16なのに木は行01〜10のまま、撮り直しても数分待っても直らず、`ft_tap(#row_03)` が `selected=row_10` を返した)。
+  ブリッジ側の既定(WebView 内だけ `refresh()`)はシナリオ実行の実測(全ノードで snapshot +65ms・E2E-Android の sum +43%)に基づき、MCP は1手ずつ撃つ経路で
+  往復のほうが桁で大きいので上乗せは見えない。**「ジェスチャの後だけ」のフラグ運用にしない**(立て忘れたツールが1つでもあると黙って古い木に戻る)。出るのは Android の Compose だけ
+- **ref は撃つ直前に撮り直して照合する**(`RefGuard` / `MCPServer.verifiedRef`)。ref はスナップショットごとに振り直されるので、覚えた番号のまま撃つと別の要素に当たる。
+  覚えた要素の同一性(identifier → ラベル+型 → 型+frame)で引き直し、**動いていれば新しい ref へ撃ち直す/消えていれば撃たずに理由を返す**。
+  identifier を持つ要素がその identifier で引けないときは**ラベルへ落ちない**(別要素を掴む)。ghost 判定は `ContainerGeometry.isOutsideContainer` を共有する
+  (MCP 側に別の閾値を置くと DSL と「ghost の定義」が割れる)。**identifier で引き直したらラベルの変化も見る**(`RefGuard.labelChangeNote`): 検索候補が更新された画面では
+  同じ id・別の行を掴むことがある(実測: 「立川駅、最近表示した項目」を狙ったタップが「立川駅 南口、立川市」に化けた)。動いた距離と無関係に出す。
+  再ターゲット後に実際に操作を撃つ経路(`verifiedRef` / double_tap・pinch・drag(fromRef) が通る `verifiedElement`)には同じ警告を入れ、存在確認だけの経路
+  (スクロール探索の着地表示・フォーカス待ち)には入れない。**再ターゲットは「なぜ動いたか」の手掛かりまで返す**: 原因は断定できないが、同じ深さの兄弟が同じ分だけ動いたかは
+  手元の2枚から言える(揃っていれば容器のスクロール、その要素だけならレイアウト変化)。**画面全体で数えない**(固定ヘッダやタブが多数派になり、スクロールを「動いていない」と誤答した: 動かない13対動いた7)
+- **`ft_scroll_to` は DSL と同じ `StepExecutor` に委ねる**。整定待ち・キャッシュ回避・容器基準の刻み・ghost の掴み直し・飛び越しの拾い直し・打ち切りは全部あちらに入っており、
+  同じ知見の2つ目の実装を作ると必ず割れる。MCP は FlowStep を1つ組んで投げるだけ = MCP で届く要素はシナリオでも届く
+- **`ft_scroll_to` は「返す木にそれが居るか」を確かめてから成功と言う**。探索のスワイプはタップ可能な行を発火させることがあり(SwiftUI の SUT で実測)、executor は途中の観測で
+  passed のまま撮り直した木は別画面になる(E2E-iOS のホームで決定的に再現)。照合は `matches`(waitFor と同じ = DSL と同じ)で行う
+  (`scrollTo` は `StepOutcome.resolvedElement` を載せないので、そちらを当てにすると一度も走らない)。**この撮り直しは節約の対象ではない**: iOS の `ft_scroll_to` は
+  0スワイプでも 5.35s(探索 2.0s + 撮り直し 2.0s。注記の生成は主因でない)。撮り直しを省くと、この照合と「中心が画面外へ動いた」ゲート(`MCPScrollToOffscreenGateTests`)が
+  どちらも定義上通る(返す木 = 照合した木)。後者は0スワイプの witness を持つ(Apple マップの経路ページャは読み取りの合間に自分で動く)ので、スワイプ数では守れない。**2枚目を読むこと自体が砦**
+- **`ft_swipe` にも `scrollFrame` を置き、実装は `StepExecutor` へ委ねる**。web ページの中の横スクロールする表を動かす手段が無かったため。FlowStep(action: "scroll") を組んで投げるだけ
+  (`ScrollGeometry`・マージン定数・容器解決・fail-fast は全部あちら)。**直に `driver.swipe(_:intent:path:)` を叩かない**: in-app ブリッジは Compose/Flutter で領域指定つきスクロールを
+  501 で拒否する設計で、その 501→XCUITest フォールバックは `StepExecutor.swipeWithFallback` にしか無い。**`direction` は指の向きのまま渡す**(action `"scroll"` は指の向きとして読む)。
+  `scroll` アクションは `scrollFrameRect` を先に見る(見ないと ref 形の scrollFrame が黙って全画面スワイプへ退化する)。
+  効くのは**木に出ている容器だけ**: web ページの入れ子 `overflow-x` のように容器が木に現れない相手には効かない(ページ全体を渡すと中心線が表の外を通り、ok を返して1px も動かない)。
+  その逃げ道は `ft_drag` の座標指定(実測で動いた)。ツール定義にもこの2点を書く
+- **`ft_drag` は `fromRef`(要素の中心から。撃つ直前に撮り直して照合)と `dx`/`dy`(移動量)を受ける**。半開きシートを広げる操作を座標の手計算にしないため。
+  **シートが折りたたまれていること自体は注記にしない** —— 状態は `#Card grabber` の value のようなアプリ・ロケール固有の文字列にあり、条件にすると Apple マップの日本語表示にだけ効く判定になる。
+  気付ける場所は探索が止まった瞬間なので、scrollTo のシート展開ヒント(dsl-syntax.md の「スクロールの語彙」)で塞ぐ
+- **スクロール容器は行に `scroll` を出し、2つ以上あるときだけ先頭で名指しする**(`ScrollFrameCandidates`)。id を持たない ScrollView/Table/CollectionView も木に出る
+  (xcuitest の `isEligible` が容器型を id 必須から免除・in-app も対応済み。id の無い容器は矩形で名指しされる)。`ft_scroll_to` の `scrollFrame:` に渡す値の探し方が必要だが、
+  専用ツールは足さない(欲しくなるのが常に snapshot の直後で、ツールは説明文が毎リクエストに乗るため)。**`scrollFrame:` は ref(整数)も受ける**(MCP 専用。DSL は文字列のみ):
+  id が重複・欠落した容器はセレクタで一意に指せないため、`MCPServer.scrollTo` が既存の stale-ref 再照合(`resolveSessionRef` → `RefGuard.relocate`)を通して frame を
+  `FlowStep.scrollFrameRect` に入れる(`StepExecutor.scrollContainer` は locator より rect を優先し、rect は常に解決済み扱いなので scrollFrame の fail-fast に掛からない)。
+  規律は `scrollFrameNote` と同じ **true を見つけたときだけ喋る**(Compose/Flutter の in-app は申告できないので「容器なし」と言うと嘘になる)。名指しは id → ラベル(40字以内)の順で、
+  どちらも無ければ矩形を出して「書けない」ことを明示する(存在しないセレクタを勧めない)。1つだけの画面で黙るのは、iOS in-app では `scrollFrame` を渡すと XCUITest フォールバックを払うため。
+  飛び越しの拾い直しの注記も総称でなく実物の名前を出す(`suggestedScrollFrame`。推測した容器に申告済みの容器が IoU 0.5 以上で重なるときだけ)。
+  **印が出ない理由は2つあり混同しない**: ①ブリッジが申告できない(Compose/Flutter の自前描画容器)/ ②容器がスナップショットに載っていない(ブリッジがそもそもスクロール容器と認識しない
+  web ページの入れ子 `overflow-x` 等。identifier が空の認識外の容器は `BridgeRouter.isEligible` の `default` 分岐・in-app は `.other` で除外される)。`scrollFrame:` は名前を要求するので②の容器は指定できず、
+  印が無いことと書けないことが一致している。型で指定できるようにするにはブリッジのフィルタを緩める必要があり(版上げ + `clippingContainer` の推測結果が変わるため 4 SUT の E2E が要る)、価値は中程度なので保留
+- **実機ブリッジは `/status` で udid を申告しない**。iOS 16 以降 `UIDevice.name` は機種名しか返さず `SIMULATOR_UDID` も無いので、`status.device` を鍵にした一致(`liveIOSBridges`)も
+  `Found.udid` も原理的に実らない。そこでホスト側に `.fleetest/bridge-<port>.device` = port→実機 udid の記録を持つ。**書くのは `IOSDeviceTransport.establish` の1箇所**
+  (lan/usb 両方が通る実機専用経路)、**消すのは `teardown` の1箇所**(`bridge down` から無条件に呼ばれる。仮想デバイスでは no-op)。`BridgeDiscovery.scan` は
+  **`status.udid` の申告を必ず優先**し、nil のときだけ記録で補う(仮想デバイスは自分で正しい udid を出す)。記録の無い旧ブリッジは従来挙動へ静かに落ちる。
+  `scan` には `repoRoot` を渡す(nil だと記録を読めず 127.0.0.1 へ落ち、lan トランスポートの実機ブリッジは疎通できない)。この記録は `ft_list_apps` の宛先解決にも使う:
+  実機を `port:` だけで指した呼び出しは `connectedPorts[key]` からこの記録を引いて実機 udid を得る。**実機かどうかの判定は `bootedSimulatorUDID` より必ず前**に置く
+  (あちらは実機で throw するので、後ろに置くと実機判定へ到達しない)
+- **`ft_list_apps` の実機経路は `devicectl`**(`IOSPhysicalAppCatalog`)。`simctl` は実機 udid で `Invalid device` になるので
+  `xcrun devicectl device info apps --include-all-apps --json-output` を使う。**user/system は `bundleIdentifier` の `com.apple.` 接頭辞で分類する** ——
+  devicectl の既定一覧(`--include-all-apps` 無し)は `builtByDeveloper` だけで App Store アプリが漏れ、`url` の `/System` でも分類できない
+  (Safari も Apple マップも `/private/var/containers/...`。実測: 全287件・非Apple 206件)
+- **ブラウザの取りこぼしは「空白の幾何」で言う**(`MCPServer.webViewGapNote` / `gridWithoutHeaderNote`)。ブラウザは画面に描いているものを a11y へ出さないことがあり(Android の Chrome が顕著)、
+  **木に無い要素は待つことも探すことも指すこともできない**のに応答から気付けない。判定は幾何だけ = webView の中で**どの葉とも交わらない連続帯**。
+  - **閾値を超えた帯は全部数える**。最大の1本だけを返すと、Yahoo!天気の週間画面では 345px の帯だけが報告され、黙って落ちた 268px のほうに週間表の日付・気温・アイコンが入っていた。
+    読み手は「警告された1箇所以外は揃っている」と読むので、1本だけ言うのは黙るより悪い。名指しは3本まで(`webViewGapBandsReported`)・残りは件数で言う
+  - **格子の見出し欠落は「見出し行が入る余地」まで見る**。値のセルが揃っているのに列見出しだけ無い形は `gridWithoutHeaderNote` が名指しするが、見出しが値と centerX で揃っていると
+    見出し自身が格子の最上行として鎖に取り込まれる。直上の空き ÷ **行間の中央値**が `gridHeaderRoomRatio`(2.0)以上のときだけ言う(実測比: 誤検知 1.16 / 0.54 に対し真陽性 4.4)。
+    中央値なのは、実測の格子が途中に別セクションを挟んで間隔を飛ばすため(平均だと1本の飛びで閾値が跳ねる)
+  - **webView ノードごと無い形は別の注記が要る**(`missingPageContentNote`)。`webViewGapNote` は `type == "webView"` の中しか測れず、`emptyTreeNote` は `elements.isEmpty` ちょうどが条件なので、
+    Chrome が自分の chrome しか公開しない画面では両方が黙る(状況が悪化したほうが黙る逆転)。判定は幾何のまま画面全体へ広げ、`unrepresentedScreenFraction`
+    (どの要素とも交わらない最大の帯 ÷ 画面高)が 0.5 以上・URL バー在り・webView 無しの3条件。**URL バーを条件に入れるのは必須** —— オーバーレイが背景を落とす形は正常で、無いと誤検知する
+    (コーパス実測: witness 88.6% / 次点 `and-browser_urlmenu` 5.9%)
+- **注記が載る応答は目録の `contexts` で決める**(`NoteCatalog.Context`)。`ft_scroll_to` には「この一覧をそのまま報告してよいか / この行を指せるか」を言う注記を載せる
+  (`urlishLabelsNote` / `ambiguousLabelsNote` / `duplicateIDsNote` / `emptyTreeNote` ほか)。`ft_scroll_to` は「swipe + snapshot の繰り返しの代わりに使え」と自ら勧める経路なので、
+  **警告が落ちる側が常用経路になる**(実測: `link "13101"`(実際の描画は「千代田区」)を無警告で返し、`ft_snapshot` で撮り直して初めて出た)。
+  手数が増えるだけの注記(`unlabeledClickablesNote`)やスクロールで変わらないもの(`addressBarNote`)は載せない。増やすときは `Scripts/mcp-bench.sh` の手数で決める
+- **横スクロールの残骸は「同じ y・違う x で繰り返す区間」で言う**(`duplicateRegionNote`)。WebView の表を横へ送ると、スクロール前の行が古い x のまま木に残り新しい行が並んで入る
+  (実測: 気象庁は同じ y の行が 200pt ずれて二重に並び、約55行のうち印が付いたのは4行だけ)。既存の3経路はどれも構造上当たらない: `outsideDeclaredScroller` / `isUntappableGhost` は
+  「容器と交差ゼロ」が条件で x=0 は容器の内側、`stackedRefs` は「同一矩形が3個以上」が条件で複製は2個、`ContainerGeometry.hasClampedCoordinates` は同一矩形・同深さ3個以上が条件で流用できない。
+  しかも WebKit の横スクロール div は `scrollable` を申告しない。**幾何条件を落とさない** —— 素の「最長反復区間」にすると、1ページ内の2つの表が同じ見出し行を共有しているだけの形を掴む
+  (実測で11行)。実測は witness 10 に対し他フィクスチャ最大3
+- **「変わっていない」の判定は木の外の数字も見る**(`looksUnchanged`。**判定はこの1本のまま**、2つ目を書かない)。`SnapshotResponse.elements` はブリッジが上限で切った後の列で、落とした数は
+  `truncatedCount` に別で載る。要素だけを比べると上限より下だけが変わった操作を「変化なし」と報告する(実測: 表を横送りするタップで113要素増えたのに上限120の内側がバイト一致で `waitForChange` が空振り)。
+  呼び手は回避できない(`maxElements` は `ft_snapshot` にしか無く、待ちの中の `freshSnapshot` は常に既定値)。**木が空同然の画面では「変化なし」が常に真になる**ので、
+  `unrepresentedScreenFraction` が 0.5 以上のときは「『動かなかった』と『公開されていない』を区別できない」但し書きを付ける。
+  **手ごとの「何も起きていないかもしれない」も結論で言う**: ok の tap の前後で木の内容が同じ(次の tap の撃つ前の木・最後の木と比べる。署名は飲まれたタップの診断と同じ `StepExecutor.sameContent`)か、
+  disabled な要素への touch なら、その行に警告を添え結論を「passed」と言わない。失敗にはしない・打つ前に待たない。木が空同然の画面では手ごとに名指さない。
+  **比べるのは tap の手だけ**(select / waitForSettle のような掴むだけの手は直前の tap の記録が残るので、比べると誤る)
+- **`ft_pinch` は座標(`x`/`y`[+`radius`])でも対象を指せる**。地図やキャンバスは要素として木に無く、対象を省くと指が画面全体に開く(実測 Apple マップ: 場所カードを半分出したまま
+  `scale 0.4` で地図は1pxも動かずシートが全画面に展開した)。既定の半径は**画面の短辺の 22%**(座標系が iOS=pt / Android=px で桁が違うので固定値にしない)、画面の内側へクランプする。
+  XCUITest も座標で撃てる(`CoordinatePinch`。公開 API に座標版が無いので非公開の `XCPointerEventPath` / `XCSynthesizedEventRecord`)。**実行時に存在を確かめ、無ければ要素ピンチへ縮退して戻り値で必ず言う**
+  (黙って退化させると狙った場所でなく手前のシートを掴む)。**ホスト側で先回りして「無視した」と言わない**(縮退したかを知っているのはブリッジだけ)
+- **「セレクタを書けない」と言う前にスコープ記法を試す**。ラベルも id も無い clickable の注記は、id を持つ祖先があれば `#container >> .clickable[n]` で書ける(docs/commands.md)。
+  実測(Google マップの経路画面): 移動手段タブは id もラベルも無いが `#directions_mode_tabs` の中に居り、この形で一意に指せる(タブのラベルは「58 分」のように検索ごとに変わるのでラベルで書くこと自体が誤り)。
+  `MCPServer.scopedSelector` が組み立て、**祖先の id が画面で一意でなければ nil**(`#recycler_view` が4つある画面で別の容器を掴むため)。祖先も名無しなら「ref か座標」と言う
+- **木が「起動したアプリのもの」かを突き合わせる**(`MCPServer.switchedAppNote`)。Android のブリッジは session を前面ウィンドウから採る(`root.getPackageName()`)ので、back でアプリを出ると
+  session ごと別アプリへ移り、`backgroundedSessionNote` は構造上発火しない。4 SUT は id・ラベルが共通契約なので木を見ても気付けない。ホスト側で最後の `ft_launch` を覚えるのが唯一の検知経路
+- **`ft_navigate back` は「画面が変わった」と断言しない**。iOS の back は端の swipe で、自前ナビの画面(`#btn_back` を持つ SwiftUI 等)では1pxも動かないことがあり、アプリの外へ出ることもある。両方を注記に書く
+- **モード切替の案内には「アプリが起動し直る」まで書く**(`iosModeHint` 末尾)。dylib は起動時にしか差し込めないので in-app ブリッジの初回起動はアプリを再起動する。書かないと、案内に従った瞬間に探索中の画面が消え、
+  ホーム画面へ同じ座標のジェスチャが撃たれる(実測: マップ画面での double tap がホームから `#nav_scroll` を開き `行 05` を選んだ)
+- **`ft_status` は session と「いま前面か」を分けて出す**。session はブリッジが掴んでいるアプリで `ft_navigate home` の後も変わらない。前面判定は XCUITest の `/appstate`(1往復)。
+  iOS は任意の前面 bundle ID を取れない(`foregroundAppID` は nil)ので「session のアプリが前面か」だけを言う
+- **棚卸し・診断・スクリーンショット**: `ft_list_devices` は実行プロファイルの `devices` から台帳を組む(`--profile` 指定時はその enabled な devices、無指定ならプロジェクト内全実行プロファイルの和 = `FTCore.MachineInventory`)。
+  解決できなければ素のカタログ(`SimulatorCatalog` / `AndroidSerialResolver`)へ落ちるが、**落ちた理由を必ず本文に書く**(黙って代替すると登録マシン名とプロファイル名の不一致を永久に発見できない)。
+  `ft_logs` は**ブリッジを一切通らない**(要る場面はアプリが落ちてブリッジごと消えた直後)。iOS はホストの DiagnosticReports、Android は adb だけを見る。`udid` は入口で畳まず(畳み込みはブリッジを走査する)、
+  セッションの記憶と `.fleetest/bridge-<port>.device` だけで解決する。罠が2つ: ①クラッシュ直後はまだ .ips が無い(ReportCrash の書き込みは非同期。見つからないときだけ数秒待って引き直す)/
+  ②既定の窓 300s には前の run のレポートが残っている(実測で11分前のものを掴んだ)ので**経過時間を必ず出す**。Android は `pidof` が空のときテキスト一致へ落とすと crash の原因行を捨てる
+  (`FATAL EXCEPTION` とスタックはパッケージ名を含まず `Process:` の1行だけが名指し)ため、crash バッファでは絞らず「絞れなかった」と明示する。
+  `ft_screenshot` は既定で縮小 JPEG(`maxWidth` 600)。**費用は画素数で決まる**のでバイト数で形式を選ばない(平坦な UI では原寸 PNG のほうが小さいことすらある)。
+  600 は実測(1179px の iPhone で CJK 本文もステータスバーも読め、画素は 1/2.4)。密な画面は `maxWidth` / `fullSize` で逃がす
+- **`ft_batch` は StepExecutor に委ねる**。MCP の dispatch を順に回す案は採らない —— 複数手の実行は探索ロジックなので、2つ目の実装を作らず StepExecutor へ渡す(`ft_scroll_to` と同じ)。
+  主目的は**「バッチで通った = そのまま書けばシナリオでも通る」を成立させる**こと。
+  **steps は DSL の手を並べた文字列1本・表記は最小記述の1つだけ**(決定: ユーザー 2026-08-10):
+  `"steps": "type '#f' 'abc'; scrollTo '#item' direction: .down"` —— 引数は引用符+空白区切り・手は `;`(改行も同義。どちらも引用符の中では区切らない。`BatchLineParser.splitSteps`)。
+  MCP の arguments はオブジェクト必須なのでキー自体は消せない。廃止した表記(括弧・引数カンマ・配列 steps)は**書き換え方を添えて拒否**する —— 黙って受けると表記が再び分裂し、黙って落とすと1往復増える。
+  **文字列の引用符だけは `'…'` と `"…"` の両方を等価に受ける**(JSON の `\"` 経由で `"…"` が届くのは自然な書き方なので拒まない。案内する推奨は JSON エスケープの要らない `'…'`)。
+  **限定文法のパーサ**(`BatchLineParser`。純粋関数・デバイスにも MCPServer の状態にも依存しない)が `name arg*` / `arg := [label ":"] value` / `value := string | number | bool | .ident` だけを解釈し、
+  入れ子呼び出し・配列・演算子・クロージャは構文的に受け付けず明確なエラーにする。シナリオへの変換は draft が担う(記録は FlowStep からの再生成なので正形(括弧+`"`)の DSL が出る)。
+  バッチ文法が executor/codegen の全ステップを表せることは `testRoundTripThroughScenarioCodeGen` が守る。位置引数の名前は**シグネチャ文字列(`DSLCommandIndex.signature`)から導出する**
+  (`BatchArgSpecTable`。名前の一覧をハードコードしない)。シグネチャが引数リストの形をしていない `swipe(.up / .down / .left / .right)` だけは小さな明示表(`positionalOverrides`)、
+  辞書キー語彙が DSL のパラメータ名と食い違う唯一の箇所(`swipeElementToElement(from, ...)` → "selector")も1件だけの表(`dictKeyAliases`)で吸収する。
+  **未対応ラベルは黙って捨てない** —— 各ビルダに「実際に読むキー」を宣言させ(`BatchStepBuilder.keys`)、シグネチャに載っているのにビルダが対応していないラベル(例: `tap` の `containerInference:`)は名指しで拒否し、
+  シグネチャにすら無いラベルは別の文言(`ft_dsl_commands` へ誘導)で拒否する。探索の `scroll:` / `maxSwipes:` は `tap` / `type` / `clearInput` / `select` が受ける(DSL の「スクロールの指定は `scroll:` だけ」に揃える。
+  バッチには `withScroll*` の文脈が無いので `.noScroll` は省略と同じ。`maxSwipes:` だけ・セレクタ無しの `scroll:` は効かないので拒否)。`swipePointToPoint` も1手として受ける。
+  書き戻し(`ScenarioCodeGen`)は操作系の `waitSeconds:` を**値があれば必ず**出す(検証系と違い省略時は5秒でなく約0.7秒なので、5を省くと別の意味に化ける)。
+  **ref は1手目でだけ書ける**: 禁止の理由「ref はそれを撮ったスナップショットに対してだけ有効で、各手が木を変えるので後続の手の ref は黙って別の要素に当たる」は2手目以降にしか当てはまらない。
+  1手目は ft_tap と同じ経路(`verifiedRef` = RefGuard の再照合。gone は拒否・ghost/移動は警告付きで続行)で解決し、**そのまま書けるセレクタへ変換してから**実行する
+  (`SelectorNaming.graded` = ft_tap の推奨セレクタと同じ実装。変換できない要素は拒否 —— ref はシナリオに書けないため)。**何に解決したかは応答に出す**。記録(`InteractionLog`)も解決後のセレクタで残す。
+  **2手目以降の ref は採用しない**(決定: ユーザー 2026-08-16・**再提案しない**)—— 一意なセレクタが無い要素をバッチで叩く手段としては座標タップのほうが筋が良く、`tap x: y:` は `ScenarioCodeGen` が1:1で書き出せる。
+  拒否文言は `tap` のときだけ座標形を逃げ道として案内し、**理由と書き換え方まで返す**。通すのは operation/scroll カテゴリだけで、判定は `DSLCommandIndex` から導出する。
+  ライフサイクル・破壊的なコマンドは弾く(1回の承認でデータ消去へ届かせない)。**検証は実行より前に全手へ通す**(途中で弾くと前半の手だけがデバイスに残る)。最初の失敗で止め、
+  **木は最後に1回だけ**返す(毎手の木を積むとバッチにした意味が消える)。その最後の木は MCP の描画経路を通すので遮蔽・ghost 等の MCP 固有の注記は付く。
+  - **「全部通ったのに画面が1ピクセルも変わっていない」を言う**。最後の木が操作系ツールの settle-lite(`snapshotAfterBody`)を通らないと、空振りしたバッチが無条件に成功と表示される。
+    判定は `MCPServer.looksUnchanged` を再利用し、起点はループより前で捕まえる(`recordSnapshot` が上書きするため)。**断定はしない**(縁に着いていて正当に動かない回がある)
+  - **codegen はバッチが実行できる全アクションを書き戻せる**(`scrollDown/Up/Left/Right` の `case "scroll"` が無く `// (unsupported step: …)` に落ちて「通ったバッチは1:1でシナリオ行になる」契約が破れた)
+- **引数語彙は操作系の全ツールで揃える**: 長押しは `holdSeconds`(DSL の `tap(holdSeconds:)` と同語彙。旧 `duration` は黙って既定値へ落とさず改名を案内して拒否)、
+  `snapshotAfter`/`waitFor`/`timeout`/`expandBulk`/`interactiveOnly` は操作系ツール(tap/type/drag/swipe/double_tap/press/pinch/navigate/open_url)全部に載せる
+  (無いツールだけ毎回 ft_snapshot の1往復=承認1回を余計に払う)。`ft_open_url` は開いた先を見るためなので往復が必ず1回増える。**1行目の文面は `snapshotAfter` の有無で出し分ける**
+  (木を返すのに「後で撮り直せ」と言うのは矛盾)。集合は `MCPServerToolDefinitionsTests` が守る。**繰り返し載るプロパティ説明は短文に留め、ニュアンスは initialize の instructions へ1本化**
+  (`MCPServer.serverInstructions`。プロパティ側に書くと全ツールへ複製され毎セッションのコンテキスト費用になる)
+- **失敗と曖昧さの返し方**: `ft_status` は Android で複数台のとき失敗させず全台を並べて返す(読み取り専用なので「曖昧なまま操作させない」規律に触れない。操作系は従来どおりエラー)/
+  `ft_scroll_to` の空振りは止まった画面で引けるものの一覧と「素のラベルは完全一致・部分一致は `*…*`」を添える/ プロファイル解決の警告は stderr に捨てず次の応答へ載せる
+  (MCP クライアントは stderr を見ない)/ `ft_doctor` は FM 不可のとき止まる機能と代わりの書き方まで返す(`FMDoctor.unavailableImpact`)
+- **既にある逃げ道は、払った場所で名指しする**(機能はあるのに応答が名乗っていない形):
+  **⑴ 待ちの上限**(`MCPServer.waitTimeoutRemedy`)—— 上限(`waitSeconds`)は全ての待ちにあるが、外れた回の文がそれを名指さないと「5秒固定」と読まれ、外れると分かっている待ちにも毎回満額を払わせる。
+  3経路(ft_snapshot の waitFor / snapshotAfter の waitFor / waitForChange)に同じ1文を出す。**当たった回には出さない**。
+  **⑵ 木の畳み方の継承**(`MCPServer.inheritingSnapshotFilters`)—— 木を返す口はすべてこの1関数を通す(2つ目の継承規則を書かない)。素の `ft_snapshot` と `ft_batch` も継承する
+  (ft_snapshot の省略を「記憶を消す」にすると、「以後は黙って引き継ぐ」と宣言した直後の素の ft_snapshot が全行を返して宣言が嘘になる)。外すのは `interactiveOnly: false` の明示だけ。**宣言は値が変わったときに1回**。
+  操作の応答(snapshotAfter・ft_scroll_to・ft_batch・ft_rotate)では曖昧ラベル・重複 id の表の**明細を畳む**(`snapshotBody(foldsSelectorTables:)`。事実 = ×N は残す)、
+  **操作できる要素を含む群だけ**を並べる(`NoteCatalog.Input.actionResponse`)。満額は `ft_snapshot` だけ。ベンチ(`Scripts/mcp-bench.sh`)での手数の確認は未実施。
+  **初出だけ満額の注記(`once` / `onceNonEmpty`)の鍵はデバイス(sessionKey)ごと**(`MCPServer.noteScope`。1サーバを2エージェントが別デバイスで共有すると2人目が初出を見ていないのに「初出を見よ」と言われる)。
+  **ft_launch / ft_clear_app_data でそのデバイスの鍵を忘れる**(`resetOnceNotes`。サーバはプロセス寿命で鍵を持つので次の呼び手が最初の操作から短縮形を受け取る)。
+  **重複ラベル・重複 id の表は、操作の応答では行の名前が直前に出した表に含まれていれば出さない**(`MCPServer.unlessCovered`。件数は比べない)。`ft_snapshot` の満額は覚えない。
+  **似たラベル**は、部分一致の候補が無いとき「no label contains it; short labels on screen: …」と言う(2文字の語は編集距離で何にでも当たるので「似ている」と言わない)。
+  **通貨の表記の注記**は「この画面では」と限り、待ちの中では部分一致に数えない。
+  **⑶ シート展開救済の名乗り**(`MCPServer.sheetRescueMarker`)—— 所要時間の内訳(`sheet-expand rescue +1.4s`)と散文の語を揃え、4形(記憶で省いた/伸びなかった/展開だけで出た/再試行した)の先頭の語を固定する
+  (この応答の宛先はエージェントの本文1本なので機械可読チャネルは増やさない)。
+  **⑷ `ft_type` の `replace: true` は素の type の約2倍**(実測 6.1s 対 2.3s)。内訳は clear の1往復と打った結果の読み返し(in-app iOS は clear/type の成否を検証せず YES を返すので、
+  読み返さないと「replaced」が嘘になる)。`snapshotAfter`(かつ `pressEnter` 無し)ならその1枚と共有するので、値段と避け方をスキーマに書く
+- **「書けるセレクタが無い」を黙らない**: 同じ id を複数の要素が持つとき行内に `×N`(`SnapshotRenderer`)/ **ラベルも id も無い clickable** の件数と ref(座標でしか指せないことを伝える)/
+  3件以上が共有するラベル(素のラベルでは一意に指せない)/ `ft_scroll_to` にも複数スクロール領域の注記(`scrollFrame:` を渡すべき当人に出す)
+- **`checked` は行に出す**(`true` のときだけ。印が無い = オフと状態を持たないの両方)。`disabled` だけ出して `checked` を出さないと、タブの選択状態が `checkIsON` では表明できるのに MCP からは観測できない
+- **別パッケージの木は、相手がシステム UI なら案内を変える**(`MCPServer.systemDialogPackages`)。許可ダイアログ(`permissioncontroller` 等)で「`ft_launch` してから ref を信用しろ」を実行すると、
+  ダイアログを放置したままアプリを再起動してループする。既知のシステム UI では「これを操作すれば元へ戻る」と言う
+
 ### DS-4.4.1 WebView の中身
 
 WebView(iOS=WKWebView / Android=android.webkit.WebView)の中身は、経路ごとに見え方が違う。
@@ -743,6 +1015,142 @@ iOS ブリッジと区別なく扱える。
   取れなければ従来値へ落とす)。**フィルタ側を display に替えてはいけない** ——
   「画面の大半を覆う容器を落とす」0.85 の意味が変わり、ダイアログの中身の出方が動く
 - 実装・落とし穴の詳細は重複させず [AndroidRunner/README.md](../../AndroidRunner/README.md) を参照
+
+- **型語彙を iOS と揃える**: Android クラス名(EditText/TextView/Switch...)を iOS 側の
+  型名(TextField/StaticText/Switch...)へマップすることで、FM プロンプト・ガードレール・
+  Flow DSL が完全共通化できた。**FTFoundationModels と FTCore は1行も変えずに Android で動いた**
+- **リスト行のテキスト昇格**: Android は「クリック可能な無名コンテナ+非クリックのテキスト子」
+  構造が支配的。ドライバ側でクリック可能ノードへ子孫テキストを昇格させて解決する
+- **クロスパッケージ画面は launchApp の前面判定を壊す**(2026-07-14 実例、以後ブリッジ側で自動復旧):
+  Android 16 の設定「セキュリティとプライバシー」は別パッケージ(SafetyCenter/permissioncontroller)の
+  画面で、開いたまま残ると force-stop は bundleID しか殺さないため以後の
+  `launchApp("com.android.settings")` が「画面が表示されませんでした」で全滅する罠があった。
+  `handleLaunch` は前面判定タイムアウト時、前面に居座るパッケージ(bundleID/ブリッジ自身/HOME を
+  除く)を force-stop+HOME で掃除して1回だけ再試行するようになり、カスケード全滅はしなくなった
+  (事後復旧であり予防ではない。ストール自体は初回1回は起きうる)。手動復旧は
+  `adb shell am force-stop com.google.android.permissioncontroller`+HOME のまま残す(フォールバック)。
+  検証(2026-07-18、Pixel 9a/Android 16 実機): 設定→「Security & privacy」タップで SafetyCenter を
+  settings と同一タスクに積んで launchApp settings すると、v6 は 10s タイムアウトで error・SafetyCenter
+  居座り、v7 は同条件で自己復旧して settings 前面化(前面判定タイムアウト→掃除+再試行の before/after 確認済み)。
+  **版 67 から、前面がシステムダイアログのパッケージ(permissioncontroller / packageinstaller / systemui。
+  ホストの `systemDialogPackages` と同じ集合。Android 側だけ chrome も追加で含む —— Custom Tab を
+  force-stop するとアプリ側の遷移が壊れるため)で、かつ対象アプリの窓が `getWindows()` に見えている
+  ときは「ダイアログ越しに前面」として掃除せず成功を返す**(権限ダイアログを force-stop すると権限フローが
+  壊れる)。対象アプリの窓が見えない全画面の居座り(上の SafetyCenter の形)は従来どおり掃除+再試行
+
+### DS-8.7.1 Android の常駐ブリッジ(AndroidRunner)
+
+snapshot の 2 秒(uiautomator dump 自体のコスト)がフロー実行の支配項になったため、
+iOS と同型の常駐ブリッジを追加した(`AndroidRunner/`、自作 instrumentation APK)。
+
+- **共通コア部分は iOS ブリッジと同一プロトコル**(DS-4.5) → ホストは `BridgeClient` を無改修で流用
+  (`adb forward tcp:0 tcp:8123` 経由)。AppDriver/FTFoundationModels/FTCore は引き続き無変更
+- 純フレームワーク API の Java のみ(androidx/gradle 不要、SDK 付属ツールでビルド、
+  prebuilt APK を同梱)。初回操作時に自動インストール・自動起動(`AndroidBridge.swift`)。**他のセッション(run・MCP)が
+  使っているデバイスでは作り直さない**(force-stop がそのセッションのブリッジごと落とす)。呼び手がそのデバイスを持つ
+  run(とその子のシナリオ)なら MCP から引き取ったデバイスでも作り直す(`RunnerAccessibilityHealth.hasForeignLeaseUnlessOwnRun`)
+- 実測: snapshot 2.0s → 8.7ms(中央値)、フロー8本 87s → 38s。日本語 type も
+  ACTION_SET_TEXT で IME 不要(ADBKeyboard は不使用)
+- ブリッジ単一実装。adb 直叩き経路(uiautomator dump/input/screencap、Unicode IME 自動導入)は持たない。
+  操作毎の `/status` 事前プローブも持たず、接続拒否系エラー時のみ自動再プロビジョン+1回リトライする
+- 落とし穴: (1) UiAutomation は `am instrument -w` 必須(UiAutomationConnection が am
+  プロセス側に住む)→ デバイス内で `&` バックグラウンド化して常駐 (2) a11y 接続は実質1本
+  → ブリッジ稼働中は他の a11y クライアント(uiautomator dump 等)が Killed される
+  (3) **adbd の再起動(`adb tcpip` / `adb usb`)で UiAutomationConnection(shell・screenshot・
+  入力注入の口)だけが死ぬ** —— a11y は生きたままなので `getRootInActiveWindow()` は取れ、
+  `executeShellCommand` は RemoteException を握って空のパイプを返す(例外にならない)。
+  実測 2026-09-05・Pixel 4a: `DeadObjectException` ×47 のまま `/status` が `ready:true` を返し続け、
+  launch/screenshot が全部 500。版 63 から `/status` が `echo ft-alive` の往復で口の死活を見て
+  `ready:false` + `reason:"uiautomation-dead"` を返し、**自ら exit する**(ホストは connection refused
+  → `ensureBridge` の再セットアップへ倒れる。長寿命プロセスの `.active` キャッシュもこれで消える)。
+  版 64 から**操作系も同じ門を通る**(`BridgeRouter.assertConnectionAlive`): shell の出力が空・
+  `takeScreenshot` が null・`injectInputEvent` が false のときに死活を確かめ、死んでいれば
+  503 で落として exit する —— `/status` を誰も呼ばない長寿命プロセス(MCP・モニター)でも、
+  死んだ口に tap が黙って通ることが無い
+
+
+#### Android のテキスト注入の規律
+
+`InputInjector` の4経路(`setTextAppendingAt` / `clearTextAt` / `setTextAppending` /
+`clearFocused` = ref なしの `clearInput()`)が守る規律。
+**破ると「入ったのに値が壊れる」「成功を返すのに入っていない」が高負荷でだけ出る**
+(8台並列で約40%再現・単独実行では8回中0回。解決後は10周×37シナリオで0件)。
+**ref なしの `clearFocused` だけが1発の `performAction` で 409 を返していた**(2026-09-06 に
+揃えた。ブリッジ版 65): Flutter のパスワード欄で実機 Pixel 4a の 10 周中 5 周が
+「does not accept ACTION_SET_TEXT」で赤。logcat プローブで確定した原因は
+**`findFocus(FOCUS_INPUT)` が半分の確率で欄ではなく FlutterView の入れ物
+(`android.widget.FrameLayout`・editable=false・text=null・子 1 つ)を返す**こと —— Flutter の
+a11y ブリッジが入力フォーカスのセマンティクスノードを持っていない瞬間は、フレームワークが
+フォーカスを持つ View 自体へ倒す。入れ物に SET_TEXT を撃てば拒否(旧 409)、「空」と読めば
+黙って成功(再試行だけ足した中間版では「reported success but the value remained」で 5/10)。
+直し方は **`focusedEditable`**: findFocus の結果が編集可能でなければ木から `isFocused && isEditable`
+を探し、無ければ期限(4 秒)まで引き直す。読む前に refresh・空を読めたら成功・受理だけでは
+成功にしない、は他の3経路と同じ。`pressImeEnter` も同じ選び方(入れ物への ACTION_IME_ENTER は
+必ず失敗し keyevent へ落ちていた)。修正後 10 周 0 件(うち 1 周は木から見つけて成功)
+
+- **`performAction(ACTION_SET_TEXT)` の `true` は「受理された」であって「入った」ではない**。
+  タップがキーボードに吸われてフォーカスが立っていない Compose の TextField は、受理しても
+  反映しない(a11y ノードは座標で見つかるので受理はされる)。**必ず読み返して確認する**
+- **`combined` は最初の確定読みから1回だけ作る**。再発火は常に同じ値=構造的に冪等。
+  読み返すたびに作り直すと、**パスワード欄の a11y 読みはマスクされている**ため伏せ字を値として
+  書き込み(`password=•••…secret42`)、遅延適用と重なれば二重追記になる(`hello123hello123`)
+- **中身のあるマスク欄へは追記そのものを撃たない**(`rejectMaskedAppend`。2026-08-06 追加)。
+  上の規律は「作り**直す**と伏せ字を書く」だったが、**初回構築も同じ穴**だった ——
+  追記は `既存の読み + text` を書き戻す形で、パスワード欄の「既存の読み」は伏せ字そのもの。
+  実測: 空欄へ `abc` → 続けて `def` で、アプリ側の echo が **`•••def`** になり、
+  ツールは "Typed" と成功を返した(値が壊れたことは後段の検証まで分からない)。
+  読める術が無い以上ここは追記できないので **422 で弾く** ——
+  置換したいなら呼び手が先に `clearInput` する(空への置換は冪等で安全)。
+  空欄への1回目は `current` が空なので従来どおり通る。
+  **弾いた判断は `catch (RuntimeException)` で再試行に化けさせない**(BridgeException だけ
+  先に再スローする)。しないと 4 秒待って「ノードが無効化された」という無関係な 500 になる
+- **適用確認はマスク欄だけ長さ一致**で見る(値そのものは読めない)
+- **SET_TEXT はフォーカスが立っているときだけ撃つ**。立たないときは座標でなく `ACTION_CLICK`
+  でフォーカスを要求する(キーボードの開閉で adjustResize が走ると**座標は当てにならない**)。
+  猶予後の未フォーカス発火は最後の1回だけ・検証付き
+- **対象の追跡は `ref` → resource-id 表**(`SnapshotBuilder.Result.refIds`)で毎周回取り直す。
+  点だけを頼ると再レイアウトで別ノードに化ける
+- **フォーカス済みでも 700ms 反映されないなら IME セッションが腐っている**(前のアプリ
+  インスタンスに紐づいた残留)。BACK で IME を閉じ、最新 bounds の中心を**実タップ**して
+  張り直す。`ACTION_CLICK` では張り直らない(実測)。BACK は
+  `UiAutomation.getWindows()` に `TYPE_INPUT_METHOD` があるときだけ撃つ(無いと画面が戻る)
+- **`performAction` / ノード読みは try/catch で「取り直し」に変換**する。レイアウト変化中の
+  ノードは内部で NPE を投げる
+- **読む前に `AccessibilityNodeInfo.refresh()` する**(2026-07-31 追加)。a11y ノードは
+  キャッシュから供給されるので、`getRootInActiveWindow()` を毎周回取り直しても
+  **`getText()` は変更前の値を返し続ける**ことがある。とくに WebView(Chromium)は DOM 変更の
+  a11y イベントを数秒遅れて出す。取り直さないと「SET_TEXT は効いているのに読みが古く、
+  期限切れで 500」= **実際には入っているのに失敗**になる(WebView 入力欄で 20% 再現。
+  期限時のノードは `focused=true` で `text=""` なのに、ホストのスナップショットは
+  `hello123` を読めていた)。`SnapshotBuilder.collect` が `insideWebView` で同じことを
+  していたのに、注入側だけ漏れていた。**副産物として速くなる**: 確認が即座に成立するので
+  WebView の type は 2,000→300ms、通常欄も中央値 864→520ms
+  (キャッシュが古いあいだ待っていたぶんが消えた)
+- **この規律は WebView 限定ではない**(2026-08-01 に範囲を拡大)。IME 等が前面にあると
+  ネイティブ画面でも数秒古いツリーが返り、**アプリは正しいのに検証だけが落ちる**
+  (逆に、遷移前の状態を期待するアサーションは**誤って成功する**)。`SnapshotBuilder.collect` は
+  全ノードで `refresh()` する。**`isVisibleToUser()` より前に呼ぶこと** —— 可視性が古いと
+  実際は見えているノードがサブツリーごと消え、`getChild()` も古い子リストを返す
+- **`refresh()` の戻り値を見る**(2026-09-20 追加)。false は「取り直せなかった」で、
+  **ノードの中身は古いまま残る**。その読みを「値がまだ入っている」の根拠にすると、
+  反映済みの欄を期限切れで落とす(refresh を入れる前と同じ誤りが、refresh 済みの顔で残る)。
+  注入の4経路(`setTextAppendingAt` / `clearTextAt` / `setTextAppending` / `clearFocused`)は
+  **false の周回では読まず・撃たず**、次の周回で木から引き直す。`SnapshotBuilder` は対象外 ——
+  あちらの仕事は「今ある情報を返す」ことで、失敗の判定はしない
+- **期限切れの失敗には判別できるだけの事実を載せる**(`failureFacts`): 最後に読み返した値
+  (**マスク欄は長さだけ**・40 文字で切る)/ 直前の `refresh()` の成否 / `ACTION_SET_TEXT` が
+  受理された回数 / IME ウィンドウが前面か。これが無いと「読みが古かった」のか
+  「アプリが本当に値を戻した」のかが記録から割れない(2026-09-20 の誤った赤 →
+  MN-39.1)
+- **Android の 409 / 500 に受け皿は無い**。ホストが `typeDriver` へフォールバックできるのは
+  iOS の inapp モードだけ(`ScenarioRunnerMain` が iOS の分岐でしか渡さない)なので、
+  ブリッジのこの判断がそのままシナリオの合否になる
+
+**評価して不採用(再提案しない)**: `ACTION_FOCUS` でフォーカスを立てる案は **NPE を誘発して
+失敗率が 2/5 → 5/5 に悪化**した(フォーカス移動でノードが無効化される)。ホスト側での事前・事後の
+キーボード回避(閉じてから打つ/失敗したら閉じて再試行)は**発動しても効果が無い** —
+対策はブリッジの注入ループ内でなければ届かない。
+
 
 ### DS-4.6 座標系の契約と Compose の frame 制約
 

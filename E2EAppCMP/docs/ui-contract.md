@@ -66,7 +66,7 @@ tag 定数は `composeApp/src/commonMain/kotlin/com/ftester/e2e/Tags.kt` に集�
   (`agree=<true|false>` 等)で、`checkIsON` / `checkIsOFF` は echo と並べて書く。
 - **プロセス起動時は必ずホームタブのルートに戻る**(画面遷移状態を永続化しない)。
   `launchApp` はアプリのデータを消さないため、ナビ状態のリセットはアプリ側の責務
-  (DS-23)。永続化するのは下表の「永続」印の付いた値だけ。
+  (docs/design/dsl-syntax.md「inapp の `launchApp` は…アプリのデータは消さない」)。永続化するのは下表の「永続」印の付いた値だけ。
 - **Compose iOS の制約**: Scaffold 等コンテナの testTag は iOS AX ツリーに現れない
   → 着地判定は必ず leaf(Text/Button)で行う。高密度スクロール画面は frame がクランプされ
   tap が外れるため、リスト行の高さは 56dp 以上を確保する。

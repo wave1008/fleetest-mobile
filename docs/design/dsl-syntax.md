@@ -453,6 +453,15 @@ DS-10 は2ファイルに分かれる。後半は dsl-execution.md。
 - `ios { } / android { }`: 対象 OS のときだけ実行する。**中身が実行されなかったことは警告しない**
   (ブロックに何が書かれているかは実行しないと分からないため)
 
+- **xcuitest の `launchApp` も既定で simctl 化**(`FastLaunchDriver`)。`XCUIApplication.launch()`(約4.6s)の代わりに simctl terminate+launch+activate 接続(約2.4s)で再起動する
+  (シナリオ wall −14〜19%)。`FT_NO_FAST_LAUNCH=1` で従来動作へ戻せる。attachOnly(整定なし接続)を launch に使わない理由は PT-6
+- **inapp の `launchApp` は毎回 `simctl launch --terminate-running-process` で terminate+relaunch するが、アプリのデータは消さない**ので、アプリがディスクへ永続化した直前ルートを復元し得る
+  (プロセス再利用ではない)。決定的なナビ状態リセットはアプリ側の責務で、ツールは状態リセットの注入(`SIMCTL_CHILD_FT_RESET` 等)を意図的に提供しない(決定: ユーザー 2026-07-20)。
+  シナリオ側は scene1 で対象タブをルートへ正規化して吸収する
+- **`launchApp` は全モードで常にプロセスを再起動する**(前面化ではない。Android はブリッジの force-stop+起動、xcuitest は `FastLaunchDriver` の terminate 込み launch)。
+  「起動済みならプロセス温存でエントリー画面へ」の warm 化は実装・検証まで行って**中止・破棄**した(2026-08-08): Android は `am start --activity-clear-task` で成立するが、
+  **iOS には起動済みプロセスをエントリー画面へ戻す OS 機構が無く**、前面化(activate)だけでは「起動直後の最初の画面」という契約を満たせない(片 OS のみの機能では意味が無い)
+
 ### ディープリンク配送(`openURL`/`launchApp(url:)`)
 
 - `openURL(url)` = 起動済みアプリへの warm 配送(**再起動しない**)。`launchApp(bundleID?, url:)` は
@@ -665,6 +674,17 @@ select(.id("txt_result")).textIs("dialog=none")   // 検証はセレクタを取
   という判断にはならない。**再検討条件**: 人がカスタマイズしない領域の生成が出てきたとき
   (そこは綴りをコンパイラに任せられるので `Sel` で生成する余地がある)
 
+- **`.型[n]` の n は「現在画面に見えている同型要素のツリー順」**。圧縮スナップショットは画面外要素を含まないため、序数は**スクロール位置と画面クロム(戻るボタン・下部タブ)に依存する**。
+  レイアウト変更で黙ってずれるので、序数セレクタは実スナップショットで採取してから書く
+- **型は「役割」に正規化する**。ブリッジが返す型はネイティブのクラス名ではなく役割で、**OS を跨いで保証されるのは `button` / `staticText` / `textField` / `secureTextField` / `switch` の5つ**。
+  Android 側の正規化規則は3つ(`SnapshotBuilder`): ① clickable なノードが同一 bounds の無名 `android.widget.Button` 子を持てば `button`(Compose は Role.Button をこの形でしか出さない。testTag が付く当のノードは `android.view.View`)/
+  ② `checkable` な汎用ノードは `switch`(Compose の Role.Switch は legacy className を持たない)/ ③ 葉 + contentDesc のみの汎用ノードは `staticText`
+  (Flutter は canvas 描画でテキストも `android.view.View`。これが無いと id を振っていないテキストが丸ごと落ち、ラベルをアンカーにした方向セレクタが使えない)
+- **`checkBox` / `slider` / リスト行は揃えられない**(iOS 側が役割を出さない: Compose の Checkbox/Radio は iOS で `button`、Slider は `other`。同一アプリ・同一画面で実測)。
+  **型で指さず `#id` を使う**。情報が無い側に合わせるしかないケースで、ブリッジ実装では解消できない
+- **Android は「別ウィンドウ」に描画される UI(`AlertDialog` 等)にテスト用 id が出ない**(2026-07-22 実測)。`testTagsAsResourceId` はルートに1回付ければ子孫全体に効くが、ダイアログはルートの子孫ではないため効かず、
+  **ダイアログ内だけ `#id` が全滅する**(ラベルは引ける)。アプリ側でダイアログにも `Modifier.semantics { testTagsAsResourceId = true }` を再適用させる。iOS は testTag が自動で accessibilityIdentifier になるため起きない(Android 固有)
+
 ### 掴んだ要素の値の読み出し
 
 `exist` の戻り値 `FTElement` から `.text` / `.value` / `.id` で**値そのもの**を取れる
@@ -851,6 +871,10 @@ select("#btn_ok"); textIs("OK")                 // 暗黙(トップレベルの�
   メッセージが無いと `countIs("項目", 3)` が 6 を返す理由に辿り着けない(`StepExecutor.nestingHint`)
 - **失敗メッセージのロケータ表示は節を `||` で連ねる**(`FlowStep.locatorSummary`)。
   `(fallback: …)` と呼ばない(`||` は和集合で、「片方だけ使われる」という誤った期待を与えるため)
+
+- **テキストの可視性検証の run では、ソフトキーボードに覆われた要素への `exist`/`textIs` は既定で失敗する**。実行プロファイルの `fmTextVisibilityCheck` / `ocrTextVisibilityCheck` のどちらか(既定はどちらも true)が有効だと、
+  `exist`/`textIs` は既定 `requireVisible: true` のため「`text visibility check failed (on screen)`」になる。入力を伴う画面では検証対象・操作対象を入力欄より**上**に置く
+  (TestProjects/E2E-CMP のテキスト入力画面がこの配置。2026-07-22 実測)
 
 ### 部分一致・正規表現・反復
 
@@ -1049,3 +1073,12 @@ select("#btn_ok"); textIs("OK")                 // 暗黙(トップレベルの�
   snapshot に出すようにした)。**申告できないブリッジ(Compose/Flutter の XCUITest ブリッジ)では
   黙る** —— 使ってよいのは true を見つけたときだけで、
   「false = スクロールできない」と読むと誤報になる
+- **scrollTo の「シートを広げろ」ヒントは `scrollFrame` 未指定でも出す**。`step.scrollFrame != nil` を入口にすると、同じ画面でも指定した2回目にしか出ない(実測: Apple マップの経路手順で、未指定の1回目は
+  「content no longer moved」としか言わなかった)。未指定のときは `StepExecutor.partialHeightSheetExists` が**申告のあるスクロール容器の高さ**で判定する —— 帯は画面の 15〜80%
+  (下端はチップ行・横カルーセル ≒5% を落とし、上端は全画面リストを落とす)。実測でヒントが要った容器は 22%(`#TransitDirectionsListView`)と 37%(`#directions_group_list`)
+- **`scrollFrame` fail-fast の範囲と細部**(`ScrollSearchResult.scrollFrameMissing`。上の「画面に1件も無い scrollFrame は全画面スワイプへ落とさず失敗させる」の続き):
+  scrollTo 探索だけでなく `scrollDown` 等の単発スクロール・`scrollToBottom` 等の端送り・flick 系・`withScroll*` 配下の探索も同じ(全画面退化はどれでもボタン誤発火になり得る)。**`select` 系だけは例外**
+  (「掴めなければ空要素を返す」契約が優先し、fail-fast も skipped になる = 失敗はしないが探索もしない)。探索中に容器が消えた場合も失敗にするが文言は分ける
+  (スワイプ済みなら「disappeared after N swipe(s)」、0本のときだけ「実行していない」。動詞は呼び手ごと: search was not run / swipe was not sent / flick was not sent)。
+  **判定はセレクタ照合そのもの**(`Self.match`)で行う —— `scrollContainer` の nil を流用しない(`FT_SCROLL_TARGET=legacy`(座標スクロールの殺しスイッチ)でも nil を返すので、殺しスイッチが全 scrollFrame シナリオ即死に化ける)。
+  legacy 時は fail-fast ごとスキップして従来挙動へ落とす。scrollFrame 未指定の全画面スワイプは従来どおり(正当な既定)

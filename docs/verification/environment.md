@@ -183,7 +183,7 @@ Compose の入力欄は独自のキーイベント処理を持つため、**他�
 実害(2026-07-28): Android の `pressEnter` はソフトキーボードが出ていると `keyevent 66` が
 View/XML の `EditText` に届かない(IME が消費する)のに、CMP SUT の E2E は通っていた。
 E2E-Android(View/XML)を回して初めて赤くなり、a11y の `ACTION_IME_ENTER` 経路へ作り直した
-(DS-23)。**入力・キー・IME 系を触ったら E2E-Android と E2E-iOS を必ず含める**。
+(docs/design/dsl-syntax.md「Android の Enter はキーイベントでは届かない」)。**入力・キー・IME 系を触ったら E2E-Android と E2E-iOS を必ず含める**。
 
 ## 既知の間欠失敗(2026-08-13 時点)
 

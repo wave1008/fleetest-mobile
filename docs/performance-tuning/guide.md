@@ -375,10 +375,12 @@ window/transition/animator の `*_scale` はチューニングノブではなく
   アサーション経路は従来どおり(部分一致の存在確認は許容)なので、確証が要るときは
   **同一シナリオを XCUITest ブリッジを持たない in-app ブリッジ単独(フォールバック無)でも走らせ当該 tap が失敗することを確認**
   (negative control)。
-- **Compose アプリの type は inapp モードで自動的に XCUITest 実行になる**(design/ §セレクタの
-  inapp モードの type 項)。1 回あたり activate+XCUITest snapshot+type で数秒かかり、inapp の
-  tap(数百 ms)と桁が違う。type を含むシナリオの時間比較・回帰判定では type ステップ数を
-  揃えるか除外して比べる(ネイティブ UIKit アプリの type は inapp のままなのでアプリ間比較も不可)。
+- **inapp モードでも XCUITest へ回る type がある**: 改行を含む文字列(iOS の Return キーの既定の挙動に揃えるため。
+  `StepExecutor` が typeDriver を優先する)と、in-app ブリッジが 409 等で打てなかったとき(ロケータ付きは `StepExecutor` が
+  `DriverError.isTextInputFallback` で、ref なしは `HybridFallbackDriver.type` が退避する)。それ以外は Compose を含めて in-app で打つ
+  (`ScenarioRunnerMain` の `preferTypeDriver` は常に false)。XCUITest 経路の type は in-app より数倍遅い
+  (Compose の実測で in-app 266ms・XCUITest 1.0〜1.3s)。type を含むシナリオの時間比較・回帰判定では、
+  XCUITest へ回る type の数を揃えるか除外して比べる(改行入りは文字列で、退避はステップの注記で分かる)。
 - **通知許可ダイアログのリセットは `simctl privacy` では効かない**(あれは TCC=写真/連絡先等)。
   通知権限は**アプリ再インストール(uninstall→install)でのみ未決定に戻る**。ダイアログ系の
   fixture を繰り返し検証するときは各回 reinstall する

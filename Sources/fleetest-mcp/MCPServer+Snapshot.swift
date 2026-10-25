@@ -1269,7 +1269,7 @@ extension MCPServer {
     ///
     /// 自前でスワイプのループを書かない理由: 整定待ち・キャッシュ回避・容器基準の刻み・
     /// ghost の掴み直し・飛び越しの拾い直し・打ち切りは全部 StepExecutor に入っており、
-    /// **同じ知見の2つ目の実装を作ると必ず割れる**(docs/design/ の「契約は1箇所」)。
+    /// **同じ知見の2つ目の実装を作ると必ず割れる**(CLAUDE.md「判定は1箇所に置く」)。
     /// ここは FlowStep を1つ組んで投げるだけにする = MCP で届く要素はシナリオでも届く。
     /// `scrollFrame` 引数の解決結果。**ref(整数)は rect へ、文字列は locator へ**
     /// (FlowStep.scrollFrameRect 参照)。`original` は ref 経由のときだけ埋まり、

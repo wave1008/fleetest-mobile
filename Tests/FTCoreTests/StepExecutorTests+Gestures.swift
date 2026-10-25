@@ -469,7 +469,7 @@ extension StepExecutorTests {
 
         XCTAssertEqual(outcome.driverFallback?.contains("still reported outside"), true,
                        "救えなかったことを注記に残すこと: \(outcome.driverFallback ?? "nil") 呼び出し=\(log.entries)")
-        // **止めないのは設計どおり**(docs/design/history.md「スクロール残像(ghost)は拒否せず、警告して撃つ」)。
+        // **止めないのは設計どおり**(docs/design/dsl-execution.md「スクロール残像(ghost)は拒否せず、警告して撃つ」)。
         // その代わり run 横断で数えられる注記を必ず残す
         guard case .passed = outcome.status else {
             XCTFail("外のままでも撃って緑のまま(設計どおり)の想定だが \(outcome.status) だった"); return

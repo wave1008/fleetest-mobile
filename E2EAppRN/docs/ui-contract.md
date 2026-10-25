@@ -122,7 +122,7 @@ xcuitest は Modal の内容だけを見るが、**in-app は背景ツリーと�
 **入力欄がネイティブ SUT(SwiftUI/View)と同型になるのが RN の特徴**(`RCTUITextField` は
 `UITextField` 派生・`ReactEditText` は `EditText` 派生のため)。CMP(iOS は入力欄が全部 `textView`)とも
 Flutter(in-app では `other`)とも違い、新しい型分岐をホスト側に足す必要が無かった
-(docs/design/ の「入力欄は『モード間で揃える』ところまでが担保」)。
+(docs/design/overview.md「入力欄は「モード間で揃える」ところまでが担保」)。
 
 `type` / `pressEnter` は両 OS・両モードで既存経路がそのまま通る(controlled `TextInput` の値
 巻き戻しは起きない。in-app の `pressEnter` も UIKit 経路で発火し、Flutter のような engine 私有 API
