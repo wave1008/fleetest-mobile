@@ -143,13 +143,29 @@ final class RemoteHostRegistryTests: XCTestCase {
         XCTAssertEqual(result.first { $0.machine == "b" }?.color, "rose")
     }
 
-    /// 出力が実行のたびに揺れないよう、名前順で安定に並べる
-    func testUpsertKeepsResultSortedByName() {
+    /// 並びは利用者が決めた順。新規は末尾に足し、既存の置き換えは位置を変えない(名前順へ戻さない)
+    func testUpsertAppendsNewAndReplacesInPlace() {
         var entries: [RemoteHostEntry] = []
         entries = RemoteHostRegistry.upsert(RemoteHostEntry(machine: "zeta", host: "z@host"), into: entries)
         entries = RemoteHostRegistry.upsert(RemoteHostEntry(machine: "alpha", host: "a@host"), into: entries)
         entries = RemoteHostRegistry.upsert(RemoteHostEntry(machine: "mid", host: "m@host"), into: entries)
-        XCTAssertEqual(entries.map(\.machine), ["alpha", "mid", "zeta"])
+        entries = RemoteHostRegistry.upsert(RemoteHostEntry(machine: "zeta", host: "z2@host"), into: entries)
+        XCTAssertEqual(entries.map(\.machine), ["zeta", "alpha", "mid"])
+        XCTAssertEqual(entries.first?.host, "z2@host")
+    }
+
+    // MARK: - reorder
+
+    func testReorderPutsListedFirstAndKeepsRestInRelativeOrder() {
+        let entries = ["a", "b", "c", "d"].map { RemoteHostEntry(machine: $0, host: "\($0)@host") }
+        XCTAssertEqual(RemoteHostRegistry.reorder(["c", "a"], in: entries).map(\.machine),
+                       ["c", "a", "b", "d"])
+    }
+
+    /// 登録に無い名前は無視し、登録を増やしも消しもしない
+    func testReorderIgnoresUnknownNames() {
+        let entries = ["a", "b"].map { RemoteHostEntry(machine: $0, host: "\($0)@host") }
+        XCTAssertEqual(RemoteHostRegistry.reorder(["x", "b", "local"], in: entries).map(\.machine), ["b", "a"])
     }
 
     // MARK: - upsert developerDir (Xcode pin)

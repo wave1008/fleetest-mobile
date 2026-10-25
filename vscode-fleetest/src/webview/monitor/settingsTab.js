@@ -119,7 +119,7 @@ languageSelect.addEventListener('change', () => {
 // 埋めておく)。入力欄には「これになる」名前をウォーターマークで出す。
 const remoteHostsError = document.getElementById('settings-remote-hosts-error');
 let hostRows = []; // { id, tr, machineInput, hostInput, dirInput, fmInput, confirmed, confirmButton,
-                    //   color, colorSwatch, enabledInput }
+                    //   color, colorSwatch, enabledInput, moveUpButton }。**配列の順 = 表の行の順 = 送る順**
 let nextRowId = 0;
 // 未設定時の FM 枠。**CLI が返す値をそのまま使う**(拡張は定数を持たない —— 二重管理にすると
 // 片方だけ変わったときにウォーターマークが嘘になる)。未受信のうちは空欄のまま
@@ -149,7 +149,11 @@ function renderLocalRow(tbody, local) {
     td.appendChild(input);
     tr.appendChild(td);
   };
-  // **列の並びは可変行と揃える**(user@host → マシン → バッジ色 → マシン有効 → FM 並列枠 → 作業ベースディレクトリ)
+  // **列の並びは可変行と揃える**(並べ替え → user@host → マシン → バッジ色 → マシン有効 → FM 並列枠 → 作業ベースディレクトリ)。
+  // この機械の行は先頭に固定なので並べ替えのボタンを持たない(空のセルで列数だけ揃える)
+  const moveTd = document.createElement('td');
+  moveTd.className = 'settings-remote-hosts-move';
+  tr.appendChild(moveTd);
   fixedCell(local.host, 'settings-remote-hosts-host');
   fixedCell(local.machine, 'settings-remote-hosts-machine');
   // この機械にはリモートのバッジが出ないので色は持たない(空のセルで列数だけ揃える)
@@ -340,6 +344,7 @@ function removeHostRow(id) {
   }
   const [row] = hostRows.splice(index, 1);
   row.tr.remove();
+  refreshMoveUpButtons();
   if (colorPopoverRow === row) {
     closeColorPopover();
   }
@@ -479,6 +484,7 @@ function confirmHostRow(id) {
   row.confirmButton.remove();
   row.confirmButton = null;
   row.tr.classList.remove('settings-remote-hosts-row-pending');
+  refreshMoveUpButtons();
   onHostsChanged();
 }
 
@@ -518,8 +524,20 @@ function addHostRow(host, confirmed) {
     return input;
   };
 
-  // **列の並び = td を append する順**。ホスト → マシン → バッジ色 → マシン有効 → FM → ディレクトリ。
+  // **列の並び = td を append する順**。並べ替え → ホスト → マシン → バッジ色 → マシン有効 → FM → ディレクトリ。
   // 必須の host を先に置き、任意のマシン名をその右に置く(見出しは monitorHtml.ts と対)
+  const moveTd = document.createElement('td');
+  moveTd.className = 'settings-remote-hosts-move';
+  const moveUpButton = document.createElement('button');
+  moveUpButton.type = 'button';
+  moveUpButton.className = 'settings-remote-hosts-move-up';
+  moveUpButton.title = t('wvMonitor2.remote.moveUpTitle');
+  moveUpButton.setAttribute('aria-label', t('wvMonitor2.remote.moveUpTitle'));
+  moveUpButton.innerHTML = MOVE_UP_ICON;
+  moveUpButton.addEventListener('click', () => moveHostRowUp(id));
+  moveTd.appendChild(moveUpButton);
+  tr.appendChild(moveTd);
+  row.moveUpButton = moveUpButton;
   row.hostInput = makeTextCell(host ? host.host : '', 'user@host', 'settings-remote-hosts-host');
   row.color = host ? (host.color || '') : '';
   row.machineInput = makeTextCell(host ? host.machine : '', '', 'settings-remote-hosts-machine');
@@ -594,6 +612,36 @@ function addHostRow(host, confirmed) {
 
   remoteHostsBody.appendChild(tr);
   hostRows.push(row);
+  refreshMoveUpButtons();
+}
+
+// 上向き矢印(軸 + 山形の頭)。currentColor で塗るのでテーマの文字色に従う
+const MOVE_UP_ICON = '<svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor"'
+  + ' stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+  + '<path d="M8 13.5V3"/><path d="M3.5 7.5 8 3l4.5 4.5"/></svg>';
+
+/** ↑ボタンを出すのは**2つ目以降の確定済みのリモートの行だけ**。先頭のリモートの行は
+ *  この機械の行(先頭に固定)より上へ行けないので出さない。未確定の行は登録簿に無く、
+ *  remoteConfig の作り直しで常に末尾へ戻るので出さない */
+function refreshMoveUpButtons() {
+  hostRows.forEach((row, index) => {
+    row.moveUpButton.hidden = !(row.confirmed && index > 0 && hostRows[index - 1].confirmed);
+  });
+}
+
+/** 行を1つ上の確定済みの行と入れ替え、表の並びのまま送る(並びは monitorPanel.ts が --order で CLI へ届ける) */
+function moveHostRowUp(id) {
+  const index = hostRows.findIndex((r) => r.id === id);
+  if (index <= 0 || !hostRows[index].confirmed || !hostRows[index - 1].confirmed) {
+    return;
+  }
+  const row = hostRows[index];
+  const above = hostRows[index - 1];
+  hostRows[index - 1] = row;
+  hostRows[index] = above;
+  above.tr.before(row.tr);
+  refreshMoveUpButtons();
+  onHostsChanged();
 }
 
 remoteHostsAddButton.addEventListener('click', () => {
@@ -632,6 +680,7 @@ function applyRemoteConfig(message) {
     remoteHostsBody.appendChild(row.tr);
     hostRows.push(row);
   }
+  refreshMoveUpButtons();
   if (typeof message.error === 'string' && message.error !== '') {
     delete remoteHostsError.dataset.duplicate;
     remoteHostsError.textContent = t('wvMonitor2.remote.syncFailed', { reason: message.error });

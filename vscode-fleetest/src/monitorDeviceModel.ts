@@ -536,15 +536,41 @@ export function isMonitorEvent(value: unknown): value is MonitorEvent {
 }
 
 /**
- * デバイス一覧を整列する: **手元が先 → 機械名順 → ios→android → 仮想デバイス→実機 → name 順**
- * (ユーザー決定)。
+ * デバイス一覧を整列する: **手元が先 → 機械の順(compareMachineOrder) → ios→android → 仮想デバイス→実機 → name 順**
+ * (ユーザー決定)。machineOrder は設定タブのマシン一覧の順(登録簿の順。手元は含めない)。
  * **機械が外側**なのは、デバイスは機械ごとに起動・停止し、run も機械ごとに配られるため ——
  * タイルは1列なので、外側 = 左右のかたまりになる。
  * monitorProcessManager.ts が monitorDevices 受信時に適用し、以降の全消費側
  * (タイル・拡大表示・実行ログ・run ボードのツリー)はこの順で受け取る。
  */
-export function sortMonitorDevices(devices: readonly MonitorDevice[]): MonitorDevice[] {
-  return [...devices].sort(compareMonitorDeviceOrder);
+export function sortMonitorDevices(
+  devices: readonly MonitorDevice[],
+  machineOrder: readonly string[],
+): MonitorDevice[] {
+  return [...devices].sort((a, b) => compareMonitorDeviceOrder(a, b, machineOrder));
+}
+
+/** 機械の表示順の唯一の定義元: **手元(undefined / 空文字)が先 → machineOrder(設定タブのマシン一覧 =
+ * 登録簿の順)→ 一覧に無い機械は名前順**。デバイスモニター(タイル・ホストのグラフ・run ボード)と
+ * ダッシュボードが共有する —— 別々に持つと、設定タブで並べ替えたときに一部の表示だけ古い順に残る。
+ * webview 側は machineColors.js の settingsMachineOrder() を渡す */
+export function compareMachineOrder(
+  a: string | undefined,
+  b: string | undefined,
+  machineOrder: readonly string[],
+): number {
+  const [ma, mb] = [a ?? "", b ?? ""];
+  if (ma === mb) {
+    return 0;
+  }
+  if (ma === "" || mb === "") {
+    return ma === "" ? -1 : 1;
+  }
+  const [ra, rb] = [machineOrder.indexOf(ma), machineOrder.indexOf(mb)];
+  if (ra !== rb) {
+    return ra === -1 ? 1 : rb === -1 ? -1 : ra - rb;
+  }
+  return ma.localeCompare(mb);
 }
 
 /** 周期の monitorDevices が、先に届いた monitorStorage(1台の計測の終わり)を巻き戻さないようにする。
@@ -574,10 +600,11 @@ export function keepFinishedStorage(
 export function compareMonitorDeviceOrder(
   a: { readonly machine?: string; readonly platform: string; readonly kind?: string; readonly name: string },
   b: { readonly machine?: string; readonly platform: string; readonly kind?: string; readonly name: string },
+  machineOrder: readonly string[],
 ): number {
-  const [ha, hb] = [a.machine ?? "", b.machine ?? ""];
-  if (ha !== hb) {
-    return ha === "" ? -1 : hb === "" ? 1 : ha.localeCompare(hb);  // 手元が先
+  const byMachine = compareMachineOrder(a.machine, b.machine, machineOrder);
+  if (byMachine !== 0) {
+    return byMachine;
   }
   if (a.platform !== b.platform) {
     return a.platform === "ios" ? -1 : 1;

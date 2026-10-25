@@ -738,7 +738,7 @@ test("同じ機械・同じ OS の中は Simulator / Emulator が先、実機が
     device("android", "virtual", "Z-emu"),
     device("ios", undefined, "Z-sim"),  // kind 欠落は仮想デバイス
     device("ios", "virtual", "Y-sim"),
-  ]);
+  ], []);
   assert.deepEqual(sorted.map((d) => d.id), ["Y-sim", "Z-sim", "A-iPhone", "Z-emu", "A-phone"]);
 });
 
@@ -754,7 +754,7 @@ test("デバイスの並びは機械が外側・OS が内側", async () => {
     device("M1Max", "android", "Pixel-02"),
     device(undefined, "ios", "iPhone-02"),
     device("M1Max", "ios", "iPhone-00"),
-  ]);
+  ], []);
   assert.deepEqual(sorted.map((d) => d.id), [
     // 手元(machine 無し)が先。その中で ios → android
     "undefined:iPhone-02",
@@ -764,4 +764,18 @@ test("デバイスの並びは機械が外側・OS が内側", async () => {
     "M1Max:iPhone-01",
     "M1Max:Pixel-02",
   ]);
+});
+
+// 機械の順は設定タブのマシン一覧(登録簿の順)。一覧に無い機械はその後ろに名前順。手元は常に先頭
+test("機械の順は設定タブのマシン一覧に従い、一覧に無い機械は後ろに名前順", async () => {
+  const { sortMonitorDevices } = await import("../src/monitorDeviceModel");
+  const device = (machine) => ({
+    id: machine ?? "local", name: "iPhone", platform: "ios", state: "connected", detail: "", kind: "virtual",
+    ...(machine ? { machine } : {}),
+  });
+  const sorted = sortMonitorDevices(
+    [device("Zed"), device("M1Max"), device(undefined), device("Abc"), device("M1Ultra")],
+    ["M1Ultra", "M1Max"],
+  );
+  assert.deepEqual(sorted.map((d) => d.id), ["local", "M1Ultra", "M1Max", "Abc", "Zed"]);
 });

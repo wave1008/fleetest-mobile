@@ -944,3 +944,16 @@ test("境目は端まで引き切れない(左右どちらも 80px は残す)", 
   assert.equal(leftWidth(document), "320px", "400 - 80");
 });
 
+
+test("機械の行は設定タブのマシン一覧の順に並び、並べ替えたら即座に並べ直す", (t) => {
+  const { window, document } = createWebview();
+  t.after(() => window.close());
+  post(window, { type: "hostMetricsMachines", machines: ["M1Max", "M1Ultra"] });
+  post(window, { type: "monitorRuns", observed: true, runs: [] });
+  post(window, { type: "monitorRuns", machine: "M1Max", observed: true, runs: [] });
+  post(window, { type: "monitorRuns", machine: "M1Ultra", observed: true, runs: [] });
+  const machines = () => boardRows(document).map(badgeOf);
+  assert.deepEqual(machines(), ["local", "M1Max", "M1Ultra"], "一覧が届く前は名前順");
+  post(window, { type: "remoteConfig", hosts: [{ machine: "M1Ultra", host: "u@u", dir: "" }, { machine: "M1Max", host: "u@m", dir: "" }] });
+  assert.deepEqual(machines(), ["local", "M1Ultra", "M1Max"]);
+});

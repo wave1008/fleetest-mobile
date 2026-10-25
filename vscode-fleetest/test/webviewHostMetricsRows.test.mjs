@@ -1059,3 +1059,13 @@ test("新しい機械の行は、手元のエンコーダーが dead でも語�
   assert.equal(encoderBadge(document, "mac2"), null);
   assert.equal(encoderTip(document, "mac2"), "");
 });
+
+test("ホストのグラフの行は設定タブのマシン一覧の順に並び、並べ替えたら即座に並べ直す", (t) => {
+  const { window, document } = createWebview();
+  t.after(() => window.close());
+  send(window, { type: "hostMetricsMachines", machines: ["mac2", "mac3"] });
+  send(window, { type: "remoteConfig", hosts: [{ machine: "mac3", host: "u@3", dir: "" }, { machine: "mac2", host: "u@2", dir: "" }] });
+  assert.deepEqual(machineLabels(document), ["local", "mac3", "mac2"]);
+  send(window, { type: "remoteConfig", hosts: [{ machine: "mac2", host: "u@2", dir: "" }, { machine: "mac3", host: "u@3", dir: "" }] });
+  assert.deepEqual(machineLabels(document), ["local", "mac2", "mac3"]);
+});

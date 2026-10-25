@@ -12,6 +12,7 @@ import {
   normalizeRemoteHosts,
   parseMachineColors,
   parseRemoteHostsResponse,
+  remoteHostsOrderToSync,
 } from "../src/remoteRunArgs";
 
 test("normalizeRemoteHosts: 配列でない/不正要素は除去", () => {
@@ -273,4 +274,19 @@ test("diffRemoteHostsForSync: pin 済みマシンの他欄編集は upsert に d
   assert.equal("developerDir" in upserts[0], false,
     "developerDir キーが無ければ CLI の import は既存の pin を保つ(ApiRemoteHostsCommand.mergingDeveloperDir)");
   assert.equal(JSON.stringify(upserts[0]).includes("developerDir"), false);
+});
+
+const hostsNamed = (...names) => names.map((machine) => ({ machine, host: `u@${machine}`, dir: "" }));
+
+test("remoteHostsOrderToSync: 並びが同じなら undefined", () => {
+  assert.equal(remoteHostsOrderToSync(hostsNamed("a", "b"), hostsNamed("a", "b")), undefined);
+});
+
+test("remoteHostsOrderToSync: 並びが違えば設定タブの順を返す", () => {
+  assert.deepEqual(remoteHostsOrderToSync(hostsNamed("a", "b", "c"), hostsNamed("a", "c", "b")), ["a", "c", "b"]);
+});
+
+test("remoteHostsOrderToSync: local と登録簿に無い名前(書き込み失敗)は数えない", () => {
+  assert.equal(remoteHostsOrderToSync(hostsNamed("a", "b"), hostsNamed("local", "a", "x", "b")), undefined);
+  assert.deepEqual(remoteHostsOrderToSync(hostsNamed("a", "b"), hostsNamed("local", "b", "x", "a")), ["b", "a"]);
 });

@@ -1134,3 +1134,26 @@ test("run 詳細: humanOperations の欄が無い記録は従来どおり描く(
   assert.equal(window.document.querySelectorAll("#run-detail-body .human-operations").length, 0);
   assert.ok(window.document.querySelector("#run-detail-body .scenario-detail table"));
 });
+
+test("デバイスの健全性: 機械の並びは設定タブのマシン一覧に従い、並べ替えたら即座に並べ直す", (t) => {
+  const { window, sendToWebview } = createWebview();
+  t.after(() => window.close());
+  showAllDevices(window);
+  sendToWebview({ type: "dashboard", message: { type: "data", payload: basePayload({}) } });
+  sendToWebview({
+    type: "devices",
+    filter: "all",
+    devices: [
+      monitorDevice({ id: "M1Max:ios:a", name: "a", platform: "ios", machine: "M1Max" }),
+      monitorDevice({ id: "M1Ultra:ios:b", name: "b", platform: "ios", machine: "M1Ultra" }),
+      monitorDevice({ id: "ios:c", name: "c", platform: "ios" }),
+    ],
+  });
+  const names = () => [...window.document.querySelectorAll("#table-device-health-body tr[data-worker]")]
+    .map((tr) => tr.dataset.worker);
+  assert.deepEqual(names(), ["ios:c", "ios:a", "ios:b"], "一覧が届く前は名前順");
+  // デバイス一覧の再送を待たない(remoteConfig だけで並べ直す)
+  sendToWebview({ type: "remoteConfig",
+    hosts: [{ machine: "M1Ultra", host: "u@u", dir: "" }, { machine: "M1Max", host: "u@m", dir: "" }] });
+  assert.deepEqual(names(), ["ios:c", "ios:b", "ios:a"]);
+});

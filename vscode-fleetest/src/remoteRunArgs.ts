@@ -239,6 +239,21 @@ export function diffRemoteHostsForSync(
   return { removedNames, upserts };
 }
 
+/**
+ * 設定タブの行の順(next)と CLI が返した登録簿の順(current)が違えば、送る並び(マシン名の列)を返す。
+ * 同じなら undefined。`diffRemoteHostsForSync` は machine で突き合わせるので**並びの違いを差分にしない** ——
+ * 並べ替えだけの編集はここでしか CLI へ届かない。"local"(固定行)と、登録簿に無い名前(書き込みに失敗した行)は数えない。
+ */
+export function remoteHostsOrderToSync(
+  current: readonly RemoteHostEntry[],
+  next: readonly RemoteHostEntry[],
+): readonly string[] | undefined {
+  const registered = new Set(current.map((h) => h.machine));
+  const desired = next.map((h) => h.machine).filter((m) => registered.has(m));
+  const actual = current.map((h) => h.machine).filter((m) => desired.includes(m));
+  return desired.join(",") === actual.join(",") ? undefined : desired;
+}
+
 /** `fleetest api remote-machines` の応答のうち **hosts[] 以外の欄**の控え。
  *  拡張はこれを保持し、webview へ送り返す `remoteConfig` に載せる。 */
 export interface RemoteHostsSideFields {

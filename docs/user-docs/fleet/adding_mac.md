@@ -191,6 +191,10 @@ Expected result:
   are not scheduled onto that machine. Devices of a run profile that live on it are skipped and
   the scenarios go to the remaining machines. The row for your own Mac has it too. A run that
   names the machine explicitly with `--runner` still reaches it.
+- Every remote machine row except the first has an up-arrow button at the left end. Pressing it
+  moves the row up by one and saves that order. The row for your own Mac always stays at the top.
+  The Device Monitor and the dashboard follow this order right away (tiles, graph rows, the run
+  board and the health tables).
 - The "−" at the right end of a row removes the registration after you confirm it in a dialog.
 - "user@host" and the machine name must be unique (a blank machine name counts as the name taken
   from "user@host", and `local` is taken by your own Mac). If they collide, nothing is saved: the

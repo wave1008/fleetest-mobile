@@ -63,7 +63,7 @@ polling (screenshots at a fixed interval); the choice is remembered per workspac
   (recording clips are still extracted with the software encoder, which is slower; hover it for the reason and when it was observed).
   Only for a run with the OCR text visibility check (`ocrTextVisibilityCheck`) turned on: while the OCR model is being compiled (for example on the first run after a rebuild; tens of seconds), the run waits
   for the compile to finish before starting its first scenario ("Compiling Vision…" appears in the running list).
-  Turning on **"Show memory size, CPU cores, and GPU cores in the Device Monitor"** (Machines section of the
+  Turning on **"Show memory size and core counts"** (Device Monitor section of the
   Settings tab, off by default) adds each machine's capacity to the labels, such as `MEM 192` (GB) / `CPU 24` /
   `GPU 76` (`MEM -` until the values arrive).
 - The **run board** under the toolbar shows one row per machine — this Mac and every registered

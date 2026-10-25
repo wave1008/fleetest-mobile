@@ -26,10 +26,18 @@ struct ApiRemoteHostsCommand: AsyncParsableCommand {
     @Option(help: "Remove this entry by machine name, then print the resulting registry")
     var remove: String?
 
-    func run() async throws {
-        if importJSON != nil && remove != nil {
-            throw ValidationError("--import and --remove cannot be combined")
+    @Option(help: ArgumentHelp("Reorder the registry to these machine names (comma-separated; unlisted "
+                + "machines keep their relative order after them), then print the resulting registry"))
+    var order: String?
+
+    /// 解析の段で断る(run() は設定ファイルを読み書きするので、ここに置くと検査だけを試せない)
+    func validate() throws {
+        if [importJSON != nil, remove != nil, order != nil].filter({ $0 }).count > 1 {
+            throw ValidationError("--import, --remove and --order cannot be combined")
         }
+    }
+
+    func run() async throws {
 
         var config = LocalConfig.load()
         if let importJSON {
@@ -60,6 +68,9 @@ struct ApiRemoteHostsCommand: AsyncParsableCommand {
             try config.save()
         } else if let name = remove {
             config.remoteHosts = RemoteHostRegistry.remove(machine: name, from: config.remoteHosts ?? [])
+            try config.save()
+        } else if let order {
+            config.remoteHosts = RemoteHostRegistry.reorder(Self.orderNames(order), in: config.remoteHosts ?? [])
             try config.save()
         }
 
@@ -104,6 +115,14 @@ struct ApiRemoteHostsCommand: AsyncParsableCommand {
             let known = MachineBadgeColor.palette.map(\.key).joined(separator: ", ")
             throw ValidationError("unknown machine badge color \"\(raw)\" (known: \(known))")
         }
+    }
+
+    /// `--order` の値(カンマ区切りのマシン名)。前後の空白は落とし、空の要素は捨てる
+    /// (マシン名にカンマと空白は使えない = `RemoteHostRegistry.validateName`)
+    static func orderNames(_ raw: String) -> [String] {
+        raw.split(separator: ",")
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
     }
 
     static func decodeImport(_ json: String) throws -> [RemoteHostEntry] {

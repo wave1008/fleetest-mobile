@@ -24,7 +24,7 @@ import { syncChildren } from '../monitor/rowSync.js';
 import { formatLocalDateTime } from './format.js';
 import { machineLabel } from './machineNames.js';
 import { monitorDevices, onMonitorDevicesChanged } from '../monitor/deviceTiles.js';
-import { LOCAL_MACHINE_LABEL, paintMachineBadge } from '../monitor/machineColors.js';
+import { LOCAL_MACHINE_LABEL, onMachineOrderChanged, paintMachineBadge, settingsMachineOrder } from '../monitor/machineColors.js';
 import { adoptTitleHoverTips, setHoverTip } from '../monitor/hoverTip.js';
 import { formatBytesAuto } from '../../retentionModel';
 import { compareMonitorDeviceOrder } from '../../monitorDeviceModel';
@@ -120,7 +120,8 @@ function orderKey(row) {
 }
 
 function sortRows(rows) {
-  return [...rows].sort((a, b) => compareMonitorDeviceOrder(orderKey(a), orderKey(b)));
+  const order = settingsMachineOrder();
+  return [...rows].sort((a, b) => compareMonitorDeviceOrder(orderKey(a), orderKey(b), order));
 }
 
 /** deviceHealth(履歴)と monitorDevices()(今の状態)を machine+worker で結合する。 */
@@ -543,6 +544,14 @@ onMonitorDevicesChanged(() => {
   }
   lastMonitorSignature = signature;
   currentRows = rows;
+  renderRows();
+});
+
+// 設定タブで並べ替えたら行も並べ直す。**デバイス一覧の再送(拡張が並べ直す)を待たない** —— 一覧は remoteConfig より
+// 先に届くことがあり、そのときはまだ古い順で結合している
+onMachineOrderChanged(() => {
+  lastMonitorSignature = null;
+  currentRows = combineRows(lastHealthRows);
   renderRows();
 });
 

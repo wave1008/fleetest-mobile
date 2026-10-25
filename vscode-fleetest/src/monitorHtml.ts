@@ -939,6 +939,12 @@ function renderSettingsPanel(): string {
         </select>
       </div>
       <div class="settings-group">
+        <div class="settings-section-title">${t("panels.settings.deviceMonitorSectionTitle")}</div>
+        <!-- ツールバーのホストグラフの名札を CPU n / GPU n / MEM GB にする(既定 OFF)。
+             対向: settingsTab.js / hostCharts.js の setShowMachineCapacity, monitorPanel.ts。 -->
+        <label class="settings-item"><input type="checkbox" id="settings-show-machine-capacity"> ${t("panels.settings.showMachineCapacityLabel")}</label>
+      </div>
+      <div class="settings-group">
         <div class="settings-section-title">${t("panels.settings.schedulingSectionTitle")}</div>
         <label class="settings-item"><input type="checkbox" id="settings-lpt"> ${t("panels.settings.lptSchedulingLabel")}</label>
         <div class="settings-hint">${t("panels.settings.lptSchedulingHint")}</div>
@@ -1027,6 +1033,7 @@ function renderSettingsPanel(): string {
         <table class="settings-remote-hosts-table">
           <thead>
             <tr>
+              <th class="settings-remote-hosts-move"></th>
               <th class="settings-remote-hosts-host">${t("panels.settings.remoteHostsColHost")}</th>
               <th class="settings-remote-hosts-machine">${t("panels.settings.remoteHostsColMachine")}</th>
               <th class="settings-remote-hosts-color">${t("panels.settings.remoteHostsColColor")}</th>
@@ -1051,9 +1058,6 @@ function renderSettingsPanel(): string {
           <input type="number" id="settings-remote-wait-lock" class="settings-number settings-seconds-number" min="0" step="1">
           <span class="settings-unit">${t("panels.settings.remoteWaitLockUnit")}</span>
         </label>
-        <!-- ツールバーのホストグラフの名札を CPU n / GPU n / MEM GB にする(既定 OFF)。
-             対向: settingsTab.js / hostCharts.js の setShowMachineCapacity, monitorPanel.ts。 -->
-        <label class="settings-item"><input type="checkbox" id="settings-show-machine-capacity"> ${t("panels.settings.showMachineCapacityLabel")}</label>
       </div>
     </div>
   </div>`;

@@ -255,6 +255,7 @@ export const panelsStrings = {
 
   "panels.settings.deviceScreenSectionTitle": { ja: "デバイス画面", en: "Device screen" },
   "panels.settings.schedulingSectionTitle": { ja: "スケジューリング", en: "Scheduling" },
+  "panels.settings.deviceMonitorSectionTitle": { ja: "デバイスモニター", en: "Device Monitor" },
   "panels.settings.lptSchedulingLabel": {
     ja: "LPT スケジューリングを有効にする",
     en: "Enable LPT scheduling",
@@ -317,8 +318,8 @@ export const panelsStrings = {
   },
   "panels.settings.remoteWaitLockUnit": { ja: "秒", en: "sec" },
   "panels.settings.showMachineCapacityLabel": {
-    ja: "デバイスモニターにメモリ容量、CPUコア数、GPUコア数を表示する",
-    en: "Show memory size, CPU cores, and GPU cores in the device monitor",
+    ja: "メモリ容量、コア数を表示する",
+    en: "Show memory size and core counts",
   },
 
   // 設定タブ「ログ・録画」のクリーンアップ欄(静的ラベル)。保持ポリシーの実体は **VSCode 設定ではなく

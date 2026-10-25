@@ -79,7 +79,8 @@ public enum RemoteHostRegistry {
         return .rawTarget(trimmed)
     }
 
-    /// 同名は置き換え、無ければ追加。マシン名順で安定に並べる(出力が実行のたびに揺れない)。
+    /// 同名は**その位置で**置き換え、無ければ末尾に追加。**並べ替えない** —— 並びは利用者が設定タブで
+    /// 決めた順(`reorder`)で、名前順へ戻すとどの編集でも決めた順が崩れる。
     /// **色の唯一の決定点**: entry.color が nil なら既存(同名)の色を保つ・既存も無ければ
     /// 他のマシンと重ならない色を自動割り当てする(色を省略した upsert で色が消えないように —
     /// upsert は丸ごと置き換えなので、ここで保たないと別件の add で色が消える)。
@@ -104,9 +105,26 @@ public enum RemoteHostRegistry {
         let resolved = RemoteHostEntry(machine: entry.machine, host: entry.host, dir: entry.dir,
                                        fmConcurrency: entry.fmConcurrency, color: color, enabled: enabled,
                                        developerDir: entry.developerDir)
-        var result = others
-        result.append(resolved)
-        return result.sorted { $0.machine < $1.machine }
+        var result = entries
+        if let index = result.firstIndex(where: { $0.machine == entry.machine }) {
+            result[index] = resolved
+        } else {
+            result.append(resolved)
+        }
+        return result
+    }
+
+    /// names の順に並べ直す。names に無い登録はその後ろに元の相対順のまま残し、登録に無い名前は無視する
+    /// (並べ替えで登録を増やしも消しもしない)
+    public static func reorder(_ names: [String], in entries: [RemoteHostEntry]) -> [RemoteHostEntry] {
+        var rest = entries
+        var result: [RemoteHostEntry] = []
+        for name in names {
+            if let index = rest.firstIndex(where: { $0.machine == name }) {
+                result.append(rest.remove(at: index))
+            }
+        }
+        return result + rest
     }
 
     public static func remove(machine: String, from entries: [RemoteHostEntry]) -> [RemoteHostEntry] {

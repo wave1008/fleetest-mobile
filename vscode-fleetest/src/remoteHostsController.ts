@@ -7,6 +7,7 @@
 //   fleetest api remote-machines                     → {"hosts":[{name,host,dir,machine}, …]}
 //   fleetest api remote-machines --import '<JSON配列>' → upsert 後の一覧を同じ形で返す
 //   fleetest api remote-machines --remove <name>       → 削除後の一覧を同じ形で返す
+//   fleetest api remote-machines --order <name,…>      → 並べ替え後の一覧を同じ形で返す
 // 出力は1行 JSON、失敗は非ゼロ終了(oneShotCli.ts の runOneShot が spawn+JSON.parse を担う)。
 //
 // spawn を伴う glue(fetchRemoteHosts 等)は他の単発 CLI 呼び出し(compatCheck.ts・
@@ -82,4 +83,9 @@ export function importRemoteHosts(
 /** name の登録を削除し、結果の一覧を返す。 */
 export function removeRemoteHost(deps: RemoteHostsCliDeps, name: string): Promise<RemoteHostsCliOutcome> {
   return runRemoteHostsCli(deps, ["api", "remote-machines", "--remove", name]);
+}
+
+/** 登録簿を names の順に並べ替え、結果の一覧を返す(names に無い登録は後ろに残る)。 */
+export function reorderRemoteHosts(deps: RemoteHostsCliDeps, names: readonly string[]): Promise<RemoteHostsCliOutcome> {
+  return runRemoteHostsCli(deps, ["api", "remote-machines", "--order", names.join(",")]);
 }

@@ -1048,3 +1048,42 @@ test("再起動の close 待ちの間に何も起きなければ、close で起�
   assert.equal(calls.filter((args) => args[1] === "monitor").length, 1);
   assert.equal(calls.filter((args) => args[1] === "host-metrics").length, 1);
 });
+
+// 設定タブで並べ替えたら、次の監視サイクルを待たずに直近の観測を並べ直して webview へ再送する。
+// **ウォッチドッグへは再通知しない**(同じ観測を連続回数に二重に数えさせない)
+test("setMachineOrder は直近のデバイス一覧を機械の順に並べ直して再送し、notifyMonitorDevices は呼ばない", () => {
+  const procs = [];
+  const spawnFn = () => {
+    const proc = makeFakeProc();
+    procs.push(proc);
+    return proc;
+  };
+  const posts = [];
+  let notified = 0;
+  const manager = new MonitorProcessManager(
+    makeDeps({ post: (m) => posts.push(m), notifyMonitorDevices: () => { notified += 1; } }), spawnFn);
+  manager.startAll();
+  feedMonitorDevices(procs[0], [
+    { id: "ios:mac3/C", name: "C", machine: "mac3" },
+    { id: "ios:local1", name: "local1" },
+    { id: "ios:mac2/A", name: "A", machine: "mac2" },
+  ]);
+  const ids = () => posts.filter((m) => m.type === "devices").at(-1).devices.map((d) => d.id);
+  assert.deepEqual(ids(), ["ios:local1", "ios:mac2/A", "ios:mac3/C"], "一覧が来る前は名前順");
+  const notifiedBefore = notified;
+
+  manager.setMachineOrder(["mac3", "mac2"]);
+  assert.deepEqual(ids(), ["ios:local1", "ios:mac3/C", "ios:mac2/A"]);
+  assert.equal(notified, notifiedBefore, "ウォッチドッグへは再通知しない");
+
+  const count = posts.length;
+  manager.setMachineOrder(["mac3", "mac2"]);
+  assert.equal(posts.length, count, "順が変わらなければ送らない");
+
+  // 以降の監視サイクルもその順で並ぶ
+  feedMonitorDevices(procs[0], [
+    { id: "ios:mac2/A", name: "A", machine: "mac2" },
+    { id: "ios:mac3/C", name: "C", machine: "mac3" },
+  ]);
+  assert.deepEqual(ids(), ["ios:mac3/C", "ios:mac2/A"]);
+});

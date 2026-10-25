@@ -26,7 +26,10 @@
 import { t } from '../i18n.js';
 import { HM_FM_MAX_RATE, HM_VISION_MAX_RATE, hmSharedCountScale, hmCompilingBands } from './hostChartScale.js';
 import { setHoverTip } from './hoverTip.js';
-import { isMachineDisabled, onMachineEnablementChanged, LOCAL_MACHINE_LABEL } from './machineColors.js';
+import {
+  isMachineDisabled, onMachineEnablementChanged, onMachineOrderChanged, settingsMachineOrder, LOCAL_MACHINE_LABEL,
+} from './machineColors.js';
+import { compareMachineOrder } from '../../monitorDeviceModel';
 
 const HM_MAX_SAMPLES = 60;
 // 手元の tick が途絶えたとみなすまでの猶予(ms)。手元の host-metrics 子が落ちてから自動再起動
@@ -256,12 +259,16 @@ onMachineEnablementChanged(() => {
   hmDrawAllRows();
 });
 
-/** 手元が先・以降は機械名順に並べ直す(appendChild は既存ノードでは移動として働く)。 */
+/** 手元が先・以降は設定タブのマシン一覧の順に並べ直す(compareMachineOrder。appendChild は既存ノードでは移動として働く)。 */
 function hmSortRows() {
-  for (const machine of [...hmRows.keys()].filter((key) => key !== '').sort()) {
+  const order = settingsMachineOrder();
+  for (const machine of [...hmRows.keys()].filter((key) => key !== '').sort((a, b) => compareMachineOrder(a, b, order))) {
     hmContainer.appendChild(hmRows.get(machine).el);
   }
 }
+
+// 設定タブで並べ替えたら行も並べ直す(remoteConfig は行より後にも先にも届く)
+onMachineOrderChanged(() => hmSortRows());
 
 function hmEnsureRow(machine) {
   const existing = hmRows.get(machine);
@@ -303,7 +310,7 @@ function hmEnsureRow(machine) {
   }
   hmApplyLock(row, machine);   // 行より先に届いていた占有をここで貼る
   hmApplyDisabled(row, machine);   // 複製元(手元の行)の印を引き継がない
-  hmSortRows(); // サンプル先着で作られた行も並びは機械名順に保つ
+  hmSortRows(); // サンプル先着で作られた行も並びは機械の順に保つ
   hmSyncMultiClass();
   hmFitColumns();   // 機械名が増えたので列の幅を測り直す(hm-multi が付いて見えてから)
   return row;
@@ -685,7 +692,7 @@ export function hostMetricsMachines() {
 /** 容量付きの名札(CPU n / GPU n / MEM n)の系列と素の名前。行ごとに桁が変わるので幅を揃える対象 */
 const HM_CAPACITY_LABEL_METRICS = ['cpu', 'gpu', 'mem'];
 const HM_CAPACITY_LABEL_NAMES = { cpu: 'CPU', gpu: 'GPU', mem: 'MEM' };
-/** 設定タブ「デバイスモニターにメモリ容量、CPUコア数、GPUコア数を表示する」(既定 OFF = 素の CPU / GPU / MEM)。
+/** 設定タブ「メモリ容量、コア数を表示する」(既定 OFF = 素の CPU / GPU / MEM)。
  *  値は monitorPanel.ts の showMachineCapacity メッセージで届く */
 let hmShowCapacity = false;
 

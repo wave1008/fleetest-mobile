@@ -93,15 +93,15 @@ const rowsOf = (document) => [...document.querySelectorAll("#table-machine-healt
 const labelOf = (tr) => tr.children[0].textContent;
 const tipOf = (cell) => cell.getAttribute("data-hover-tip") || "";
 
-test("行の集合は履歴とモニターの和集合で、local が先頭・残りは名前昇順", (t) => {
+test("行の集合は履歴とモニターの和集合で、local が先頭・残りは名前順(設定タブの一覧に無い機械)", (t) => {
   const { window, document, send } = createWebview();
   t.after(() => window.close());
   send({ type: "hostMetricsMachines", machines: ["zeta"] });
   send(sample("zeta"));
   send(sample(""));
   loadData(send, payload([health("alpha-host"), health("H")], [{ host: "alpha-host", machine: "alpha" }]));
-  assert.deepEqual(rowsOf(document).map(labelOf), ["local", "H", "alpha", "zeta"]);
-  const alpha = rowsOf(document)[2];
+  assert.deepEqual(rowsOf(document).map(labelOf), ["local", "alpha", "H", "zeta"]);
+  const alpha = rowsOf(document)[1];
   assert.equal(alpha.children[1].textContent.includes("?"), true, "モニターに居ない行の FM は不明");
   assert.equal(alpha.children[4].textContent, "–", "モニターに居ない行の負荷は「–」");
   const zeta = rowsOf(document)[3];
@@ -436,4 +436,18 @@ test("テストプロジェクトの選択欄も集計期間と同じ色の枠(�
   assert.ok(rule, "集計期間と1つの規則");
   assert.match(rule[0], /border: 1px solid var\(--vscode-button-background\);/);
   assert.doesNotMatch(css.match(/\nselect\.dash-project \{[^}]*\}/)[0], /button-background/);
+});
+
+// 設定タブで並べ替えたら即座に並べ直す(データの取り直しを待たない)。並びはモニターと同じ compareMachineOrder
+test("行の並びは設定タブのマシン一覧の順に従い、並べ替えたら即座に並べ直す", (t) => {
+  const { window, document, send } = createWebview();
+  t.after(() => window.close());
+  send({ type: "hostMetricsMachines", machines: ["alpha", "zeta"] });
+  send(sample("alpha"));
+  send(sample("zeta"));
+  send(sample(""));
+  send({ type: "remoteConfig", hosts: [{ machine: "zeta", host: "u@z", dir: "" }, { machine: "alpha", host: "u@a", dir: "" }] });
+  assert.deepEqual(rowsOf(document).map(labelOf), ["local", "zeta", "alpha"]);
+  send({ type: "remoteConfig", hosts: [{ machine: "alpha", host: "u@a", dir: "" }, { machine: "zeta", host: "u@z", dir: "" }] });
+  assert.deepEqual(rowsOf(document).map(labelOf), ["local", "alpha", "zeta"]);
 });

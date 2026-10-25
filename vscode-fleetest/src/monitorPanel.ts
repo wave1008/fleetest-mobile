@@ -72,10 +72,11 @@ import {
   fetchRemoteHosts,
   importRemoteHosts,
   removeRemoteHost,
+  reorderRemoteHosts,
   type RemoteHostsCliDeps,
   type RemoteHostsCliOutcome,
 } from "./remoteHostsController";
-import { diffRemoteHostsForSync, mergeRemoteHostsSideFields,
+import { diffRemoteHostsForSync, mergeRemoteHostsSideFields, remoteHostsOrderToSync,
   type LocalMachineEntry, type MachineColor, type RemoteHostEntry } from "./remoteRunArgs";
 import {
   fetchRetention,
@@ -336,6 +337,9 @@ export class MonitorPanelController implements vscode.Disposable {
    * 差分計算(diffRemoteHostsForSync)の基準に使うだけで、これ自体が正ではない
    * (RR-13「原則」。正は CLI の LocalConfig)。 */
   private lastKnownRemoteHosts: RemoteHostEntry[] = [];
+  /** setRemoteConfig の同期を1本ずつ流す鎖。**並行させない** —— 2本が同じ古い lastKnownRemoteHosts から差分を
+   *  取ると CLI の書き込みが追い越し合い、遅く終わった側(古い編集)の並び・値が残る(↑を続けて押すと起きる) */
+  private remoteHostsSyncChain: Promise<void> = Promise.resolve();
   /** 未設定時の FM 枠(CLI が返す既定)。**拡張は値を持たず、読めたものをそのまま配る** */
   private lastKnownDefaultFMConcurrency: number | undefined;
   private lastKnownLocalMachine: LocalMachineEntry | undefined;
@@ -734,6 +738,17 @@ export class MonitorPanelController implements vscode.Disposable {
       }
       this.noteRemoteHostsOutcome(result);
     }
+    // 並べ替え(↑ボタン)と、rename で末尾へ回った行の位置戻しはここで届く
+    const order = remoteHostsOrderToSync(finalHosts, hosts);
+    if (order !== undefined) {
+      const result = await reorderRemoteHosts(deps, order);
+      if (result.hosts !== undefined) {
+        finalHosts = result.hosts;
+      } else {
+        error = result.error;
+      }
+      this.noteRemoteHostsOutcome(result);
+    }
     this.lastKnownRemoteHosts = finalHosts;
 
     // CLI が返した確定形(書き込めなかった行の除外・machine の実値を含む)で webview を必ず作り直す。
@@ -741,6 +756,8 @@ export class MonitorPanelController implements vscode.Disposable {
                 defaultFMConcurrency: this.lastKnownDefaultFMConcurrency,
                 local: this.lastKnownLocalMachine,
                 machineColors: this.lastKnownMachineColors });
+    // 並べ直したデバイス一覧は remoteConfig の後に届ける(webview の機械の順が先に新しくなっている)
+    this.processManager.setMachineOrder(finalHosts.map((host) => host.machine));
   }
 
   /** 設定タブのマシン削除の確認(webview の window.confirm は効かないのでホスト側で出す)。
@@ -1204,7 +1221,10 @@ export class MonitorPanelController implements vscode.Disposable {
           .update("language", message.value, vscode.ConfigurationTarget.Global);
         break;
       case "setRemoteConfig": {
-        void this.syncRemoteHostsFromWebview(message.hosts);
+        const hosts = message.hosts;
+        this.remoteHostsSyncChain = this.remoteHostsSyncChain
+          .then(() => this.syncRemoteHostsFromWebview(hosts))
+          .catch(() => {});   // 失敗は syncRemoteHostsFromWebview が remoteConfig.error で返す。鎖は止めない
         break;
       }
       case "requestRemoveRemoteHost":
@@ -1396,6 +1416,7 @@ export class MonitorPanelController implements vscode.Disposable {
                     defaultFMConcurrency: this.lastKnownDefaultFMConcurrency,
                 local: this.lastKnownLocalMachine,
                 machineColors: this.lastKnownMachineColors });
+        this.processManager.setMachineOrder(this.lastKnownRemoteHosts.map((host) => host.machine));
       });
     }
     // 設定タブ「ログ・録画」のクリーンアップ欄。**保持ポリシーの正は CLI 側のマシン設定**で、拡張は既定値を

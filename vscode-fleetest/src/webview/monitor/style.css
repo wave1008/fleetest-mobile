@@ -3152,6 +3152,43 @@ button.settings-remote-hosts-color-swatch:focus-visible {
 .settings-remote-hosts-fm-input {
   box-sizing: border-box;
 }
+/* 並べ替えの列(最左)。ボタンの幅まで縮める。ボタンを出さない行(この機械・先頭のリモート・未確定)も
+   列幅は揃う(hidden でも td は残る) */
+.settings-remote-hosts-table th.settings-remote-hosts-move,
+.settings-remote-hosts-table td.settings-remote-hosts-move {
+  width: 1%;
+  padding-left: 0;
+  padding-right: 0;
+  text-align: center;
+}
+/* 上向き矢印のアイコンボタン。グローバルな button の地色を打ち消し、ホバーで淡い面だけ出す */
+button.settings-remote-hosts-move-up {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--vscode-icon-foreground, var(--vscode-foreground));
+  cursor: pointer;
+  vertical-align: middle;
+}
+button.settings-remote-hosts-move-up:hover {
+  background: var(--vscode-toolbar-hoverBackground, rgba(90, 93, 94, 0.31));
+}
+button.settings-remote-hosts-move-up:active {
+  background: var(--vscode-toolbar-activeBackground, rgba(99, 102, 103, 0.31));
+}
+button.settings-remote-hosts-move-up:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
+}
+button.settings-remote-hosts-move-up[hidden] {
+  display: none;
+}
 .settings-remote-hosts-remove,
 .settings-remote-hosts-confirm {
   padding: 2px 8px;

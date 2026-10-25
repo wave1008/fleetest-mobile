@@ -281,6 +281,8 @@ export class MonitorProcessManager {
    * 観測が新スコープの表示として再送されないようにする。
    */
   private latestDevices: readonly MonitorDevice[] | undefined;
+  /** 設定タブのマシン一覧の順(登録簿の順)。monitorPanel.ts が remoteConfig を配るたびに setMachineOrder で入れる */
+  private machineOrder: readonly string[] = [];
 
   /** テスト用の spawn 差し替え口(既定は実 spawn)。monitorProcessManager.test.mjs 参照。 */
   constructor(
@@ -445,7 +447,7 @@ export class MonitorProcessManager {
         if (value.kind === "monitorDevices") {
           // プロファイルタブの表示順に整列してから全消費側へ配る(sortMonitorDevices 参照)。
           // 先に届いた1台ぶんの「測り終えた」を巻き戻さない(keepFinishedStorage の doc)
-          this.publishDevices(keepFinishedStorage(this.latestDevices, sortMonitorDevices(value.devices)));
+          this.publishDevices(keepFinishedStorage(this.latestDevices, sortMonitorDevices(value.devices, this.machineOrder)));
           return;
         }
         if (value.kind === "monitorBridgeLogRotation") {
@@ -588,6 +590,22 @@ export class MonitorProcessManager {
         proc.kill("SIGKILL");
       }
     }, 2000);
+  }
+
+  /** 設定タブのマシン一覧の順が変わったら、次の監視サイクルを待たず直近の観測を並べ直して再送する。
+   * **webview への再送だけ**(notifyMonitorDevices は呼ばない —— 同じ観測をウォッチドッグに二重に数えさせない) */
+  setMachineOrder(machineOrder: readonly string[]): void {
+    if (machineOrder.join("\n") === this.machineOrder.join("\n")) {
+      return;
+    }
+    this.machineOrder = [...machineOrder];
+    if (!this.latestDevices) {
+      return;
+    }
+    this.latestDevices = sortMonitorDevices(this.latestDevices, this.machineOrder);
+    this.deps.post(
+      devicesToWebviewMessage(this.latestDevices, this.deps.getConfig().monitorDeviceFilter),
+    );
   }
 
   /**

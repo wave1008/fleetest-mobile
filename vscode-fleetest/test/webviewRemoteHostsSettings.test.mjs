@@ -82,8 +82,8 @@ function fillAndCommit(window, input, value) {
 // **必須のホストが先、任意のマシン名がその右**。下のテストが見出しと入力欄の両方で固定する
 // 入力欄の並び(バッジ色の列は入力欄を持たないので、列の位置とは別に持つ)
 const [HOST, MACHINE, ENABLED, FM, DIR] = [0, 1, 2, 3, 4];
-// 列(見出し・td)の並び
-const [COL_HOST, COL_MACHINE, COL_COLOR, COL_ENABLED, COL_FM, COL_DIR] = [0, 1, 2, 3, 4, 5];
+// 列(見出し・td)の並び。最左は並べ替え(↑ボタン)の列
+const [COL_MOVE, COL_HOST, COL_MACHINE, COL_COLOR, COL_ENABLED, COL_FM, COL_DIR] = [0, 1, 2, 3, 4, 5, 6];
 
 const REMOTE_CONFIG = {
   type: "remoteConfig",
@@ -302,7 +302,7 @@ test("列幅のクラスが見出し・可変行・固定行の3箇所に付い�
     local: { machine: "local", host: "wave1008@localhost", fmConcurrency: 0 } });
 
   // 幅は CSS が列ごとのクラスで決める。**見出しとセルの両方に要る**(片方だけだと効かない)
-  const widthClass = [[COL_HOST, "host"], [COL_MACHINE, "machine"], [COL_COLOR, "color"], [COL_FM, "fm"], [COL_DIR, "dir"]];
+  const widthClass = [[COL_MOVE, "move"], [COL_HOST, "host"], [COL_MACHINE, "machine"], [COL_COLOR, "color"], [COL_FM, "fm"], [COL_DIR, "dir"]];
   const th = [...document.querySelectorAll(".settings-remote-hosts-table thead th")];
   for (const [col, name] of widthClass) {
     assert.ok(th[col].classList.contains(`settings-remote-hosts-${name}`), `見出し(${name})`);
@@ -934,4 +934,54 @@ test("順番待ちの隣に「奪う」導線を出さない", (t) => {
   const visible = panel.innerHTML.replace(/<!--[\s\S]*?-->/g, "");
   assert.ok(!/force-lock|forceLock|ignore-lock/i.test(visible),
     "--force-lock / --ignore-lock に当たる操作口を設定タブに置かない");
+});
+
+// 並べ替え(↑ボタン)。**この機械の行は先頭に固定**で動かさない。ボタンを出すのは2つ目以降の
+// 確定済みのリモートの行だけ(先頭のリモートはこの機械より上へ行けない)
+const THREE_REMOTES = { type: "remoteConfig",
+  hosts: [{ machine: "A", host: "u@a", dir: "" }, { machine: "B", host: "u@b", dir: "" },
+          { machine: "C", host: "u@c", dir: "" }],
+  defaultFMConcurrency: 5,
+  local: { machine: "local", host: "wave1008@localhost", fmConcurrency: 0 } };
+
+function moveUpVisibility(document) {
+  return [...document.querySelectorAll("#settings-remote-hosts-body tr")].map((tr) => {
+    const button = tr.querySelectorAll("td")[COL_MOVE].querySelector(".settings-remote-hosts-move-up");
+    return button ? !button.hidden : false;
+  });
+}
+
+test("↑ボタンは2つ目以降の確定済みのリモートの行にだけ出る", (t) => {
+  const { window, document } = createWebview();
+  t.after(() => window.close());
+
+  post(window, THREE_REMOTES);
+  assert.deepEqual(moveUpVisibility(document), [false, false, true, true], "local / A / B / C");
+
+  // 未確定の行は登録簿に無いので出さない
+  click(window, document.getElementById("settings-remote-hosts-add"));
+  assert.deepEqual(moveUpVisibility(document), [false, false, true, true, false]);
+});
+
+test("↑ボタンで行が1つ上へ移り、その並びで送られる(この機械は先頭のまま)", (t) => {
+  const posted = [];
+  const { window, document } = createWebview((m) => posted.push(m));
+  t.after(() => window.close());
+
+  post(window, THREE_REMOTES);
+  const rowC = document.querySelectorAll("#settings-remote-hosts-body tr")[3];
+  click(window, rowC.querySelector(".settings-remote-hosts-move-up"));
+
+  const machines = [...document.querySelectorAll("#settings-remote-hosts-body tr")]
+    .map((tr) => tr.querySelectorAll("input")[MACHINE].value);
+  assert.deepEqual(machines, ["local", "A", "C", "B"]);
+  const sent = JSON.parse(JSON.stringify(posted.filter((m) => m.type === "setRemoteConfig").at(-1)));
+  assert.deepEqual(sent.hosts.map((h) => h.machine), ["local", "A", "C", "B"]);
+  assert.ok(isMonitorFromWebviewMessage(sent), "拡張側のゲートを通る");
+  // 先頭へ上がった行のボタンが消え、下がった行に出る
+  click(window, document.querySelectorAll("#settings-remote-hosts-body tr")[2]
+    .querySelector(".settings-remote-hosts-move-up"));
+  assert.deepEqual([...document.querySelectorAll("#settings-remote-hosts-body tr")]
+    .map((tr) => tr.querySelectorAll("input")[MACHINE].value), ["local", "C", "A", "B"]);
+  assert.deepEqual(moveUpVisibility(document), [false, false, true, true]);
 });

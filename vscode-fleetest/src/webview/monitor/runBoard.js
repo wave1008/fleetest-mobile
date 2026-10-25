@@ -12,8 +12,10 @@ import {
 } from './domRefs.js';
 import { vscode, persistedState } from './vscodeApi.js';
 import {
-  paintMachineBadge, isMachineDisabled, onMachineEnablementChanged, LOCAL_MACHINE_LABEL,
+  paintMachineBadge, isMachineDisabled, onMachineEnablementChanged, settingsMachineOrder,
+  LOCAL_MACHINE_LABEL,
 } from './machineColors.js';
+import { compareMachineOrder } from '../../monitorDeviceModel';
 import { setHoverTip } from './hoverTip.js';
 import {
   deviceIdForLane, selectOnlyDevices, devicesOnMachine,
@@ -104,10 +106,13 @@ function machineList() {
   // なので、「空き」と並べると使える機械に見える。isMachineDisabled は '' を手元として読む
   // (LOCAL_MACHINE_KEY と同じ綴り)。**run はこれで消えない** —— 一覧に無い機械の run は
   // render の最後の loop が拾う(走っている事実は隠さない)
-  return [LOCAL_MACHINE_KEY, ...remoteMachines].filter((machine) => !isMachineDisabled(machine));
+  const order = settingsMachineOrder();
+  const remotes = [...remoteMachines].sort((a, b) => compareMachineOrder(a, b, order));
+  return [LOCAL_MACHINE_KEY, ...remotes].filter((machine) => !isMachineDisabled(machine));
 }
 
-// 「マシン有効」の切り替えは remoteConfig で届く(machineColors.js)。届いた時点で並べ直す
+// 「マシン有効」の切り替えと並べ替えは remoteConfig で届く(machineColors.js)。届いた時点で並べ直す
+// (この通知は remoteConfig のたびに鳴るので、並べ替えの通知 onMachineOrderChanged を別に足さない = 二重に描く)
 onMachineEnablementChanged(() => render());
 
 function applyCollapsedUi() {

@@ -12,9 +12,9 @@
 let palette = [];            // [{key, color}, ...] 表示順 = 配列順。未受信の間は空
 let paletteByKey = new Map(); // key -> color(hex)
 let hexByMachine = new Map(); // machine -> color(hex)。鍵が不明(パレット未受信・未知の鍵)なら持たない
-// 設定タブのマシン一覧の並び(手元 "local" → hosts[] の順。settingsTab.js の applyRemoteConfig と同じ)。
-// バッジを複数並べる箇所が orderMachinesLikeSettings で使う
-let machineRank = new Map([['local', 0]]); // machine -> 並び順
+// 設定タブのマシン一覧の並び(hosts[] の順。手元 "local" は含めない = 常に先頭)。settingsTab.js の applyRemoteConfig と同じ。
+// 比べ方はモニター・ダッシュボードが monitorDeviceModel.ts の compareMachineOrder(settingsMachineOrder を渡す)、録画タブが orderMachinesLikeSettings
+let remoteMachineOrder = [];
 const machineOrderListeners = [];
 // 「マシン有効」が off の機械(手元は "local")。remoteConfig の hosts[].enabled / local.enabled が正
 // (CLI の FTCore.MachineEnablement と同じ集合)。欠落は有効(設定タブの未保存の行は enabled を持たない)
@@ -33,12 +33,9 @@ export function applyMachineColors(message) {
 
   hexByMachine = new Map();
   const hosts = Array.isArray(message.hosts) ? message.hosts : [];
-  machineRank = new Map([['local', 0]]);
-  for (const host of hosts) {
-    if (typeof host.machine === 'string' && host.machine !== '' && !machineRank.has(host.machine)) {
-      machineRank.set(host.machine, machineRank.size);
-    }
-  }
+  remoteMachineOrder = [...new Set(hosts
+    .map((host) => host.machine)
+    .filter((machine) => typeof machine === 'string' && machine !== '' && machine !== 'local'))];
   for (const host of hosts) {
     if (typeof host.machine !== 'string' || host.machine === '' || typeof host.color !== 'string') {
       continue;
@@ -77,13 +74,21 @@ export function onMachineEnablementChanged(listener) {
   machineEnablementListeners.push(listener);
 }
 
-/** 設定タブのマシン一覧の順に並べ替えたコピー。一覧に無いマシンは後ろに、受け取った順のまま置く。 */
+/** 設定タブのマシン一覧の順に並べ替えたコピー(録画タブのバッジ)。一覧に無いマシンは後ろに、**受け取った順のまま**置く
+ *  (compareMachineOrder の名前順とは意図して別。webviewRecordingsMachineDevice.test.mjs が固定) */
 export function orderMachinesLikeSettings(machines) {
-  const rank = (m) => (machineRank.has(m) ? machineRank.get(m) : Number.MAX_SAFE_INTEGER);
+  const rank = (m) => (m === LOCAL_MACHINE_LABEL ? -1
+    : remoteMachineOrder.includes(m) ? remoteMachineOrder.indexOf(m) : Number.MAX_SAFE_INTEGER);
   return machines
     .map((machine, index) => ({ machine, index }))
     .sort((a, b) => rank(a.machine) - rank(b.machine) || a.index - b.index)
     .map((entry) => entry.machine);
+}
+
+/** 設定タブのマシン一覧の順(リモートだけ・手元は含めない)。monitorDeviceModel.ts の compareMachineOrder /
+ *  compareMonitorDeviceOrder の machineOrder にそのまま渡す */
+export function settingsMachineOrder() {
+  return remoteMachineOrder;
 }
 
 /** remoteConfig を受けるたび(並びが変わりうる)に呼ぶ。描いた並びを作り直す箇所が登録する。 */

@@ -12,7 +12,8 @@ import { syncChildren } from '../monitor/rowSync.js';
 import { formatLocalDateTime } from './format.js';
 import { machineLabel } from './machineNames.js';
 import { hostMetricsMachines, onHostMetricsCommitted } from '../monitor/hostCharts.js';
-import { LOCAL_MACHINE_LABEL, paintMachineBadge } from '../monitor/machineColors.js';
+import { LOCAL_MACHINE_LABEL, onMachineOrderChanged, paintMachineBadge } from '../monitor/machineColors.js';
+import { compareMachineLabels } from './machineNames.js';
 import { adoptTitleHoverTips, setHoverTip } from '../monitor/hoverTip.js';
 
 const body = document.getElementById('table-machine-health-body');
@@ -52,11 +53,7 @@ let lastHistory = [];
 let lastSignature = null;
 
 function sortLabels(labels) {
-  return [...labels].sort((a, b) => {
-    if (a === LOCAL_MACHINE_LABEL) return b === LOCAL_MACHINE_LABEL ? 0 : -1;
-    if (b === LOCAL_MACHINE_LABEL) return 1;
-    return a < b ? -1 : a > b ? 1 : 0;
-  });
+  return [...labels].sort(compareMachineLabels);
 }
 
 /** 履歴(machineHealth)とモニターの行を表示名で結合する。 */
@@ -326,6 +323,15 @@ function renderPeriodHeader(period) {
     from: formatLocalDateTime(period.since), to: formatLocalDateTime(period.generatedAt),
   });
 }
+
+// 設定タブで並べ替えたら行も並べ直す(まだ何も届いていなければ描かない = 「確認中」の表示を消さない)
+onMachineOrderChanged(() => {
+  if (!historySeen && !liveSeen) {
+    return;
+  }
+  lastSignature = null;
+  renderRows(combineRows());
+});
 
 export function renderMachineHealth(machineHealthRows, period) {
   renderPeriodHeader(period);
