@@ -27,8 +27,9 @@ E2E と実機の検証を回すための手順。
 `Scripts/e2e.sh` の iOS は **既定が `ios-inapp` プロファイル**(2026-08-11 に xcuitest から反転)。
 **利用者の既定モードは inapp モード(in-app ブリッジ優先)**(`RunProfile` の `iosMode ?? "inapp"`)なので、
 既定スイートが見るべきは in-app 側。**XCUITest ブリッジ**(ランナー・スナップショット・型写像・
-ジェスチャ申告)を触ったら **`Scripts/e2e.sh --ios-xcuitest`** を追加で回すこと。
-逆に inapp モードだけを回したいときは `--ios-inapp`(既定と同じモードで iOS のみ)。
+ジェスチャ申告)を触ったら、変更が通るシナリオを **xcuitest モードで** 追加で回すこと
+(`fleetest run --project <P> --profile ios-xcuitest --scenario <クラス>`)。
+全実施を頼まれたときのスイートは `Scripts/e2e.sh --ios-xcuitest`(iOS だけを xcuitest モードで)、inapp モードだけなら `--ios-inapp`。
 
 **モード指定は iOS だけを回す**(2026-08-11)。Android にモードの選択肢は無く
 (`iosMode` は iOS 専用)、一緒に回すと既定スイートと1バイトも違わない実行をもう一度

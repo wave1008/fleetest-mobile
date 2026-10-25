@@ -1,9 +1,12 @@
 // docs/README.md(保守者向け文書の索引と書き方)の整合検証。壊れても黙る形を落とす:
 //   ① 索引と docs/ 直下の文書が食い違う(索引から辿れない文書・存在しない文書を指す行)
 //   ② 節の ID(`MN-72` 等)への参照に、定義する見出しが無い / 同じ ID の見出しが2つある
+//   ③ 正典・規則が名指しするコードの名前が無い(改名・撤去の後の残り)
+//   ④ 正典・規則が e2e.sh 系を「絞って回す」手順として案内する(フックが必ず断る)
 // 接頭辞の一覧は docs/README.md「節の ID」の表が唯一の定義元で、ここでは持たない。
 
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { test } from "node:test";
@@ -194,6 +197,112 @@ test("制約と回避の各節は確認環境の行を持つ", () => {
   assert.ok((text.match(/^### /gm) ?? []).length >= 5, "制約の節が読めない");
   assert.deepEqual(constraintsMissingEnv(text), [], "確認環境の行が無い(版を上げたとき見直す対象を選べない)");
   assert.deepEqual(constraintsMissingEnv("### A\n\n確認環境: 未記録\n### B\n本文\n"), ["B"]);
+});
+
+// ── 正典・規則が名指しするコードの名前 ──
+// 改名・撤去の後に古い名前が正典に残る型(2026-10-25 のレビューで約 10 件: baseRules・MonitorHostScopeTests・
+// DockerBackend 等)。記録(種別「記録」)は過去の名前を持ってよいので見ない。
+// 照合先は git 管理下のコード本文とファイル名(docs・TestProjects・reports・*.md は除く。このファイル自身も除く =
+// 下の許可表が照合先に入ると素通しになる)。
+
+/** コード外の名前(OS・外部製品・Shirates 側・経緯の文脈・書式の例)。理由ごとに並べる。 */
+const EXTERNAL_CODE_NAMES = new Set([
+  // OS・Apple の非公開実装・設定キー
+  "ApplicationFirewall", "BootSessionIdentifier", "DiagnosticCollectionPolicy", "GenerativeExperiencesSafetyInferenceProvider",
+  "JavaVirtualMachines", "MobileAsset", "ModuleCache", "RemoteVideoEncoder", "SwiftTestingInteropRecordHandler",
+  "TextRecognition", "TodayFeedConfigDecoder", "V11E2EPipeline", "H14D",
+  // sshd_config のキー
+  "PasswordAuthentication", "PermitRootLogin", "PermitUserEnvironment", "StrictHostKeyChecking",
+  // UI フレームワーク・エージェントの名前
+  "FlingBehavior", "ReactEditText", "AskUserQuestion",
+  // Shirates 側の名前(shirates-parity.md の対応表)
+  "InScanResults", "TestElement.swipeTo",
+  // 撤去済みと明記した文脈・監査の回の記録(当時の名前)
+  "FastInput", "MonitorLease", "LocalConfig.currentMachineName",
+  // 書式の例(`FlowStep.defaultXxx` = 既定値の置き場の型)
+  "FlowStep.defaultXxx",
+]);
+
+/** backtick 内の CamelCase の名前(と `型.メンバ`)のうち、照合先に無いもの。 */
+export function unknownCodeNames(text, corpus, allow = new Set()) {
+  const missing = new Set();
+  for (const m of text.matchAll(/`([^`\n]+)`/g)) {
+    for (const [, type, member] of m[1].matchAll(/\b([A-Z][a-z0-9]+(?:[A-Z][A-Za-z0-9]*)+)(?:\.([a-z][A-Za-z0-9]+))?/g)) {
+      if (!corpus.has(type)) { if (!allow.has(type)) missing.add(type); }
+      else if (member && !corpus.has(member) && !allow.has(`${type}.${member}`)) missing.add(`${type}.${member}`);
+    }
+  }
+  return [...missing];
+}
+
+function codeCorpus() {
+  const self = "vscode-fleetest/test/docsIndex.test.mjs";
+  const files = execFileSync("git", ["ls-files"], { cwd: ROOT, encoding: "utf8" }).split("\n")
+    .filter((f) => f && f !== self && !/^(docs|TestProjects|reports)\//.test(f) && !f.endsWith(".md")
+      && !/\.(png|jpe?g|gif|mp4|mov|apk|zip|ttf|otf|ico|icns|car|a|dylib|jar)$/i.test(f));
+  return identifiersOf(files.join("\n") + "\n"
+    + files.map((f) => { try { return readFileSync(path.join(ROOT, f), "utf8"); } catch { return ""; } }).join("\n"));
+}
+
+/** 本文中の識別子の照合口。完全一致が無ければ識別子の一部としても探す(docs は `*RightEdge` のように
+ *  名前の一部を書く)。本文全体の部分一致にしないのは速さのため(識別子の一覧だけを走査する)。 */
+export function identifiersOf(text) {
+  const ids = new Set(text.match(/[A-Za-z_][A-Za-z0-9_]*/g) ?? []);
+  const joined = [...ids].join("\n");
+  return { has: (name) => ids.has(name) || joined.includes(name) };
+}
+
+/** 正典・手順・台帳・索引の docs と、CLAUDE.md・AGENTS.md・規則ファイル(リポジトリ直下からの相対パス)。 */
+function canonicalTexts() {
+  const kinds = new Map([...INDEX.split(/^## 書き方$/m)[0]
+    .matchAll(/^\| \[[^\]]+\]\(([^)#]+)\) \| ([^|]+?) \|/gm)].map((m) => [m[1], m[2]]));
+  const docs = ["README.md", ...maintainerDocs()].filter((d) => kinds.get(d) !== "記録" && !d.startsWith("maintainer-notes/"))
+    .map((d) => `docs/${d}`);
+  return ["CLAUDE.md", "AGENTS.md", ...walk(".claude/rules"), ...docs];
+}
+
+test("正典と規則が名指しするコードの名前は実在する", () => {
+  const corpus = codeCorpus();
+  assert.ok(corpus.has("StepExecutor") && corpus.has("ScenarioSandbox"), "照合先のコードが読めない");
+  const files = canonicalTexts();
+  assert.ok(files.includes("docs/design/profiles.md") && files.includes(".claude/rules/remote.md")
+    && !files.includes("docs/remote-runner/records.md"), `対象の文書が読めない: ${files.length}`);
+  const bad = files.flatMap((f) => unknownCodeNames(readFileSync(path.join(ROOT, f), "utf8"), corpus, EXTERNAL_CODE_NAMES)
+    .map((n) => `${f}: ${n}`));
+  assert.deepEqual(bad, [], "コードに無い名前(改名・撤去の後の残り。外部の名前なら EXTERNAL_CODE_NAMES に理由ごと足す)");
+});
+
+// ── 絞った e2e.sh の案内 ──
+// e2e.sh / e2ex.sh / e2ey.sh は SUT・OS・モードで絞ってもスイート全体を回し、Scripts/test-scope-guard.py が
+// 引数に関係なく断る。正典・規則が「絞って回す」手順として案内すると、その手順は必ず止まる(2026-10-25 に
+// CLAUDE.md・android.md・operations.md で見つかった)。絞った確認は `fleetest run --scenario`。
+// 通すのは、置き場・モードの指定(全体のまま)と、全実施・実測・実例の文脈の行だけ。
+
+/** 絞り込みの引数を付けた e2e 系スクリプトを、全実施・実測の文脈なしに案内している行。 */
+export function narrowedSuiteAdvice(text) {
+  const SUITE_WIDE = new Set(["--local", "--align", "--on", "--performance", "--negative", "--retrain-classifiers", "--record"]);
+  const CONTEXT = /FT_FULL_TEST=1|全実施|実測|実例|再現|赤|20\d\d-\d\d-\d\d/;
+  return text.split("\n").filter((line) => {
+    if (CONTEXT.test(line)) return false;
+    return [...line.matchAll(/e2e[xy]?\.sh((?:\s+(?:--[\w<>-]+|[A-Z][\w]*))+)/g)]
+      .some((m) => m[1].trim().split(/\s+/).some((a) => a.startsWith("--") && !SUITE_WIDE.has(a)));
+  });
+}
+
+test("正典と規則は e2e.sh 系を絞って回す手順として案内しない", () => {
+  const bad = canonicalTexts().flatMap((f) => narrowedSuiteAdvice(readFileSync(path.join(ROOT, f), "utf8"))
+    .map((l) => `${f}: ${l.trim().slice(0, 100)}`));
+  assert.deepEqual(bad, [], "絞った確認は `fleetest run --project <P> --profile <prof> --scenario <クラス>` で書く(全実施の文脈なら FT_FULL_TEST=1 を添える)");
+});
+
+test("名前と絞り込みの検出器は両方向に拾う", () => {
+  const corpus = identifiersOf("struct ScenarioSandbox { static let commonRules = [] }; let iosFastInput = 1");
+  assert.deepEqual(unknownCodeNames("`ScenarioSandbox.baseRules` と `DockerBackend` と `ScenarioSandbox.commonRules` と `*FastInput`", corpus),
+    ["ScenarioSandbox.baseRules", "DockerBackend"]);
+  assert.deepEqual(unknownCodeNames("`DockerBackend`", corpus, new Set(["DockerBackend"])), []);
+  assert.deepEqual(narrowedSuiteAdvice("触ったら `Scripts/e2e.sh --cmp --android` を回す\n`Scripts/e2e.sh --local` で回す\n"
+    + "実測(`Scripts/e2e.sh --ios`)\nFT_FULL_TEST=1 Scripts/e2ey.sh --flutter\n`e2ex.sh --on M1Ultra`"),
+    ["触ったら `Scripts/e2e.sh --cmp --android` を回す"]);
 });
 
 test("§ と目次の検出器は形の崩れを拾う", () => {
