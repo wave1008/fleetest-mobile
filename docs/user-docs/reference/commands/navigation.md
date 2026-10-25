@@ -43,7 +43,8 @@ hinge(130)              // half-open book posture
   the first `back(settle:)` closes the keyboard instead of navigating (OS behavior) — call it twice
   when a field may still have focus.
 - When the screen is unchanged before and after `back()`, the step gets a note (`the tree is identical to the one before back …`) — the shape of
-  an app whose own navigation ignores the system back.
+  an app whose own navigation ignores the system back. The step does not fail; only the note is
+  added. To deal with it, `tap` the app's own back button, or call `back()` once more.
 - **`tapAppIcon` search order**: current screen first; if not found, Android opens the app
   drawer and scrolls (`flickCenterToTop`, up to 8 times), iOS pages through the home screens
   (`flickRightToLeft`, up to 5 times, stopping after two unchanged pages). On iOS, an app that is not

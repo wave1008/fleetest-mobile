@@ -24,6 +24,14 @@ searches while scrolling that way, and `.noScroll` never scrolls, even inside a 
 the direction of the enclosing block (outside a block: the current screen only). There are no function-name aliases such as
 `tapWithScrollDown` or `existWithoutScroll` (writing one gives a compile error that shows the `scroll:` form).
 
+When `maxSwipes:` is omitted on a command with `scroll:` (`tap` / `exist` / `select`, etc.), it
+swipes at most 8 times in that direction. It stops earlier once the list has reached its edge and
+the content no longer moves (two swipes in a row leave the screen unchanged). Before giving up, it
+searches once more in the opposite direction in smaller steps. If the element is still not found,
+the command's usual handling applies (`exist` / `tap` fail, `select` returns an empty element); when
+the search stopped at the edge, the failure message says so, because raising `maxSwipes` will not
+help.
+
 ## Example
 
 ```swift

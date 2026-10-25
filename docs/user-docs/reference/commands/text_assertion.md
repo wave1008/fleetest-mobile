@@ -47,9 +47,10 @@ exist("#total")
 
 - **Comparison is "same if it looks the same."** Invisible characters (zero-width, bidi control,
   soft hyphen, etc.) are ignored, but visually different strings are treated as different —
-  a half-width and a full-width space are different, and leading/trailing/repeated spaces are
-  preserved. Pass `strict: true` to disable this normalization
-  (`textIs("Done", strict: true)`). A mismatch failure message says whether the normalized or
+  a half-width and a full-width space (U+3000) are different, and leading/trailing/repeated
+  spaces are preserved. The one exception is the no-break space (NBSP, U+00A0), which is treated
+  the same as a half-width space. Pass `strict: true` to disable this normalization (including the
+  NBSP handling) (`textIs("Done", strict: true)`). A mismatch failure message says whether the normalized or
   strict comparison would have matched.
 - The element is assumed to already exist; these commands wait up to `waitSeconds` for the value to
   change, so they can be used to wait for a value update.

@@ -32,6 +32,10 @@ expectation {
   [Value Assertion](./value_assertion.md), [idIs](./id_assertion.md).
 - `exist` / `notExist` / `countIs` always take a selector — they are the commands that resolve
   more than one element, so there is no implicit form that operates on the last grabbed element.
+- **`notExist` does not look at visibility.** It judges only whether the element is gone from the
+  accessibility tree. An element that is merely covered by another modal but still in the tree
+  counts as still present, and the check fails once the wait runs out (unlike `exist` / `select`,
+  which by default also confirm that the element is visible).
 - The "actually visible" check compares the text drawn on screen with the expected text. When
   **only the beginning is drawn** (the same holds for text and value assertions):
   - an ellipsis (`…`) is drawn at the end → green, as truncation the app intended; the step gets

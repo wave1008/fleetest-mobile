@@ -31,6 +31,8 @@ swipeBy("#map", dxRatio: -0.3, dyRatio: -0.2, durationSeconds: 0.5)  // pan diag
 - **`swipe` is the only command whose direction is the finger's movement**, not content
   movement. Every `scroll*` command is content-based (`.down` = reveal content further down =
   the finger moves up).
+- **`swipe` does not check that anything moved.** The step does not fail when there is nothing to
+  move. To confirm the movement, verify it afterwards with `exist` or similar.
 - `swipeBy` and `swipeElementToElement` are the building blocks used for maps, image viewers, and
   drawing canvases — see [gestures](./gestures.md) for panning/zooming a map or canvas.
 - **`settle: false`** skips this command's post-action wait for the screen to settle (the next step may see a moving screen). See [tap](./tap.md) for details.

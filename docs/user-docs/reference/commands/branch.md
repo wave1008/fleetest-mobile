@@ -35,6 +35,9 @@ expectation {
 - Use it to neutralize a dialog or banner that may or may not appear, or for any one-off branch
   a scenario needs. There is no separate "may or may not appear" argument on other commands —
   that case is always expressed with `ifCanSelect`.
+- **`ifCanSelect` never scrolls to look.** It has no `scroll:` argument and, even inside
+  `withScrollDown { }` and the other `withScroll*` blocks, matches only the current screen. An
+  element that is off screen counts as not resolved (the block does not run).
 - **Declared interruptions are closed before the condition is answered.** If an
   [`irregularHandler`](./irregular_handler.md) covers the target element, `ifCanSelect` closes
   it first and then judges — otherwise a covered element would silently read as "not found" and

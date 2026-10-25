@@ -31,6 +31,10 @@ field.type("alice")                // same as type("#login_id", "alice")
   first, so typing into a button would press it (a submit or a purchase). It refuses whatever the UI framework (Compose and Flutter
   included), only when the element's type is a button, switch, link and so on. Pointing at an
   element that wraps exactly one input field types into it with a warning.
+- **Typing into a field that already has a value appends; the step does not fail** (it only gets a
+  note that the field already held a value). To replace the contents, use
+  `type(sel, "some text", replace: true)` or call `clearInput(sel)` first. See
+  [clearInput](./clear_input.md).
 - **Line breaks (`\n`) follow the OS default.** On iOS this arrives as a Return key press: it
   inserts a newline in a multi-line field, or fires the field's commit action (search, done, …)
   in a single-line field — which one happens depends on the field, not on `type`. On Android, a

@@ -8,7 +8,7 @@ Fires the keyboard's commit action, or closes the on-screen keyboard.
 
 | function | description |
 |---|---|
-| `pressEnter(settle:)` | Fires the Enter / IME action (search, done, submit, newline …) on the currently focused input. |
+| `pressEnter(settle:)` | Fires the Enter / IME action (search, done, submit, newline …) on the currently focused input. When no field has focus, it waits up to 1.5 seconds for focus to land or the keyboard to appear, then sends Enter. If focus still has not landed, the step does not fail: Enter is sent anyway and the step gets a note saying no field had focus (the key may have gone to the field that had focus before). |
 | `hideKeyboard(settle:)` | Closes the on-screen keyboard. Does nothing when no keyboard is showing, so it is safe to call unconditionally. On **Android** it presses the back key. On **iOS** it taps an empty spot above the keyboard (a point that is on no element, or only on a screen-wide container you cannot operate; never on text, images, buttons or input fields, a toast, or the status bar), and if the keyboard is still showing it presses Enter. The next action (such as `tap`) waits until the screen information no longer reports the keyboard before it looks for its element (Android; on some devices the keyboard stays reported for a few seconds after it closes, hiding elements at the bottom edge). |
 
 ## Example
