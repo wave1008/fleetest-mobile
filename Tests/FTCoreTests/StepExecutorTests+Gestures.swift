@@ -975,7 +975,7 @@ extension StepExecutorTests {
     // MARK: - ジェスチャの秒数上限(maxGestureSeconds。executeAction の入口で断る)
 
     /// 上書き無しで既定 10 秒を超えたら**デバイスに触る前に**失敗すること(log.entries が空 = snapshot も
-    /// 撃たれていない。CLAUDE.md「tap は対象が操作可能になるまで待ってから撃つ」より前の門)
+    /// 撃たれていない。.claude/rules/dsl-commands.md「`tap` は対象が操作可能になるまで待ってから撃つ」より前の門)
     func testGestureDurationAboveDefaultCapFailsBeforeTouchingDriver() async throws {
         let log = CallLog()
         let primary = FakeAppDriver(name: "primary", log: log,

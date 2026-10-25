@@ -291,7 +291,7 @@ struct ApiRunCommand: AsyncParsableCommand {
         }
 
         // **中断(SIGINT/SIGTERM/SIGHUP)の登録は、この Mac のロックを取るより前**(1プロセス1組。
-        // .claude/rules/process-lifecycle.md「割り込みの登録は run の記録開始の直後・供給より前」)。recorder はまだ無い
+        // .claude/rules/process-lifecycle.md「割り込みの登録(`InterruptRelay.observing`)は手元の dispatch.lock を取る直前」)。recorder はまだ無い
         // (`RunRecorder.begin` はビルド後にしか作れない)ので nil で構築し、後で確定したら
         // `attachRecorder` で繋ぐ(既に中断済みならその場で markInterrupted)。runDirect/
         // runWithProfile/runWithProfileParallel はパラメータで受け取るだけで自分では登録しない
@@ -687,7 +687,7 @@ struct ApiRunCommand: AsyncParsableCommand {
                     }
                     // ProfileRunner.run と同じ関数(RunStartLine)で組み立てる。iOS が居ない
                     // プロファイルで「iOS joins…」と言ったり、Android 0 台で Android の行を
-                    // 出したりしない(CLAUDE.md「2 実装の差」対策)
+                    // 出したりしない(CLAUDE.md「`fleetest run` と `fleetest api run` は2実装」対策)
                     let hasLateIOS = !resolvedProfile.iosDevices.isEmpty && !performanceMode
                     logSupply(RunStartLine.text(
                         androidWorkers: androidWorkers.count, eagerIOSWorkers: eagerIOSWorkers.count,

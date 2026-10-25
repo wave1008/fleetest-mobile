@@ -506,7 +506,7 @@ final class CommandDispatchTests: XCTestCase {
 
     /// **上限側も trap する**(`UInt64(無限大)` / UInt64 に収まらない巨大値)。
     /// 壁時計上限(FTSync.commandTimeout)へ丸める — それより長くは待てない契約なので
-    /// 情報は失われない(docs/commands.md「1コマンドの壁時計上限は 120 秒」)
+    /// 情報は失われない(docs/commands.md「1 コマンド(1 ステップ)の壁時計上限は 120 秒」)
     func testHugeWaitIsClampedInsteadOfTrapping() {
         XCTAssertEqual(ftSleepNanoseconds(.infinity),
                        UInt64(FTSync.commandTimeout * 1_000_000_000))

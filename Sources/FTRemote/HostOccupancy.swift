@@ -3,7 +3,7 @@
 // 判定する(RR-18.7 の M2「占有表示・配信の自動退避」)。
 //
 // dispatch.lock は機械に1本(RemoteDispatchLock。`~/.fleetest/`)で、**リモートへのディスパッチも
-// ローカル run も同じ1本を取る**(CLAUDE.md「1マシンで同時に走る run は1本」)。
+// ローカル run も同じ1本を取る**(.claude/rules/remote.md「1マシンで同時に走る run は1本」)。
 // だから**手元も観測の対象**で、「ランナー機の文脈か」は占有を配るかどうかの
 // 条件にしない —— 手元の run も占有である。
 // その機械で動いているプロセス(手元の `api monitor` / fan-out の子)は **ssh を1本も足さずに**
@@ -12,8 +12,7 @@
 //
 // **保持者が誰かは表示専用**(RemoteDispatchLockInfo と同じ規律 —— pid も issuer も自己申告)。
 // 配信の退避は**保持者が誰かによらず**効かせる: 配信とテストの干渉は他人の run でも自分の run
-// でも同じように起きる(docs/verification/environment.md「8台に配信を張った状態のフル E2E は Android が
-// 実際に赤になった」)。`mine` は文言と破壊的操作の確認にだけ使う。
+// でも同じように起きる(docs/verification/environment.md「モニターと E2E」)。`mine` は文言と破壊的操作の確認にだけ使う。
 //
 // **この判定は「出れば占有」であって「出なければ空き」ではない**: dispatch.lock を取らない
 // 経路(`--force-lock` で押し切った run・MCP の `ft_*`)は写らない。

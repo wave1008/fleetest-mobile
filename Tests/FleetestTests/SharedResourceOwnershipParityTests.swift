@@ -245,7 +245,7 @@ final class SharedResourceOwnershipParityTests: XCTestCase {
 
     /// **戻すと落ちる根拠**: 起動し直しの判定(BridgeToolchainLedger.decide)が走るのは
     /// 「起動するとき」だけなので、生きたブリッジを**引き取る**(.adopt)側で別途確認しないと、
-    /// 版の違うブリッジを黙って引き取り続ける(bridge-provision.md「.reuse と .adopt の両方で見る」)。
+    /// 版の違うブリッジを黙って引き取り続ける(.claude/rules/process-lifecycle.md「③`.reuse` と `.adopt` の両方で見る」)。
     ///
     /// **`decide(` と `matchesCurrent(` の同居では固定できない** —— `.reuse` 側は
     /// `decide(toolchainMatches: matchesCurrent(...))` の形で引数として `matchesCurrent` を含むので、

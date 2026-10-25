@@ -427,7 +427,7 @@ Claude Code は v2.1.277 から AGENTS.md を読むが、同じ場所か上に C
   同名は上書きされ他のサーバは残る(2回流しても壊れない)。確認は `codex mcp get fleetest`。
   **設定ファイル(`~/.codex/config.toml` 等)を手で編集しない** —— TOML は同じテーブルの重複で
   ファイル全体が無効になる。CLI を持たないクライアントは、書式
-  (docs/user-docs/reference/tools/other_agents_ja.md「2. MCP サーバを登録する」)を示して 🧑 に貼ってもらう。
+  (docs/user-docs/reference/tools/other_agents_ja.md「2. MCP サーバーを登録する」)を示して 🧑 に貼ってもらう。
 - 登録したら「**AIアシスタントを再起動し、このフォルダで新しいセッションを開く**(再起動後に `ft_*` が使える)」と案内する。
 - 手順書の渡し方も同じ docs で案内する。
 

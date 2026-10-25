@@ -1244,7 +1244,7 @@ public final class StepExecutor {
     /// **「打った後」の観測は読み返し(`verifyTypedText`)に頼らない** —— 読み返しが走るのは
     /// `AppDriver.verifiesTypedText == false`(in-app ブリッジ)のときだけで、実機(xcuitest
     /// ブリッジ)は `verifiesTypedText == true` なので読み返し自体を通らない
-    /// (CLAUDE.md「type の読み返しの有無はドライバの能力」)。
+    /// (.claude/rules/executor.md「type の読み返しの有無はドライバの能力」)。
     /// 実測したバグは iPhone 13 実機(XCUITest ブリッジ)で起きており、読み返しの木に頼る実装は
     /// **この経路を1度も検知できない**。**「打った後」は次のステップが解決のために
     /// どのみち撮る最初の `freshSnapshot` に譲る**ことで、読み返しの有無・ブリッジに依存しない

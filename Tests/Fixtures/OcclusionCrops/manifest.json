@@ -1,5 +1,5 @@
 {
-  "note": "occlusion-guard Tier-2(RegionText)の固定コーパス。実 run(E2E-CMP / E2E-iOS)で FM の段に届いた crop。値は 2026-09-07 実測(docs/poc-fm-occlusion-guard.md §5.17) **認識器は ANE を避けて CPU に載せる**(RegionText.recognize。2026-09-10: 最初の実 crop で ANE 向けコンパイルが 21.8 秒かかり、ステップの締め切りを食っていた)。装置を変えると読みが変わる —— selected-row40 の ja+en ×3 は ANE では読めたが CPU では selectea のまま(言語規則の経路は両装置で同じ) **2026-09-15: 日本語の集合には言語補正を掛ける**(字形「単」→「单」の取り違えを直す。swipe-down は ja+en でも等倍で読めるようになった)",
+  "note": "occlusion-guard Tier-2(RegionText)の固定コーパス。実 run(E2E-CMP / E2E-iOS)で FM の段に届いた crop。値は 2026-09-07 実測(OG-5.17) **認識器は ANE を避けて CPU に載せる**(RegionText.recognize。2026-09-10: 最初の実 crop で ANE 向けコンパイルが 21.8 秒かかり、ステップの締め切りを食っていた)。装置を変えると読みが変わる —— selected-row40 の ja+en ×3 は ANE では読めたが CPU では selectea のまま(言語規則の経路は両装置で同じ) **2026-09-15: 日本語の集合には言語補正を掛ける**(字形「単」→「单」の取り違えを直す。swipe-down は ja+en でも等倍で読めるようになった)",
   "crops": [
     {
       "file": "swipe-down.png",

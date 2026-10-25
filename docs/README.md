@@ -24,7 +24,13 @@
 | [design/dsl-execution.md](design/dsl-execution.md) | 正典 | 失敗時の情報・実行・自己修復を変える前 |
 | [design/profiles.md](design/profiles.md) | 正典 | プロファイル・実行の入口・結果の保存・配布を変える前 |
 | [design/monitor.md](design/monitor.md) | 正典 | モニターの配信・回復・表示を変える前 |
+| [design/response.md](design/response.md) | 正典 | レスポンス計測の定義・測り方・結果の形を確かめる/変える前 |
 | [remote-runner/spec.md](remote-runner/spec.md) | 正典 | リモート実行の用語(host・machine)とセキュリティ前提を確かめる/変えるとき |
+| [remote-runner/01-11.md](remote-runner/01-11.md) | 正典 | リモート実行の基本設計(方針・構成・版整合・分散)を変える前 |
+| [remote-runner/13.md](remote-runner/13.md) | 正典 | フリート実行・監視の fan-out を変える前 |
+| [remote-runner/14-16.md](remote-runner/14-16.md) | 正典 | ランナー機の導入や運用コマンドを変える前 |
+| [remote-runner/17.md](remote-runner/17.md) | 正典 | リモート制御・スクリプト・サービスを変える前 |
+| [remote-runner/18-22.md](remote-runner/18-22.md) | 正典 | 共有の規律やマシン設定を変える前 |
 | [commands.md](commands.md) | 正典 | DSL コマンドの引数・挙動を確かめる/変えるとき(読者は利用者。user-docs と併せて直す) |
 | [results-json.md](results-json.md) | 正典 | 結果 JSON のスキーマを読む/変えるとき(唯一の定義元) |
 | [framework-differences.md](framework-differences.md) | 正典 | UI フレームワークで挙動が割れる変更を入れるとき(表に1行足す) |
@@ -69,16 +75,12 @@
 | [maintainer-notes/074-088.md](maintainer-notes/074-088.md) | 記録 | 規則を緩めたく/消したくなったとき・同じ型の判断をするとき(MN-74〜88) |
 | [maintainer-notes/089-106.md](maintainer-notes/089-106.md) | 記録 | 規則を緩めたく/消したくなったとき・同じ型の判断をするとき(MN-89〜106) |
 | [remote-runner/README.md](remote-runner/README.md) | 索引 | リモート実行の設計の節を探すとき |
-| [remote-runner/00-12.md](remote-runner/00-12.md) | 記録 | リモート実行の基本設計を変える前 |
-| [remote-runner/13.md](remote-runner/13.md) | 記録 | フリート実行・監視の fan-out を変える前 |
-| [remote-runner/14-16.md](remote-runner/14-16.md) | 記録 | ランナー機の導入や運用コマンドを変える前 |
-| [remote-runner/17.md](remote-runner/17.md) | 記録 | リモート制御・スクリプト・サービスを変える前 |
-| [remote-runner/18-22.md](remote-runner/18-22.md) | 記録 | 共有の規律やマシン設定を変える前 |
+| [remote-runner/records.md](remote-runner/records.md) | 記録 | リモート実行の未検証事項・作業計画・初期の罠を確かめるとき |
 | [design/history.md](design/history.md) | 記録 | 設計の経緯や過去に踏んだ実装の罠を確かめるとき |
 | [performance-tuning/records.md](performance-tuning/records.md) | 記録 | 過去の実測を確かめるとき |
 | [verification/resolved.md](verification/resolved.md) | 記録 | 直した不具合と同じ型の症状を調べるとき |
 | [sandbox-seatbelt.md](sandbox-seatbelt.md) | 記録 | シナリオのサンドボックスに許可を足す/調べるとき |
-| [response-measurement.md](response-measurement.md) | 記録 | レスポンス計測の設計を変えるとき |
+| [response-measurement.md](response-measurement.md) | 記録 | レスポンス計測の試作の実測を確かめるとき |
 | [poc-fm-occlusion-guard.md](poc-fm-occlusion-guard.md) | 記録 | テキストの可視性検証(FM)の判定の根拠を確かめるとき |
 
 ## 書き方
@@ -117,7 +119,7 @@ H1 の直後に次の表を置き、その下に1〜2文の導入を書く(こ�
 | `PT` | performance-tuning |
 | `FD` | framework-differences |
 | `SB` | sandbox-seatbelt |
-| `RM` | response-measurement |
+| `RM` | response-measurement(試作の記録)と design/response(現行の設計) |
 | `OG` | poc-fm-occlusion-guard |
 | `OI` | open-issues |
 
