@@ -2,6 +2,8 @@
 
 [日本語](README_ja.md)
 
+![fleetest mobile](docs/user-docs/images/fleetest-mobile_flyer_en.png)
+
 **fleetest mobile** is an E2E testing tool for iOS and Android apps, designed to be used from an AI assistant
 such as Claude Code. It runs on macOS.
 

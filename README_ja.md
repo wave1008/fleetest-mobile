@@ -2,6 +2,10 @@
 
 [English](README.md)
 
+![fleetest mobile](docs/user-docs/images/fleetest-mobile_flyer_ja.png)
+
+
+
 **fleetest mobile** は、Claude Code などの AIアシスタントから使うことを前提にした、iOS / Android アプリの
 E2E テストツールです。macOS で動きます。
 
