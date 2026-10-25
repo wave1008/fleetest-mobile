@@ -93,6 +93,32 @@ final class MCPBatchTests: XCTestCase {
         XCTAssertEqual(driver.calls, [], "弾いた手はドライバへ触れないこと")
     }
 
+    /// 座標のダブルタップもバッチで通る(`doubleTap(x:y:)` へ 1:1)。画面中心へ化けず x/y のままドライバへ届く
+    func testCoordinateDoubleTapRunsInABatch() async throws {
+        let text = body(try await server.call(tool: "ft_batch", args: steps("doubleTap x: 120 y: 640")))
+        XCTAssertFalse(text.contains("FAILED"), text)
+        XCTAssertTrue(driver.calls.contains("doubleTap(x:120.0,y:640.0)"), "\(driver.calls)")
+    }
+
+    func testCoordinateDoubleTapWithASelectorIsRejected() async {
+        do {
+            _ = try await server.call(tool: "ft_batch", args: steps("doubleTap '#btn' x: 10 y: 20"))
+            XCTFail("セレクタと座標の併記が通った")
+        } catch {
+            XCTAssertTrue(error.localizedDescription.contains("not both"), error.localizedDescription)
+        }
+        XCTAssertEqual(driver.calls, [], "弾いた手はドライバへ触れないこと")
+    }
+
+    func testCoordinateDoubleTapNeedsBothAxes() async {
+        do {
+            _ = try await server.call(tool: "ft_batch", args: steps("doubleTap x: 10"))
+            XCTFail("y の無い座標 doubleTap が通った")
+        } catch {
+            XCTAssertTrue(error.localizedDescription.contains("both x and y"), error.localizedDescription)
+        }
+    }
+
     /// `maxGestureSeconds:` 付きの座標長押しがバッチを通ってドライバへ届くこと(既定 10 秒を
     /// 超える holdSeconds を上書きで許す形。CLAUDE.md「ft_batch は DSL の行を受けるので、索引の
     /// signature を変えたら batchStepBuilders のキーも同時に変える」の実地確認)

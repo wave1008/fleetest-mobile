@@ -98,7 +98,7 @@ test("runAction: 操作記録に撃ったデバイスの id を付ける", () =>
   const start = source.indexOf("private async runAction(");
   const run = source.slice(start, source.indexOf("private async runTapAtPoint(", start));
   assert.match(run, /const loggedDeviceId = this\.selectedDeviceId;/);
-  assert.equal((run.match(/this\.postOperationLog\(options\.logLabel, (true|false), mcp, loggedDeviceId\)/g) ?? []).length, 2,
+  assert.equal((run.match(/this\.postOperationLog\(options\.logLabel, (true|false), action\??\.dsl \?\? undefined, loggedDeviceId\)/g) ?? []).length, 2,
     "成功と失敗の両方の行にデバイスを付ける");
   assert.ok(!source.includes("injectTestStep"), "デバイスの分からない行は流さない");
   assert.match(source, /\.\.\.\(deviceId !== undefined \? \{ deviceId \} : \{\}\)/);
@@ -137,4 +137,15 @@ test("handleServeEvent: 軌跡(gesture)の操作の応答が届いた時点で g
   const body = source.slice(start, source.indexOf("this.settlePendingServeRequest(", start));
   assert.match(body, /if \(event\.kind === "actionResult"\) \{\s*pending\.action = event\.result;\s*if \(pending\.cmd === "gesture"\) \{\s*this\.post\(\{ type: "gestureActionDone", ok: event\.result\.ok \}\);/);
   assert.match(source, /expectsAction: command\.cmd !== "refresh",\s*cmd: command\.cmd,/, "送ったコマンドの cmd を控える");
+});
+
+test("runAction: 操作記録の dsl は serve が返した actionResult.dsl を流す(拡張側で変換しない)", () => {
+  const source = fs.readFileSync(path.join(root, "src/monitorLiveController.ts"), "utf8");
+  const start = source.indexOf("private async runAction(");
+  const run = source.slice(start, source.indexOf("private async runTapAtPoint(", start));
+  assert.ok(!source.includes("mcpCommandForServeCommand"), "MCP コマンドへの変換は持たない");
+  assert.match(run, /action\.dsl \?\? undefined/, "失敗した操作の行にも serve の dsl を流す");
+  assert.match(run, /action\?\.dsl \?\? undefined/, "成功した操作の行に serve の dsl を流す");
+  assert.match(source, /\.\.\.\(dsl !== undefined \? \{ dsl \} : \{\}\)/, "operationLog メッセージの欄名は dsl");
+  assert.ok(!/\bmcp\b[^-]/.test(run), "runAction に mcp の欄が残っていない");
 });

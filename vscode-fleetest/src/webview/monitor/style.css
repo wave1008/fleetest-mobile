@@ -2862,11 +2862,11 @@ input[type="radio"]:focus-visible {
   --oplog-label-width: 220px; /* 操作列の幅。gridLivePanel.js の defaultLabelWidth と揃えること(ドラッグで上書き) */
   flex: 1 1 auto;
   min-height: 0;
-  overflow: auto; /* 縦に加えて横にも(MCP 列は省略せず、行の幅は中身で決まる) */
+  overflow: auto; /* 縦に加えて横にも(DSL 列は省略せず、行の幅は中身で決まる) */
   border: 1px solid var(--vscode-widget-border, var(--vscode-panel-border));
   border-radius: 3px;
 }
-/* 3列: 時刻(固定 = 等幅 8 文字)/ 操作(ドラッグで幅を決める・中で省略)/ MCP のコマンド(中身の幅のまま =
+/* 3列: 時刻(固定 = 等幅 8 文字)/ 操作(ドラッグで幅を決める・中で省略)/ DSL コマンド(中身の幅のまま =
    はみ出したぶんは一覧の横スクロール)。3列とも幅が行に依らないので、行ごとに列がずれない */
 #grid-live-panel .oplog-row,
 #grid-live-panel .oplog-head {
@@ -2889,11 +2889,11 @@ input[type="radio"]:focus-visible {
 #grid-live-panel .oplog-row .oplog-time {
   color: var(--vscode-descriptionForeground);
 }
-#grid-live-panel .oplog-row .oplog-mcp {
+#grid-live-panel .oplog-row .oplog-dsl {
   color: var(--vscode-textLink-foreground);
   cursor: pointer;
 }
-#grid-live-panel .oplog-row .oplog-mcp:empty { cursor: default; }
+#grid-live-panel .oplog-row .oplog-dsl:empty { cursor: default; }
 /* 見出し行: 縦スクロールしても上に留まる(横には行と一緒に動く = 列がずれない) */
 #grid-live-panel .oplog-head {
   position: sticky;

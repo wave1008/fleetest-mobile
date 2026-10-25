@@ -25,10 +25,10 @@ final class MCPCoordinateReproductionWordingTests: XCTestCase {
         content.compactMap { $0["text"] as? String }.joined()
     }
 
-    func testDoubleTapSaysItHasNoCoordinateFormInsteadOfClaimingTapSyntax() async throws {
+    func testDoubleTapNamesItsOwnCoordinateFormInsteadOfClaimingTapSyntax() async throws {
         let result = try await server.call(tool: "ft_double_tap", args: ["x": 100.0, "y": 200.0])
         let body = text(result)
-        XCTAssertTrue(body.contains("doubleTap only takes a selector"), body)
+        XCTAssertTrue(body.contains("writable as doubleTap(x:, y:)"), body)
         XCTAssertFalse(body.contains("writable as tap(x:, y:)"), body)
     }
 

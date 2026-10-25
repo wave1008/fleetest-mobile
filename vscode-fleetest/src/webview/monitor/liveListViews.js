@@ -70,10 +70,10 @@ export function clockText(now = new Date()) {
 }
 
 /** 操作記録(host の operationLog を追記)を listEl に描く。
- * 行は「時刻 / 操作 / MCP のコマンド」の3列(grid は CSS の .oplog-row / .oplog-head)。MCP 列は同じ操作を
- * ft_* で撃つ形(host の mcpCommandForServeCommand)で、**クリックでコピー**する(貼って使うもの)。
- * テスト実行由来の行には無い(空のまま = 列は揃える)。
- * **一覧は左右にもスクロールする**(MCP 列は省略しない = 行の幅は中身で決まり、.oplog-list が overflow:auto)。
+ * 行は「時刻 / 操作 / DSL コマンド」の3列(grid は CSS の .oplog-row / .oplog-head)。DSL 列は同じ操作の
+ * Swift DSL の1行(serve が組んだ actionResult.dsl。行末コメントつき)で、**クリックでコピー**する(シナリオへ貼って使うもの)。
+ * 組めない操作・テスト実行由来の行には無い(空のまま = 列は揃える)。
+ * **一覧は左右にもスクロールする**(DSL 列は省略しない = 行の幅は中身で決まり、.oplog-list が overflow:auto)。
  * 操作列の幅は見出し行(.oplog-head)の境目をドラッグして変える(--oplog-label-width)。
  * persistKey: 幅を vscode.setState に保存するキー。defaultLabelWidth: CSS の --oplog-label-width の既定と揃えること。
  * 見出し行は一覧の中に置く(外に置くと横スクロールで列がずれる)。clear / replace・行数の上限では消さない。 */
@@ -97,10 +97,10 @@ export function createOplogView(listEl, { persistKey, defaultLabelWidth }) {
   resizer.className = 'oplog-col-resizer';
   resizer.title = t('wvMonitor.live.oplogColResize');
   labelHead.appendChild(resizer);
-  const mcpHead = document.createElement('span');
-  mcpHead.className = 'oplog-mcp';
-  mcpHead.textContent = t('wvMonitor.live.oplogColMcp');
-  head.append(timeHead, labelHead, mcpHead);
+  const dslHead = document.createElement('span');
+  dslHead.className = 'oplog-dsl';
+  dslHead.textContent = t('wvMonitor.live.oplogColDsl');
+  head.append(timeHead, labelHead, dslHead);
   let resizePointerId = null;
   let resizeStartX = 0;
   let resizeStartWidth = 0;
@@ -129,7 +129,7 @@ export function createOplogView(listEl, { persistKey, defaultLabelWidth }) {
   listEl.appendChild(head);
   applyLabelWidth(labelWidth);
 
-  function makeRow(label, ok, mcp, time) {
+  function makeRow(label, ok, dsl, time) {
     const row = document.createElement('div');
     row.className = ok ? 'oplog-row' : 'oplog-row failed';
     const timeEl = document.createElement('span');
@@ -139,11 +139,11 @@ export function createOplogView(listEl, { persistKey, defaultLabelWidth }) {
     text.className = 'oplog-label';
     text.textContent = (ok ? '' : '✗ ') + label;
     const command = document.createElement('span');
-    command.className = 'oplog-mcp';
-    if (mcp) {
-      command.textContent = mcp;
-      command.title = mcp + '\n' + t('wvMonitor.live.oplogMcpCopy');
-      command.addEventListener('click', () => { vscode.postMessage({ type: 'copyText', text: mcp }); });
+    command.className = 'oplog-dsl';
+    if (dsl) {
+      command.textContent = dsl;
+      command.title = dsl + '\n' + t('wvMonitor.live.oplogDslCopy');
+      command.addEventListener('click', () => { vscode.postMessage({ type: 'copyText', text: dsl }); });
     }
     row.append(timeEl, text, command);
     return row;
@@ -160,16 +160,16 @@ export function createOplogView(listEl, { persistKey, defaultLabelWidth }) {
   }
   return {
     /** time: 'HH:MM:SS'。省略時は今 */
-    append(label, ok, mcp, time) {
-      listEl.appendChild(makeRow(label, ok, mcp, time));
+    append(label, ok, dsl, time) {
+      listEl.appendChild(makeRow(label, ok, dsl, time));
       trim();
       listEl.scrollTop = listEl.scrollHeight; // 最新行を見せる
     },
     clear,
-    /** entries: [{ time, label, ok, mcp }]。呼び出し側が持つ控えで一覧を差し替える */
+    /** entries: [{ time, label, ok, dsl }]。呼び出し側が持つ控えで一覧を差し替える */
     replace(entries) {
       clear();
-      for (const e of entries) { listEl.appendChild(makeRow(e.label, e.ok, e.mcp, e.time)); }
+      for (const e of entries) { listEl.appendChild(makeRow(e.label, e.ok, e.dsl, e.time)); }
       trim();
       listEl.scrollTop = listEl.scrollHeight;
     },

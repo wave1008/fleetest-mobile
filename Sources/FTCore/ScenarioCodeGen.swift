@@ -146,7 +146,7 @@ public enum ScenarioCodeGen {
     /// `settle: false` のときだけ ", settle: false"(既定 true は書かない)。DSL の引数順の位置に差す
     private static func settleArg(_ step: FlowStep) -> String { step.skipsSettle ? ", settle: false" : "" }
 
-    static func command(for step: FlowStep) -> String? {
+    public static func command(for step: FlowStep) -> String? {
         let selector = selectorText(for: step)
 
         if let action = step.action {
@@ -189,6 +189,9 @@ public enum ScenarioCodeGen {
                 return "appSwitcher()"
             case "terminate":
                 return "terminateApp()"
+            case "clearAppData":
+                // text = 対象の bundle ID(MCP の ft_clear_app_data は必ず名指しする)
+                return "clearAppData(\(step.text.map(literal) ?? ""))"
             case "pressEnter":
                 return step.skipsSettle ? "pressEnter(settle: false)" : "pressEnter()"
             case "openURL":
@@ -203,7 +206,15 @@ public enum ScenarioCodeGen {
                     return step.skipsSettle ? "clearInput(settle: false)" : "clearInput()"
                 }
                 return "clearInput(\(literal(selector))\(settleArg(step))\(actionWaitArg(step))\(searchScrollArgs(step)))"
+            case "fold": return "fold()"
+            case "unfold": return "unfold()"
+            case "hinge":
+                guard let degrees = step.degrees else { return nil }
+                return "hinge(\(FTSeconds.format(degrees)))"
             case "doubleTap":
+                if step.locator == nil, let x = step.x, let y = step.y {
+                    return "doubleTap(x: \(FTSeconds.format(x)), y: \(FTSeconds.format(y))\(settleArg(step)))"
+                }
                 return step.locator == nil ? (step.skipsSettle ? "doubleTap(settle: false)" : "doubleTap()")
                     : "doubleTap(\(literal(selector))\(settleArg(step))\(actionWaitArg(step)))"
             case "gesture":

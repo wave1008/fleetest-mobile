@@ -66,6 +66,13 @@ extension MCPServer {
                                                       observe: observe, sent: { _ in })
             // Android の折りたたみ機は閉じるとロック画面が出る(ドライバが外す。iOS は何もしない)
             await foldDriver.continueAfterFold()
+            // 開閉は済んでいるので下書きへ残す(DSL の fold() / unfold() / hinge(_:) に 1:1)
+            switch target {
+            case .fold: recordInteraction(action: "fold", resolvedRef: nil, args: args)
+            case .unfold: recordInteraction(action: "unfold", resolvedRef: nil, args: args)
+            case .angle(let degrees):
+                recordInteraction(action: "hinge", resolvedRef: nil, args: args, degrees: degrees)
+            }
             // 開閉で画面の大きさごと変わるので、覚えている木は捨てて撮り直す(ft_rotate と同じ理由)
             var head: String
             switch target {

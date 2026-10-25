@@ -130,6 +130,9 @@ if (command === "list-devices") {
       kind: "actionResult",
       ok: !failed,
       error: failed ? `mock-live: ${String(cmd)} に失敗しました` : null,
+      // 実物の serve は撃ったコマンドと同じ操作の DSL の1行を返す(契約: ApiLiveCommand.swift 冒頭)。
+      // モックは tap だけ固定の行を返し、他は組めない操作として null
+      dsl: cmd === "tap" ? 'tap("#mock")' : null,
       bridgeStarting: false,
     });
     emitSnapshot();

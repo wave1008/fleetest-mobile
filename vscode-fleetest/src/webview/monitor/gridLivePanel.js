@@ -92,7 +92,7 @@ panelSplitter.addEventListener('pointercancel', endSplitDrag);
 panelSplitter.addEventListener('dblclick', (event) => event.stopPropagation());
 
 const oplogView = createOplogView(oplogList, { persistKey: 'gridLiveOplogLabelWidth', defaultLabelWidth: 220 });
-const oplogByDevice = new Map(); // id → [{ time, label, ok, mcp }]
+const oplogByDevice = new Map(); // id → [{ time, label, ok, dsl }]
 
 // gridLiveControls.js の postAction(送れたら true)と deviceTiles.js の showMirrorStill。initGridLivePanel で受ける
 // (ここから deviceTiles.js を import しない = noteMirrorFrame の doc)
@@ -475,14 +475,14 @@ export function applyGridLivePanelMessage(message) {
 function recordOperation(message) {
   const entry = {
     time: clockText(), label: message.label, ok: !!message.ok,
-    mcp: typeof message.mcp === 'string' ? message.mcp : '',
+    dsl: typeof message.dsl === 'string' ? message.dsl : '',
   };
   const entries = oplogByDevice.get(message.deviceId) ?? [];
   entries.push(entry);
   if (entries.length > OPLOG_MAX_ROWS) { entries.splice(0, entries.length - OPLOG_MAX_ROWS); }
   oplogByDevice.set(message.deviceId, entries);
   if (target && target.id === message.deviceId) {
-    oplogView.append(entry.label, entry.ok, entry.mcp, entry.time);
+    oplogView.append(entry.label, entry.ok, entry.dsl, entry.time);
   }
 }
 

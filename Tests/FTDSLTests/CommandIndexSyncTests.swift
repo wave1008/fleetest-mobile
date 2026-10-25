@@ -160,6 +160,8 @@ final class CommandIndexSyncTests: XCTestCase {
         "tap": "座標形 tap(x:, y:, holdSeconds:) は別オーバーロードとして存在するが、"
             + "索引は selector 版の引数だけを signature に載せる(x/y は summary の散文で説明する。"
             + "CommandIndex.swift の tap のコメント参照)。x/y は意図的に signature から除外する",
+        "doubleTap": "座標形 doubleTap(x:, y:, settle:) は別オーバーロード。tap と同じく signature は selector 版だけ"
+            + "(位置引数名の導出に使うので触らない)。x/y は summary の散文で説明する",
     ]
 
     /// 引数リストのテキスト(丸括弧の中身)→ ラベル集合。トップレベルのカンマで区切り、

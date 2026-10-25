@@ -30,7 +30,6 @@ import {
   describeElementShort,
   devicesToOptions,
   fallbackDeviceOption,
-  mcpCommandForServeCommand,
   hitTestElement,
   isTextInputElement,
   type LiveActionResult,
@@ -164,7 +163,7 @@ export class MonitorLiveController implements vscode.Disposable {
   private openObservationPending = false;
   /** 直近の snapshot の screen(ポイント座標のサイズ)。クリック→タップ座標変換に使う。 */
   private lastScreen: LiveSize | undefined;
-  /** 直近の snapshot の要素一覧。タップ位置のヒットテスト・MCP コマンド表示の ref 解決に使う。 */
+  /** 直近の snapshot の要素一覧。タップ位置のヒットテストに使う。 */
   private lastElements: readonly LiveElement[] = [];
   private busy = false;
   /** busy の原因が**画面を変えない観測**(画面の撮り直し・デバイス一覧の取り直し)か。webview はこの間の画面の操作を
@@ -303,10 +302,10 @@ export class MonitorLiveController implements vscode.Disposable {
 
   /** 「操作記録」1行を webview へ送る(対向: gridLivePanel.js の operationLog ハンドラ)。
    * 全ユーザー操作(tap/swipe/type/press/home/appSwitcher)の成否をここへ流す。 */
-  private postOperationLog(label: string, ok: boolean, mcp?: string, deviceId?: string): void {
+  private postOperationLog(label: string, ok: boolean, dsl?: string, deviceId?: string): void {
     this.post({
       type: "operationLog", label, ok,
-      ...(mcp !== undefined ? { mcp } : {}),
+      ...(dsl !== undefined ? { dsl } : {}),
       ...(deviceId !== undefined ? { deviceId } : {}),
     });
   }
@@ -883,7 +882,7 @@ export class MonitorLiveController implements vscode.Disposable {
     // **bridgeStarting は常に false**(この経路は自動起動とは無関係の host 側の障害
     // [プロセス終了・応答タイムアウト]なので、デバイスが起動中かどうかは分からない・関係ない)
     this.settlePendingServeRequest({
-      action: pending.expectsAction ? { ok: false, error: message, bridgeStarting: false } : undefined,
+      action: pending.expectsAction ? { ok: false, error: message, bridgeStarting: false, dsl: null } : undefined,
       snapshot: { ok: false, error: message, bridgeStarting: false },
     });
   }
@@ -914,7 +913,7 @@ export class MonitorLiveController implements vscode.Disposable {
       const message = serveUnavailableMessage();
       // serve プロセス自体が居ない(bridgeStarting とは無関係の host 側の障害)
       return Promise.resolve({
-        action: command.cmd === "refresh" ? undefined : { ok: false, error: message, bridgeStarting: false },
+        action: command.cmd === "refresh" ? undefined : { ok: false, error: message, bridgeStarting: false, dsl: null },
         snapshot: { ok: false, error: message, bridgeStarting: false },
       });
     }
@@ -1009,8 +1008,6 @@ export class MonitorLiveController implements vscode.Disposable {
     this.setBusy(true);
     // 操作中に選択が変わっても、行は操作を撃ったデバイスのものとして届ける
     const loggedDeviceId = this.selectedDeviceId;
-    // 要素一覧は sendServeCommand の観測で入れ替わるので、送る前の(利用者が見ていた)木で引く
-    const mcp = mcpCommandForServeCommand(command, this.lastElements);
     try {
       this.ensureServeProcess(device);
       const { action, snapshot } = await this.sendServeCommand(command);
@@ -1023,7 +1020,7 @@ export class MonitorLiveController implements vscode.Disposable {
           this.postActionError(action.error);
         }
         if (options?.logLabel) {
-          this.postOperationLog(options.logLabel, false, mcp, loggedDeviceId);
+          this.postOperationLog(options.logLabel, false, action.dsl ?? undefined, loggedDeviceId);
         }
         return false;
       }
@@ -1033,7 +1030,7 @@ export class MonitorLiveController implements vscode.Disposable {
       this.post({ type: "actionError", message: "" });
       this.connectionBannerShown = false;
       if (options?.logLabel) {
-        this.postOperationLog(options.logLabel, true, mcp, loggedDeviceId);
+        this.postOperationLog(options.logLabel, true, action?.dsl ?? undefined, loggedDeviceId);
       }
       this.applySnapshotResult(snapshot);
       return snapshot.ok;

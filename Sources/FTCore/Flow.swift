@@ -173,6 +173,9 @@ public struct FlowStep: Codable, Sendable {
     /// **`tap` と `swipePointToPoint`(始点)以外は未使用**
     public var x: Double?
     public var y: Double?
+    /// `hinge` の角度(0 = 閉 / 180 = 開)。**下書き(ScenarioCodeGen)へ渡すためだけの欄で、StepExecutor は
+    /// fold / unfold / hinge を実行しない**(DSL では FlowStep を通らない)。`hinge` 以外は未使用
+    public var degrees: Double?
     /// `swipePointToPoint` の終点(単位は `x` / `y` と同じ)。**`swipePointToPoint` 以外は未使用**
     public var toX: Double?
     public var toY: Double?
@@ -213,7 +216,7 @@ public struct FlowStep: Codable, Sendable {
                 startMarginRatio: Double? = nil, endMarginRatio: Double? = nil,
                 intervalSeconds: Double? = nil,
                 scale: Double? = nil, dxRatio: Double? = nil, dyRatio: Double? = nil,
-                x: Double? = nil, y: Double? = nil,
+                x: Double? = nil, y: Double? = nil, degrees: Double? = nil,
                 toX: Double? = nil, toY: Double? = nil,
                 imageThreshold: Double? = nil, aspectRatioTolerance: Double? = nil,
                 preferCheckStateClassifier: Bool? = nil,
@@ -227,6 +230,7 @@ public struct FlowStep: Codable, Sendable {
         self.gesture = gesture
         self.x = x
         self.y = y
+        self.degrees = degrees
         self.toX = toX
         self.toY = toY
         self.imageThreshold = imageThreshold

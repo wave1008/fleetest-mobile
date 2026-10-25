@@ -422,8 +422,7 @@ extension MCPServer {
                                     ? nil : durationSeconds,
                                 maxGestureSeconds: try Self.doubleArgument(args, "maxGestureSeconds"),
                                 x: fromX, y: fromY, toX: toX, toY: toY)
-        dragStep.note = "coordinates — replace with a selector before keeping this;"
-            + " a layout change makes it hit something else"
+        dragStep.note = DraftNotes.coordinates
         recordAction(InteractionLog.Entry(step: dragStep, unresolved: nil,
                                           summary: "drag (\(fromX), \(fromY)) → (\(toX), \(toY))"),
                      args: args)

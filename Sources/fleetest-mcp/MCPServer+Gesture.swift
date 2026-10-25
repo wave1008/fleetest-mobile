@@ -95,27 +95,9 @@ extension MCPServer {
         return value
     }
 
-    /// 絶対座標の `[FTFinger]`(`gestureFingersArgument` が返した、送信前の形)→ 比率の `[FTFinger]`
-    /// (DSL の gesture が書く形)。screen で割るだけ —— resolve 後の `GestureRequest`(点に展開済み)
-    /// から再構築するより単純(往復して move/hold を推測し直さずに済む)
+    /// 絶対座標の `[FTFinger]`(`gestureFingersArgument` が返した、送信前の形)→ 比率の `[FTFinger]`。
+    /// 実体は `TouchGesture.ratioFingers`(ライブ操作の操作記録と共有)
     static func gestureFingersRatio(_ fingers: [FTFinger], screen: FTRect) -> [FTFinger] {
-        guard screen.width > 0, screen.height > 0 else { return [] }
-        func ratio(_ x: Double, _ y: Double) -> (x: Double, y: Double) {
-            ((x - screen.x) / screen.width, (y - screen.y) / screen.height)
-        }
-        return fingers.map { finger in
-            let (rx, ry) = ratio(finger.x, finger.y)
-            var built = FTFinger(x: rx, y: ry, startSeconds: finger.startSeconds)
-            for step in finger.steps {
-                switch step {
-                case .move(let x, let y, let durationSeconds):
-                    let (mx, my) = ratio(x, y)
-                    built = built.move(x: mx, y: my, durationSeconds: durationSeconds)
-                case .hold(let seconds):
-                    built = built.hold(seconds: seconds)
-                }
-            }
-            return built
-        }
+        TouchGesture.ratioFingers(fingers, screen: screen)
     }
 }

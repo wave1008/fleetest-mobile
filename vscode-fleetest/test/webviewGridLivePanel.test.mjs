@@ -266,13 +266,13 @@ test("操作記録は deviceId が1台表示のデバイスの行だけ出し、
   clickTile(document, 0);
   const labels = () => [...document.querySelectorAll("#grid-live-oplog-list .oplog-row .oplog-label")].map((e) => e.textContent);
 
-  live(window, { type: "operationLog", label: "ホーム", ok: true, mcp: 'ft_navigate {"target":"home"}', deviceId: "d0" });
+  live(window, { type: "operationLog", label: "ホーム", ok: true, dsl: "home()", deviceId: "d0" });
   live(window, { type: "operationLog", label: "別のデバイス", ok: true, deviceId: "d1" });
   live(window, { type: "operationLog", label: "テスト実行の行", ok: true });
   live(window, { type: "operationLog", label: "失敗", ok: false, deviceId: "d0" });
   assert.deepEqual(labels(), ["ホーム", "✗ 失敗"], "deviceId の無い行・別デバイスの行は出さない");
-  const mcp = document.querySelector("#grid-live-oplog-list .oplog-row .oplog-mcp");
-  assert.equal(mcp.textContent, 'ft_navigate {"target":"home"}');
+  const dsl = document.querySelector("#grid-live-oplog-list .oplog-row .oplog-dsl");
+  assert.equal(dsl.textContent, "home()");
 
   // 別のデバイスを1台表示にすると、そのデバイスの控えへ差し替わる
   clickTile(document, 0);

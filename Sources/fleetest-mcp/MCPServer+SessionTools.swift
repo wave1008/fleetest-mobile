@@ -345,6 +345,7 @@ extension MCPServer {
             launchedBundleIDs[clearAppDataKey] = nil
             launchTimestamps[clearAppDataKey] = nil
             systemAlertProbePending.insert(clearAppDataKey)
+            recordClearAppData(bundleID: bundleID, args: args)
             return text("Reinstalled \(bundleID) from \(path) (physical device: app data"
                 + " wiped by uninstall + install; permission grants are reset too)"
                 + (reinstallNote.map { "\n\($0)" } ?? ""))
@@ -356,7 +357,15 @@ extension MCPServer {
         // 次の ft_launch は「初回起動」ではなく「再起動」)。switchedAppNote がこれを見て
         // 「クラッシュしたかも」ではなく「この操作で止めた」と言う
         toolStoppedBundleIDs[clearAppDataKey] = "ft_clear_app_data"
+        recordClearAppData(bundleID: bundleID, args: args)
         return text(springBoardNote + "Cleared the data of \(bundleID). The app is stopped — ft_launch to continue")
+    }
+
+    /// 下書きへ `clearAppData("<bundle ID>")` を残す(DSL に同じコマンドがある。実機の再インストールでも
+    /// 消えるものは同じなので同じ行)
+    private func recordClearAppData(bundleID: String, args: [String: Any]) {
+        recordAction(InteractionLog.Entry(step: FlowStep(action: "clearAppData", text: bundleID), unresolved: nil,
+                                          summary: "clearAppData \(bundleID)"), args: args)
     }
 
     func ftTerminate(_ args: [String: Any]) async throws -> [[String: Any]] {
@@ -396,6 +405,9 @@ extension MCPServer {
         systemAlertProbePending.remove(terminateKey)
         // 前面が消えたので、覆い探針の記憶(F 節)は使い回さない
         lastScreenProbe[terminateKey] = nil
+        // 下書きへ `terminateApp()` を残す(DSL の terminateApp は対象を取らない = セッションのアプリ)
+        recordAction(InteractionLog.Entry(step: FlowStep(action: "terminate"), unresolved: nil,
+                                          summary: "terminate \(terminateBundleID)"), args: args)
         return text(terminateUnverified
             ? "Terminate sent for \(terminateBundleID) (nothing was launched in this session, so the"
                 + " driver stopped whichever app it is attached to — on Android nothing is stopped"

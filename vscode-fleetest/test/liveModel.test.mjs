@@ -32,7 +32,6 @@ import {
   parseLiveSnapshotResult,
   parseListDevicesResult,
   pointFromClick,
-  mcpCommandForServeCommand,
   remoteDeviceOption,
   sameLiveDeviceRef,
   serializeLiveServeCommand,
@@ -222,28 +221,47 @@ test("parseLiveSnapshotResult: bridgeStarting が欠落/非boolean なら undefi
 
 // ---- parseLiveActionResult ----
 
-test("parseLiveActionResult: {ok:true} を { ok: true, bridgeStarting } に正規化する", () => {
-  assert.deepEqual(parseLiveActionResult({ ok: true, bridgeStarting: false }), { ok: true, bridgeStarting: false });
-  assert.deepEqual(parseLiveActionResult({ ok: true, bridgeStarting: true }), { ok: true, bridgeStarting: true });
-});
-
-test("parseLiveActionResult: {ok:false,error} をそのまま返す", () => {
-  assert.deepEqual(parseLiveActionResult({ ok: false, error: "失敗しました", bridgeStarting: false }), {
-    ok: false,
-    error: "失敗しました",
-    bridgeStarting: false,
+test("parseLiveActionResult: {ok:true} を { ok: true, bridgeStarting, dsl } に正規化する", () => {
+  assert.deepEqual(parseLiveActionResult({ ok: true, bridgeStarting: false, dsl: null }), {
+    ok: true, bridgeStarting: false, dsl: null,
+  });
+  assert.deepEqual(parseLiveActionResult({ ok: true, bridgeStarting: true, dsl: 'tap("#login")' }), {
+    ok: true, bridgeStarting: true, dsl: 'tap("#login")',
   });
 });
 
+test("parseLiveActionResult: {ok:false,error} をそのまま返す", () => {
+  assert.deepEqual(parseLiveActionResult({ ok: false, error: "失敗しました", bridgeStarting: false, dsl: null }), {
+    ok: false,
+    error: "失敗しました",
+    bridgeStarting: false,
+    dsl: null,
+  });
+});
+
+test("parseLiveActionResult: 失敗した操作でも dsl(撃つ前に組めた行)を落とさない", () => {
+  assert.deepEqual(
+    parseLiveActionResult({ ok: false, error: "x", bridgeStarting: false, dsl: "tap(x: 120, y: 340)" }),
+    { ok: false, error: "x", bridgeStarting: false, dsl: "tap(x: 120, y: 340)" },
+  );
+});
+
+test("parseLiveActionResult: dsl は必須(欠落・文字列でも null でもない値は undefined。後方互換の読み替えは置かない)", () => {
+  assert.equal(parseLiveActionResult({ ok: true, bridgeStarting: false }), undefined, "dsl 欠落");
+  assert.equal(parseLiveActionResult({ ok: false, error: "x", bridgeStarting: false }), undefined, "エラー形も dsl 欠落は undefined");
+  assert.equal(parseLiveActionResult({ ok: true, bridgeStarting: false, dsl: 12 }), undefined, "dsl が数値");
+  assert.equal(parseLiveActionResult({ ok: true, bridgeStarting: false, dsl: undefined }), undefined, "dsl が undefined");
+});
+
 test("parseLiveActionResult: ok が欠落/非boolean、error が非文字列、または bridgeStarting が欠落/非boolean なら undefined", () => {
-  assert.equal(parseLiveActionResult({}), undefined);
-  assert.equal(parseLiveActionResult({ ok: "true" }), undefined);
-  assert.equal(parseLiveActionResult({ ok: false }), undefined);
-  assert.equal(parseLiveActionResult({ ok: false, error: 123 }), undefined);
+  assert.equal(parseLiveActionResult({ dsl: null }), undefined);
+  assert.equal(parseLiveActionResult({ ok: "true", dsl: null }), undefined);
+  assert.equal(parseLiveActionResult({ ok: false, dsl: null }), undefined);
+  assert.equal(parseLiveActionResult({ ok: false, error: 123, dsl: null }), undefined);
   assert.equal(parseLiveActionResult(null), undefined);
-  assert.equal(parseLiveActionResult({ ok: true }), undefined, "bridgeStarting 欠落");
-  assert.equal(parseLiveActionResult({ ok: true, bridgeStarting: "false" }), undefined, "bridgeStarting が文字列");
-  assert.equal(parseLiveActionResult({ ok: false, error: "x" }), undefined, "エラー形も bridgeStarting 欠落は undefined");
+  assert.equal(parseLiveActionResult({ ok: true, dsl: null }), undefined, "bridgeStarting 欠落");
+  assert.equal(parseLiveActionResult({ ok: true, bridgeStarting: "false", dsl: null }), undefined, "bridgeStarting が文字列");
+  assert.equal(parseLiveActionResult({ ok: false, error: "x", dsl: null }), undefined, "エラー形も bridgeStarting 欠落は undefined");
 });
 
 // ---- serializeLiveServeCommand ----
@@ -274,47 +292,55 @@ test("serializeLiveServeCommand: JSON化して末尾に改行を付ける", () =
 // ---- parseLiveServeEvent ----
 
 test("parseLiveServeEvent: kind=actionResult の成功/失敗を判別する", () => {
-  assert.deepEqual(parseLiveServeEvent({ kind: "actionResult", ok: true, bridgeStarting: false }), {
+  assert.deepEqual(parseLiveServeEvent({ kind: "actionResult", ok: true, bridgeStarting: false, dsl: null }), {
     kind: "actionResult",
-    result: { ok: true, bridgeStarting: false },
+    result: { ok: true, bridgeStarting: false, dsl: null },
   });
   assert.deepEqual(
-    parseLiveServeEvent({ kind: "actionResult", ok: false, error: "失敗しました", bridgeStarting: false }),
+    parseLiveServeEvent({ kind: "actionResult", ok: false, error: "失敗しました", bridgeStarting: false, dsl: null }),
     {
       kind: "actionResult",
-      result: { ok: false, error: "失敗しました", bridgeStarting: false },
+      result: { ok: false, error: "失敗しました", bridgeStarting: false, dsl: null },
     },
   );
 });
 
 test("parseLiveServeEvent: actionResult の bridgeStarting(自動起動が進行中か)を落とさない", () => {
-  assert.deepEqual(parseLiveServeEvent({ kind: "actionResult", ok: false, error: "x", bridgeStarting: true }), {
+  assert.deepEqual(parseLiveServeEvent({ kind: "actionResult", ok: false, error: "x", bridgeStarting: true, dsl: null }), {
     kind: "actionResult",
-    result: { ok: false, error: "x", bridgeStarting: true },
+    result: { ok: false, error: "x", bridgeStarting: true, dsl: null },
   });
+});
+
+test("parseLiveServeEvent: actionResult の dsl(操作記録に出す DSL の1行)を落とさない・欠落は不正", () => {
+  assert.deepEqual(
+    parseLiveServeEvent({ kind: "actionResult", ok: true, bridgeStarting: false, dsl: 'tap("#login")' }),
+    { kind: "actionResult", result: { ok: true, bridgeStarting: false, dsl: 'tap("#login")' } },
+  );
+  assert.equal(parseLiveServeEvent({ kind: "actionResult", ok: true, bridgeStarting: false }), undefined, "dsl 欠落");
 });
 
 test("parseLiveServeEvent: actionResult の app(操作を撃った先)を落とさない", () => {
   assert.deepEqual(
-    parseLiveServeEvent({ kind: "actionResult", ok: true, app: "com.example.app", bridgeStarting: false }),
+    parseLiveServeEvent({ kind: "actionResult", ok: true, app: "com.example.app", bridgeStarting: false, dsl: null }),
     {
       kind: "actionResult",
-      result: { ok: true, bridgeStarting: false, app: "com.example.app" },
+      result: { ok: true, bridgeStarting: false, dsl: null, app: "com.example.app" },
     },
   );
   assert.deepEqual(
     parseLiveServeEvent({
-      kind: "actionResult", ok: false, error: "x", app: "com.apple.springboard", bridgeStarting: false,
+      kind: "actionResult", ok: false, error: "x", app: "com.apple.springboard", bridgeStarting: false, dsl: null,
     }),
     {
       kind: "actionResult",
-      result: { ok: false, error: "x", bridgeStarting: false, app: "com.apple.springboard" },
+      result: { ok: false, error: "x", bridgeStarting: false, dsl: null, app: "com.apple.springboard" },
     },
   );
   // app が文字列でない/無い形では欄自体を作らない(undefined の欄で deepEqual を割らない)
-  assert.deepEqual(parseLiveServeEvent({ kind: "actionResult", ok: true, app: 12, bridgeStarting: false }), {
+  assert.deepEqual(parseLiveServeEvent({ kind: "actionResult", ok: true, app: 12, bridgeStarting: false, dsl: null }), {
     kind: "actionResult",
-    result: { ok: true, bridgeStarting: false },
+    result: { ok: true, bridgeStarting: false, dsl: null },
   });
 });
 
@@ -940,7 +966,7 @@ test("統合: mock-live.mjs live serve の tap は actionResult(ok:true) → sna
   const serve = spawnServe(process.execPath, [MOCK_LIVE, "live", "serve", "--platform", "ios"], process.cwd());
   const [actionLine, snapshotLine] = await serve.send({ cmd: "tap", ref: 1 }, 2);
   const actionEvent = parseLiveServeEvent(actionLine);
-  assert.deepEqual(actionEvent, { kind: "actionResult", result: { ok: true, bridgeStarting: false } });
+  assert.deepEqual(actionEvent, { kind: "actionResult", result: { ok: true, bridgeStarting: false, dsl: 'tap("#mock")' } });
   const snapshotEvent = parseLiveServeEvent(snapshotLine);
   assert.ok(snapshotEvent && snapshotEvent.kind === "snapshot" && snapshotEvent.result.ok);
   await serve.close();
@@ -1017,41 +1043,9 @@ test("sameLiveDeviceRef: 同じ udid でも機械が違えば別の台(serve を
   assert.equal(sameLiveDeviceRef({ ...base, machine: "M1Ultra" }, { ...base, machine: "M1Ultra" }), true);
 });
 
-// ---- 操作記録の MCP 列(mcpCommandForServeCommand) ----
-// ツール名・引数名は Sources/fleetest-mcp/MCPServer+ToolDefs.swift と対
-
-const ELEMENTS = [
-  { ref: 3, type: "button", identifier: "btn_go", label: "Go", value: null, placeholder: null,
-    enabled: true, frame: { x: 100, y: 200, width: 40, height: 20 }, depth: 1 },
-];
-
-test("mcpCommandForServeCommand: 操作ごとに ft_* とその引数へ写す", () => {
-  const f = (command) => mcpCommandForServeCommand(command, ELEMENTS);
-  assert.equal(f({ cmd: "tap", x: 12.34, y: 56.78 }), 'ft_tap {"x":12.3,"y":56.8}');
-  assert.equal(f({ cmd: "type", text: "hello" }), 'ft_type {"text":"hello"}');
-  assert.equal(f({ cmd: "drag", fromX: 10, fromY: 400, toX: 10, toY: 100, press: 0, duration: 0.55 }),
-    'ft_drag {"fromX":10,"fromY":400,"toX":10,"toY":100,"durationSeconds":0.6}');
-  assert.equal(f({ cmd: "press", x: 1, y: 2, duration: 1.5 }), 'ft_long_press {"x":1,"y":2,"holdSeconds":1.5}');
-  assert.equal(f({ cmd: "doubleTap", x: 1, y: 2 }), 'ft_double_tap {"x":1,"y":2}');
-  assert.equal(f({ cmd: "pinch", scale: 2, duration: 0.5 }), 'ft_pinch {"scale":2,"durationSeconds":0.5}');
-  assert.equal(f({ cmd: "home" }), 'ft_navigate {"target":"home"}');
-  assert.equal(f({ cmd: "appSwitcher" }), 'ft_navigate {"target":"appSwitcher"}');
-  assert.equal(f({ cmd: "fold", state: "unfold" }), 'ft_fold {"state":"unfold"}');
-});
-
-// ref はスナップショットごとの採番で MCP の ft_snapshot と一致しないので、要素の枠の中心(座標)に畳む
-test("mcpCommandForServeCommand: 要素番号のタップは枠の中心の座標に畳む(引けなければ ref のまま)", () => {
-  assert.equal(mcpCommandForServeCommand({ cmd: "tap", ref: 3 }, ELEMENTS), 'ft_tap {"x":120,"y":210}');
-  assert.equal(mcpCommandForServeCommand({ cmd: "tap", ref: 99 }, ELEMENTS), 'ft_tap {"ref":99}');
-});
-
-test("mcpCommandForServeCommand: 観測だけ(refresh)は操作ではないので出さない", () => {
-  assert.equal(mcpCommandForServeCommand({ cmd: "refresh" }, ELEMENTS), undefined);
-});
-
 // ---- 軌跡モード(gesture) ----
-// ワイヤ形(GestureRequest)は t が秒。mcpCommandForServeCommand は
-// gestureStepsFromPoints(点列→move/hold の列)を土台にする。
+// ワイヤ形(GestureRequest)は t が秒。gestureStepsFromPoints = 点列→move/hold の列
+// (serve 側の同等品は TouchGesture.fingers(fromPoints:))。
 
 test("gestureStepsFromPoints: 同座標が続く区間は hold、動けば move", () => {
   // t は2進で誤差なく表現できる値を選ぶ(0.3-0.9 のような値は浮動小数点誤差(0.6000...1)が
@@ -1076,32 +1070,6 @@ test("gestureStepsFromPoints: 時刻が巻き戻る/止まっている点(dt<=0)
   assert.deepEqual(gestureStepsFromPoints(points), [
     { kind: "move", x: 30, y: 40, seconds: 0.5 },
   ]);
-});
-
-test("mcpCommandForServeCommand: gesture は ft_gesture の fingers/steps 形へ写す", () => {
-  const command = {
-    cmd: "gesture",
-    fingers: [{ points: [
-      { x: 10, y: 20, t: 0 },
-      { x: 10, y: 20, t: 0.3 },
-      { x: 50, y: 80, t: 0.9 },
-    ] }],
-  };
-  assert.equal(
-    mcpCommandForServeCommand(command, ELEMENTS),
-    'ft_gesture {"fingers":[{"x":10,"y":20,"steps":[{"holdSeconds":0.3},{"x":50,"y":80,"durationSeconds":0.6}]}]}',
-  );
-});
-
-test("mcpCommandForServeCommand: gesture の秒は0.01刻みに丸め、0を超える値に敷く", () => {
-  const command = {
-    cmd: "gesture",
-    fingers: [{ points: [{ x: 0, y: 0, t: 0 }, { x: 1, y: 1, t: 0.002 }] }],
-  };
-  assert.equal(
-    mcpCommandForServeCommand(command, ELEMENTS),
-    'ft_gesture {"fingers":[{"x":0,"y":0,"steps":[{"x":1,"y":1,"durationSeconds":0.01}]}]}',
-  );
 });
 
 // ---- isGridLiveAction: tracePoints ----
@@ -1172,12 +1140,6 @@ test("serveCommandAllowanceMs: press/drag/pinch は指定秒数そのもの(秒�
     350,
   );
   assert.equal(serveCommandAllowanceMs({ cmd: "pinch", scale: 2, duration: 0.5 }), 500);
-});
-
-test("mcpCommandForServeCommand: 上限を上げた軌跡は ft_gesture に maxGestureSeconds を出す", () => {
-  const fingers = [{ points: [{ x: 0, y: 0, t: 0 }, { x: 10, y: 10, t: 12 }] }];
-  assert.match(mcpCommandForServeCommand({ cmd: "gesture", fingers, maxGestureSeconds: 12 }, []), /"maxGestureSeconds":12/);
-  assert.doesNotMatch(mcpCommandForServeCommand({ cmd: "gesture", fingers }, []), /maxGestureSeconds/);
 });
 
 test("traceSummary: 点の数・時間・範囲・隣り合う点の最大の跳び(左上の角を経由した点列は最小 0 と大きな跳びで分かる)", async () => {

@@ -111,11 +111,7 @@ extension MCPServer {
     /// 下書きの行末に残す但し書き。安定なセレクタには**付けない** ——
     /// 全行にコメントが付くと読み飛ばされ、本当に危ない行が埋もれる
     static func indexedSelectorNote(_ durability: Durability) -> String? {
-        switch durability {
-        case .stable: return nil
-        case .indexed: return "index-based selector — breaks if the number of same-type siblings changes"
-        case .relative: return "relative selector — breaks if the layout around it changes"
-        }
+        DraftNotes.selectorDurability(durability)
     }
 
     /// 下書きに入った手の番号付き一覧。**これを見て `drop:` を組む**ので、番号は
@@ -176,7 +172,7 @@ extension MCPServer {
                            text: String? = nil, direction: String? = nil,
                            coordinate: (x: Double, y: Double)? = nil,
                            duration: Double? = nil, maxGestureSeconds: Double? = nil,
-                           scale: Double? = nil,
+                           scale: Double? = nil, degrees: Double? = nil,
                            replace: Bool = false) {
         // tap → type の間に別の操作が入ったら「叩いた欄へ入れる」意図ではない(DSL と同じ規律)
         if action != "tap", action != "type" { lastTapTargets[Self.sessionKey(args)] = nil }
@@ -205,20 +201,33 @@ extension MCPServer {
         } else if let coordinate {
             described = "\(action) at (\(coordinate.x), \(coordinate.y))"
         }
-        // ロケータ不要の手(swipe / フォーカス任せの type / 全画面ピンチ)はセレクタが無くても行にできる
-        let needsLocator = !["swipe", "type", "pressEnter", "back", "home", "appSwitcher",
-                             "pinchOut", "pinchIn", "hideKeyboard"]
+        // ロケータ不要の手(swipe / フォーカス任せの type・clearInput / 全画面ピンチ)はセレクタが無くても行にできる
+        let needsLocator = !["swipe", "type", "clearInput", "pressEnter", "back", "home", "appSwitcher",
+                             "pinchOut", "pinchIn", "hideKeyboard", "fold", "unfold", "hinge"]
             .contains(action) || (resolvedRef != nil || coordinate != nil)
         // **座標タップは行にできる**(DSL の `tap(x:y:)` へ 1:1 で書き出せる)。
         // **ただし用途で重みが違う**(ユーザー方針): 対話中の探索では座標のほうが速いことがあるが、
         // **シナリオに残す目的ならセレクタが最優先**。下書きは実行できる行を出したうえで、
         // 置き換えるべきであることを行末コメントに残す(ScenarioCodeGen が `step.note` を出す)
-        if action == "tap", selector == nil, let coordinate {
-            var step = FlowStep(action: "tap", x: coordinate.x, y: coordinate.y)
-            step.duration = duration
-            step.maxGestureSeconds = maxGestureSeconds
-            step.note = "coordinates — replace with a selector before keeping this;"
-                + " a layout change makes it hit something else"
+        // 座標の長押し(`ft_long_press {x,y}` = action "press")は `tap(x:y:holdSeconds:)`、座標の doubleTap は
+        // `doubleTap(x:y:)` へ落とす(どちらも TODO に落とさない)。**点に写る要素に書けるセレクタがあればその行**
+        // (`PointTarget`。ライブ操作の操作記録と同じ判定)。木は撃つ前に読んだ最後の木(記録は撃った直後・snapshotAfter より前)
+        if ["tap", "press", "doubleTap"].contains(action), selector == nil, let coordinate {
+            let isDoubleTap = action == "doubleTap"
+            var step: FlowStep
+            if let tree = lastSnapshots[Self.sessionKey(args)],
+               let graded = PointTarget.writableSelector(atX: coordinate.x, y: coordinate.y, in: tree) {
+                step = FlowStep(action: isDoubleTap ? "doubleTap" : "tap",
+                                locator: FTSelector.parse(graded.selector).primary)
+                step.note = DraftNotes.selectorDurability(graded.durability)
+            } else {
+                step = FlowStep(action: isDoubleTap ? "doubleTap" : "tap", x: coordinate.x, y: coordinate.y)
+                step.note = DraftNotes.coordinates
+            }
+            if !isDoubleTap {
+                step.duration = duration
+                step.maxGestureSeconds = maxGestureSeconds
+            }
             recordAction(InteractionLog.Entry(step: step, unresolved: nil,
                                               summary: described), args: args)
             return
@@ -238,6 +247,7 @@ extension MCPServer {
         step.duration = duration
         step.maxGestureSeconds = maxGestureSeconds
         step.scale = scale
+        step.degrees = degrees
         step.replace = replace ? true : nil
         // **下書きの本文にも格付けを残す**(掃討で判明): 注記と ft_tap の戻り値だけに
         // 印を出しても、その場で読まれなければ意味が無い —— 添字付きのセレクタは

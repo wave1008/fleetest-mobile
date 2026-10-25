@@ -330,8 +330,8 @@ export const webviewMonitorAStrings = {
     en: "This click was not sent because the previous operation is still running. Try again once it finishes",
   },
   "wvMonitor.live.longPressMark": { ja: "長押し", en: "Long press" },
-  "wvMonitor.live.oplogMcpCopy": { ja: "クリックでコピー", en: "Click to copy" },
+  "wvMonitor.live.oplogDslCopy": { ja: "クリックでコピー", en: "Click to copy" },
   "wvMonitor.live.oplogColOperation": { ja: "操作", en: "Operation" },
-  "wvMonitor.live.oplogColMcp": { ja: "MCP コマンド", en: "MCP command" },
+  "wvMonitor.live.oplogColDsl": { ja: "DSL コマンド", en: "DSL command" },
   "wvMonitor.live.oplogColResize": { ja: "ドラッグで操作列の幅を変更", en: "Drag to resize the operation column" },
 } satisfies MessageDict;

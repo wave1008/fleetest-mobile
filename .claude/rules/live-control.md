@@ -5,6 +5,7 @@ paths:
   - "Sources/fleetest/LiveBridge*.swift"
   - "Sources/fleetest-devicepoll/main.swift"
   - "Sources/fleetest/ApiLive*.swift"
+  - "Sources/fleetest/LiveOperation*.swift"
   - "Sources/fleetest/BridgeCommand.swift"
   - "Sources/fleetest/LiveBridgeAutoStarter.swift"
   - "Sources/fleetest/LiveSessionFollower.swift"
@@ -102,3 +103,6 @@ CLAUDE.md から移した規則(本文は移設前と同一)。この領域の�
   (`InAppBridgeState.isRecordedForDevice` → udid の走査で XCUITest のポートへ乗り換える)。背面で止まったアプリの in-app は
   答えないので、掴むと home・前面追従を含む全操作が「The network connection was lost」になる(run の起動し直しで
   XCUITest と in-app のポートが入れ替わった後に実地で踏んだ)
+- **serve にコマンドを足したら、操作記録の DSL の行(`LiveOperationDSL.step(for:)`)を足すか、行を持たない理由を
+  `LiveOperationDSLTests.commandsWithoutALine` に書く**(全数を `perform` の case と突き合わせて落とす)。変換は MCP の下書きと同じ
+  `FlowStep` → `ScenarioCodeGen` を通し、拡張(TS)に変換を書かない(同じ操作の行が MCP とライブ操作で割れる)

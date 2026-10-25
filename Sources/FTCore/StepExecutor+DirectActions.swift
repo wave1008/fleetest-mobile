@@ -339,9 +339,37 @@ extension StepExecutor {
     // そちらを使う(FlowStep.x の宣言。用途を問わない規律)
     func executeDirectCoordinateTap(step: FlowStep, x: Double, y: Double,
                                     phase: inout PhaseAccumulator) async throws -> StepOutcome {
+        let hold = step.duration ?? FlowStep.defaultTapHoldSeconds
+        return try await executeCoordinateTouch(x: x, y: y, phase: &phase) { driver in
+            if hold > 0 {
+                try await driver.press(x: x, y: y, duration: hold)
+            } else {
+                try await driver.tap(x: x, y: y)
+            }
+        }
+    }
+
+    /// **座標のダブルタップ**(`doubleTap(x:y:)`)。座標タップと同じ安全策を共有する。
+    /// **`gestureActions` の対象未指定経路へ流さない**(x/y を見ず画面中心を撃つ)。
+    /// **撃った後に整定を待つ**(セレクタ形・画面中心形の doubleTap = `performGesture` と揃える。
+    /// ダブルタップはズーム等のアニメーションを起こすので、待たないと形によって次の解決が古い木を掴む)
+    func executeDirectCoordinateDoubleTap(step: FlowStep, x: Double, y: Double,
+                                          phase: inout PhaseAccumulator) async throws -> StepOutcome {
+        let outcome = try await executeCoordinateTouch(x: x, y: y, phase: &phase) {
+            try await $0.doubleTap(x: x, y: y)
+        }
+        let settled = skippingSettle(step) ? true : try await settledSignature(phase: &phase).settled
+        guard !settled else { return outcome }
+        var notes = outcome.driverFallback.map { [$0] } ?? []
+        note(.settleCapped, into: &notes)
+        return StepOutcome(status: outcome.status, driverFallback: notes.joined(separator: " / "))
+    }
+
+    /// 座標で撃つ操作(tap / press / doubleTap)の共通部。`fire` は撃つドライバを受ける
+    private func executeCoordinateTouch(x: Double, y: Double, phase: inout PhaseAccumulator,
+                                        fire: (AppDriver) async throws -> Void) async throws -> StepOutcome {
         let clock = ContinuousClock()
         let start = clock.now
-        let hold = step.duration ?? FlowStep.defaultTapHoldSeconds
         var note: String?
         // **自前描画(か判定不明)のアプリで、木のどの要素も含まない点は最初から XCUITest で撃つ**。
         // in-app の合成タッチは要素の無い点で届いた確証が無く、Compose の Popup の「外側タップで閉じる」に
@@ -349,30 +377,18 @@ extension StepExecutor {
         if let td = typeDriver, uiFramework?.isSelfRendered != false {
             let snapshot = try await driver.snapshot()
             if !snapshot.elements.contains(where: { Self.frame($0.frame, containsX: x, y: y) }) {
-                if hold > 0 {
-                    try await td.press(x: x, y: y, duration: hold)
-                } else {
-                    try await td.tap(x: x, y: y)
-                }
+                try await fire(td)
                 phase.actionMs += Self.ms(clock.now - start)
                 return StepOutcome(status: .passed,
                                    driverFallback: "sent via XCUITest (no element at this point in the tree)")
             }
         }
         do {
-            if hold > 0 {
-                try await driver.press(x: x, y: y, duration: hold)
-            } else {
-                try await driver.tap(x: x, y: y)
-            }
+            try await fire(driver)
         } catch {
             // in-app は座標ジェスチャを持たない(501)。inapp-boost モードでは XCUITest へ回す
             guard DriverError.isBridgeIncapable(error), let td = typeDriver else { throw error }
-            if hold > 0 {
-                try await td.press(x: x, y: y, duration: hold)
-            } else {
-                try await td.tap(x: x, y: y)
-            }
+            try await fire(td)
             note = "fell back to XCUITest"
         }
         phase.actionMs += Self.ms(clock.now - start)

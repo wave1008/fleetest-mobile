@@ -157,7 +157,19 @@ extension MCPServer {
             return (FlowStep(action: "swipe", direction: direction.rawValue,
                              settle: batchSettle(raw)), "swipe \(direction.rawValue)")
         },
-        "doubleTap": BatchStepBuilder(keys: ["selector", "settle", "waitSeconds"]) { raw in
+        "doubleTap": BatchStepBuilder(keys: ["selector", "settle", "waitSeconds", "x", "y"]) { raw in
+            // 座標形(`doubleTap(x:y:)`)。tap と同じく、セレクタとの併記・片方だけの指定は拒否する
+            if let x = raw["x"] as? Double, let y = raw["y"] as? Double {
+                guard raw["selector"] == nil else {
+                    throw MCPError("doubleTap takes either a selector or x/y, not both —"
+                        + " drop one (a selector survives a layout change, coordinates do not)")
+                }
+                let step = FlowStep(action: "doubleTap", settle: batchSettle(raw), x: x, y: y)
+                return (step, "doubleTap (\(FTSeconds.format(x)), \(FTSeconds.format(y)))")
+            }
+            if raw["x"] != nil || raw["y"] != nil {
+                throw MCPError("doubleTap needs both x and y for a coordinate double tap")
+            }
             let selector = try optionalBatchSelector(raw)
             let step = FlowStep(action: "doubleTap", locator: selector?.primary,
                                 fallbacks: selector.flatMap(batchFallbacks),

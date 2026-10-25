@@ -66,6 +66,49 @@ public enum TouchGesture {
     /// recognizer がタッチとして数えないことがある
     public static let minimumContactSeconds = 0.05
 
+    /// 絶対座標の点列(ワイヤ形 `GestureFinger`)→ 絶対座標の `[FTFinger]`。**同じ座標が続く区間は静止(hold)**、
+    /// そうでなければ移動(move)。時刻が進まない点(dt <= 0)は畳む —— 間引き後の点列や pointerup の
+    /// 最終点が直前の点と同時刻・同座標になり得るため。ライブ操作の軌跡(gesture)の操作記録が使う
+    public static func fingers(fromPoints fingers: [GestureFinger]) -> [FTFinger] {
+        fingers.compactMap { finger in
+            guard let first = finger.points.first else { return nil }
+            var built = FTFinger(x: first.x, y: first.y, startSeconds: max(0, first.t))
+            for (previous, current) in zip(finger.points, finger.points.dropFirst()) {
+                let seconds = current.t - previous.t
+                guard seconds > 0 else { continue }
+                if current.x == previous.x, current.y == previous.y {
+                    built = built.hold(seconds: seconds)
+                } else {
+                    built = built.move(x: current.x, y: current.y, durationSeconds: seconds)
+                }
+            }
+            return built
+        }
+    }
+
+    /// 絶対座標の `[FTFinger]` → 画面に対する比率の `[FTFinger]`(DSL の `gesture { }` が書く形)。
+    /// 画面の大きさが 0 以下なら空(割れない)
+    public static func ratioFingers(_ fingers: [FTFinger], screen: FTRect) -> [FTFinger] {
+        guard screen.width > 0, screen.height > 0 else { return [] }
+        func ratio(_ x: Double, _ y: Double) -> (x: Double, y: Double) {
+            ((x - screen.x) / screen.width, (y - screen.y) / screen.height)
+        }
+        return fingers.map { finger in
+            let (rx, ry) = ratio(finger.x, finger.y)
+            var built = FTFinger(x: rx, y: ry, startSeconds: finger.startSeconds)
+            for step in finger.steps {
+                switch step {
+                case .move(let x, let y, let durationSeconds):
+                    let (mx, my) = ratio(x, y)
+                    built = built.move(x: mx, y: my, durationSeconds: durationSeconds)
+                case .hold(let seconds):
+                    built = built.hold(seconds: seconds)
+                }
+            }
+            return built
+        }
+    }
+
     /// 比率の指を `target` の枠で絶対座標へ写し、`validate` を通した要求を返す。
     /// 失敗は英語の文言(DSL の失敗メッセージ・MCP のエラーにそのまま出す)
     public static func resolve(_ fingers: [FTFinger], in target: FTRect, screen: FTRect,

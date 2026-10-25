@@ -705,6 +705,12 @@ backboardd のこのエラーは、モニターが画面を配信しているデ
     モニター自身の配信)でだけ描き、`clearSnapshot` や別デバイスへのつなぎ替わりで捨てる。未取得の間は案内を出す。
   - **操作記録はデバイスごと**: host の `operationLog` が手動操作の行にだけ `deviceId`(操作を撃った時点の選択)を付け、
     パネルはデバイスごとに最大200行を控えて対象の行だけ出す。`deviceId` の無い行は出さない。「クリア」は対象のぶんだけ。
+    右列は**同じ操作の Swift DSL の1行**(`tap("#login")` / `tap(x: 120, y: 340)  // coordinates — …`)で、クリックでコピーする。
+    **拡張は変換せず、serve が `actionResult.dsl` で返した行をそのまま出す**(変換は `Sources/fleetest/LiveOperationDSL.swift` の1箇所 =
+    MCP の下書きと同じ `FlowStep` → `ScenarioCodeGen`)。**拡張は画面の操作を座標で送る**ので、tap / 長押し / ダブルタップは
+    撃つ前の直近の観測の木で、押した点にある操作可能な型のいちばん小さい要素へ写し(`FTCore.PointTarget`。MCP の下書きの座標タップと
+    同じ判定)、書けるセレクタがあればセレクタの行・無ければ座標の行にする。組めない操作は `dsl: null`(右列は空)。
+    drag は押してからの静止が OS の長押し判定時間(iOS 0.5 秒・Android 0.4 秒)未満なら `swipePointToPoint`、以上なら `gesture { FTFinger… }`。
   - **枠の整定**: 画面を変える操作(「更新」以外)を送った時点で枠を消し(一覧は消さない)、**その操作の直接の結果の
     `snapshot` では描かず**、次の `snapshot` で描く。**この依存**: 直接の結果を受けたらグリッド自身が
     `SETTLE_REFRESH_MS`(700ms)後に「更新」(`refreshSnapshot`)を1回撃つ(`opSettleTimer`)ので、操作の結果の次には整定後の木が

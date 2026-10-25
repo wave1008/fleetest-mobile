@@ -205,7 +205,11 @@ public enum DSLCommandIndex {
                   + "at 10s by default — pass maxGestureSeconds: (up to 60) to allow longer."
                   + " The selector form returns the element it grabbed."),
         .init("doubleTap", "operation", "doubleTap(selector?, settle:, waitSeconds:)",
+              // 座標形はオーバーロードなので tap と同じく signature へ載せず summary で説明する
               "Double-taps. No selector = the center of the screen."
+                  + " There is also doubleTap(x:, y:, settle:) for raw coordinates — iOS pt / Android px, the same"
+                  + " system as the snapshot frames (returns nothing). Prefer a selector: coordinates hit"
+                  + " something else as soon as the layout moves."
                   + " The selector form returns the element it grabbed, so assertions chain directly."),
         .init("pinchOut", "operation",
               "pinchOut(selector?, scale:, durationSeconds:, maxGestureSeconds:, settle:, waitSeconds:)",

@@ -221,6 +221,9 @@ public enum StepDescription {
                 if step.locator == nil { return "clear the focused input" }
                 return isJapanese(obj) ? "\"\(obj)\"を空にする" : "clear \"\(obj)\""
             case "doubleTap":
+                if step.locator == nil, let x = step.x, let y = step.y {
+                    return "double-tap at (\(FTSeconds.format(x)), \(FTSeconds.format(y)))"
+                }
                 if step.locator == nil { return "double-tap the center of the screen" }
                 return isJapanese(obj) ? "\"\(obj)\"をダブルタップする" : "double-tap \"\(obj)\""
             case "pinchOut", "pinchIn":

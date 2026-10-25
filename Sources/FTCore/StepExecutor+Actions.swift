@@ -99,6 +99,12 @@ extension StepExecutor {
         if action == "swipe" {
             return try await executeDirectSwipe(step: step, phase: &phase)
         }
+        // fold / unfold / hinge は DSL では FlowStep を通らない(FTDSL の CommandsFold)。下書き用の FlowStep が
+        // ここへ来たら、未知 action の skipped(黙って成功扱い)に落とさず明示的に失敗にする
+        if action == "fold" || action == "unfold" || action == "hinge" {
+            return StepOutcome(status: failedWithoutKind(
+                "\(action) is not executable as a step — run it with the \(action) DSL command"))
+        }
         if action == "rotateTo" {
             return try await executeDirectRotateTo(step: step, phase: &phase)
         }
@@ -114,6 +120,10 @@ extension StepExecutor {
         if action == "tap", let x = step.x, let y = step.y, step.locator == nil,
            step.fallbacks?.isEmpty ?? true {
             return try await executeDirectCoordinateTap(step: step, x: x, y: y, phase: &phase)
+        }
+        if action == "doubleTap", let x = step.x, let y = step.y, step.locator == nil,
+           step.fallbacks?.isEmpty ?? true {
+            return try await executeDirectCoordinateDoubleTap(step: step, x: x, y: y, phase: &phase)
         }
         if action == "swipePointToPoint" {
             return try await executeDirectPointToPoint(step: step, phase: &phase)

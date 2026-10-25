@@ -1199,17 +1199,14 @@ extension MCPServer {
     static let coordinateReproductionNoteShort =
         " (writable as tap(x:, y:) — see the first note)"
 
-    /// `ft_double_tap` / `ft_drag` / `ft_long_press` を座標で撃ったときの
-    /// 応答が、`coordinateReproductionNote`(tap 用)をそのまま流用して「writable as tap(x:, y:)」
-    /// と言っていた —— 実際には doubleTap に座標形は無く、drag に対応する DSL コマンドも無く、
-    /// long press は holdSeconds を省くとただの tap に化ける。操作ごとに正しい書き方を言う
-
-    /// `doubleTap` は DSL でセレクタしか取らない(座標形が無い)
+    /// `ft_double_tap` / `ft_drag` / `ft_long_press` を座標で撃ったときの応答は、tap 用の注記を流用せず
+    /// 操作ごとに正しい書き方を言う(drag に対応する DSL は `swipePointToPoint`・
+    /// long press は holdSeconds を省くとただの tap に化ける)
     static let doubleTapCoordinateNote =
-        " (not writable as a DSL step: doubleTap only takes a selector in the DSL, not x/y —"
-        + " target the element with a selector once you have one for it)"
+        " (writable as doubleTap(x:, y:) — fine while exploring, but replace it with a selector"
+        + " before keeping it in a scenario: a layout change makes it hit something else)"
     static let doubleTapCoordinateNoteShort =
-        " (still no coordinate form for doubleTap — see the first note)"
+        " (writable as doubleTap(x:, y:) — see the first note)"
 
     /// 座標どうしの drag の DSL の形は `swipePointToPoint`(docs/commands.md)。tap の note を流用すると
     /// 別の操作(タップ)が書かれる。press(動かす前の静止)は swipePointToPoint に対応が無い

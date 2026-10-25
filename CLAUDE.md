@@ -121,7 +121,8 @@ grep やシェル(`cat`)で見るだけのとき・新しいファイルを読�
 - FM を呼ぶ → `FMCallAdmission` を通す・オンデバイスだけ・**画像を伴う呼び出しは FM の常駐プロセス(`fleetest api fm-serve`)へ頼む**
   (自分で `LanguageModelSession` を作らない。fm-occlusion.md → MN-81)
 - MCP のツール・引数を足す → `ArgumentBounds` に載せる・ツールの集合を固定するテスト
-  (`MCPToolCallTests` の driverBackedTools 等)を更新する・DSL と同じ判定は共有する(mcp.md)
+  (`MCPToolCallTests` の driverBackedTools 等)を更新する・DSL と同じ判定は共有する・下書きに DSL の行を残すか
+  (残さないなら理由)を `MCPDraftCoverageTests` の表に載せる(mcp.md)
 - compose.yaml に読めるキーを足す → `ComposeNormalizer` の許可表・`ComposePolicy` の検査・`ComposePolicyTests` / スクリプトの中継
   `fleetest-services` に動詞を足す → `ServicePolicy` と `ServicePolicyTests`(executor.md)
 - ブリッジの挙動・エンドポイントを変える → 版を上げる(iOS `bridgeProtocolVersion` / Android

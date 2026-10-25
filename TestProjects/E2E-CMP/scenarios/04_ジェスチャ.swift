@@ -152,6 +152,11 @@ class ジェスチャが正しく検出されること {
                     android { doubleTap("#pad_map") }
                 }.expectation {
                     android { select("#txt_double_count").textIs("double=1") }
+                }.action {
+                    // 座標形(`doubleTap(x:y:)`)も同じ経路で届く。点は #pad_map(コンテンツ領域いっぱい)の中央付近
+                    android { doubleTap(x: 540, y: 1200) }
+                }.expectation {
+                    android { select("#txt_double_count").textIs("double=2") }
                 }
             }
             scene(17, "左上への斜めドラッグが両軸で検出される") {

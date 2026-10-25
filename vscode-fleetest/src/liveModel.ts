@@ -148,7 +148,14 @@ export interface LiveErrorResult {
   readonly bridgeStarting: boolean;
 }
 
-export type LiveActionResult = LiveOkResult | LiveErrorResult;
+/** actionResult の成否に共通の欄。`dsl` = 撃った操作と同じ操作の Swift DSL の1行(行末コメントつき)。
+ * **必須(値は null 可)**: serve が組めなかった操作(観測だけ・DSL に行が無い・ref が木に無い)は null。
+ * 契約と変換は Sources/fleetest/ApiLiveCommand.swift 冒頭・LiveOperationDSL.swift。 */
+export interface LiveActionDsl {
+  readonly dsl: string | null;
+}
+
+export type LiveActionResult = (LiveOkResult | LiveErrorResult) & LiveActionDsl;
 
 function isLiveRect(value: unknown): value is LiveRect {
   if (!isRecord(value)) {
@@ -218,13 +225,19 @@ export function parseLiveSnapshotResult(value: unknown): LiveSnapshot | LiveErro
 }
 
 export function parseLiveActionResult(value: unknown): LiveActionResult | undefined {
+  // dsl は必須(null 可)。欠落・文字列でも null でもない値は不正な actionResult として捨てる
+  // (後方互換の読み替えは置かない。版を揃える運用 = 版と契約の同期)
+  if (!isRecord(value) || !(value.dsl === null || typeof value.dsl === "string")) {
+    return undefined;
+  }
+  const dsl = value.dsl;
   // app は**在るときだけ載せる**(undefined の欄を作らない。serve は分からなければ null を送る)
-  const app = isRecord(value) && typeof value.app === "string" ? { app: value.app } : {};
+  const app = typeof value.app === "string" ? { app: value.app } : {};
   if (isLiveOkResult(value)) {
-    return { ok: true, bridgeStarting: value.bridgeStarting, ...app };
+    return { ok: true, bridgeStarting: value.bridgeStarting, dsl, ...app };
   }
   if (isLiveErrorResult(value)) {
-    return { ok: false, error: value.error, bridgeStarting: value.bridgeStarting, ...app };
+    return { ok: false, error: value.error, bridgeStarting: value.bridgeStarting, dsl, ...app };
   }
   return undefined;
 }
@@ -291,9 +304,8 @@ export type GestureStep = GestureStepMove | GestureStepHold;
 
 /** 点列(x/y は絶対座標、t は秒)→ move/hold の列。**同じ座標が続く区間は静止(hold)**、そうでなければ
  * 移動(move)。時刻が巻き戻る/止まっている点(dt<=0)は畳む(捨てる)—— 間引き後の点列や
- * pointerup の最終点が直前の点と同時刻・同座標になり得るため。mcpCommandForServeCommand の
- * ft_gesture 表示と recordedGestureFingers(記録→シナリオ生成)の両方がこれを土台にする
- * (ロジックを2箇所に持たない)。 */
+ * pointerup の最終点が直前の点と同時刻・同座標になり得るため。serve 側の同等品は
+ * `TouchGesture.fingers(fromPoints:)`(Sources/FTCore/TouchGesture.swift。片方だけ変えない)。 */
 export function gestureStepsFromPoints(
   points: readonly LiveGesturePoint[],
 ): GestureStep[] {
@@ -312,68 +324,6 @@ export function gestureStepsFromPoints(
     }
   }
   return steps;
-}
-
-/** 操作記録の右列に出す、**同じ操作を MCP で撃つときのコマンド**(`ft_tap {"x":120,"y":340}` の形)。
- * ツール名と引数名は Sources/fleetest-mcp/MCPServer+ToolDefs.swift と対(片方だけ変えない)。
- * **要素番号(ref)は座標に畳む** —— ref はスナップショットごとの採番で、ライブ操作の serve と MCP の
- * ft_snapshot は別プロセスなので同じ番号が同じ要素を指さない。座標(スナップショットの枠と同じ
- * pt / px)ならそのまま撃てる。枠を引けない ref は ref のまま出す(黙って落とさない)。
- * 観測だけの refresh は操作ではないので nil。 */
-export function mcpCommandForServeCommand(
-  command: LiveServeCommand,
-  elements: readonly LiveElement[],
-): string | undefined {
-  const n = (value: number): number => Math.round(value * 10) / 10;
-  const line = (tool: string, args: Record<string, unknown>): string => `${tool} ${JSON.stringify(args)}`;
-  switch (command.cmd) {
-    case "tap": {
-      if ("ref" in command) {
-        const element = elements.find((e) => e.ref === command.ref);
-        return element
-          ? line("ft_tap", { x: n(element.frame.x + element.frame.width / 2), y: n(element.frame.y + element.frame.height / 2) })
-          : line("ft_tap", { ref: command.ref });
-      }
-      return line("ft_tap", { x: n(command.x), y: n(command.y) });
-    }
-    case "type":
-      return line("ft_type", { text: command.text });
-    case "drag":
-      return line("ft_drag", {
-        fromX: n(command.fromX), fromY: n(command.fromY), toX: n(command.toX), toY: n(command.toY),
-        durationSeconds: n(command.duration),
-      });
-    case "press":
-      return line("ft_long_press", { x: n(command.x), y: n(command.y), holdSeconds: n(command.duration) });
-    case "doubleTap":
-      return line("ft_double_tap", { x: n(command.x), y: n(command.y) });
-    case "gesture": {
-      // 秒は 0.01 刻みで丸め、0 未満に落ちないよう最小値を敷く(TouchGesture.validate は
-      // 0 より大きい秒数を要求する。丸めで 0 になった移動/静止を無効な引数として送らない)
-      const roundSeconds = (value: number): number => Math.max(0.01, Math.round(value * 100) / 100);
-      const fingers = command.fingers.map((finger) => {
-        const first = finger.points[0] ?? { x: 0, y: 0, t: 0 };
-        const steps = gestureStepsFromPoints(finger.points).map((step) =>
-          step.kind === "hold"
-            ? { holdSeconds: roundSeconds(step.seconds) }
-            : { x: n(step.x), y: n(step.y), durationSeconds: roundSeconds(step.seconds) },
-        );
-        return { x: n(first.x), y: n(first.y), steps };
-      });
-      return line("ft_gesture", command.maxGestureSeconds === undefined
-        ? { fingers }
-        : { fingers, maxGestureSeconds: command.maxGestureSeconds });
-    }
-    case "pinch":
-      return line("ft_pinch", { scale: n(command.scale), durationSeconds: n(command.duration) });
-    case "home":
-    case "appSwitcher":
-      return line("ft_navigate", { target: command.cmd });
-    case "fold":
-      return line("ft_fold", { state: command.state });
-    case "refresh":
-      return undefined;
-  }
 }
 
 /** serve の stdin へ書き込む1行(末尾改行付き)を組み立てる。 */
@@ -751,13 +701,13 @@ export type LiveToWebviewMessage =
   // テキスト入力欄をタップした直後に「入力するテキスト」欄へフォーカスを移す指示(受け手: gridLivePanel.js)。
   | { readonly type: "focusTypeInput" }
   // 「操作記録」1行(受け手: gridLivePanel.js)。
-  // mcp: 同じ操作を MCP で撃つコマンド(mcpCommandForServeCommand)。
+  // dsl: 同じ操作の Swift DSL の1行(serve が組んだもの。actionResult.dsl。無ければ省く)。
   // deviceId: 操作したときの selectedDeviceId(グリッドビューがデバイスごとに振り分ける)
   | {
       readonly type: "operationLog";
       readonly label: string;
       readonly ok: boolean;
-      readonly mcp?: string;
+      readonly dsl?: string;
       readonly deviceId?: string;
     }
   // グリッドビューの操作(GridLiveAction)が、serve へ流す前に断られた(受け手: gridLiveControls.js)。

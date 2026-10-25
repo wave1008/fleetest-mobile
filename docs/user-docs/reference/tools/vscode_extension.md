@@ -92,7 +92,10 @@ polling (screenshots at a fixed interval); the choice is remembered per workspac
   path** ("Double tap" lights up while Command is held, "Trace" while Option is held; keep holding to see its explanation). Between the enlarged screen and the run log you get the same
   **element list** (Refresh re-reads it; "Show bounding boxes", next to the device count in the header, overlays frames on the screen;
   long rows scroll sideways) and **operation log** (drag the border with the run log to resize them), and **text to type** (Enter sends) sits right below the enlarged screen. Selecting a device does not connect to it, so the
-  element list appears after your first operation or Refresh (or right away when "Show bounding boxes" is on; that switch starts off each time the panel opens). The operation log is kept per device.
+  element list appears after your first operation or Refresh (or right away when "Show bounding boxes" is on; that switch starts off each time the panel opens). The operation log is kept per device. Its right-hand column shows the DSL line
+  for each operation as you would write it in a scenario; click it to copy. Pressing a button or another operable element gives a
+  selector line (`tap("#login")` and so on). Pressing a map or an empty spot, or an element with no selector, gives a coordinate line
+  with a trailing comment asking you to replace it with a selector.
   A double-click on the screen is two taps, so to toggle the selection
   double-click outside the screen (the device name row or the margin). On a foldable device (the iPhone Duo
   Simulator or a foldable Android Emulator) **Fold** and **Unfold** buttons appear as well (never for physical devices).

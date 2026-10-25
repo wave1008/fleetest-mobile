@@ -105,7 +105,7 @@ docs/user-docs/reference/testclass/testcode_structure_ja.md と docs/user-docs/r
 | `swipePointToPoint(startX:startY:endX:endY:durationSeconds: 1.5, maxGestureSeconds:, settle:)` | 2点間ドラッグ(座標は snapshot の screen と同じ座標系。iOS = pt / Android = px)。`durationSeconds` の上限は既定 10 秒・`maxGestureSeconds:` で最大 60 秒まで上書き。**`ft_batch` でも書ける**(`swipePointToPoint startX: 200 startY: 550 endX: 200 endY: 250`)。MCP の `ft_drag` の下書きもこの行になる |
 | `swipeElementToElement(開始sel, 終点sel, durationSeconds: 1.5, maxGestureSeconds:, settle:, waitSeconds:)` | 要素間のドラッグ(スライダー・並べ替え・部分領域のドラッグ用)。**終点はヒール対象外**(始点だけがヒール・フォールバック連鎖を持つ)。`durationSeconds` の上限は既定 10 秒・`maxGestureSeconds:` で最大 60 秒まで上書き。**押してから動かすまでは 0.05 秒固定**(長押しから始まる並べ替えは起動しない) —— それが要る画面は下記「`gesture`」で `.hold(seconds:)` してから `.move` を書く |
 | `swipeBy(sel?, dxRatio:dyRatio:durationSeconds: 1.5, maxGestureSeconds:, settle:, waitSeconds:)` | 対象の中心から**比率**で指を動かす(**斜め可**。両方を非 0 にすると対角)。比率は対象の幅・高さに対する割合で、符号は指の向き。**片側 0.9 が上限**(指が対象の枠の中に収まる範囲。超えた指定は 0.9 に丸めて注記 `swipe-by-ratio-capped`。対象より遠くへ払うのは `swipeElementToElement` / `swipePointToPoint`)。セレクタ省略 = 画面全体。`durationSeconds` の上限は既定 10 秒・`maxGestureSeconds:` で最大 60 秒まで上書き |
-| `doubleTap(sel?, settle:, waitSeconds:)` | ダブルタップ。セレクタ省略 = 画面中心。**`tap` を2回書いても代用できない**(往復で OS のダブルタップ判定時間を超える) |
+| `doubleTap(sel?, settle:, waitSeconds:)` / `doubleTap(x:y:settle:)` | ダブルタップ。セレクタ省略 = 画面中心。**`tap` を2回書いても代用できない**(往復で OS のダブルタップ判定時間を超える)。**座標形 `doubleTap(x:y:)`** は座標を直接叩く(座標系は `tap(x:y:)` と同じ = iOS pt / Android px・戻り値なし)。**セレクタで指せるならそちらを使う** —— 座標はレイアウトが動いた瞬間に別の物を叩く。木のどの要素も含まない点を自前描画のアプリで撃つ安全策と、in-app が撃てないときの XCUITest への切り替えは座標タップと同じ。`ft_batch` でも書ける(`doubleTap x: 120 y: 640`)が**セレクタとの併記は拒否** |
 | `pinchOut(sel?, scale: 2.0, durationSeconds: 0.5, maxGestureSeconds:, settle:, waitSeconds:)` | 2本指を開く = **拡大**。`scale` は 1 より大きい値のみ。`durationSeconds` の上限は既定 10 秒・`maxGestureSeconds:` で最大 60 秒まで上書き |
 | `pinchIn(sel?, scale: 0.5, durationSeconds: 0.5, maxGestureSeconds:, settle:, waitSeconds:)` | 2本指を閉じる = **縮小**。`scale` は 0 より大きく 1 未満のみ。`durationSeconds` の上限は既定 10 秒・`maxGestureSeconds:` で最大 60 秒まで上書き |
 | `gesture(sel?, maxGestureSeconds:settle:waitSeconds:) { FTFinger(x:y:).move(x:y:durationSeconds:).hold(seconds:) }` | `pinchOut`/`pinchIn`/`doubleTap`/`swipeBy` で表せない動き(パターンロック・長押しからのドラッグ・3本指以上のジェスチャ・回転)を1本の生ジェスチャとして組む。指ごとに `FTFinger` を並べ、全体の秒数の上限は既定 10 秒・`maxGestureSeconds:` で最大 60 秒まで上書き(下記「`gesture`: 指を離さずに続ける多点ジェスチャ」) |
@@ -1085,7 +1085,7 @@ may have been swallowed by it (nothing was re-sent: repeating it could double-fi
 
 | 用途 | 方針 |
 |---|---|
-| **テストを実装する**(シナリオに残す) | **セレクタが最優先**。座標は「アプリが要素を公開しない」等でどうしても書けないときだけ。`ft_draft_scenario` は座標の行に「セレクタへ置き換えよ」という行末コメントを付けて出す |
+| **テストを実装する**(シナリオに残す) | **セレクタが最優先**。座標は「アプリが要素を公開しない」等でどうしても書けないときだけ。`ft_draft_scenario` は座標で撃った tap / 長押し / ダブルタップを、押した点にある操作可能な要素に書けるセレクタがあればその行で出し(`FTCore.PointTarget`。ライブ操作の操作記録と同じ判定)、無ければ座標の行に「セレクタへ置き換えよ」という行末コメントを付けて出す |
 | **アドホックな MCP 実行**(エージェントが調べる・動かす) | セレクタを優先するが、**座標のほうが早く解けるならそれでよい**。実行時間の短縮を優先する |
 
 理由は非対称だから: シナリオは**後から何度も実行される**のでレイアウト変更で壊れる書き方は負債になるが、

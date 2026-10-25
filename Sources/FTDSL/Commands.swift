@@ -610,6 +610,17 @@ public func doubleTap(settle: Bool = true, file: StaticString = #filePath, line:
                  command: "doubleTap", file: file, line: line)
 }
 
+/// 座標のダブルタップ(座標は snapshot の screen と同じ座標系。iOS = pt / Android = px)。
+/// 要素を掴まないので戻り値なし。**セレクタで指せるならそちらを使う**(`tap(x:y:)` と同じ規律)。
+/// FlowStep を通す(`coordinateTap` と同じ理由)。StepExecutor は x/y 付きを専用経路へ振り分ける
+/// (`gestureActions` の対象未指定経路は x/y を見ず画面中心を撃つ)
+public func doubleTap(x: Double, y: Double, settle: Bool = true,
+                      file: StaticString = #filePath, line: UInt = #line) {
+    FTRuntime.requireCore(command: "doubleTap")
+        .perform(step: FlowStep(action: "doubleTap", settle: stepSettle(settle), x: x, y: y),
+                 description: "doubleTap (\(x), \(y))", command: "doubleTap", file: file, line: line)
+}
+
 @discardableResult
 public func doubleTap(_ selector: String, settle: Bool = true, waitSeconds: Double? = nil,
                       file: StaticString = #filePath, line: UInt = #line) -> FTElement {
