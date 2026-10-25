@@ -753,7 +753,7 @@ if [ "$LAYOUT" = "clone" ]; then
 elif [ -d "$WORK_DIR/.git" ]; then
   added=""
   # 対の実装: FTCore.ProjectScaffold.ensureGitignore(fleetest init が使う)。片方だけ変えない
-  for line in ".build/" ".fleetest/" "TestProjects/*/reports/"; do
+  for line in ".build/" ".fleetest/" "TestProjects/*/reports/" "TestProjects/*/results/" "TestProjects/*/workspace/apps/"; do
     if ! grep -qxF "$line" "$WORK_DIR/.gitignore" 2>/dev/null; then
       printf '%s\n' "$line" >> "$WORK_DIR/.gitignore"
       added="$added $line"

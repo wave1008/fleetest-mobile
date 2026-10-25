@@ -83,9 +83,23 @@ final class ProjectScaffoldTests: XCTestCase {
         packageRoot.appendingPathComponent(".gitignore")
     }
 
+    func testDependencyPathIsRelativeOnlyForSiblingOrChildClones() {
+        let work = URL(fileURLWithPath: "/Users/a/dev/work")
+        XCTAssertEqual(ProjectScaffold.dependencyPath(
+            toolRoot: URL(fileURLWithPath: "/Users/a/dev/foundation-tester"), packageRoot: work), "../foundation-tester")
+        XCTAssertEqual(ProjectScaffold.dependencyPath(
+            toolRoot: URL(fileURLWithPath: "/Users/a/dev/work/vendor/ft"), packageRoot: work), "vendor/ft")
+        XCTAssertEqual(ProjectScaffold.dependencyPath(
+            toolRoot: URL(fileURLWithPath: "/opt/foundation-tester"), packageRoot: work), "/opt/foundation-tester",
+            "隣でも中でもない場所は絶対パスのまま(2人目の環境で解けない相対パスを作らない)")
+        XCTAssertEqual(ProjectScaffold.dependencyPath(toolRoot: work, packageRoot: work), "/Users/a/dev/work",
+                       "自分自身は相対にしない")
+    }
+
     func testGitignoreFreshCreatesBothEntries() throws {
         let added = try ProjectScaffold.ensureGitignore(packageRoot: packageRoot)
-        XCTAssertEqual(added, [".build/", ".fleetest/", "TestProjects/*/reports/"])
+        XCTAssertEqual(added, [".build/", ".fleetest/", "TestProjects/*/reports/", "TestProjects/*/results/",
+                               "TestProjects/*/workspace/apps/"])
         let content = try String(contentsOf: gitignoreURL, encoding: .utf8)
         XCTAssertTrue(content.contains(".build/"))
         XCTAssertTrue(content.contains("TestProjects/*/reports/"))
@@ -107,7 +121,8 @@ final class ProjectScaffoldTests: XCTestCase {
         try existing.write(to: gitignoreURL, atomically: true, encoding: .utf8)
 
         let added = try ProjectScaffold.ensureGitignore(packageRoot: packageRoot)
-        XCTAssertEqual(added, [".fleetest/", "TestProjects/*/reports/"])
+        XCTAssertEqual(added, [".fleetest/", "TestProjects/*/reports/", "TestProjects/*/results/",
+                               "TestProjects/*/workspace/apps/"])
 
         let content = try String(contentsOf: gitignoreURL, encoding: .utf8)
         XCTAssertTrue(content.contains("*.log"), "既存行は保持")
@@ -128,7 +143,7 @@ final class ProjectScaffoldTests: XCTestCase {
     }
 
     func testGitignoreRecognizesAlternateSpellingsAsPresent() throws {
-        let existing = "/.build/\n.fleetest\n./TestProjects/*/reports\n"
+        let existing = "/.build/\n.fleetest\n./TestProjects/*/reports\nTestProjects/*/results\n/TestProjects/*/workspace/apps/\n"
         try existing.write(to: gitignoreURL, atomically: true, encoding: .utf8)
 
         let added = try ProjectScaffold.ensureGitignore(packageRoot: packageRoot)

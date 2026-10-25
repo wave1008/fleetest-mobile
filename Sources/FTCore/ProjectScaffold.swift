@@ -281,9 +281,28 @@ public enum ProjectScaffold {
     /// 受け手のパッケージの .gitignore に SwiftPM ビルド成果物と実行レポートの ignore を冪等に足す
     /// (fleetest init から呼ぶ)。無ければ作成、あれば欠けている行だけ追記。戻り値は追記した行(全部揃って
     /// いれば空 = 何も書かない)
+    /// `fleetest init` が Package.swift に書く `.package(path:)` の値。クローンが作業フォルダの隣(`../foundation-tester`)か
+    /// 中にあれば相対パス(git で共有した2人目の Mac でもそのまま解決する)、それ以外は絶対パス。
+    /// 相対を作業フォルダ基準で解く読み手: install.sh / preflight.sh / update.sh / toolRootResolve.ts / BuildFingerprint
+    public static func dependencyPath(toolRoot: URL, packageRoot: URL) -> String {
+        // リンクは解かない(隣に置いたシンボリックリンクも `../名前` で書け、SwiftPM がリンクを辿る)
+        let tool = toolRoot.standardizedFileURL.pathComponents
+        let root = packageRoot.standardizedFileURL.pathComponents
+        if tool != root, tool.dropLast() == root.dropLast(), let name = tool.last {
+            return "../" + name
+        }
+        if tool.count > root.count, Array(tool.prefix(root.count)) == root {
+            return tool.dropFirst(root.count).joined(separator: "/")
+        }
+        return toolRoot.standardizedFileURL.path
+    }
+
     @discardableResult
     public static func ensureGitignore(packageRoot: URL) throws -> [String] {
-        let entries = [".build/", ".fleetest/", "TestProjects/*/reports/"]
+        // 対の実装: Scripts/install.sh の .gitignore の行(片方だけ変えない)。
+        // results/ は録画(画面の文字が写る)・workspace/apps/ は run のたびに複製されるアプリの束
+        let entries = [".build/", ".fleetest/", "TestProjects/*/reports/", "TestProjects/*/results/",
+                       "TestProjects/*/workspace/apps/"]
         let url = packageRoot.appendingPathComponent(".gitignore")
 
         // 先頭の "/"・"./"、末尾の "/" を無視して同一視する(.build / /.build/ / .build/ はどれも同じ扱い)
@@ -358,7 +377,7 @@ public enum ProjectScaffold {
 
         ### 0. 前提の機械判定と一括質問
         環境は機械判定する(人間に「入っているか」を聞かない)。失敗した項目だけ 🧑 停止して対処を依頼(代行不可):
-        - macOS 26+: `sw_vers -productVersion` / Xcode 26+: `xcodebuild -version`(license 未同意エラーで
+        - macOS 26+: `sw_vers -productVersion` / \(XcodeRequirement.display)+: `xcodebuild -version`(license 未同意エラーで
           落ちたら 🧑 に `sudo xcodebuild -license accept` を依頼)
         - Apple Intelligence: `fleetest doctor --fm-only`(exit 0 で可。**exit 1 でも中断せず続行** —
           FM は視覚検証・シナリオ生成にだけ必要な任意機能。使いたくなったら System 設定で
@@ -477,7 +496,7 @@ public enum ProjectScaffold {
 
         ### 0. 前提の機械判定
         環境は機械判定する(人間に「入っているか」を聞かない)。失敗した項目だけ 🧑 停止して対処を依頼(代行不可):
-        - macOS 26+: `sw_vers -productVersion` / Xcode 26+: `xcodebuild -version`(license 未同意エラーで
+        - macOS 26+: `sw_vers -productVersion` / \(XcodeRequirement.display)+: `xcodebuild -version`(license 未同意エラーで
           落ちたら 🧑 に `sudo xcodebuild -license accept` を依頼)
         - Apple Intelligence: `fleetest doctor --fm-only`(exit 0 で可。**exit 1 でも中断せず続行** —
           FM は視覚検証・シナリオ生成にだけ必要な任意機能。完了報告に要有効化の旨を残す)

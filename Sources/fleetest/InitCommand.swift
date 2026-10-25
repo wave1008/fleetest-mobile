@@ -59,8 +59,8 @@ struct InitCommand: AsyncParsableCommand {
 
         let dependencyLine: String
         if let fleetestPath {
-            let abs = URL(fileURLWithPath: fleetestPath, relativeTo: cwd).standardizedFileURL.path
-            dependencyLine = #".package(path: "\#(abs)"),"#
+            let abs = URL(fileURLWithPath: fleetestPath, relativeTo: cwd).standardizedFileURL
+            dependencyLine = #".package(path: "\#(ProjectScaffold.dependencyPath(toolRoot: abs, packageRoot: cwd))"),"#
         } else if let fleetestURL {
             dependencyLine = #".package(url: "\#(fleetestURL)", branch: "\#(fleetestBranch)"),"#
         } else {

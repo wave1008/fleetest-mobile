@@ -85,7 +85,9 @@ public enum ProfileWriter {
         [
             "app": appRef,
             "devices": devices,
-            "fmTextVisibilityCheck": true,
+            // fmTextVisibilityCheck は書かない(既定 true のまま)。明示の true はレスポンス計測モードが
+            // 「利用者の意思」として断る(ResponseMeasurementPolicy)ので、既定値を明示で書くと計測用の
+            // プロファイルが作れない
             "heal": true,
         ]
     }
