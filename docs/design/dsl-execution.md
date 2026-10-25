@@ -381,8 +381,8 @@ iOS Simulator ではアプリのプロセスの描画が壊れ、アプリを起
 - **`beforeEach()` / `afterEach()`**: 同じクラスに引数なし・非async・非throws で書くと `@TestClass` マクロが
   各 `@Test` の run クロージャに織り込む(基底クラスからの継承は見ない)。ライフサイクル無しの
   クラスの生成コードは従来どおり(`X().method()` の 1 式のまま)
-  - **beforeEach の失敗はシナリオごと中断**する。`scene(n)` の入口は `sceneAborted` を毎回 false に戻すため、
-    scene をまたいで効く `scenarioAborted` へ昇格させている(ここを外すと beforeEach 失敗が無視される)
+  - **beforeEach の失敗はシナリオごと中断**する。中で失敗すると本体と同じく `handleFailure` が `scenarioAborted` を立て、
+    以降のステップは skipped で記録される(中断の状態は `scenarioAborted` の1つだけ。`scene(n)` の入口では戻さない)
   - **afterEach は失敗後でも実行**する(中断フラグを一時解除 → 実行後に「元の中断」と「片付け中の失敗」の
     OR で復元)。片付けが飛ぶと後続シナリオを汚すため。ただし**画面凍結・ユーザー中断(debug stop)では
     実行しない**(前者は別デバイスで振り直すので無駄、後者は「止めた」のに片付けで再び止まるのが不合理)

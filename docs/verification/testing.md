@@ -453,7 +453,7 @@ pid の生死で補強した。純粋関数は正しくテストも緑だった�
   `~/Library/Caches/fleetest-scenarios-<project>/com.apple.e5rt.e5bundlecache` を消す
 - 結果 JSON の読み方: `ocrMs`(OCR 段の所要)・`guardMs`(OCR + FM)・注記 `ocr-budget-exhausted`。
   1 プロセス内で `guardMs > 0` を並べて**最初の 1 件だけ桁違いに大きい**なら初期化の型
-  (docs/results-json.md §TimelineStepRecord)
+  (docs/results-json.md「TimelineStepRecord」)
 
 **スナップショットの検知は dry-run では当てられない**(木が要る)。掃討は
 **`Tests/Fixtures/RealAppSnapshots/` に固定した実アプリのスナップショット**へ当てる
@@ -593,7 +593,7 @@ iOS は z を持たないので後着が「手前」と読まれる(既知の「
 作業ツリーごと rsync** して変異を適用し、`swift test --filter` を並列に走らせて
 OK(検出)/ SURVIVED(素通し)/ ERROR(適用失敗)の表を出す。
 **本線のツリーには1バイトも書かない**ので、復元忘れ・「変異版バイナリのままデバイス検証」
-(§変異テストの後は製品バイナリを作り直す)の型が構造的に起きない。
+(judgment.md「変異テストの後は製品バイナリを作り直す」)の型が構造的に起きない。
 初回だけ worktree のコールドビルドで数分かかる(以後は増分)。
 **worktree に運ぶのは git が無視していない物だけ**で、借りた worktree からは `.build` 以外の
 無視物(前の変異のテストが残した results/・xcresult・SUT のビルド成果物)を毎回消す —— 放置すると
@@ -601,7 +601,7 @@ OK(検出)/ SURVIVED(素通し)/ ERROR(適用失敗)の表を出す。
 `Scripts/mutation-check.sh --purge` で 40.5GB 回収)。同じ worktree を2本で触らないよう
 `<repo名>-mutwt/.mutation-check.lock` を取る(先客がいれば即座に断る)。
 **filter には密閉されたテストだけを指定する** —— ホスト共有資源(`.fleetest/` 台帳・simctl/adb・
-DiagnosticReports)に触るテストをプロセス並列で走らせると偽の失敗が出る(§並列実行)。
+DiagnosticReports)に触るテストをプロセス並列で走らせると偽の失敗が出る(MN-4.9。ホスト共有資源の隔離)。
 手で1件だけ確かめるときの旧手順(`cp` 退避 → 壊す → 実行 → 復元)も引き続き可。
 **復元に `git checkout <file>` を使わない** —— そのファイルの**未コミットの変更が全部消える**
 (変異を戻したつもりで、そのセッションの実装ごと巻き戻す。2026-08-03 に実際に踏んだ)。

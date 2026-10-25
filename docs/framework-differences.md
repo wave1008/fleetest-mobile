@@ -421,7 +421,7 @@ SwiftUI の pinch(SUT が枠で切り取っていなかった)・inputs S0030/40
 | 版・コミット | 内容 |
 |---|---|
 | — | React Native の XCUITest で、出てきたばかりのダイアログ・シートの中の要素を押す前だけ表示の切り替え(0.55 秒)を待つ(`PresentedOverlayTapWait`)。fade の最中の tap が捨てられていた |
-| `9bbf17dd` | 入力系(`type` / `pressEnter` / `clearInput`)の 409 を、MCP・ライブ操作でも XCUITest へ回す(`DriverError.isTextInputFallback` / `isClearInputFallback`)。この表の「→ XCUITest へ」は DSL でしか成り立っておらず、**同じ構成の同じ操作が `ft_type` / `ft_press_enter` / `ft_clear_input` では落ちていた** |
+| `9bbf17dd` | 入力系(`type` / `pressEnter` / `clearInput`)の 409 を、MCP・ライブ操作でも XCUITest へ回す(`DriverError.isTextInputFallback` / `isClearInputFallback`)。この表の「→ XCUITest へ」は DSL でしか成り立っておらず、**同じ構成の同じ操作が `ft_type`(`pressEnter: true` を含む) / `ft_clear_input` では落ちていた** |
 | v117 | in-app のスクリーンショットは、自前描画(Compose / Flutter)で木が絵より先に進んでいる間は撮らない(`InAppRenderCatchUp`。findImage / imageIs / 分類器 / occlusion-guard が別の画面の画素を切り出していた) |
 | — | チェック状態を見本画像から判定する CheckStateClassifier(Shirates Vision の移植。実行プロファイル `preferCheckStateClassifier`・既定 true) |
 | v114 | チェック状態を value からも読む(Flutter・SwiftUI Toggle・RN・WebKit で `checkIsON` が落ちていた)。DOM 経路で `aria-checked`・`indeterminate` を読む |

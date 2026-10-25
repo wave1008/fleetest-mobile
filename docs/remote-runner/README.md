@@ -17,7 +17,7 @@
 - RR-2 却下済みの代替案(再提案しない)
 - RR-3 採用方針: ジョブ(run)単位の SSH ディスパッチ
 - RR-4 全体アーキテクチャ
-- RR-5 control plane / execution plane 分離(GUI セッション制約への回答)
+- RR-5 Aqua セッションの前提と実行の置き場(GUI セッション制約への回答)
 - RR-6 Android の SSH 実行
 - RR-7 版整合・更新
 - RR-8 マルチマシン分散(`run --fleet --split`)
@@ -49,3 +49,4 @@
 - RR-9 未検証事項(実装前に潰す)
 - RR-10 作業計画
 - RR-12 Phase 1 実装メモ(2026-07-31)
+- 設計文書から外した当初の計画・構成案(RR-1 着手判断・RR-4/5 session agent 案・RR-11 GUI の計画・RR-0 キー改名の経緯)

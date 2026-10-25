@@ -12,7 +12,9 @@ paths:
 
 CLAUDE.md から移した規則(本文は移設前と同一)。この領域のファイルを Read したときに自動で読み込まれる。
 
-- `cd vscode-fleetest && npm run compile`(esbuild+tsc)/ `npm test`。挙動を変えたら
+- `cd vscode-fleetest && npm run compile`(esbuild+tsc)/ テストは変更が通るファイルだけ
+  `node esbuild.mjs --tests && node --test out-test/<名前>.test.mjs`(素の `npm test` = 全体はフックが断る。
+  全実施を頼まれたときだけ `FT_FULL_TEST=1`)。挙動を変えたら
   **`npm version --no-git-tag-version <新版>` で版を上げて** `npm run install-local`
   (反映は VSCode の Reload Window **+パネル開き直し**。code CLI は PATH に無い)
 - **package.json だけ手で書き換えない** —— lock も version を内包しており、放置すると受け手の

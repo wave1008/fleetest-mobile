@@ -33,7 +33,7 @@ CLAUDE.md から移した規則(本文は移設前と同一)。この領域の�
   キルスイッチは実行プロファイルの `playProtectBypass: false`(ユーザー決定: 設定タブではなく
   プロファイル)—— OFF でもツールは端末のダイアログに答えない(止まるだけ)
 - **Android のテキスト注入(`InputInjector`)を触ったら負荷10周で判定する**
-  (`for i in $(seq 10); do Scripts/e2e.sh --cmp --android; done`)。**単独実行では出ない** flake が
+  (`for i in $(seq 10); do fleetest run --project E2E-CMP --profile android --scenario <入力のクラス>; done`)。**単独実行では出ない** flake が
   ある(高負荷でだけ約40%)。守る規律 —「`ACTION_SET_TEXT` の `true` は受理であって反映ではない
   (必ず読み返す)」「`combined` は最初の読みから1回だけ作る(パスワード欄の読みはマスクされて
   おり、作り直すと伏せ字を書き込む・二重追記する)」「フォーカスが立つまで撃たない」

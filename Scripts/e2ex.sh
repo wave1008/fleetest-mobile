@@ -21,7 +21,7 @@
 #                                   # align 済みのコミット + そこの clone の中身なので、ツールを直したら
 #                                   # commit → Scripts/align.sh → これ、の順。E2E をこの Mac(`e2e.sh --local`)で
 #                                   # 回しながら E2EX を M1Ultra で回すのが既定の分担(ユーザー指示 2026-09-28)。
-#                                   # 向こうに要る道具(Flutter / CocoaPods / node)は ~/.zshrc の
+#                                   # 向こうに要る道具(Flutter / CocoaPods / node)は ~/.zprofile の
 #                                   # fleetest-tools ブロックの PATH にある
 #
 # **プロファイルは -01〜-08 の8台を名前で指す(udid を持たない)**ので、同名のデバイスを持つどの機でも同じ
@@ -59,7 +59,7 @@ for h in json.load(sys.stdin).get("hosts", []):
   # ランナーのクローン(fleetest remote align が揃える場所)。dist/ は gitignore なので align で消えない
   REMOTE_CLONE="~/fleetest-runner/foundation-tester"
   echo "==> $MACHINE($HOST)で回す: Scripts/e2ex.sh $*"
-  # ログイン shell(zsh -lc)で起こす = ~/.zshrc の PATH(fleetest-tools)と非対話 ssh の PATH 補正を兼ねる
+  # ログイン shell(zsh -lc)で起こす = ~/.zprofile の PATH(fleetest-tools)と非対話 ssh の PATH 補正を兼ねる(-lc は ~/.zshrc を読まない)
   exec ssh -tt -o BatchMode=yes "$HOST" "zsh -lc 'cd $REMOTE_CLONE && Scripts/e2ex.sh $*'"
 fi
 

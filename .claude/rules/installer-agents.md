@@ -80,7 +80,8 @@ CLAUDE.md から移した規則(本文は移設前と同一)。この領域の�
     無いと導入の翌週にスキルの description しか手掛かりが無くなる)。
     **使い方の解説は書かない**(ツール説明と二重管理になり必ずズレる)。受け手の資産なので
     マーカーの内側だけ差し替え、嫌う受け手には `--skip-entry-point`。
-    **ここは受け手のファイルを書き換える唯一の箇所**なので、**マーカーが begin/end ちょうど1組で
+    **受け手が書いた内容を書き換えるのはここ(マーカーの内側)だけ**(ステップ7.8 は印 `.fleetest-copied` のある自分のコピーだけ・
+    `.claude/settings.json` と `.mcp.json` はツールが管理する欄だけを書く)なので、**マーカーが begin/end ちょうど1組で
     なければ1バイトも書かない**(`installClaudeMdBlock.test.mjs` が3形を守る)→ MN-1.2
   - **クローンが git 管理しているファイルには書かない**。判定はレイアウトではなく
     **入口ファイルがクローンの作業ツリーの内側にあるか**(`os.path.commonpath` による包含判定)。
@@ -120,7 +121,7 @@ CLAUDE.md から移した規則(本文は移設前と同一)。この領域の�
   **webview で `window.confirm` は効かない** ——
   破壊的操作の確認はホスト側の `showWarningMessage({modal:true})`。
   **`reason=` は ja/en どちらでも英語**(拡張の通知に素通しするため。枠だけ訳す)。
-  **TOOL_ROOT の解決規則は preflight.sh / update.sh / `src/toolRootResolve.ts` と同じ**(4箇所。
+  **TOOL_ROOT の解決規則は install.sh / preflight.sh / update.sh / update-check.sh / `src/toolRootResolve.ts` で同じ**(5箇所。
   片方だけ変えない。`toolRootContract.test.mjs` が規則の3語(クローン判別マーカー・既定の隣・
   Package.swift の宣言)の欠落を検出)
 - **インストーラが面倒を見るエージェントは Claude Code だけ**(規約位置の唯一の定義元は

@@ -117,7 +117,7 @@ CLAUDE.md から移した規則(本文は移設前と同一)。この領域の�
   RR-0。**エイリアスは頻繁に変わりうるので記録・登録の鍵に
   しない**(例外はその machine 自身に関する構成)。JSON キーはプロファイル `devices[].machine`・
   登録簿 `machine`・記録 `host`。**拡張 ⇄ webview のメッセージと CLI ⇄ 拡張のワイヤも `machine`**
-  (ProtocolVersion 9。同時配布なので旧キーは読まない = **型検査の効かない webview 境界は
+  (同時配布なので旧キーは読まない = **型検査の効かない webview 境界は
   往復テストで縛る**)→ MN-3.1。
   リモートへ送るプロファイルは `FTCore.RunnerProfileView` が「そのランナーから見た姿」へ畳む
   (自分のデバイスは `machine: "local"`・他機のデバイスは削除)ので、**転送物にも引数にもエイリアスは出ない**
@@ -184,7 +184,7 @@ CLAUDE.md から移した規則(本文は移設前と同一)。この領域の�
     **async 文脈でパイプを行読みするときは `FTRemote.PipeLinePump`**(semaphore の `wait` を
     async 文脈に書かない = Swift 6 でエラー。同期関数の既存2箇所は据え置き)。
     **SIGKILL へのエスカレートは ssh にだけ**。**シグナルソースは1プロセスに1組**
-    → MN-3.2。`fleetest remote unlock` は自分の死んだディスパッチのロックだけを外す(`RemoteDispatchUnlock`)。**持ち主・生死を問わず奪うのは `--force` を明示したときだけ**(`decideForced`。生死の確認はしない = 確かめた体裁を作らない。RR-5)。**`--runner local` で手元のロックも外せる**(判定の軸は issuer ではなく **issuerHost** —— この機械が置いたロックは pid で確定・他人がここへディスパッチしたロックは**その run がこの機械に残っていないか**を pgrep で確かめる。**base を仮定して pgrep しない** = 別 base の生きた run を「居ない」と答えて守っているロックを外す)。**ロックの自動回収・unlock はランナー上でその run が生きていないことを確かめてから外す**(手元の pid が死んでもリモートの run は生きている)。**`-tt` の ssh は `ParentBoundCommand` で包む**(`kill -9` で親が死ぬと孤児の ssh がリモートの run を出力の write で止めたままにする)
+    → MN-3.2。`fleetest remote unlock` は自分の死んだディスパッチのロックだけを外す(`RemoteDispatchUnlock`)。**持ち主・生死を問わず奪うのは `--force` を明示したときだけ**(`decideForced`。生死の確認はしない = 確かめた体裁を作らない。RR-13)。**`--runner local` で手元のロックも外せる**(判定の軸は issuer ではなく **issuerHost** —— この機械が置いたロックは pid で確定・他人がここへディスパッチしたロックは**その run がこの機械に残っていないか**を pgrep で確かめる。**base を仮定して pgrep しない** = 別 base の生きた run を「居ない」と答えて守っているロックを外す)。**ロックの自動回収・unlock はランナー上でその run が生きていないことを確かめてから外す**(手元の pid が死んでもリモートの run は生きている)。**`-tt` の ssh は `ParentBoundCommand` で包む**(`kill -9` で親が死ぬと孤児の ssh がリモートの run を出力の write で止めたままにする)
   - **リモートの dispatch.lock も手元と同じ規律で待つ**: 待機の毎周に中断を見て列から抜ける(取得後・リモート run の開始前に中断済みなら外して抜ける)/ 死んだ自分のロックの回収は毎周試す / `DispatchPrelock.acquireInOrder` は中断で握った分を逆順に外し印も捨てて false を返し、呼び手(DeviceMachineRunner / ApiRunMachineFanout / FleetRunner)は子を1つも起こさない。**正常終了(exit 0/1)以外で外すときは run が終わったことを確かめてから**(timeout・ssh 断は `releaseLockIfRunEnded`・fan-out の親は `releaseDispatchLockAsParent(exitCode:)`)—— 無条件の `rm -rf` は後始末中の run に次の run を重ねる。**中断したときも回収の前に向こうの run の終わりを待つ**(`awaitRemoteRunEnd` / `shouldAwaitRemoteRunEnd`。ssh は SIGHUP で即座に閉じるが向こうはそこから run.json を書き終えるので、待たないと開始欄だけの写しを回収して「クラッシュ」に見える)。**ssh/scp/rsync のキープアライブは `FTRemote.SSHOptions` の1箇所**(新しい ssh の組み立てはここを通す。`SSHOptionsTests` が呼び手を走査で固定)
   - **機械分担の run は手元のデバイスの二重使用を、どの機械へも配る前に断る**
     (`ProfileRunner.rejectIfLocalDevicesLeasedBeforeDispatch`。run / api run の2経路。子の中の拒否だけだと
@@ -322,7 +322,7 @@ CLAUDE.md から移した規則(本文は移設前と同一)。この領域の�
   (名前も置き場所も固定。拡張のフォームにも入力欄を置かない = ユーザー決定)。
   **呼ぶのは `ProfileRunner.run` と `ApiRunCommand` の2箇所** —— リモートの子は
   `fleetest run --runner local` として向こうで同じコードを通るので `RemoteRunDispatcher` には
-  足さない。守る規律5つ: **①setup の失敗は run を止める**(teardown の失敗は結果を変えない)/
+  足さない。守る規律6つ: **①setup の失敗は run を止める**(teardown の失敗は結果を変えない)/
   **②デバイスに触る前に撃つ** / **③片付けは defer だけに頼らない** —— setup の前に
   `.fleetest/hooks/<pid>.json` を置き、次の run 開始時と `fleetest hooks reap`(`remote clean` が撃つ)が死んだ pid の
   ぶんを代わりに実行する(**生存判定は pid だけ。mtime を見ない**)。**④刺さっても打ち切らない**

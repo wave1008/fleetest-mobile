@@ -132,7 +132,7 @@ WebDriverAgent と同じ原理を最小構成で自作する(iOS)。Android に�
 | `GET  /screenshot` | `XCUIScreen.main.screenshot()` → PNG |
 | `POST /terminate` | 対象アプリ終了 |
 
-上記13個は3実装共通のコア。差分は次のとおり(**唯一の正は
+上記のうち `/hold` と `/gesture` を除く13個は3実装共通のコア。差分は次のとおり(**唯一の正は
 `Tests/FTCoreTests/BridgeContractTests.swift` のルート表**。ここはその写し):
 
 | ブリッジ | 共通コアへの追加 | 計 |
@@ -847,7 +847,7 @@ WebView(iOS=WKWebView / Android=android.webkit.WebView)の中身は、経路ご�
 
 | 経路 | 中身の取得 | 備考 |
 |---|---|---|
-| Android ブリッジ | a11y の仮想ツリー | リンクは Chromium の `chromeRole`(非ローカライズ)で `link` に正規化。**全ノードを `refresh()`** してから読む(WebView は DOM 変更の a11y 反映が 4〜8 秒遅れ、ネイティブ画面でも IME 等が前面だと数秒古いツリーが返る) |
+| Android ブリッジ | a11y の仮想ツリー。**ホストが CDP で DOM を差し込む**(DS-21) | リンクは Chromium の `chromeRole`(非ローカライズ)で `link` に正規化。**全ノードを `refresh()`** してから読む(WebView は DOM 変更の a11y 反映が 4〜8 秒遅れ、ネイティブ画面でも IME 等が前面だと数秒古いツリーが返る) |
 | iOS xcuitest | a11y ツリー | 中身が現れるまで **約 2.3 秒**(WebContent プロセスの a11y 起動待ち) |
 | iOS in-app(uikit ホスト) | **DOM を JS で走査** | `InAppWebViewDOM` + `WebViewDOM.javaScript`。1往復・隔離ワールド |
 | iOS in-app(Compose / Flutter ホスト) | **DOM を JS で走査**(2026-08-02 から) | interop が合成タッチと `insertText` を横取りするので**読めても操作は届かない**。読みは DOM のまま、**ref を使う操作だけ座標へ解決して XCUITest の実タッチ**へ回す(`webViewPath: "dom-interop"`。PT-3.13)。画面ごとの委譲は DOM が全く読めない構成だけに残る |
@@ -990,9 +990,9 @@ iOS ブリッジと区別なく扱える。
 - **常駐 instrumentation**: `am instrument -w` でデバイス内にバックグラウンド常駐させ、
   HTTP サーバ(BridgeInstrumentation)を内蔵する。`AndroidBridge.swift` が初回操作時に
   自動インストール・自動起動するためセットアップ手順は不要
-- **共通コア13 + locale/settle/gesture/scrollAction**: DS-4.3 の共通コア(status/session/snapshot/
+- **共通コア13 + 追加10(23)**: DS-4.3 の共通コア(status/session/snapshot/
   tap/type/clear/pressEnter/swipe/press/doubletap/pinch/screenshot/terminate)に `POST /locale`・
-  `POST /settle`・`POST /gesture`・`POST /scrollAction` を加えて話す(**`/scrollAction` は Android だけ**:
+  `POST /settle`・`POST /gesture`・`POST /hold`・`POST /waitForSettle`・応答時間計測の4本・`POST /scrollAction` を加えて話す(**`/scrollAction` は Android だけ**:
   端送りの1本を a11y のスクロール操作で送る。指のドラッグは端を越えた余りが SwipeRefreshLayout 等の親へ渡り
   引っ張って更新になるため。宛先は指を置く点を含み軸が合う最小の scrollable、軸が分からなければ送らず
   ホストが従来のドラッグへ落ちる。契約は BridgeDTO.ScrollActionRequest。iOS 固有の drag/appswitcher/home/hidekeyboard/

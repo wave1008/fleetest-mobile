@@ -46,7 +46,7 @@ for u in org/jetbrains/compose/compose-gradle-plugin org/jetbrains/kotlin/kotlin
 4. **回す**(全体の実行なので `FT_FULL_TEST=1` が要る = ユーザーに全実施の了承を取ってから):
 
    ```bash
-   FT_FULL_TEST=1 Scripts/e2e.sh  --local --<fw>                  # iOS in-app + Android + 陽性対照
+   FT_FULL_TEST=1 Scripts/e2e.sh  --local --<fw>                  # iOS in-app + Android(陽性対照は --negative を付けたときだけ)
    FT_FULL_TEST=1 Scripts/e2e.sh  --local --<fw> --ios-xcuitest
    FT_FULL_TEST=1 Scripts/e2ey.sh --<fw>
    FT_FULL_TEST=1 Scripts/e2ey.sh --<fw> --ios-xcuitest
@@ -56,7 +56,7 @@ for u in org/jetbrains/compose/compose-gradle-plugin org/jetbrains/kotlin/kotlin
    `<fw>` は `flutter` / `rn` / `cmp`。e2ex は手元の ssh が切れると向こうも止まる(**手元の Mac を再起動しない**)
 5. **FM の状態を数える**: 各 run の結果 JSON の `fm.calls` / `fm.skipped`。FM が止まっていた回は「FM を飛ばした
    ステップが 0 か」を見る(0 なら判定に影響なし)。止まりかたは下の「FM」
-6. **赤は版を上げる前の結果と突き合わせる**(同じシナリオの過去の結果。`results/runs/*/scenarios/*.json` の `passed`。
+6. **赤は版を上げる前の結果と突き合わせる**(同じシナリオの過去の結果。`results/runs/*/*/scenarios/*.json` の `passed`。
    ファイル名は NFD なので照合前に NFC へ正規化する)。前からある間欠の赤は回し直しで確かめる
 7. **受け手向け docs の「確かめた環境」を直す**: `docs/user-docs/reference/writing/ui_component_patterns.md` と `_ja.md`(対で)
 

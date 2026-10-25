@@ -208,7 +208,7 @@ FoundationModels はモデル型を2つ持ち、**`PrivateCloudComputeLanguageMo
 **`AppDriver` プロトコル**が唯一のプラットフォーム境界。iOS ブリッジ(Runner/)・Android
 ブリッジ(AndroidRunner/)・InApp ブリッジは共通コア 13 エンドポイント(status/session/
 snapshot/tap/type/clear/pressEnter/swipe/press/doubletap/pinch/screenshot/terminate)を
-共有しつつ、XCUITest は 34、Android は 23、InApp は 18 という差分がある(追加分の内訳は DS-4.3 の表)(唯一の正は DS-4.3 の表 = `Tests/FTCoreTests/BridgeContractTests.swift`)。
+共有しつつ、XCUITest は 34、Android は 23、InApp は 18 という差分がある(追加分の内訳は DS-4.3 の表)(唯一の正は `Tests/FTCoreTests/BridgeContractTests.swift` のルート表で、DS-4.3 の表はその写し)。
 `FTFoundationModels` / `FTCore` / `FTDSL` はプラットフォーム非依存のまま両OSで動く
 (ブリッジ設計の詳細は DS-4、Swift DSL の詳細は DS-10)。
 
@@ -323,7 +323,7 @@ foundation-tester/
 (自己修復は指紋照合のみで FM を呼ばないため。DS-10「ロケータの指紋」・MN-22)。
 `@Generable` 型はスクリーンショットの画面検証(`ScreenVerdict`)等、FM を呼ぶ他の機能のもの。
 
-### DS-5.3 実装(Sources/FTFoundationModels/ の9ファイル)
+### DS-5.3 実装(Sources/FTFoundationModels/ の10ファイル)
 
 | 実装 | 役割 |
 |---|---|
@@ -386,7 +386,7 @@ fleetest snapshot [--json] | tap | type | swipe | press | screenshot
 ```
 
 実行結果はシナリオ実行毎に `TestProjects/<name>/reports/scenario-*.md`(DS-10)へ自動出力される。
-集約・分析は別レイヤの `fleetest results list/summary/flaky/trend/devices/slow/insights/log`(DS-14)で行う。
+集約・分析は別レイヤの `fleetest results list/summary/flaky/trend/devices/slow/response/insights/log`(DS-14)で行う。
 
 - **`bridge up` が起動するのは xcuitest ブリッジ(iOS)/デバイス内サーバ(Android)のみ**(in-app ブリッジを
   起動する経路は無い)。プロセスは常駐し、停止は `bridge down` か `devices down` を要する

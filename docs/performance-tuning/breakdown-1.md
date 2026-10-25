@@ -76,7 +76,7 @@ actionResult+snapshot イベント。0.383s のうち大半は静穏待ちの床
 ### PT-3.1 並列度のスケーリング実測(M1 Max 10コア、2026-07-15)
 
 **この節の「2+2 が sweet spot」はこのマシン・この規模の値で、現在の既定ではない**
-(現マシンは M2 Ultra で E2E は iOS 6 + Android 8 レーンが日常)。**使い方は数値ではなく手順**:
+(現マシンは M2 Ultra で E2E は iOS 6 + Android 6 レーンが日常。この Mac の Android は最大 6 台。PT-3.35)。**使い方は数値ではなく手順**:
 デバイスを増やす前に実行中の CPU idle を見る。
 
 Demo 16 シナリオ(iOS 6+Android 10)を iOS/Android 同数のデバイスで A/B/C 比較
@@ -103,7 +103,7 @@ Demo 16 シナリオ(iOS 6+Android 10)を iOS/Android 同数のデバイスで A
    —— 外部パッケージ構成(受け手・ランナー機)は直下に Sources/ が無く、ツール本体は依存の先に居る
    (含めないと判定不能で毎回ビルドするか、ツール更新後に古いバイナリを使うかのどちらかになる)。実測: `api run --dry-run` の連続実行 3.96s → **0.08s**。
    ツールチェーン識別(xcode_select_link の先+version.plist の mtime)を含むのは、Xcode 更新後に
-   古いバイナリを温存して FoundationModels ABI 不整合で dyld クラッシュする罠(§CLAUDE.md)を
+   古いバイナリを温存して FoundationModels ABI 不整合で dyld クラッシュする罠(CLAUDE.md「ビルド・検証」)を
    スキップが助長しないため。**強制的に再ビルドさせたいときは `.fleetest/build-fingerprint-*.txt`
    を消すか手で `swift build` する**
 2. **ビルドとワーカー供給の並行化**(`fleetest api run` と `fleetest run --profile`): ビルド(ホスト CPU)とデバイス供給
@@ -218,8 +218,8 @@ M1Max 10コア/16コア ANE が 3.51 で、コア数比にも ANE 比にも対�
 (docs/results-json.md)。
 
 **機械によっては枠を絞る必要がある** —— FM を2並列以上で呼ぶと壊れる機械が実在する
-(M1 Ultra で実測。設定は登録簿の `fmConcurrency`・RR-19)。既定 5 は
-この機械では使えないが、**機械ごとの設定であって既定を下げる理由にはならない**。
+(M1 Ultra で実測。設定は登録簿の `fmConcurrency`・RR-19)。枠 5 は
+この機械では使えないが、**機械ごとの設定であって上げた側の実測を否定する理由にはならない**(既定は 1)。
 
 **外すなら多い側に外す**: 枠が少なすぎると待ちが積み上がり、`FMCallSlots` の timeout(20秒)を
 超えた回は `FMCallAdmission` が false を返して**occlusion-guard が黙って素通りする**(枠1 の実測で
@@ -398,7 +398,7 @@ SampleApp 76シナリオを `ios-5-android-5`(10台)で実行したときのレ�
 **@Test を増やすと合計が増える**(1本ごとに `launchApp` + 画面遷移。実測で1スイート約 +25秒 =
 レーン時間 +約3秒)。合計律速のスイートを分割すると、この増分がそのまま壁時計に乗る。
 
-判定に**フル実行の反復は要らない**: 1周ぶんの `results/runs/<runID>/scenarios/*.json` の
+判定に**フル実行の反復は要らない**: 1周ぶんの `results/runs/<YYYY-MM>/<runID>/scenarios/*.json` の
 `durationMs` から max と sum を出し、`run.json` の profile のデバイス数で割るだけで構造的に決まる。
 run 間ばらつきは ±5 秒あるので、**壁時計の実測値だけで数秒の差を断じない**。
 
@@ -483,7 +483,7 @@ A/B 実測(E2E-Android 31シナリオ・Android 8レーン・交互に3回ずつ
    新しい run が1シナリオしか含まないと、その1本が満たされた時点で遡りが止まり、
    他のシナリオの実績を1件も読まないまま抜ける。歯止めは走査ディレクトリ数だけにする。
 
-   **診断は run ログの `🔀 LPT 投入順: 実績あり N/M 件`**(N が M より大きく欠けていたらこれ)。
+   **診断は run ログの `🔀 LPT ordering: N/M with history`**(N が M より大きく欠けていたらこれ)。
    壁時計だけ見ると「遅くなった」と誤読するので、**総仕事量(シナリオ所要の合計)を併せて見る** —
    合計が同じで壁時計だけ伸びていたら順序かレーン配分の問題で、実行速度の退行ではない。
 
@@ -751,7 +751,7 @@ uikit ホストの同シナリオ(元から DOM 経路)が 11.3s なので、ほ
 | Android | 483ms | 337ms | 39ms | 438ms | inject 37ms + settle 285ms(stablePkg 60 + quiet 225)+ HTTP 約20ms |
 
 - **XCUITest の律速は `coordinate.tap()` のイベント合成そのもの**(363ms・全体の 92.5%)。
-  quiescence 待ちは 29ms しかない。**`FT_FAST_INPUT=1`(PT-6 のレバー1)を実負荷で2回計っても
+  quiescence 待ちは 29ms しかない。**`FT_FAST_INPUT=1`(当時の PT-6 のレバー1。今は無く、操作ごとの `settle: false` が後継)を実負荷で2回計っても
   tap 634→601/605ms・run 全体 −1.7% にとどまる**のはこれが理由で、数字は quiesce の実測値と一致する。
   **「XCUITest が遅いのは整定待ちのせい」という見立ては誤り**。ツール側に削り代は無い
 - **Android の settle は cap(`ACTION_CAP_MS` 2,000ms)に一度も届かない**(165 回中 0 回・

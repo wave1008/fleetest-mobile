@@ -200,7 +200,7 @@ Scripts/fm-verify.sh                    # 既定 TestProjects/E2E-CMP・プロ�
 ```
 
 **既定では回さない**。見ているソース(`negative-controls.json` の `watches."fm-verify"`)が前回 ✅ から変わったら
-`e2e.sh` の終わりで推奨する。回すのはユーザーの指示があるとき(§陽性対照スイート)。
+`e2e.sh` の終わりで推奨する。回すのはユーザーの指示があるとき(testing.md「陽性対照スイート」)。
 
 - FM 専用シナリオは `TestProjects/E2E-CMP/scenarios/_disabled/` に置く(`92_screenLooksLike` =
   screenLooksLike)。**既定スイートに入れない**: 生きた FM の判定は非決定的でフレーク源になり、
@@ -295,7 +295,7 @@ Scripts/heal-verify.sh --profile android-heal
 - run の特定は実行前後の `results/runs/` の差で行う。`fm-verify.sh` と**同時に回さない**
   (どちらも `_disabled/` のシナリオを出し入れする)
 - 自己修復(`StepExecutor` の解決分岐・`LocatorFingerprint`・`LocatorFingerprintCache`・`heal` の配線)を
-  触ったら回すことを**推奨する**(`e2e.sh` の終わりに出る。回すのはユーザーの指示があるとき = §陽性対照スイート)。実測(2026-09-15): iPhone 17 Pro Simulator で約 70 秒(シナリオのビルド込み)・Pixel 9 Emulator(`--profile android-heal`)で約 40 秒。どちらも全段が期待どおり
+  触ったら回すことを**推奨する**(`e2e.sh` の終わりに出る。回すのはユーザーの指示があるとき = testing.md「陽性対照スイート」)。実測(2026-09-15): iPhone 17 Pro Simulator で約 70 秒(シナリオのビルド込み)・Pixel 9 Emulator(`--profile android-heal`)で約 40 秒。どちらも全段が期待どおり
 
 ## デバイス供給の競合(モニターと run が同じデバイスを取り合う)
 
@@ -309,7 +309,7 @@ Scripts/heal-verify.sh --profile android-heal
      に落とす(検出は `BridgeLauncher.portsByUDID` = プロセス引数の `-destination id=<UDID>` 照合。
      `scanRunningBridges` は /status 応答済みしか映らないのでこれだけでは足りない)。
      引き取ったランナーが応答しなければ止めて同じポートで立て直す(親を失ったゾンビ対策。
-     **起動予算を超えて生きているランナーは待たずに起動し直す** —— 上の §「起動中のブリッジを待つ」)
+     **起動予算を超えて生きているランナーは待たずに起動し直す** —— judgment.md「「起動中のブリッジを待つ」は pid の生死では打ち切れない」)
   2. run は**供給フェーズ(install・凍結triage)の間も run-lease を保つ**(`SupplyLeaseHolder`)。
      `RunOrchestrator` の lease はシナリオ実行中しか書かれないため、その手前に watchdog の
      `api start-device` が割り込む穴が空いていた。**orchestrator が書き始めたキーは手放す**

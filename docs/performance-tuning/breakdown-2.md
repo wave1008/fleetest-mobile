@@ -673,7 +673,7 @@ iOS シミュレータ(iPhone 17 Pro・in-app)/ Android エミュレータ(Pixel
     **zsh では `log` が組み込みコマンド**なので `/usr/bin/log` と書く(`too many arguments` で落ちる)。
     時刻で切り出すと直前のプロセスの分が混ざるので、前後に 1 秒空ける
   - 補助の準備の所要: `fleetest-scenarios-<project> compile-ocr` を直接起動する(JSON 1 行に言語集合ごとの ms)
-  - 隠れる余地: `TestProjects/*/results/runs/*/run.json` の `startedAt` と `events/*.ndjson` の先頭行の `t` の差。
+  - 隠れる余地: `TestProjects/*/results/runs/*/*/run.json` の `startedAt` と `events/*.ndjson` の先頭行の `t` の差。
     ミリ秒で取るなら試作で `FT_PHASE_LOG` に「補助の準備ができた」の印を足す
 
 ### PT-3.34 操作後の整定を画像の静止判定にする(2026-10-09〜10・**不採用。実装して E2E で比べ、撤去**)
@@ -781,7 +781,7 @@ v173 / v99 で撤去)。動機は「木と完了通知は動きの一部しか�
 | `scrollToTop` | 243s | 45 | 4,624ms |
 
 **launch が最大項なのは PT-3.2〜3.4 の既知どおり**で、CoreSimulator 直叩き・fast launch は適用済み、
-`attachOnly` 化は PT-7 で棄却済み。**新しい削り代は見つからなかった**。
+`attachOnly` 化は PT-6 で棄却済み。**新しい削り代は見つからなかった**。
 
 **この計測で踏んだ罠**: `E2E-CMP/ios-xcuitest` だけレーン稼働 87%・余剰 +10.1s と出たが、
 **測定手順が作ったアーティファクト**だった。直前に 1 シナリオを単独で約 90 回回したため

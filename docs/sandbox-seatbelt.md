@@ -9,9 +9,9 @@ macOS の Seatbelt(`sandbox-exec`)で包む機能を作った。2026-10-06 に�
 実行できる穴への対策として採用し、**常に有効・設定はマシン側だけ**の形で main へ移植した。
 この文書は、その過程で**実際に測って分かったこと**と、**調べ方**と、**踏んだ失敗**の記録。
 
-- 設計(型の分担・規則の形・壁の外に残るもの)は DS-11.7](design/README.md)。
+- 設計(型の分担・規則の形・壁の外に残るもの)は [DS-11.7](design/README.md)。
 - 守る規律は `.claude/rules/executor.md` のサンドボックスの項。
-- 利用者向けの説明は [user-docs/reference/tools/mcp_server_ja.md](user-docs/reference/tools/mcp_server_ja.md) §サンドボックスと承認。
+- 利用者向けの説明は [user-docs/reference/tools/mcp_server_ja.md](user-docs/reference/tools/mcp_server_ja.md)「サンドボックスと承認」。
 
 数字と挙動は、断りが無い限り M2 Ultra / macOS 27.2 / Xcode 27.0 での実測。
 
@@ -437,7 +437,7 @@ UI 操作のハンドラ本体の一部は語句検索だけで、本文は読�
 ### SB-8.7 run の前後のスクリプト(枠に入れた)
 
 `run-setup.sh` / `run-teardown.sh` は `ScenarioSandbox` の用途 `.script` で包む(入口は `FTCore.ScriptSandbox.launch`。設計は
-RR-17「サービスの宣言とスクリプトのサンドボックス化」](remote-runner/README.md))。シナリオの枠との差は
+[RR-17](remote-runner/README.md)「サービスの宣言とスクリプトのサンドボックス化」)。シナリオの枠との差は
 `ScenarioSandbox.profile` の用途分岐にまとまっている(書ける場所 = `data/` + `hooks.writablePaths` + 一時領域、
 通信 = 宣言した公開ポート + プロキシ + gateway のソケット、GPU・ANE・LaunchServices は開けない)。要点は2つ。
 

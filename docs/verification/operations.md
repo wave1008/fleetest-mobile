@@ -150,7 +150,7 @@ fleetest monitor resume
 **中途半端に止めた対照からは誤った結論が出る。** 観測ループだけ止めた回で接続断が 11→2 に減り、
 残り2件が1台(emulator-5558)に集中していたので「その個体の問題」と報告した ——
 **実際はそのデバイスの配信が残っていただけ**で、配信を止めたら同じデバイスを含む全台が緑になった。
-**対照は「全部止めた」まで作ってから読む**(§「切り分けは『実験系が効いているか』を先に確かめる」
+**対照は「全部止めた」まで作ってから読む**(testing.md「切り分けは「実験系が効いているか」を先に確かめる」
 と同じ型を、止め方の側で踏んだ形)。
 
 これで長らく保留だった「**E2E の再キューは環境か実装か**」も**環境**と確定した
@@ -178,7 +178,7 @@ Flutter と RN の実機用は **Release 構成**(Flutter の Debug は flutter 
 
 ## クラッシュダイアログは回帰スクリプトが止めて戻す(2026-10-03)
 
-`Scripts/e2e.sh` / `e2ex.sh` / `e2e-negative.sh` / `e2e-devices.sh` は実行中だけ macOS の問題レポーター(Simulator のアプリが
+`Scripts/e2e.sh` / `e2ex.sh` / `e2ey.sh` / `e2e-negative.sh` / `e2e-devices.sh` は実行中だけ macOS の問題レポーター(Simulator のアプリが
 落ちるたびに出る。陽性対照のクラッシュ検知が毎回落とす)を止め、終了時に元の値へ戻す(`Scripts/crash-dialog.sh`)。
 `e2ex.sh --on` は向こうの機械で止める。止めても `.ips` は書かれるのでクラッシュ検知は効く(陽性対照で確認済み)。
 
@@ -201,7 +201,7 @@ Flutter と RN の実機用は **Release 構成**(Flutter の Debug は flutter 
 **条件判定が覆いを閉じてから答える**)。条件判定の1本は 2026-08-20 に追加 ——
 `ifCanSelect` は `perform` を通らないので、操作・検証側を直しても自動では守られない。
 **この形の失敗は赤くならない**(分岐が黙って飛ぶ)ので、witness 側で不成立を赤くしてある。
-**覆いに関する変更を入れたらこの3本を回す**(修正前は3本とも落ち、修正後は3本とも緑、が対照)。
+**覆いに関する変更を入れたらこの5本を回す**(修正前は落ち、修正後は5本とも緑、が対照)。
 
 **操作側の確認は木では取れない**: 合成タッチの宛先が正しい窓かは、**座標タップ**で確かめる
 (`POST /tap {"x":…,"y":…}` でモーダルが閉じるか)。木に載っているのに閉じられない、が
@@ -253,7 +253,11 @@ Flutter と RN の実機用は **Release 構成**(Flutter の Debug は flutter 
   `--ios-inapp`(既定と同じモードで iOS のみ) /
   `--record`(録画パイプラインの整合チェック付き。詳細は下記「録画」節) /
   `--local`(各 run に `--runner local` = この Mac のデバイスだけ。E2EX を M1Ultra で同時に回すときの形) /
+  `--performance`(性能計測モード。上記「モニターと E2E」) / `--negative`(最後に陽性対照スイートも回す) /
+  `--retrain-classifiers`(各 SUT の画像分類器のキャッシュを消してから回す) /
   `--align`(下記)
+- **`e2e.sh` / `e2ex.sh` / `e2ey.sh` は引数に関係なく「スイート全体」として `Scripts/test-scope-guard.py` が断る**(全実施を頼まれたときだけ
+  `FT_FULL_TEST=1`)。絞った確認は `fleetest run --project <P> --profile <prof> --scenario <クラス>` で通るシナリオを名指しする
 - **回帰の分担(ユーザー指示 2026-09-28)**: E2E はこの Mac(M2Ultra)で `Scripts/e2e.sh --local`、
   E2EX は `Scripts/e2ex.sh --on M1Ultra`(ssh でランナーのクローン `~/fleetest-runner/foundation-tester` に入り、
   **そこで SUT をビルドして**そこのデバイスで回す。残りの引数はそのまま渡す)を**同時に**起こす。向こうで動くのは
@@ -284,7 +288,7 @@ Flutter と RN の実機用は **Release 構成**(Flutter の Debug は flutter 
 - **ディープリンクの URL スキームは SUT ごとに固有でなければならない**(2026-08-09)。
   iOS の E2E シミュレータには4つの iOS SUT が同居するため、共有スキームだと `openurl` の
   解決先が端末ごとに揺れる(実測で別アプリへ配送された)。`DeepLinkSchemeSyncTests` が
-  契約(`E2EAppCMP/docs/ui-contract.md` §ディープリンク)との一致と SUT 間の重複を検出する
+  契約(`E2EAppCMP/docs/ui-contract.md`「ディープリンク」)との一致と SUT 間の重複を検出する
 
 ## SUT の Info.plist はコミットするソース —— URL スキーム等は直接編集する
 
@@ -301,17 +305,17 @@ Flutter / RN の SUT の `Info.plist` も同じ(ソース)。
 
 ## 受け手フロー(preflight / install.sh)の検証
 
-- **更新は `Scripts/update.sh`**(install.sh を再実行 + `project sync` + プラグイン更新と版照合)。
+- **更新は `Scripts/update.sh`**(install.sh を再実行 + `project sync`。スキルのコピーの更新は install.sh のステップ7.8。版が変わったら新しいリリースの注釈を表示)。
   clone 構成でこれを回すとき、**受け手向けの整備がクローン自身に効かないこと**を確かめる
   (実害: install.sh の `.gitignore` 追記がリポジトリを dirty にし、次の更新が pull ガードで
   止まる。現在は clone 構成では skip する。`.gitignore` の項目は `ProjectScaffold.ensureGitignore`
   と対 — 片方だけ変えない)
-- **クローンを dirty にしたまま `install.sh` を試すと必ず止まる**(ローカル変更の破棄を尋ね、
-  端末が無い実行では中止する仕様)。本体を触りながら試すときは **`--no-pull`** を付ける
+- **clone 構成でクローンを dirty にしたまま `install.sh` を試すと必ず止まる**(ローカル変更の破棄を尋ね、
+  端末が無い実行では中止する仕様。外部構成では尋ねずに破棄する = `--keep-local` で尋ねる側へ)。本体を触りながら試すときは **`--no-pull`** を付ける
 - 実行の記録は `<WORK_DIR>/.fleetest/install-<日時>.log`(実行ごとに別ファイル)。
   端末出力を追わずに後から失敗を追える
 - **スキルが渡す新しい引数は、受け手のクローンが pull されるまで存在しない**。
-  スキルからは**スキルと一緒に届いた Scripts/**(手順書と同じ版。プラグインのキャッシュ)の
+  スキルは**クローンのローカルの Scripts/**(SKILL.md の3つ上。手順書と同じ版)の
   ファイルを `bash` で呼ぶ(`curl | bash` はエージェントの安全確認に止められるので使わない)。
   実害: `--platform` を渡した初回が「不明なオプション」で落ちた(2026-07-29)
 - 個別コマンドを叩いて確かめる前に、**preflight と install.sh の出力に既にあるか**を見る
@@ -522,17 +526,12 @@ Flutter / RN の SUT の `Info.plist` も同じ(ソース)。
 
 ### 実機と VSCode 拡張
 
-- 実行プロファイルのデバイス編集フォーム(`updateDeviceInMachineProfile`)は実機で表示が変わる:
-  iOS は機種/OS 行を隠し **udid** を、Android は AVD 行の代わりに **serial** を readonly 表示する
-  (いずれも実体を指すので変更不可)。実機で識別子を空にした保存は拒否する
 - デバイスタイルは実機に「実機」バッジを出す。右クリックの起動/停止は**項目を残したまま
   ラベルを「ブリッジを起動/停止」に変える**(実機は端末そのものを起動・停止せず、操作対象は
   ブリッジだけ)。**項目を隠してはいけない**: 隠すとモニターから実機のブリッジを起動できず、
   タイルが「接続中」のまま何もできなくなる(2026-07-25 に実際にそうしてしまった)
-- `kind`/`serial` は拡張側の 2 箇所(`config.ts` の `MachineDeviceEntry` と `monitorModel.ts` の
+- `kind`/`serial` は拡張側の 2 箇所(`config.ts` の `MachineDeviceEntry` と `monitorProfileForms.ts` の
   同名型)に独立定義がある。**両方直すこと**(vscode 非依存を保つための意図的な重複)
-- webview→拡張の `machineDeviceUpdate.fields` に `serial` を足した。**拡張と webview のバンドルは
-  別々に更新されうる**ので、受信側は欠落を "" に補う(旧 webview と混ぜても壊さない)
 - 機種/OS はプロファイルに無ければ `installedDevicesRequest` で取りに行くが、**要求は
   1 デバイス 1 回に絞ること**。この要求は毎回 `fleetest api installed-devices` を spawn する
   (devicectl + adb getprop で数秒)ので、値が埋まらないデバイス(未接続の実機・`hw.device.name`

@@ -48,7 +48,7 @@ executableTarget `fleetest-scenarios-<name>`(path: `TestProjects/<name>/scenario
 - プロジェクト間はビルド隔離される(1 プロジェクトのコンパイルエラーが他を止めない)。
   バイナリ毎に objc 走査が分かれるため、シナリオ一覧のプロジェクト別化は発見ロジック無変更で成立
 - プロジェクト名は SPM ターゲット名になるため `^[A-Za-z0-9_][A-Za-z0-9_-]*$`(日本語はクラス名側で使う)
-- `--project` 省略時の解決: TestProjects/ が 1 つならそれ → LocalConfig.defaultProject → `default` という名前の
+- `--project` 省略時の解決: TestProjects/ が 1 つならそれ → LocalConfig.defaultProject → `project1` という名前の
   プロジェクト(拡張が起動時に用意する。`ProjectStore.defaultProjectName`)→ 候補一覧付きエラー
 - CLI: `fleetest project create <name>` / `project list` / `project sync`
   (手動コピーや git pull 後の TestProjects/ ↔ マーカー区間の再整合)
@@ -269,7 +269,7 @@ FM(Foundation Models)を使うのは `fmTextVisibilityCheck`(occlusion-guard の
 一切行わない(子ランナーへも伝搬し、delegate 自体を作らない)。screenLooksLike を無効にした
 run では該当ステップは skip(素通り)になり、FM 利用不可時と同じ扱い。子への伝搬(プロファイル →
 子 → 実行時)は `FMToggleWiringTests` が固定する。UI は「プロファイル」タブの実行プロファイル設定
-「Advanced Features(Experimental)」セクションに、親チェックボックスの無いフラットな4行
+「Advanced Features」セクションに、親チェックボックスの無いフラットな4行
 (セレクタの自己修復(`heal`)・OCR の視覚検証・FM の視覚検証・FM の
 `screenLooksLike`)で並ぶ。`heal`(既定は `--profile` 実行 true / プロファイル無し false)は
 同じセクションに並ぶが他のトグルから独立している(自己修復は FM 機能ではない。
@@ -615,8 +615,8 @@ docs/user-docs/reference/tools/mcp_server_ja.md §サンドボックスと承認
 
 **全拒否が土台**(`(deny default)`)。全許可を土台にして書き込みと通信だけ絞る形は壁にならない ——
 実測(PoC)で、その枠の中から `simctl spawn <udid> defaults write <枠の外>` が成功し、`open -a` でアプリが
-枠の外に起動した(LaunchServices)。開けるものは `ScenarioSandbox.baseRules` / `machServices` /
-`writablePaths` に名指しで並べる。
+枠の外に起動した(LaunchServices)。開けるものは `ScenarioSandbox.commonRules` / `scenarioOnlyRules` / `commonMachServices` / `scenarioOnlyMachServices` /
+`proxyMachServices` / `writablePaths` に名指しで並べる。
 
 - **呼び手は何も運ばない**。包む判断は入口の中で完結する(マシン側の設定を読む)ので、MCP・CLI・拡張・
   リモートのランナーはどれも `ScenarioHost` の3関数を呼ぶだけで包まれる。**シナリオ実行バイナリを起こす経路を
@@ -745,7 +745,7 @@ run → monitor 方向の `RunLease`(DS-12 の「監視と実行の協調」)は
 ハングし、60s watchdog でランナーごと死ぬ(XCUITest API はメインスレッド必須のため
 サーバ側での非致死化は不可能と確認済み)。
 
-- `launch` 前に `simctl get_app_container <udid> <bundleID>` で導入確認し、未導入は launch を
+- `launch` 前に CoreSimulator 直叩き(`CoreSimAppControl.isInstalled`。使えないときだけ `simctl get_app_container <udid> <bundleID>`)で導入確認し、未導入は launch を
   呼ばず即時エラーにする(ランナーは生存)。システムアプリも判定可(実測)。確認済み
   bundleID はインスタンス内キャッシュ
 - 配線: xcuitest モードのシナリオ実行時、`DriverConnection.udid` が届く場合のみ
@@ -987,7 +987,7 @@ false green になる。
 - **`fleetest init`**: 受け手の Package.swift(空マーカー区間 + fleetest 依存。言語モードは tools-version 6.0 の既定 = Swift 6)を書き、
   `ProjectScaffold.createAndRegister` が最初のプロジェクトを登録。**`--no-project` ではプロジェクトを作らず空の
   `TestProjects/` だけ置く**(`fleetest.project` も `.vscode/settings.json` に書かない・受け手スキルも名前を焼かない。
-  install.sh は `--name` 無しの新規導入でこちらを使い、プロジェクト `default` は `/fleetest-profiles` か VSCode 拡張が後から作る。
+  install.sh は `--name` 無しの新規導入でこちらを使い、プロジェクト `project1` は `/fleetest-profiles` か VSCode 拡張が後から作る。
   `--name` ありの導入 = リモートランナーはこちら)。内外は `isExternalPackage`
   (`Sources/FTScenarioRunner` の有無)で自動判定し、`PackageManifestEditor` が内部=target 参照 /
   外部=`.product` 参照のスタンザを生成する(`project sync` も同じ判定)。

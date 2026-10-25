@@ -35,10 +35,10 @@
 |---|---|---|---|
 | **git タグ**(例 `0.1.0`) | `git tag` | 受け手へ届けたい変更をまとめてリリースするたび | 受け手の配布口(最新 = semver 最大)。注釈 = リリースノート。`update-check.sh` / `install.sh` / `update.sh` が参照 |
 | **拡張の version** | `vscode-fleetest/package.json` | 拡張の挙動を変えたとき | VSIX(別途 publish。Marketplace 等) |
-| **プロトコル版** | `Sources/FTCore/ProtocolVersion.swift` | 拡張↔CLI の JSON/NDJSON 契約を**後方非互換に**変えたときだけ +1 | 起動時の版照合(compatCheck.ts) |
+| **プロトコル版** | `Sources/FTCore/ProtocolVersion.swift` | 拡張↔CLI の JSON/NDJSON 契約を**後方非互換に**変えたとき +1。欄を足すときも、古い形を読み替えず必須にして +1(互換の読み替えは置かない) | 起動時の版照合(compatCheck.ts) |
 
 これらは**別系統**。git タグを切っても拡張の version は変わらない(逆も同様)。プロトコル版は
-契約が壊れるときだけ動かす(CLAUDE.md「ビルド・検証」参照)。
+契約を壊す変更・必須欄の追加のときだけ動かす(CLAUDE.md「版と契約の同期」参照)。
 
 タグは **`v` プレフィックス無しの semver**(`0.1.0`)。
 
@@ -57,7 +57,7 @@ git push origin 0.1.0
 
 `Scripts/release.sh` がやること: semver 検証 → **既存の最新より大きい版かの確認(小さい・同じ版は断る)** →
 作業ツリーがクリーンか確認 → タグ重複チェック → `swift build` + `swift test --parallel`(合否は exit code) →
-注釈付きタグ作成(**注釈 = `--notes-file` の中身 = リリースノート**)→(`--push` 時のみ)push。
+注釈付きタグ作成(**注釈 = `fleetest <版>` の題名行 + 空行 + `--notes-file` の本文**。題名は release.sh が付けるので notes に書かない)→(`--push` 時のみ)push。
 
 ## 発行後の確認
 

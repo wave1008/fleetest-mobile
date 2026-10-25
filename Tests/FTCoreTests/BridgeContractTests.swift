@@ -30,7 +30,7 @@ final class BridgeContractTests: XCTestCase {
     //   Android                    → AndroidRunner/build.sh の VERSION_CODE と
     //                                Sources/FTAndroid/AndroidBridge.swift の expectedBridgeVersionCode
     // 3実装でルートが異なるのは仕様。共通コアは13本で、差分は:
-    //   in-app     … 同一プロセスしか見えないので /drag・/appswitcher・/home を持たない
+    //   in-app     … 同一プロセスしか見えないので /appswitcher・/home を持たない(/drag はアプリ内の座標ドラッグとして持つ)
     //   /locale    … Android だけ
     //   /settle    … Android だけ(ホストが adb で撃った操作〈launch・戻るキー〉の整定を
     //                 ブリッジに待たせる口。ブリッジ経由の操作は応答内で待つので不要)

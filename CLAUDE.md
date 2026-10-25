@@ -140,7 +140,7 @@ grep やシェル(`cat`)で見るだけのとき・新しいファイルを読�
   `BridgeClient.stopOnSimulator`(ランナーの terminate はセッションが起動したアプリにしか効かない。`ClearAppDataContractTests`)
 - iOS Simulator を起動する経路を足す → **`SimulatorBoot.ensureBooted(udid:log:)` を通す**(起動前の掃除 `SimulatorBootCleanup.beforeBoot(udid:)` と、機械全体で同時2台の枠 `SimulatorBootSlots`。直接 simctl boot / bootstatus を撃たない = `SimulatorBootSingleEntryTests`)
   (`SimulatorPosterCachePurgeWiringTests`。DS-12.4.2・DS-12.4.3)
-- モニターの周期に計測を足す → 周期の中で待たない(裏で回して控えを読むだけ。`DeviceStorageSampler`)
+- モニターの周期に計測を足す → 周期の中で待たない(裏で回して控えを読むだけ。`DeviceStorageSampler`)→ MN-55
 - 待ち受けのソケットを足す → `FTCore.AcceptLoop` を通す(**fd を閉じるのは、その fd で待っているスレッドだけ** = 別のスレッドが閉じると
   番号が再利用され、受付が無関係の待ち受けの接続を奪う。中継中の接続も一覧から外してから待っていた側が閉じる。`AcceptLoopTests`)
   → MN-96
@@ -148,7 +148,6 @@ grep やシェル(`cat`)で見るだけのとき・新しいファイルを読�
   スレッド安全の契約が無い呼び手の log / emit は `SerializedSink`、子タスクへ渡す非 Sendable(主に `AppDriver`)は
   `UncheckedTransfer`(`Sources/FTCore/LockedValue.swift`)。`@unchecked Sendable` には守っている不変条件を1行書く。
   **in-app dylib に単体でコンパイルされるファイル**(`InAppBridge/build.sh` の一覧)からは FTCore の他の型を使わない → MN-66
-  → MN-55
 
 ## ビルド・検証
 
@@ -166,8 +165,9 @@ grep やシェル(`cat`)で見るだけのとき・新しいファイルを読�
 - **テストの範囲は PreToolUse フック `Scripts/test-scope-guard.py` が撃つ前に検査する**(`.claude/settings.json` に登録。
   このファイルは git 管理外なので**クローンごとに登録する**。
   `--filter` 無しの `swift test`・部分一致の語・素の `npm test`・`swift build --build-tests`・新しいテストの数を超える変異を断る。
-  **デバイス実行も見る**: `--scenario` / `--folder` / `--failed` の無い `fleetest run`・`e2e.sh` / `e2ex.sh` / `e2ey.sh` /
-  `e2e-devices.sh`・`--project` の無い `e2e-negative.sh`。**起動するスクリプトファイルと heredoc で書いたスクリプトの中身も読む**)。
+  **デバイス実行も見る**: `--scenario` / `--folder` / `--failed` の無い `fleetest run`・`--scenario` の無い `e2e-devices.sh`・
+  `--project` の無い `e2e-negative.sh`・**`e2e.sh` / `e2ex.sh` / `e2ey.sh` は引数に関係なく**(SUT・OS・モードで絞っても
+  その SUT のスイート全体を回す。絞った確認は `fleetest run --scenario` で書く)。**起動するスクリプトファイルと heredoc で書いたスクリプトの中身も読む**)。
   全体テストは作業の区切りにユーザーが回す運用 —— **全実施を頼まれたときだけ**コマンドに `FT_FULL_TEST=1` を書く
 - **合否は exit code で見る**(パイプすると grep 等の exit code に化けて失敗を握りつぶす)
 - **並列はテストプロセスを分けるので、ホストの共有資源に触るテストは自分で隔離する**
@@ -222,8 +222,9 @@ grep やシェル(`cat`)で見るだけのとき・新しいファイルを読�
   StepExecutor の操作合成(タップ/ドラッグ/スクロール探索の終端処理)を触ったら SUT を絞らず全部**
   回す(フレームワーク差の退行は SUT を跨がないと出ない)→ MN-4.4.1
 - **既定の e2e.sh は iOS を inapp モードで回す**(**利用者の既定も inapp モード**
-  なので、既定スイートが見るべきはそちら)。**フル E2E は引数なしの `Scripts/e2e.sh` だけ**
-  (xcuitest は含めない)。**XCUITest ブリッジを触ったときだけ `--ios-xcuitest` を的を絞って回す**。
+  なので、既定スイートが見るべきはそちら)。**フル E2E はモード・SUT・OS を指定しない `Scripts/e2e.sh` だけ**
+  (xcuitest は含めない。置き場の指定 `--local` / `--align` は可)。**XCUITest ブリッジを触ったときだけ xcuitest モードを
+  的を絞って回す**(`fleetest run --profile ios-xcuitest --scenario <クラス>`)。
   モード指定(`--ios-inapp` / `--ios-xcuitest`)は **iOS だけを回す**(Android にモードの
   選択肢は無いので既定スイートと同一の実行を二度払うだけ)。OS の絞り込みは `--ios` / `--android`
 - **この漏れは e2e.sh が検出する** —— **回さなかった側**のブリッジ入力集合(`BridgeSourceSet`)の
@@ -236,15 +237,17 @@ grep やシェル(`cat`)で見るだけのとき・新しいファイルを読�
   → MN-4.5
 
 **e2e の実行範囲はリスクとコストで決める**(上のゲートは「最低限ここまでは回す」の下限で、
-常に全部回す意味ではない。フルスイートは10分超かかるので、**何も足さない実行はしない**):
+常に全部回す意味ではない。フルスイートは10分超かかるので、**何も足さない実行はしない**)。
+範囲の欄のシナリオは **`fleetest run --project <P> --profile <prof> --scenario <クラス>` で、変更が通るものを名指しする**
+(`e2e.sh` 系は絞ってもスイート全体を回すのでフックが断る。全体は全実施を頼まれたときだけ `FT_FULL_TEST=1`):
 
 | 変更の性質 | 範囲 |
 |---|---|
 | 改名・シグネチャ変更・型に閉じたリファクタ | **`swift test --parallel` だけ**。追随漏れは必ずコンパイルエラーになる |
 | ホスト側ロジック(`StepExecutor` の分岐・セレクタ解決) | `swift test` + **該当シナリオ1〜2本** |
-| ブリッジの挙動(注入・スナップショット・型写像) | 該当 SUT の**1プロファイル**。フレームワーク差が絡むなら全 SUT |
-| 入力・キー・IME 系 | 上記 + **`--ios-xcuitest`**(既定は inapp モードなので、もう片方のモード) |
-| **幾何・容器推定・整定**(実ジェスチャの慣性で挙動が変わるもの) | 上記 + **`--ios-xcuitest`**。**in-app ブリッジは慣性を持たない**ので、この種の退行は既定スイートでは原理的に出ない(MN-4.5.1) |
+| ブリッジの挙動(注入・スナップショット・型写像) | 該当 SUT の**1プロファイル**で通るシナリオ。フレームワーク差が絡むなら全 SUT の同じ画面のシナリオ |
+| 入力・キー・IME 系 | 上記 + **xcuitest モード**(`--profile ios-xcuitest`。既定は inapp モードなので、もう片方のモード) |
+| **幾何・容器推定・整定**(実ジェスチャの慣性で挙動が変わるもの) | 上記 + **xcuitest モード**。**in-app ブリッジは慣性を持たない**ので、この種の退行は既定スイートでは原理的に出ない(MN-4.5.1) |
 | flake 調査・性能 | 該当プロファイルを**反復10周**(docs/verification/judgment.md) |
 | run 制御(再キュー・ワーカー離脱など。シナリオ実行の中身を触らない) | `swift test` + **その経路を強制的に通す陽性対照**。緑の run では1度も実行されないのでフルは情報ゼロ |
 | リリース前・大きな統合の締め | **フルスイート = `Scripts/e2e.sh`(引数なし)だけ** |

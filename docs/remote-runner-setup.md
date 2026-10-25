@@ -27,7 +27,7 @@
 | リモート実行分が `fleetest results` の集計に載る | ✅ 常に回収され、そのまま集計・flaky 検出の対象になる |
 | 複数エントリの JUnit を1ファイルに集約 | ✅ `run --fleet … --junit <パス>` |
 | リモート機のデバイス一覧の取得・作成・削除(プロファイル編集のダイアログから) | ✅ |
-| 拡張の「デバイスモニター」タブでのリモートデバイスの表示・画面配信 | ✅ 状態・静止画・ライブ映像(2026-08-17。自動修復 watchdog はリモートのデバイスを見ない) |
+| 拡張の「デバイスモニター」タブでのリモートデバイスの表示・画面配信 | ✅ 状態・静止画・ライブ映像(2026-08-17。ブリッジの自動修復はリモートのデバイスも見る。見ないのは Wi-Fi の復旧を担う健全性 watchdog) |
 
 ## 全体像
 
@@ -405,13 +405,12 @@ fleetest run --runner <ユーザー>@<ホスト> --profile <実行プロファ�
   (取得済みの分は残る)。確実にやるなら先に
   `fleetest remote exec <ランナー> -- ...` ではなく、ランナー機で
   `cd ~/fleetest-runner/users/<issuerId>/work && swift package resolve` を通しておく
-- **Android を回すときは、先にエミュレータを起こしておく**(iOS と違い自動では起きない):
-  `fleetest remote exec <ランナー> -- devices up --profile <実行プロファイル>`
 - `--runner` と併用できないもの: `--port` / `--report-dir` / `--failed` / `--skip-build`
   (理由付きで即座に止まる)。`--dry-run` は手元のシナリオだけで判定できるので、
   `--runner` を付けていても**送らずローカルで完結する**
 - 途中で Ctrl-C すると**リモート側の実行も止まる**。`--remote-timeout <秒>` で全体の上限も付けられる
-  (既定はシナリオ数から算出)
+  (既定は、`--scenario` で本数が決まっているときだけ「900秒 + 600秒 × 本数」を 1800〜86400秒に収めた値。
+  本数が実行前に分からない `--profile` 全体・`--fleet` では**無期限**)
 
 **成果物の行き先**
 
@@ -561,8 +560,8 @@ fleetest api delete-device --platform android --avd <AVD名>
 
 タイルの右クリックからの**起動・停止もその機械で実行されます**(一括の「全て起動/終了」も同じ)。
 
-**自動修復だけは手元のデバイスにしか効きません** —— ブリッジが応答しない・Wi-Fi が落ちた等の
-自動復旧は、リモートのデバイスでは動きません(手動の起動・停止は使えます)。
+**自動修復のうち、ブリッジが応答しないときの復旧はリモートのデバイスにも効きます**
+(実機は見ません)。**Wi-Fi が落ちたときの復旧(健全性 watchdog)は手元のデバイスにしか効きません。**
 
 **両方の機械の fleetest の版が揃っている必要があります**。古いと状態も映像も来ず、タイルは
 「<ホスト> に届いていません(状態は取得できません)」のままになります(→ ステップ3 で版を揃える)。
@@ -589,16 +588,16 @@ TestProjects/<project>/workspace/scripts/run-teardown.sh   # テスト実行後�
 - スクリプトが読める環境変数: `FT_HOOK`(setup/teardown)・`FT_WORKSPACE`・`FT_PROJECT`・
   `FT_PROFILE`・`FT_REPORT_DIR`・`FT_IOS_DEVICES`・`FT_ANDROID_DEVICES`
 
+サービス(DB・スタブサーバ)は `workspace/scripts/compose.yaml` に宣言する。**親の fleetest が検査して
+起動・終了する**(書き方は user-docs/reference/writing/services_ja.md)。スクリプトは Seatbelt の中で動くので
+**docker のソケットにも adb にも触れない**(Emulator への `adb reverse` は親が代行する)。
+スクリプトからコンテナを触る口は中継コマンド `fleetest-services`(`exec` / `logs` / `status` / `port`)だけ。
+
 ```bash
 #!/bin/sh
-# workspace/scripts/run-setup.sh の例
+# workspace/scripts/run-setup.sh の例(DB は compose.yaml の healthcheck を待って起動済み)
 set -eu
-docker compose -f "$FT_WORKSPACE/data/compose.yaml" up -d
-until nc -z 127.0.0.1 5432; do sleep 1; done   # 「時間」ではなく「起きたこと」で待つ
-# Android エミュレータからは 10.0.2.2、実機は adb reverse で手元のポートへ届かせる
-for serial in $(adb devices | awk '/\tdevice$/ {print $1}'); do
-  adb -s "$serial" reverse tcp:8080 tcp:8080
-done
+fleetest-services exec db -- psql -U app < "$FT_WORKSPACE/data/seed.sql"   # 初期データの投入
 ```
 
 **run が異常終了(ssh 切断・強制終了)しても、起こしたものは残らない。** 次の run の開始時と
@@ -772,7 +771,7 @@ FileVault 有効のランナーは**再起動のたびに誰かが解錠+ログ�
 | `fleetest binary not found on remote` | ビルドされていない | ランナー機で `swift build --product fleetest` |
 | `Cannot code-sign the bridge runner for a physical device on this Mac` / `the keychain holding the signing key is locked in this session` | **実機 iOS をランナー機で回すとき**。ssh セッションはキーチェーンがロックされたまま始まるので、XCUITest ランナーの codesign が署名鍵を使えない。fleetest はビルド前に**検索リスト(`security list-keychains -d user`)の各キーチェーン**を空パスワードで解錠しようとするが、署名鍵を持つキーチェーンにパスワードがあると効かない | **署名鍵を空パスワードの専用キーチェーンへ移し、検索リストに載せる**(ログインキーチェーンのパスワードは変えずに済む): ランナー機で `security create-keychain -p "" ~/Library/Keychains/fleetest-signing.keychain-db` → ログインキーチェーンから署名 ID を `security export`/`import` で移す → `security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "" <新キーチェーン>` → `security set-keychain-settings <新キーチェーン>`(引数なし = 自動ロックなし)→ `security list-keychains -d user -s <新キーチェーン> ~/Library/Keychains/login.keychain-db`。それが許されない運用なら、実機 iOS の run はランナー機の GUI セッション(画面共有)から起こす。シミュレータだけのランナーには無関係(署名しない) |
 | `unknown package` | クローンのディレクトリ名を変えた | `~/fleetest-runner/foundation-tester` に戻す |
-| `no running emulator for AVD …` | Android のエミュレータが未起動 | ステップ6 の `devices up` |
+| `no running emulator for AVD …` | `--profile` の run が Android のエミュレータを起動しようとして失敗した | AVD が存在するか・ディスクとメモリに空きがあるかを見て、ステップ6 の `devices up` で単体で起こして原因を見る |
 | `no runner workspace at …`(exit 91) | あなたの issuerId の作業場所がまだ無い(未 setup / issuerId が変わった) | `fleetest remote setup <ランナー>` を1回。issuerId は明示設定にする(「複数人でフリートを共有する」) |
 | シナリオが0本 / 見つからない | プロジェクト名が手元と違う | ステップ2 の `--name` を手元と揃える |
 | `app package not found at …` | 手元の `appPath` にアプリが無い(未ビルド・パス違い) | 手元でアプリをビルドするか `appPath` を直す(ステップ4。アプリは手元から運ばれる) |

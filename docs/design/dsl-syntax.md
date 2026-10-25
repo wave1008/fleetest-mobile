@@ -419,10 +419,7 @@ DS-10 は2ファイルに分かれる。後半は dsl-execution.md。
   セレクタ解決も挟まない)。bundleID 省略時はこの run の既定アプリ(上記 ScenarioAppResolution)。
   `restartApp` は terminate の失敗を無視して launch する(既に落ちている状態から呼べる)
 - **器のディレクトリ名は `TestProjects/<name>/scenarios/`**(profiles / reports / results / docs と大小を揃える)。
-  **旧名 `Projects/` / `Scenarios/` も解決する**: `ProjectStore.projectsDir` は `TestProjects/` が無ければ `Projects/`、
-  `TestProject.scenariosDir` は `scenarios/` が無ければ `Scenarios/` を見る
-  (導入済みの受け手は旧名のままで、`Projects`→`TestProjects` は大小が違うので
-  macOS でも解決できない)。`Scripts/preflight.sh` も両方を見る
+  旧名 `Projects/` / `Scenarios/` は見ない(新しい名前だけを解決する)
 - **`home` の機構は iOS 実機とシミュレータで違う**: シミュレータは `XCUIDevice.press(.home)`、
   **実機は springboard の下端フリック**(`press(.home)` が実機では ok を返すのに効かない。
   2026-08-05 実測)。フリックは**速さでホーム/アプリスイッチャーが分かれる**ので数値を変えない
@@ -436,17 +433,18 @@ DS-10 は2ファイルに分かれる。後半は dsl-execution.md。
   **順序は「ファイルを消してから入れ直す」**(先に入れ直すとディスクの旧値を読み直す)。
   `defaults delete` は効かず(サンドボックスのドメインが見えない)、`killall` はシムに無い。
   `ClearAppDataContractTests` が2段の欠落を検出する。
+  **権限はコンテナの外(TCC.db)にある**ので後者を省くと
+  「Android では権限ダイアログが出るのに iOS では出ない」という OS 差が黙って生まれる
+  (`pm clear` は権限もリセットする)。**ドライバの層では iOS はシミュレータ専用**(実機は devicectl に同等手段が
+  無く 501)。DSL と MCP は実機ではアンインストール + 入れ直しに切り替える(`reinstalled-to-clear-data`)。1件でも消せなければ失敗させる(部分削除を「消えた」と言わない)。
+  キーチェーン/Keystore の値は残るので、そこに初回起動判定を置くアプリでは再現しない
 - **simctl / devicectl の対象特定は `BridgeClient.resolveTarget` に一本化**(install /
   uninstall / clearAppData)。`/status` はデバイス名しか返さないので名前で引き当てるが、
   **名前をそのまま simctl へ渡さない**: 実機に繋がっているとき「Invalid device」という
   的外れな失敗になり、**同名のシミュレータが起動していればそちらを操作してしまう**。
   引き当ては booted シミュレータ優先 → 実機(devicectl 一覧は**必要になったときだけ**引く。
   数百 ms かかる)→ どちらでもなければ名前。実機と分かれば install/uninstall は
-  devicectl・clearAppData は 501。`DeviceTargetResolutionTests` が規則を固定する**権限はコンテナの外(TCC.db)にある**ので後者を省くと
-  「Android では権限ダイアログが出るのに iOS では出ない」という OS 差が黙って生まれる
-  (`pm clear` は権限もリセットする)。**ドライバの層では iOS はシミュレータ専用**(実機は devicectl に同等手段が
-  無く 501)。DSL と MCP は実機ではアンインストール + 入れ直しに切り替える(`reinstalled-to-clear-data`)。1件でも消せなければ失敗させる(部分削除を「消えた」と言わない)。
-  キーチェーン/Keystore の値は残るので、そこに初回起動判定を置くアプリでは再現しない
+  devicectl・clearAppData は 501。`DeviceTargetResolutionTests` が規則を固定する
 - `ifCanSelect(セレクタ, waitSeconds:) { }.ifElse { }`: 「出るか不定」の唯一の表現手段
   (`optional:` は無い)。既定 `waitSeconds: 0` = 即時1回判定。**`FTRuntime.perform` を
   通らないので構文検証を個別に呼ぶ**(上記 `validationError` 項)
@@ -667,7 +665,7 @@ select(.id("txt_result")).textIs("dialog=none")   // 検証はセレクタを取
   (綴りはコンパイラが保証済み。かつラベルに `>>` 等の予約文字が入っても再パースで別物にならない)
 - 型名は `SelType` の静的メンバ(OS 共通契約の5型 + エイリアス + 頻出型)。語彙に無いものは
   `.custom("...")`(先頭小文字へ正規化)
-- **生成側(`ScenarioCodeGen` / explore 生成 / `/fleetest-scenario`)は文字列版を出す。
+- **生成側(`ScenarioCodeGen` / `/fleetest-scenario`)は文字列版を出す。
   Sel を既定にしない**(ユーザー決定 2026-07-30・**再提案しない**)。生成コードは
   **人が必要に応じてカスタマイズする前提**で、`Sel` は型指定を好む人のためのシンタックスシュガー
   という位置づけ。したがって `Sel` の利用が少ないこと自体は想定どおりで、「未使用だから撤去/既定化」

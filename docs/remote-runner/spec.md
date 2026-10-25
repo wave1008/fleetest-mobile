@@ -35,31 +35,16 @@
    そのデバイスのタイルが offline のまま)。実体(udid/avd/serial)の食い違いは
    `MachineInventory.merge` が警告し、`MachineInventoryTests` がこのリポジトリの台帳全数に当てる
 
-**JSON キーの改名(2026-08-26)**: プロファイルの `devices[].host` → `machine`、マシンプロファイル
-直下の `host` → `machine`、ホスト登録簿の `name` → `machine`、記録の `machine` → `host`。
-**旧キーはプロファイルの `devices[].host` を除いて読める**(`devices[].host` は読まない = 書くと
-手元のデバイスとして扱われる。書き出しは新キーのみ)。
+**JSON キーは `machine`(エイリアス)と `host`(本物のホスト)で書き分ける**: プロファイルの
+`devices[].machine`・マシンプロファイル直下の `machine`・ホスト登録簿の `machine`。記録
+(`run.json` 等)の鍵は `host`。**旧キーは読まない**(`devices[].host` を書いても未知キーの警告で、
+手元のデバイスとして扱われる)。拡張 ⇄ webview のメッセージと CLI ⇄ 拡張のワイヤ(`api monitor` の
+`machine`・`api start-all-devices` の `machine`・`api remote-compat` の `machines[].machine`)も同じ規則で、
+片側だけ書き分けを違えると黙って壊れる。
 
-**拡張 ⇄ webview のメッセージも同じ日に揃えた**(こちらは同時に配布されるので旧キーは読まない):
-`remoteConfig.hosts[].machine`・`DeviceCommandSource.machine`・`machineProfileInfo` の
-`machines[].machine` / `devices[].machine`・`deviceOp`/`deviceOpBusy`/`deviceDownFinished` の
-`machine`・`machineDeviceRemove.devices[].machine`・`machineDeviceUpdate.deviceMachine`
-(同じ階層の `machine` = マシンプロファイル名と衝突するため別名)・`runProfileSave` の
-`fields.devices[].machine`。**片側だけ改名すると黙って壊れる** —— 実際、webview が `host` を
-送り拡張が `machine` を読む状態が数時間残り、実行プロファイルのリモート参照が
-`machine: "local"` に書き換わった。
-
-**CLI ⇄ 拡張のワイヤも揃えた(ProtocolVersion 9)**: `api monitor` の `machineHost` → `machine`、
-`api start-all-devices` のライフサイクル行の `host` → `machine`、`api remote-compat` の
-`hosts[].name` → `machines[].machine`(`sshTarget` は本物のホストなのでそのまま)。
-**旧キーは読まない** —— この3つは拡張だけが読む口で、版が合っていなければ拡張が起動時に警告する。
-
-**Swift 側の識別子も同時に揃えた**(挙動は不変): `DeviceHostGrouping` → `DeviceMachineGrouping`
-(ファイルごと)・`RunDeviceHost` → `RunDeviceMachine`・`DeviceHostRunner` → `DeviceMachineRunner`・
-`ApiRunHostFanout` → `ApiRunMachineFanout`・`MachineHostDispatch` → `MachineDispatch`
-(`Decision.host` → `.target` = マシン名か `--runner` の生の宛先)・`deviceHost` → `deviceMachine`。
-**`host` を残したのは本物のホストだけ**(登録簿の ssh 宛先・ブリッジの宛先 IP・`RemoteHostFacts` の
-鍵・fleet 定義の `runs[].host`)。
+**Swift 側の識別子も同じ規則**(`DeviceMachineGrouping`・`RunDeviceMachine`・`DeviceMachineRunner`・
+`ApiRunMachineFanout`・`MachineDispatch`・`deviceMachine`)。**`host` を残したのは本物のホストだけ**
+(登録簿の ssh 宛先・ブリッジの宛先 IP・`RemoteHostFacts` の鍵)。
 
 ## RR-15 セキュリティ前提と信頼モデル
 
@@ -157,16 +142,21 @@ RR-1 の用途②(デバイス/実機ラボの共有)は、**認証・帰属・�
 
 ### RR-15.6 ネットワーク露出 — inbound は sshd だけ
 
-**このツールは公開インターフェースに1つも listen しない。** 発行側もランナー機も、
+**ツール本体は公開インターフェースに listen しない。** 発行側もランナー機も、
 外から繋がれる口は **sshd 1つだけ**で、転送(rsync)・進行表示・成果物回収・ライブ映像は
 すべてその ssh 接続の中を通る(映像は `api device-stream` が向こうで配信ヘルパーへ `execv`
-して stdout に流す。RR-13)。実際に listen するのは全部ループバック:
+して stdout に流す。RR-13)。ツール本体が listen するのは全部ループバック:
 
 | listen するもの | アドレス |
 |---|---|
 | in-app ブリッジ(シミュレータはホストとネットワークスタックを共有) | `127.0.0.1:<port>` |
 | adb server | `127.0.0.1:5037` |
 | エミュレータの gRPC | `[::1]` |
+
+**例外は宣言したサービスのポートだけ**: 実機のレーンを含む run と `up --physical` では、compose.yaml に宣言した
+サービスのポートを `0.0.0.0` で公開する(Docker の中継コンテナ)。Apple の `container` はゲートウェイ向けの転送器が
+`*:<port>` で待ち受ける。実機が LAN 越しにサーバーへ届くために必要で、公開先は宣言したポートに限る(確認用のエコーと
+プロキシのポートは含まない)。詳細は RR-17(`compose.yaml` の検査・ネットワークの節)。
 
 **この不変条件を崩さない。** ブリッジやヘルパーを外部アドレスへ bind する変更は、
 **認証の無い口をネットワークに開ける**ことと同義になる(ブリッジは任意のアプリ操作を

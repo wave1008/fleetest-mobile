@@ -47,7 +47,7 @@ fleetest の Swift DSL は **Shirates(Classic)に準拠**している(コマン�
 ---
 
 **`maxGestureSeconds:` は fleetest 独自の引数**(🟢・ユーザー決定 2026-09-24。Shirates に対応する
-引数は無い)。秒数を取る全コマンド(`tap(holdSeconds:)` / `tap(x:y:holdSeconds:)` /
+引数は無い)。秒数を取る全コマンド(`tap(holdSeconds:)` / `tap(x:y:holdSeconds:)` / `hold` /
 `swipePointToPoint` / `swipeBy` / `swipeElementToElement` / `pinchOut` / `pinchIn` / `gesture` /
 `flickCenterToTop` ほか flick 8種)に付いており、既定の秒数上限(10 秒)をそのコマンド1回だけ
 最大 60 秒まで上げる。シミュレータの testmanagerd が桁外れの秒数で肥大化する実害
@@ -57,7 +57,7 @@ fleetest の Swift DSL は **Shirates(Classic)に準拠**している(コマン�
 
 | Shirates | fleetest | |
 |---|---|---|
-| `tap` | `tap(sel, holdSeconds:maxGestureSeconds:containerInference:linkText:waitSeconds:scroll:maxSwipes:)` | ✅ Shirates と同じく**掴んだ要素を返す**(`tap("#ok").textIs("OK")`)。セレクタで1要素を掴む他の操作(`type(sel, …)` / `clearInput(sel)` / `doubleTap(sel)` / `swipeBy(sel, …)` / `pinchOut(sel)` / `pinchIn(sel)` / `gesture(sel)` / `swipeElementToElement` / `scrollTo`)も同じ |
+| `tap` | `tap(sel, holdSeconds:maxGestureSeconds:containerInference:linkText:settle:waitSeconds:scroll:maxSwipes:)` | ✅ Shirates と同じく**掴んだ要素を返す**(`tap("#ok").textIs("OK")`)。セレクタで1要素を掴む他の操作(`type(sel, …)` / `clearInput(sel)` / `doubleTap(sel)` / `swipeBy(sel, …)` / `pinchOut(sel)` / `pinchIn(sel)` / `gesture(sel)` / `swipeElementToElement` / `scrollTo`)も同じ |
 | `tap(holdSeconds:)` | 同名 | ✅ |
 | — | `tap(sel, linkText:)` | 🟢 **Shirates に無い拡張**。段落の中の文中リンクを、解決した要素の中での文字列の位置で押す(名前は Espresso の `openLinkWithText` に倣う)。位置は木の子孫 → OCR の順で、見つからなければ失敗(要素の中心へ落とさない)。押すのは座標タップの既存経路 |
 | `tapWithScrollDown/Up/Left/Right` | `tap(sel, scroll: .down)` | 🟡 関数は置かない(下記「スクロールの指定は `scroll:` だけ」) |
@@ -86,7 +86,7 @@ fleetest の Swift DSL は **Shirates(Classic)に準拠**している(コマン�
 | `hideKeyboard` | 同名。Android は戻るキー・iOS は木から選んだ何もない点のタップ(閉じなければ Enter) | 🟡 iOS の閉じ方が違う |
 | `keyboardIsShown` / `keyboardIsNotShown` | 同名 | ✅ 取得元は OS で違う(下記) |
 | `pressHome` | `home()` | 🟡 OS 共通で提供 |
-| `pressBack` | `back()` | 🟡 **両 OS で提供**(iOS はエッジスワイプ) |
+| `pressBack` | `back()` | 🟡 **両 OS で提供**(iOS はナビゲーションバーの戻るボタン、無ければ左端エッジスワイプ) |
 | `pressSearch` / `pressTab` / `pressKeys` / `pressAndroid` | — | ⏳ **足す**(2026-08-21 判定。基準①=今は書けない)。`pressEnter` しか無いので **Tab によるフォーム移動・任意キー・Android のハードキー**が表現できない。`pressSearch` は実質カバー済み(`pressEnter` が `ACTION_IME_ENTER` を撃ち検索アクションとして発火する)。**足す条件**: 受け手がキー操作を要る画面に当たったとき、または Tab 移動を含むフォームが出たとき。ブリッジは既にキー注入を持つので薄く載る |
 | `typeChars` | — | ➖ **要らない**(2026-08-21 判定)。1文字ずつ打つのは IME の取りこぼし対策だが、fleetest は**読み返して足りない分だけ打ち直す**(`InputInjector` / `verifiesTypedText`)ので、同じ問題を別の層で解いている |
 
@@ -109,7 +109,7 @@ fleetest の Swift DSL は **Shirates(Classic)に準拠**している(コマン�
 | `scrollFrame` | 同名(`scroll*` / `scrollTo` / `withScroll*` / `flick*` の引数。セレクタ式) | ✅ 2026-08-02。**型付きセレクタ(`Sel`)版は持たない = 文字列のみ**(ユーザー決定 2026-08-04・**再提案しない**。1対1を保証するのは対象セレクタまで。理由は design/) |
 | `startMarginRatio` / `endMarginRatio` | 同名 | ✅ **既定値は fleetest の実測値**(承認済み差分) |
 | `scrollableElement` | — | ➖ `scrollFrame` のセレクタ式で足りる |
-| `ScrollDirection.None` | `FTScrollDirection` に相当なし | ➖ 「スクロールしない」は `scroll:` 引数の省略(Optional)が担う |
+| `ScrollDirection.None` | `FTScrollDirection` に相当なし | ➖ 「スクロールしない」は `scroll: .noScroll` が担う(`scroll:` の省略は「ブロックの文脈に従う」で別) |
 | `scrollDurationSeconds` / `scrollIntervalSeconds` | — | ➖ フリング前提の実測値を優先(承認済み差分) |
 | — | `scrollTo(sel, direction:maxSwipes:)` | 🟢 |
 | — | `swipeBy(sel?, dxRatio:dyRatio:)` | 🟢 2026-08-04 **斜めを含む相対ドラッグ**(マップのパン)。Shirates は縦横 4 方向しか持たない |
@@ -134,9 +134,9 @@ fleetest の Swift DSL は **Shirates(Classic)に準拠**している(コマン�
 | `packageIs` | `appIs` で代用 | ➖ **実装しない**(ユーザー決定 2026-08-03。いったん実装後に削除)。ニックネームが無い fleetest では `appIs` が ID 直指定のため Android で**完全に同じ検査**になる。**再提案しない** |
 | `isApp` | — | ➖ **`appIs` と重複**(2026-08-21 判定)。Shirates の `isApp` は真偽を返す形だが、fleetest は分岐に `ifCanSelect` / Swift を使うので、検証は `appIs`(失敗させる)側に一本化する |
 | `verify`(任意内容の検証) | `verify(message) { }` | ✅ 2026-08-03 ブロック内のアサーション1つ以上が全成功で passed。**アサーション0個は inconclusive**(passed でも failed でもない・シナリオは中断しない。Shirates の `MANUAL` 相当は持たない。ユーザー決定 2026-08-03) |
-| Vision 版の `existImage` / `existImageWithoutScroll` | `existImage`(`existImageWithScrollDown/Up` は `existImage(label, scroll: .down)`・`existImageWithoutScroll` は `scroll: .noScroll`) | 🟡 2026-09-19 移植(ユーザー指示)。**探索は `findImage` と同じ1本**(`StepExecutor.executeFindImage`。Shirates も `findImage(throwsException = false)` + `isFound` の検査)で、見つからなければ失敗(文言に最も近い距離と閾値・判定に使ったスクリーンショットをレポートに添える)。違い: `timeout` の既定は実行プロファイルの defaultTimeout(`exist` と同じ。Shirates は `waitSecondsForAnimationComplete`)・`skinThickness` / `binaryThreshold` / `segmentMargin*` / `mergeIncluded` / `swipeToSafePosition` / `message` は持たない(画像の区分けをしないため) |
+| Vision 版の `existImage` / `existImageWithoutScroll` | `existImage`(`existImageWithScrollDown/Up` は `existImage(label, scroll: .down)`・`existImageWithoutScroll` は `scroll: .noScroll`) | 🟡 2026-09-19 移植(ユーザー指示)。**探索は `findImage` と同じ1本**(`StepExecutor.executeFindImage`。Shirates も `findImage(throwsException = false)` + `isFound` の検査)で、見つからなければ失敗(文言に最も近い距離と閾値・判定に使ったスクリーンショットをレポートに添える)。違い: `waitSeconds:` の既定は実行プロファイルの defaultTimeout(`exist` と同じ。Shirates は `waitSecondsForAnimationComplete`)・`skinThickness` / `binaryThreshold` / `segmentMargin*` / `mergeIncluded` / `swipeToSafePosition` / `message` は持たない(画像の区分けをしないため) |
 | `dontExistImage` / `canFindImage` / `imageContains` | — | ➖ 持たない(`findImage` の `.isEmpty` で分岐できる) |
-| Vision 版の `findImage` / `findImages` | 同名(`findImageWithScrollDown/Up/Right/Left` は `findImage(label, scroll: .down)`。**画像系は `*WithScroll*` の別名を置かず `scroll:` だけで指定する** = ユーザー決定 2026-09-19。Shirates の名前は `UnavailableCommands.swift` が正しい書き方を返す。文脈の打ち消しは `scroll: .noScroll`) | 🟡 2026-09-19 移植(ユーザー指示。`Sources/FTCore/FindImage.swift`)。テンプレート(DefaultClassifier の見本・ラベルが引数で終わるフォルダ・`_binary.` を除く・自 OS の `@i`/`@a` を先に試す)・距離(Vision の画像特徴量)・`threshold` 既定 0.15(findImage は `<=`・findImages は `<`)・`aspectRatioTolerance` の式と既定 0.2・findImage の1位が閾値を超えたら DefaultClassifier の分類で救う(ラベル一致に加え、確信度が閾値以下かラベルの見本との距離が閾値以下 = `classifyFull` の条件)、は同じ。**違い**: **findImages もラベルの見本を全部使い、同じ要素は距離の小さいほうで1つに畳む**(Shirates は `getFile` の1枚だけ。ユーザー決定 2026-09-19 —— 1枚だと OS の版・画面の倍率・部品の状態(オン / オフ)が違う端末で当たらず、見本を足しても直せなかった。実例: SE3(2x)で E2E-iOS のオンのラジオが既定の閾値を越えて外れた)/ 候補の切り出しは画像の区分け(SegmentContainer)ではなく a11y の枠(`segmentMargin*`・`mergeIncluded`・`skinThickness`・`binaryThreshold` は持たない)/ 許容幅に入る候補が無ければ候補なし(Shirates は全区分けを残す)/ **見つからなくても失敗せず空要素**(ユーザー決定。`throwsException` は持たない)/ `waitSeconds`→`timeout`(既定 0 = Shirates と同じ)・`allowScroll`→`scroll:`・`scrollMaxCount`→`maxSwipes`(fleetest の語彙)/ `swipeToSafePosition` は持たない / 見つけた要素の `.tap()` は見つけた枠の中心を座標で叩く |
+| Vision 版の `findImage` / `findImages` | 同名(`findImageWithScrollDown/Up/Right/Left` は `findImage(label, scroll: .down)`。**画像系は `*WithScroll*` の別名を置かず `scroll:` だけで指定する** = ユーザー決定 2026-09-19。Shirates の名前は `UnavailableCommands.swift` が正しい書き方を返す。文脈の打ち消しは `scroll: .noScroll`) | 🟡 2026-09-19 移植(ユーザー指示。`Sources/FTCore/FindImage.swift`)。テンプレート(DefaultClassifier の見本・ラベルが引数で終わるフォルダ・`_binary.` を除く・自 OS の `@i`/`@a` を先に試す)・距離(Vision の画像特徴量)・`threshold` 既定 0.15(findImage は `<=`・findImages は `<`)・`aspectRatioTolerance` の式と既定 0.2・findImage の1位が閾値を超えたら DefaultClassifier の分類で救う(ラベル一致に加え、確信度が閾値以下かラベルの見本との距離が閾値以下 = `classifyFull` の条件)、は同じ。**違い**: **findImages もラベルの見本を全部使い、同じ要素は距離の小さいほうで1つに畳む**(Shirates は `getFile` の1枚だけ。ユーザー決定 2026-09-19 —— 1枚だと OS の版・画面の倍率・部品の状態(オン / オフ)が違う端末で当たらず、見本を足しても直せなかった。実例: SE3(2x)で E2E-iOS のオンのラジオが既定の閾値を越えて外れた)/ 候補の切り出しは画像の区分け(SegmentContainer)ではなく a11y の枠(`segmentMargin*`・`mergeIncluded`・`skinThickness`・`binaryThreshold` は持たない)/ 許容幅に入る候補が無ければ候補なし(Shirates は全区分けを残す)/ **見つからなくても失敗せず空要素**(ユーザー決定。`throwsException` は持たない)/ `waitSeconds:`(既定 0 = Shirates と同じ)・`allowScroll`→`scroll:`・`scrollMaxCount`→`maxSwipes`(fleetest の語彙)/ `swipeToSafePosition` は持たない / 見つけた要素の `.tap()` は見つけた枠の中心を座標で叩く |
 | Vision 版の `imageIs`(`DefaultClassifier`) | `select(sel).imageIs(label)` / `imageIs(label)` | 🟡 2026-09-18 移植(ユーザー指示で `imageIs` だけ。`Sources/FTCore/VisionClassifier.swift`)。見本の置き場所(`vision/classifiers/DefaultClassifier/` 以下の任意の深さ)・ラベル(親フォルダの相対パスを `_` でつなぐ・判定は最後の `[` 以降を含むか)・`#` ファイルの除外・同じラベルの重複エラー・学習方式は同じ。**違い**: 部品の切り出しは a11y の枠 / `threshold`・`classifierName` の引数は持たない / 見本に無いラベルは待たずに落とす / shard に割らない |
 | — | `countIs(sel, n)`(節ごとの内訳付き) | 🟢 |
 
@@ -194,7 +194,7 @@ fleetest の Swift DSL は **Shirates(Classic)に準拠**している(コマン�
 | `waitForDisplay` | `waitForDisplay(sel, waitSeconds: 15)` | ✅ 2026-08-03 スクロールしない・戻り値 `FTElement`。Shirates の `throwsException` に相当する引数は持たない(常に失敗として記録する) |
 | `waitForClose` | `waitForClose(sel, waitSeconds: 15)` | ✅ 2026-08-03 **`expression` 省略不可**(Shirates の直前セレクタ再利用の省略形は不採用。`lastElement` は 2026-08-04 に実装済みだが、待ち対象がソース上で読めなくなるため待ち系には省略形を置かない) |
 | — | `waitForSettle(sel?, quietSeconds:, throwsException: true, waitSeconds: 15)` | 🟢 **Shirates に対応物は無い**。画面(`sel` を渡せばその要素の枠。各辺 10% を除く)の画素が `quietSeconds` のあいだ変わらなくなり、さらにアクセシビリティの木が追いつくまで待つ。画像の判定・画素単位の操作・レポート用のスクリーンショットの直前に、スクロールやフリックの慣性が止まるのを待つ**明示のコマンド**(通常の操作は待たない)。**`throwsException`(Shirates の引数名)は、このコマンドの時間切れだけに効く** —— `false` なら失敗にせず注記 `settle-not-reached` を残して `false` を返す。**`sel` の要素が見つからないときは `throwsException` の値によらず常に失敗する**(下の「名前の相違」の `optional:` / `throwsException: false` の全廃は操作・検証について据え置き。時間切れだけが文書化された例外)。他ツールの名前 `waitForAnimationToEnd` は `UnavailableCommands` が受け止め、`waitForSettle()` を案内する。仕様は docs/commands.md「`waitForSettle`」・設計は DS-4.7 |
-| `usingWaitSeconds` | `waitSeconds:` 引数 / 実行プロファイル `defaultTimeout` | 🟡 **待つ上限の引数名は全コマンドで `waitSeconds:`**(Shirates と同名。ユーザー決定 2026-09-19。実行プロファイルのキー `defaultTimeout` / `scenarioTimeout` と MCP ツールの `timeout` は別物で据え置き) |
+| `usingWaitSeconds` | `waitSeconds:` 引数 / 実行プロファイル `defaultTimeout` | 🟡 **待つ上限の引数名は全コマンドで `waitSeconds:`**(Shirates と同名。ユーザー決定 2026-09-19。実行プロファイルのキー `defaultTimeout` / `scenarioTimeout` は別物で据え置き) |
 | `waitScreen` / `waitScreenOf` | — | ➖ 画面ニックネーム機構を持たない |
 
 ## アプリ・OS 操作
@@ -203,14 +203,14 @@ fleetest の Swift DSL は **Shirates(Classic)に準拠**している(コマン�
 |---|---|---|
 | `launchApp` / `terminateApp` | 同名 | ✅ |
 | `restartApp` | 同名 | ✅ 下記「名前の相違」参照 |
-| `installApp` / `removeApp` | `installApp(path?)` / `removeApp(id?)` | ✅ 2026-08-03 DSL 化。`installApp` は実行をオーケストレータ(親プロセス)へ委譲し、パス省略時は実行プロファイルの `appPath` を解決する(Shirates の `appPackageFile` 既定に一致)。オーケストレータ無しの単独実行だけ引数必須(省略時は明示エラー)。`removeApp` は id 省略を実行中アプリの既定 bundleID/package に解決する |
-| `isAppInstalled` / `launchAppByShell` | CLI 側(`fleetest install`)。DSL には無い | ➖ **導入はシナリオの外**(2026-08-21 判定)。実行プロファイルの `appPath` + `autoInstall` が run の前に面倒を見るので、シナリオが導入状態を分岐に使う形は増やさない(`installApp` / `removeApp` は明示的に操作したいとき用に既にある) |
+| `installApp` / `removeApp` | `installApp(path?)` / `removeApp(id?)` | ✅ 2026-08-03 DSL 化。`installApp` は実行をオーケストレータ(親プロセス)へ委譲し、パス省略時はアプリプロファイルの `<platform>.appPath` を解決する(Shirates の `appPackageFile` 既定に一致)。オーケストレータ無しの単独実行だけ引数必須(省略時は明示エラー)。`removeApp` は id 省略を実行中アプリの既定 bundleID/package に解決する |
+| `isAppInstalled` / `launchAppByShell` | CLI 側(`fleetest install`)。DSL には無い | ➖ **導入はシナリオの外**(2026-08-21 判定)。アプリプロファイルの `appPath` + `autoInstall` が run の前に面倒を見るので、シナリオが導入状態を分岐に使う形は増やさない(`installApp` / `removeApp` は明示的に操作したいとき用に既にある) |
 | `goPreviousApp` | `appSwitcher()`(スイッチャーを開くだけ) | 🟡 |
 | `internetOn/Off` / `wiFiOn/Off` / `mobileOn/Off` | — | ⏳ **足す**(2026-08-21 判定。基準①=回避策が無い唯一の項目)。**通信断の状態を作れない**ので、オフライン時の表示・再試行・エラーダイアログを検証できない。**実害**: 受け手のアプリは規約画面を外部サイトから読み、通信が失敗するとエラーダイアログを出す —— それが偶発的にテストを落とすのに、**意図的に再現することも防ぐこともできない**。**Android のみ**(`adb shell svc wifi/data`)で、**iOS シミュレータはホストのネットワークを共有するため同等の手段が無い**(実機も同様)。足すときは 🟡(Android 限定)として書く |
 | `shell` / `shellAsync` | `procedure { }` 内で任意の Swift(同期のブロック) | 🟡 |
 | `screenshot` | `screenshot(filename?)` | ✅ 2026-08-03(**ファイル名はラベル無しの1形だけ** = 2026-09-19。Kotlin は名前付き引数を位置でも渡せるので `screenshot("a.png")` がそのまま通る。`filename:` のラベル形は置かない)**`filename` のみ**(他3引数(`force`/`onChangedOnly`/`withXmlSource`)は Shirates の auto-screenshot 機構の制御で、fleetest は毎操作の自動撮影を持たない)。画像はレポートの該当ステップ直後に埋め込む。失敗時の証跡・MCP `ft_screenshot` とは別経路 |
 | — | `home()` / `back()` | 🟢 OS 差を吸収した1コマンド |
-| — | `clearAppData(bundleID?)` | 🟢 再インストール不要でアプリデータ**と権限**を消す。初回起動・オンボーディング・権限ダイアログのテストが書ける(iOS はシミュレータ専用。キーチェーン/Keystore の値は残る) |
+| — | `clearAppData(bundleID?)` | 🟢 再インストール不要でアプリデータ**と権限**を消す。初回起動・オンボーディング・権限ダイアログのテストが書ける(iOS の実機は入れ直しで代替 = 注記 `reinstalled-to-clear-data`、元にアプリプロファイルの `appPathPhysical` が要る。キーチェーン/Keystore の値は残る) |
 | — | `openURL(url)` / `launchApp(url:)` | 🟢 2026-08-08 ディープリンク配送。**アプリを再起動せず**今の画面の上に遷移を積む(warm)。Shirates に対応物は無い |
 | — | `fold()` / `unfold()` / `hinge(_)` | 🟢 2026-10-16 折りたたみ端末の畳み/開き/ヒンジ角。**Shirates に対応物は無い**。対応は iPhone Duo の Simulator(Xcode 27.2+・XCUITest ブリッジ経由)と折りたたみ Android の Emulator。物理端末は非対応。折りたためないデバイスではシナリオを対象外(skipped)で記録する。`fold` / `unfold` は切り替わりを確かめる(待ちの上限 `waitSeconds:`)。`hinge` は確かめない(iOS は直前の状態に依存・Android は角度の範囲で姿勢が決まる)。シナリオ終了時に元へ戻る |
 | — | `rotateTo(.landscape)` | 🟢 2026-08-10 画面回転。**Shirates に対応物は無い**(src/doc を全文検索して確認)。向きは portrait / landscape の2値のみ —— 契約は「アプリの UI がその向きになること」で、物理的な左右はテストから観測できないため語彙に置かない。回転を使ったシナリオは終了時に元の向きへ自動で戻る |
@@ -243,7 +243,7 @@ fleetest の Swift DSL は **Shirates(Classic)に準拠**している(コマン�
 
 | Shirates | fleetest | |
 |---|---|---|
-| `writeMemo` / `readMemo` / `clearMemo` / `memoTextAs` | 同名・同挙動(`writeMemo` は履歴に追記・`readMemo` は最後の値か ``・`memoTextAs` は要素と String の両方) | 🟢 **スコープは「1回の run のすべてのシナリオ(どのデバイスでも)」**。fleetest はシナリオごとに別プロセスなので、親(run を束ねる側)が run で1つ持って子へ渡す。`beforeAll()` で書いた値は全シナリオが読める。制約: シナリオが受け取るのは開始時点のメモ(走行中の他デバイスの書き込みは見えない)・複数デバイスからの同時書き込みは直列化しない・`clearMemo()` は run 全体を消す・run が複数のマシンに分かれるときはマシンごとに別のメモ。キーが無ければ `""` + 注記 `memo-key-not-found`。`ft_batch` は受けない |
+| `writeMemo` / `readMemo` / `clearMemo` / `memoTextAs` | 同名・同挙動(`writeMemo` は履歴に追記・`readMemo` は最後の値か `""`・`memoTextAs` は要素と String の両方) | 🟢 **スコープは「1回の run のすべてのシナリオ(どのデバイスでも)」**。fleetest はシナリオごとに別プロセスなので、親(run を束ねる側)が run で1つ持って子へ渡す。`beforeAll()` で書いた値は全シナリオが読める。制約: シナリオが受け取るのは開始時点のメモ(走行中の他デバイスの書き込みは見えない)・複数デバイスからの同時書き込みは直列化しない・`clearMemo()` は run 全体を消す・run が複数のマシンに分かれるときはマシンごとに別のメモ。キーが無ければ `""` + 注記 `memo-key-not-found`。`ft_batch` は受けない |
 | `TestLog.directoryForLog` | `TestLog.directoryForLog`(`URL`) | 🟢 同名・同じ単位(run × テストクラス。パスは `<reportDir>/<run の開始 yyyy-MM-dd_HHmmss>/<クラス名>/`。Shirates は `testResults` 配下・fleetest はレポートの出力先の配下)。Shirates に無い一時フォルダの口 `TestLog.directoryForTemp`(シナリオごと・終わりに消す)を足した = サンドボックスの中では `NSTemporaryDirectory()` に書けないため |
 | `account` / `data` | 同名・同じ引数(`account("[account1].password")` と `account("[account1]", "password")`)・同じキーの書式(最後の `.` で分ける)・同じ dataset JSON の形 | 🟢 Shirates と揃えた。**fleetest の追加**: ①データセットの置き場は `<プロジェクト>/dataset/accounts.json`・`data.json` に、マシン側 `~/.config/fleetest/dataset/<プロジェクト名>/` が**属性単位で上書き**する(パスワードをリポジトリに入れない) ②マシン側の `redactAccountValues: true` で、`account()` の値(データセットの全属性・4 文字以上)をレポート・実行ログ・結果 JSON で `***` に伏せる(既定は伏せない・`data()` は伏せない) ③値が無い・ファイルが壊れているときはステップを失敗にして中断(Shirates は例外) ④dry-run・一覧はキーをそのまま返す(Shirates の `isNoLoadRun` と同じ)。成功時はステップを記録しない(Shirates も記録しない)。`ft_batch` は受けない |
 | `app` / `dataPattern` | — | ➖ **持たない**。`app` は実行プロファイル(→ アプリプロファイル)が決めるので `@TestClass` には持たない。`dataPattern` は Swift のループ・配列で書ける |
@@ -292,7 +292,7 @@ fleetest の Swift DSL は **Shirates(Classic)に準拠**している(コマン�
 | コマンド | 差 |
 |---|---|
 | `hideKeyboard()` | Android・iOS とも対応(冪等)。iOS は木から「何もない点」を選んでタップし(撃つ前に in-app ブリッジの `/tapprobe` で確認)、閉じなければ Enter を送って注記する。詳細は docs/commands.md・docs/design/dsl-syntax.md「キーボードの観測と `hideKeyboard`」 |
-| `back()` | iOS は**スワイプバック対応のナビ**(NavigationStack 等)を持つ画面でのみ戻れる。独自ナビのアプリではアプリ内の戻るボタンを `tap` する。Android はキーボードが開いていると1回目がキーボードを閉じるのに消費される(OS 仕様) |
+| `back()` | iOS は**ナビゲーションバーの戻るボタン、無ければ左端エッジスワイプ**。システムのナビゲーションバーを持つ画面なら確実に戻れ、持たない画面(Compose/Flutter の独自ナビ等)は interactive pop に対応していないと戻れないので、アプリ内の戻るボタンを `tap` する。Android はキーボードが開いていると1回目がキーボードを閉じるのに消費される(OS 仕様) |
 | `keyboardIsShown` / `keyboardIsNotShown` | 取得元が OS で違う(iOS xcuitest = AX ツリーの `.keyboard` / iOS in-app = `UITextEffectsWindow` の可視判定 / Android = ホストが `dumpsys` の `InputMethod` window を見る)。**IME が別プロセスの window でアプリの a11y ツリーに出ない**ため |
 | `clearInput(sel)` | **Flutter の iOS は in-app ブリッジでは消せず XCUITest ブリッジ経由**になる(自動フォールバック。1〜2秒)。Flutter engine への editing state 配送は3回実測して不採用(design/) |
 | `tapAppIcon` | 見つからないときの探索方法が OS で違う: Android はドロワーを開いて `flickCenterToTop` で最大8回スクロール探索、iOS は `flickRightToLeft` で最大5ページ送り(2回連続で画面が変化しなければ打ち切り)。iOS は送り切っても無ければ App ライブラリの検索欄で出る名前順の一覧を探し、その一覧に名前の無い行があったときは見えているカテゴリのフォルダも開いて探す(docs/commands.md) |
@@ -305,7 +305,6 @@ fleetest の Swift DSL は **Shirates(Classic)に準拠**している(コマン�
 (別名は `maxSwipes:` しか取らない・`exist` は上下だけ・画像系は4方向、だった)、**生成側の語彙のブレ**になる
 (この文書冒頭の「何を足すかの判断基準」そのもの)。Shirates の名前を書いた人には `UnavailableCommands.swift` が
 コンパイルエラーで書き方を返す。**別名を再提案しない。**
-(この文書冒頭の「何を足すかの判断基準」そのもの)。**引数の欠落を不整合として再提案しない。**
 
 ## 足す価値がある残り
 

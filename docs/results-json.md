@@ -23,7 +23,7 @@ results/runs/<YYYY-MM>/<runID>/
 マシン名は入れない(ホスト名が表示へ漏れるため。複数マシンの衝突回避は乱数の幅で担保し、
 どの機械の run かは `host` 欄が持つ)。2026-09-01 より前の記録は `<yyyyMMdd-HHmmss(UTC)>Z-<マシン名>-<乱数4hex>` で、そのまま読める。
 
-**後方互換の契約**: 欄はすべて後発追加が Optional。**古い run も読み続けられる**ように、
+**後方互換の契約**: 後発追加の欄は Optional にする。必須にした欄は、既存の記録の移行スクリプトを同じ変更に入れる(読み替えは置かない。.claude/rules/results-retention.md)。**古い run も読み続けられる**ように、
 新しい欄が無い = キーごと省略される(空配列・false は書かない)。rawValue(`failureKind` /
 `notes` の文字列)は永続化されるので**一度出したものは変えない**。
 
@@ -132,7 +132,7 @@ guarded だけで上限を超えたときは他のカテゴリと同じく**事�
 
 | 知りたいこと | 見る欄 |
 |---|---|
-| どのフェーズで落ちたか | `failedSteps[].section` = `condition` / `action` / `expectation` / `beforeEach` / `afterEach` |
+| どのフェーズで落ちたか | `failedSteps[].section` = `condition` / `action` / `expectation` / `beforeAll` / `setUpDevice` / `beforeEach` / `afterEach` / `afterAll` / `tearDownDevice` |
 | 何のコマンドで落ちたか | `failedSteps[].command`(`tap` / `exist` …) |
 | どの経路で落ちたか | `failedSteps[].failureKind`(下表) |
 | そのステップに何が起きていたか | `failedSteps[].notes`(`interruption-dismissed` 等) |
@@ -214,7 +214,7 @@ tr '\n' '\0' < /tmp/suite.txt | xargs -0 \
   jq -r 'select(.passed==false) | "\(.worker // "-")\t\(.scenarioID)"' | sort | uniq -c | sort -rn
 ```
 
-**長い期間を跨ぐときは欄の欠落を先に確かめる**。後発追加はすべて Optional なので古い run には
+**長い期間を跨ぐときは欄の欠落を先に確かめる**。後発追加の欄(Optional のもの)は古い run には
 無い —— このリポジトリ自身の記録では `failureKind` と `workerAnomalies` はどちらも
 **2026-08-20 が初出**で、それ以前の失敗 1,205 件は経路が空。**「`not-found` が減った」と
 読める推移は、欄が無かっただけのことがある。**
@@ -460,7 +460,7 @@ kernelの`IODARTFamily` / `VM exhausted`を時刻で照合する。2008だけで
 |---|---|---|
 | index | Int | シナリオ内の通し番号 |
 | scene / sceneTitle | Int? / String? | 所属シーン |
-| section | String? | `condition` / `action` / `expectation` / `beforeEach` / `afterEach`。ブロック外は無し |
+| section | String? | `condition` / `action` / `expectation` / `beforeAll` / `setUpDevice` / `beforeEach` / `afterEach` / `afterAll` / `tearDownDevice`。ブロック外は無し |
 | description | String | 人間可読なステップ説明(group の前置・注記の括弧書きを含む) |
 | command | String? | DSL のコマンド名。**`description` を割って作らないこと** |
 | failureKind | String? | 上表 |
@@ -474,7 +474,7 @@ kernelの`IODARTFamily` / `VM exhausted`を時刻で照合する。2008だけで
 
 全ステップを到着順に持つ(録画再生 UI のステップツリー用)。
 `scene` / `sceneTitle` / `section` / `index` / `description` / `status` / `at` / `durationMs` / `notes`。
-`section` は FailedStepRecord と同じ値(condition/action/expectation/beforeEach/afterEach。CAE ブロック外は省略)で、
+`section` は FailedStepRecord と同じ値(condition/action/expectation/beforeAll/setUpDevice/beforeEach/afterEach/afterAll/tearDownDevice。CAE ブロック外は省略)で、
 拡張の「テスト結果をエクスポート」が列の振り分けに使う。2026-09-20 より前の記録には無い。
 **run 横断で注記を数えるときは `description` の文言一致ではなく `notes` を見る**
 (文言を変えた瞬間に集計が 0 件になる)。

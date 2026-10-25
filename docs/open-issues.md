@@ -305,7 +305,7 @@
 - 経緯: E2E-CMP で約 13 秒・負荷の下では未測定
 
 - 修正前は負荷テスト(10/18・10/19・10/20)で呼び出しの約 8% が 11〜61 秒。`.fleetest/mcp-rpc.log` で 5 秒を超えた 12 件は、どれも同じ
-  サーバの3回目以降だった = 毎回 90 日ぶんを解読し直していた側で、メモリの控え(`RunRecordMemo`。docs/results-json.md §RunRecordPack)で
+  サーバの3回目以降だった = 毎回 90 日ぶんを解読し直していた側で、メモリの控え(`RunRecordMemo`。docs/results-json.md「出力キャッシュが外れたときの再計算そのものを速くする(`RunRecordPack`)」)で
   E2E-CMP の2回目以降が 13 秒 → 1 秒前後になった(2026-10-20)。効いたかは次の負荷テストの mcp-rpc.log を同じ集計で見る
 - 残るのは初めて引く回の素の読み込み(約 7.3 万ファイル)。負荷の下で読み込みと CPU のどちらが効いているかは未測定
 - 手がかり: 1回目も速くするなら CLI のパックの共有が要る(パックの鍵は実行ファイルの素性 = そのままでは CLI と書き潰し合う)
@@ -357,7 +357,7 @@
 - 確認: コミット未記録(日付未記録)
 
 - `activateSnapshotNode` の古い木: 撃つ前に `isReachable` で照合するが、UIView まで辿れないノードは許可する
-  (`InAppBridge.swift:776-777`)ので、SwiftUI の AX だけのノードでは古いノードが発火し得る
+  (`InAppBridge/Sources/InAppBridge.swift:834-837`)ので、SwiftUI の AX だけのノードでは古いノードが発火し得る
 
 ### OI-24 `InAppSettle` は keyWindow だけを見る
 - 状態: 据え置き
@@ -383,8 +383,8 @@
 
 - `api bridge-sources` の平文・`remote status --json` の `"-"`・引数なし `doctor` のブリッジ停止: 仕様どおり
 
-### OI-28 DSL の側は ref の拒否ボタン押しとキーボードの下の tap を断らない
+### OI-28 DSL の側は ref の拒否ボタン押しを断らない
 - 状態: 据え置き
 - 確認: コミット未記録(日付未記録)
 
-- I4 の DSL 側(XCUITest の DSL で ref を撃つと XCTest が拒否ボタンを押す)・DSL の tap のキーボード下: 断るのは MCP だけと決めた
+- I4 の DSL 側(XCUITest の DSL で ref を撃つと XCTest が拒否ボタンを押す): 断るのは MCP だけと決めた

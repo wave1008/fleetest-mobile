@@ -115,8 +115,8 @@ SSH 側のプロセスからでもユーザーの launchd ドメインのサー�
   clone 構成のままだと**ローカルインストール済みマシンと干渉する**(実害3件: rsync
   `--delete` が相手の `Scenarios`/`profiles` を消す・レポート回収が相手のローカル実行分まで
   引き込む・クローンと `.build` の共用で SPM ビルドロック競合と results 混在)。
-  現在は**リモートに専用ベースディレクトリ1つ**(`--remote-dir`。既定 `~/fleetest-runner`)を
-  置き、その配下で完結させる:
+  この時点では**リモートに専用ベースディレクトリ1つ**(`--remote-dir`。既定 `~/fleetest-runner`)を
+  置き、その配下で完結させた(**2026-07-31 時点の配置**。現在は `<base>/foundation-tester` + `<base>/users/<issuer>/work` = RR-14・RR-18.6):
 
   ```
   <base>/          ← --remote-dir(既定 ~/fleetest-runner。チルダは $HOME で解決)
@@ -124,7 +124,7 @@ SSH 側のプロセスからでもユーザーの launchd ドメインのサー�
   └── work/        ← WORK_DIR(受け手パッケージ。TestProjects・results・.build)
   ```
 
-  実行は `cd <base>/users/<issuer>/work && <base>/foundation-tester/.build/debug/fleetest …`。`packageRoot()`(cwd から
+  当時の実行は `cd <base>/work && <base>/tool/.build/debug/fleetest …`。`packageRoot()`(cwd から
   Package.swift を探す)が work を、`RepoRoot.find()`(実行バイナリの位置)が tool を
   独立に解決するため、**既存の外部構成の仕組みでそのまま成立する**(新しい解決規則を
   作っていない)。マシン自身の `~/foundation-tester` や `TestProjects/` には一切触れない
@@ -183,3 +183,70 @@ target が hosts に無い/host 未設定を指す場合は**黙ってローカ�
 > (デバイスごとに直接指定)で決まる。登録簿は LocalConfig へ移り、`fleetest.remote.hosts` も
 > 設定キーとしては存在しない(設定タブは `fleetest api remote-machines` を読み書きする)。
 > `fleetest.remote.*` 形の設定キーは無い。
+
+## 設計文書から外した当初の計画・構成案
+
+正典(01-11.md・14-16.md・spec.md)から現行の事実だけを残して移した記述。いずれも当時の計画であり、現在の仕様ではない。
+
+### 元の RR-1 着手判断(2026-07-30)
+
+- 着手判断の鍵は上記需要が実在するかとし、Phase 0 で確かめてから実装に進む方針だった(実際は RR-10 の進行の実際のとおり Phase 0 を飛ばして Phase 1 を実装した)。
+
+### 元の RR-4・RR-5 当初の構成案(2026-07-30。session agent 案)
+
+当初の構成は、SSH の Background セッション(control plane)がジョブを LaunchAgent の session agent へ引き渡し、
+Aqua セッションの agent が `fleetest run` を spawn する(execution plane)二段構えだった。
+
+```
+┌─ リモート Mac(実行側)────────────────────────────┐
+│ Background セッション(sshd 側)= control plane    │
+│  └─ ジョブを session agent へ引き渡すだけ          │
+│ Aqua セッション(RR-5 の2モード+LaunchAgent)       │
+│  └─ session agent が fleetest run を spawn           │
+│      = execution plane(シミュレータ・XCUITest・FM)│
+└────────────────────────────────────────────────────┘
+```
+
+- session agent の責務は「ジョブを受けて `fleetest run` を spawn し出力を中継する」だけに限定し、**ジョブは直列化(1本ずつ)** する計画だった。
+  並行受付は Phase 3 の分散スケジューリング側の課題として送る。
+- 直列化が入るまでの残穴: フリート内の実行先重複拒否(RR-13)は別フリート・別人・CLI/GUI 併走による同一リモートへの二重実行を防げないので、
+  Phase 2 まで同一リモートへの二重実行は運用で避ける(ローカル+リモートの併走は問題ない)。
+- コンポーネント表では FM を「おそらく必要(未検証)」、Android エミュレータを「不要にできる可能性(`-no-window` + swiftshader が定番。RR-6 の検証が条件)」としていた。
+- 2026-07-31 の実測(RR-9 実験①)で、session agent なしの SSH 直接実行で足りると分かり、session agent は不要になった。現在の構成は 01-11.md の RR-4・RR-5(1マシン1 run は dispatch.lock = RR-13)。
+
+### 元の RR-14 Phase 2 との接続(session agent 案)
+
+session agent が来たら `fleetest remote setup` に `--with-agent` を追加し、LaunchAgent plist を `~/Library/LaunchAgents` に配置+load する
+(ユーザー空間なので sudo 不要。決定5により専用スクリプトは新設しない)計画だった。Phase 2 ゲートのモード別の読みは、
+LaunchAgent は Aqua セッションと共に立つので「再起動後に人手なしで受付可能に戻る」がモード A では「解錠+ログインの後に」になる(モード B はゼロタッチ)。
+session agent が不要になったため実装していない。
+
+### 元の RR-11 GUI への影響(2026-08 の計画)
+
+リモートデバイスをローカルと混在表示する場合に必要になる機能として、優先度を Phase 対応表で整理していた。現行の契約は 01-11.md の RR-11、実装は RR-13。
+
+- ホスト状態をホストヘッダに表示する案: 到達可能 / SSH 不可 / session agent 不在 / 版スキュー(rev・Toolchain・Protocol)/ FM 可否。
+  FM 可否(`doctor --fm-only` の結果)はホスト別に常設表示し、screenLooksLike を含むスイートの振り分け判断に使う。
+- リモートタイル表示開始(Phase 3 の頭)までに watchdog の分界を必須とした。実行開始 UI に発行先の選択(特定ホスト/自動分散)を置く案。
+- 「作らない: リモートタイルからの対話操作。モニター=受動ビューアの決定を維持」としていた。2026-09-24 に「ライブ操作は他の機械のデバイスも開ける」へ変わった(.claude/rules/live-control.md)。
+- リモートのプロセスタブ・orphanSweep は session agent 経由の状態表示だけにする案だった。
+
+| 段階 | 必要になる GUI 機能 |
+|---|---|
+| Phase 1 | ほぼ不要(CLI 完結)。あるならレーンのホスト表示・成果物のクリック時回収 |
+| Phase 2 | ホスト状態表示・設定タブのホスト一覧/更新・FM 可否表示 |
+| Phase 3 | タイルのホスト別グルーピング・帯域制御・watchdog 分界・占有表示・ディスパッチ UI |
+
+### 元の RR-0 JSON キー等の改名の経緯(2026-08-26)
+
+- プロファイルの `devices[].host` → `machine`、マシンプロファイル直下の `host` → `machine`、ホスト登録簿の `name` → `machine`、記録の `machine` → `host`。
+  当時は `devices[].host` を除いて旧キーを読める移行期だった(現在は旧キーを読まない)。
+- 拡張 ⇄ webview のメッセージも同じ日に揃えた(`remoteConfig.hosts[].machine`・`DeviceCommandSource.machine`・`machineProfileInfo` の `machines[].machine` / `devices[].machine`・
+  `deviceOp`/`deviceOpBusy`/`deviceDownFinished` の `machine`・`machineDeviceRemove.devices[].machine`・`machineDeviceUpdate.deviceMachine`
+  (同じ階層の `machine` = マシンプロファイル名と衝突するため別名)・`runProfileSave` の `fields.devices[].machine`)。
+  片側だけ改名して、webview が `host` を送り拡張が `machine` を読む状態が数時間残り、実行プロファイルのリモート参照が `machine: "local"` に書き換わった。
+- CLI ⇄ 拡張のワイヤ(ProtocolVersion 9): `api monitor` の `machineHost` → `machine`、`api start-all-devices` のライフサイクル行の `host` → `machine`、
+  `api remote-compat` の `hosts[].name` → `machines[].machine`(`sshTarget` は本物のホストなのでそのまま)。
+- Swift 側の識別子: `DeviceHostGrouping` → `DeviceMachineGrouping`(ファイルごと)・`RunDeviceHost` → `RunDeviceMachine`・`DeviceHostRunner` → `DeviceMachineRunner`・
+  `ApiRunHostFanout` → `ApiRunMachineFanout`・`MachineHostDispatch` → `MachineDispatch`(`Decision.host` → `.target`)・`deviceHost` → `deviceMachine`。挙動は不変。
+- フリート定義の `runs[].host` は登録名(エイリアス)を取るキーで、改名していない(RR-13)。

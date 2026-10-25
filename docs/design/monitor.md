@@ -598,7 +598,7 @@ backboardd のこのエラーは、モニターが画面を配信しているデ
   padding/border/gap の定数は持たず全て実測する(style.css を変えたとき片方だけ古くなるのを防ぐ)
 - **罠**: `devices` のポーリングは「デバイスモニター」タブが**非表示の間も届き続ける**
   (タブ非表示の間もフレーム配信は続く = 他タブから戻ったとき張り直しで映らない時間を作らない。ユーザー決定)。`applyDevices` は毎回
-  `relayoutTiles` を呼ぶため、`display:none` 中は `clientHeight=0` → `--tile-image-h` が下限 60px に
+  `relayoutTiles` を呼ぶため、`display:none` 中は `clientHeight=0` → `--tile-image-h` が当時の下限 60px(現在は `MIN_TILE_IMAGE_HEIGHT` = 120)に
   潰れて書き込まれ、ペイン高さと `--tile-image-h` の対応が壊れていた。**タブへ戻ると実際の画像高さぶん過大**になりタイルが
   はみ出す(初回表示だけ正しく、他タブを経由すると必ず崩れる)。対策は
   **レイアウトが無いとき(`clientHeight===0`)は書かずに抜ける** — 非表示中は直前の正しい値が保たれる。
@@ -804,6 +804,7 @@ CLI 実行・他人の run・ランナー機で直に打たれた run は `inRun
   "phase": "running", "requeued": 1, "laneDropouts": 0,
   "startedAt": "2026-09-20T10:03:12Z", "total": 12, "done": 7, "failed": 2,
   "etaSeconds": 190,
+  "supply": [ { "name": "iPhone 17-01", "platform": "ios", "step": "booting" } ],
   "lanes": [ { "key": "<udid|serial>", "name": "iPhone 17-01", "platform": "ios",
                "scenario": "05_検索", "scenarioStartedAt": "…" } ] }
 ```
@@ -1002,7 +1003,7 @@ CLI 実行・他人の run・ランナー機で直に打たれた run は `inRun
   (束ねた合計を使うのはヘッダの「実行中 N」の件数だけ)。同じ機械で run が複数走っていれば、
   その機械の行が run の数だけ続く。**どの行の種類でも同じ作り**(`.run-board-row`)にする ——
   作りを変えるとインデントと2カラムの境目が行ごとに割れる
-- **機械の行の開閉の既定は、run のある行が開き・run の無い行が閉じ**(ユーザー決定 2026-09-30)。
+- **機械の行の開閉の既定は、利用者が開かない限りどの行も閉じ**(run のある行も run の無い行も。下の「OFF の間」の規則が正。ユーザー決定 2026-09-30 → 10-01 で改訂)。
   押した結果を行の鍵ごとに覚える(寿命は webview の `getState` だけ。行の鍵は run が終われば
   二度と現れない)。閉じても行は残す —— その機械が居ることは消さない
 - **階層はインデントで示す**(16px 刻み): ヘッダ 8px → 機械の行 24px(バッジ 48px)→ デバイス 48px
