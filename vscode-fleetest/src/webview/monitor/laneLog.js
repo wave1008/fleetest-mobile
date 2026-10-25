@@ -3,9 +3,9 @@
 //
 // レーンは2枚の DOM を持つ: el(実行ログ。常に #lanes-grid の直接の子) / previewEl(拡大表示。
 // 選択中かつタイルがあるときだけ #preview-grid に置く)。**1台だけ選択のときだけ**、
-// previewEl と実行ログの複製(ミラー)を .lane-pair で束ねて #preview-grid に置く
-// (グリッドビューの中で 拡大表示|ログ を並べる。ログ本体の DOM は動かさない = 選択を外せば
-// #lanes-grid 側でそのまま続きが読める)。
+// previewEl を .lane-pair で包んで #preview-grid に置く(gridLiveControls.js の操作カラムと
+// gridLivePanel.js の操作パネルが、この中で拡大表示の右隣に並ぶ)。ログは複製しない = el は常に
+// #lanes-grid 側にあり、1台選択でも実行ログビューのレーンで読む。
 
 import { MAX_LANE_LINES, OVERALL_LANE_ID, overallLaneName, workerDisplayLabel } from "../../runLaneModel";
 import { lanesGrid, previewGrid, gridViewTitle, lanesSelectionStatus, lanesRunStatus, logPane, outputPane, devicesPanel } from './domRefs.js';
@@ -13,8 +13,6 @@ import { tiles, selectedDeviceIds, attachDeviceMirror, detachDeviceMirror, openD
 import { t } from '../i18n.js';
 import { setHoverTip } from './hoverTip.js';
 import { computePreviewGrid, computeSinglePreviewWidth } from './previewGridModel.js';
-// 循環(splitter → deviceTiles → laneLog)になるが、呼ぶのは関数の中だけなので評価順に依存しない
-import { setLogViewFoldedForSingleSelection } from './splitter.js';
 import { paintMachineBadge } from './machineColors.js';
 import { isGridLiveScreenTarget, syncGridLiveControls } from './gridLiveControls.js';
 
@@ -39,8 +37,8 @@ function renderSelectionCount() {
 }
 
 // lanesGrid(実行ログ)の子要素をdeviceOrder順に並べ直す(appendChildは既存ノードの移動)。
-// previewGrid側は「直接の子」(ミラー中でない previewEl)だけ並べ直す —— ミラー中の1枚は
-// .lane-pair に包まれて previewGrid の子になっており、動かすとミラーの組が壊れる。
+// previewGrid側は「直接の子」(.lane-pair に包まれていない previewEl)だけ並べ直す —— 1台表示の1枚は
+// .lane-pair に包まれて previewGrid の子になっており、動かすと組が壊れる。
 // deviceOrderに無いid(全体レーン等)は末尾・相対順維持。
 // 機械バッジの段を出すか。**1つでも機械付きのレーンが居れば全レーンで確保する** ——
 // 段の有無がレーンごとに混ざると見出しの高さが揃わない(タイルの .with-machine-row と同じ規律)
@@ -139,7 +137,7 @@ function ensureLane(id, name, platform, updateLabel, machine) {
   const preview = document.createElement('div');
   preview.className = 'lane-preview';
   preview.style.display = 'none';
-  // グリッドビューのダブルクリック: そのデバイスだけの選択にする(1台なら左に絵・右にログの複製)。
+  // グリッドビューのダブルクリック: そのデバイスだけの選択にする。
   // 「このデバイスのみ選択」の直後にもう一度押すと、その前の選択へ戻す(deviceTiles.js)
   // **1台表示の絵の上は除く** —— そこのクリックはタップ(gridLiveControls.js)なので、ダブルクリックは2回のタップ。
   // 修飾キー付きも除く(Command+クリック = ダブルタップを続けて押すと dblclick も来る)
@@ -196,27 +194,6 @@ function appendLaneLine(laneId, text) {
   if (laneId === OVERALL_LANE_ID) {
     syncOverallLinesClass();
   }
-
-  if (logMirror && logMirror.id === laneId) {
-    const mirrorWasAtBottom =
-      logMirror.body.scrollHeight - logMirror.body.scrollTop - logMirror.body.clientHeight < 24;
-    const mirrorLine = document.createElement('div');
-    mirrorLine.className = 'lane-line';
-    mirrorLine.textContent = text;
-    logMirror.body.appendChild(mirrorLine);
-    logMirror.lineCount += 1;
-    while (logMirror.lineCount > MAX_LANE_LINES) {
-      const first = logMirror.body.firstChild;
-      if (!first) {
-        break;
-      }
-      logMirror.body.removeChild(first);
-      logMirror.lineCount -= 1;
-    }
-    if (mirrorWasAtBottom) {
-      logMirror.body.scrollTop = logMirror.body.scrollHeight;
-    }
-  }
 }
 
 function clearAllLanes() {
@@ -250,49 +227,31 @@ function configureLanes(laneInfos) {
   updateLaneVisibility();
 }
 
-// 実行ログの複製(1台だけ選択のときにグリッドビューへ置くミラー)。詳細はファイル冒頭のコメント。
-// 一度に1台ぶんだけ持つ(束ねる .lane-pair 自体が状態を持つので、id が変わるたびに作り直す)。
-let logMirror = null;
+// 1台だけ選択のときに previewEl を包む組。一度に1台ぶんだけ持つ(id が変わるたびに作り直す)。
+let singlePair = null;
 
-function buildLogMirror(lane) {
-  const wrapper = document.createElement('div');
-  wrapper.className = 'lane-pair';
-  const mirrorLane = document.createElement('div');
-  mirrorLane.className = 'lane lane-log-mirror';
-  const header = document.createElement('div');
-  header.className = 'lane-header lane-log-title';
-  header.textContent = t('wvMonitor2.laneLog.titleRunLog');
-  const body = document.createElement('div');
-  body.className = 'lane-body';
-  mirrorLane.append(header, body);
-  wrapper.append(lane.previewEl, mirrorLane);
-  previewGrid.appendChild(wrapper);
-  return { wrapper, body };
-}
-
-// mirrorId は「ちょうど1台選択・かつタイルがある」ときだけそのデバイス id、それ以外は null。
-function syncLogMirror(mirrorId) {
-  if (logMirror && logMirror.id === mirrorId) {
+// pairId は「ちょうど1台選択・かつタイルがある」ときだけそのデバイス id、それ以外は null。
+function syncSinglePair(pairId) {
+  if (singlePair && singlePair.id === pairId) {
     return;
   }
-  if (logMirror) {
-    const oldLane = lanes.get(logMirror.id);
+  if (singlePair) {
+    const oldLane = lanes.get(singlePair.id);
     if (oldLane) {
       // previewEl を組から外して #preview-grid の直接の子へ戻す(消えていなければ引き続き表示対象)
       previewGrid.appendChild(oldLane.previewEl);
     }
-    logMirror.wrapper.remove();
-    logMirror.body.replaceChildren();
-    logMirror = null;
+    singlePair.wrapper.remove();
+    singlePair = null;
   }
-  if (mirrorId === null) {
+  if (pairId === null) {
     return;
   }
-  const lane = lanes.get(mirrorId);
-  const { wrapper, body } = buildLogMirror(lane);
-  body.append(...[...lane.bodyEl.children].map((el) => el.cloneNode(true)));
-  body.scrollTop = body.scrollHeight;
-  logMirror = { id: mirrorId, wrapper, body, lineCount: lane.lineCount };
+  const wrapper = document.createElement('div');
+  wrapper.className = 'lane-pair';
+  wrapper.append(lanes.get(pairId).previewEl);
+  previewGrid.appendChild(wrapper);
+  singlePair = { id: pairId, wrapper };
 }
 
 export function updateLaneVisibility() {
@@ -326,16 +285,14 @@ export function updateLaneVisibility() {
     }
   }
 
-  // **1台だけ選択のときだけ**、拡大表示の隣に実行ログの複製を並べる。
-  const mirrorId = singleDevice && previewIds.length === 1 ? previewIds[0] : null;
-  syncLogMirror(mirrorId);
-  // 複製が出ている間は実行ログビューを畳む(同じログを上下に出さない)。戻すのも splitter.js の1箇所
-  setLogViewFoldedForSingleSelection(mirrorId !== null);
+  // **1台だけ選択のときだけ**、拡大表示を .lane-pair で包む(操作カラム・操作パネルの置き場)。
+  const singleId = singleDevice && previewIds.length === 1 ? previewIds[0] : null;
+  syncSinglePair(singleId);
 
-  // ミラー対象を除く拡大表示をデバイス順で並べる(ミラー対象は .lane-pair の中にいるので動かさない)。
+  // 1台表示の対象を除く拡大表示をデバイス順で並べる(対象は .lane-pair の中にいるので動かさない)。
   const rank = new Map(deviceOrder.map((id, index) => [id, index]));
   const directPreviewIds = previewIds
-    .filter((id) => id !== mirrorId)
+    .filter((id) => id !== singleId)
     .sort((a, b) => (rank.get(a) ?? Number.MAX_SAFE_INTEGER) - (rank.get(b) ?? Number.MAX_SAFE_INTEGER));
   for (const id of directPreviewIds) {
     const lane = lanes.get(id);
@@ -344,9 +301,9 @@ export function updateLaneVisibility() {
     lane.previewEl.style.width = '';
   }
 
-  previewGrid.classList.toggle('single-device', mirrorId !== null);
+  previewGrid.classList.toggle('single-device', singleId !== null);
   // 1台表示のときだけライブ操作のツールバーを付ける(段組みの実測より前 = 高さを固定費に数える)
-  syncGridLiveControls(mirrorId, mirrorId !== null ? lanes.get(mirrorId).previewEl : null);
+  syncGridLiveControls(singleId, singleId !== null ? lanes.get(singleId).previewEl : null);
   relayoutPreviewGrid(previewIds);
 
   renderSelectionCount();

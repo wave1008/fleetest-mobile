@@ -3,8 +3,8 @@
 //
 // 契約(ユーザー要件 2026-09-21): 「デバイスモニター」タブは下段がグリッドビュー(選択したデバイスの
 // 拡大表示)と実行ログビュー(**ラインビューで選択したデバイスのログだけ**。どちらも選択0台では空)の
-// 2ペインに分かれる。**ちょうど1台選択のときだけ**、グリッドビューの中に 拡大表示|実行ログの複製
-// (ミラー)を並べる ―― ログ本体の DOM は実行ログビュー側から動かさない。
+// 2ペインに分かれる。**ちょうど1台選択のときだけ**、グリッドビューの中で拡大表示を .lane-pair が包む
+// (操作カラム・操作パネルの置き場。実行ログの複製は置かない ―― ログは実行ログビューだけ)。
 //
 // 絵は「複製」で描く(canvas も img も DOM の2箇所に置けない)。mjpeg は同じ data URL を
 // 別の img へ写すだけなので、ここでは **タイルと拡大表示が同じ src を指すこと**を見る。
@@ -147,7 +147,7 @@ test("選択が無い間はグリッドビューも実行ログビューも空�
   assert.equal(document.getElementById("lanes-selection-status").textContent, "0台", "0台でも出す");
 });
 
-test("1台選択で実行ログビューはその台だけに絞り、グリッドビューは拡大表示+ログの複製を並べる", (t) => {
+test("1台選択で実行ログビューはその台だけに絞り、グリッドビューは拡大表示+操作を並べる(ログの複製は置かない)", (t) => {
   const { window, document } = createWebview();
   t.after(() => window.close());
   sendDevices(window, [{}, {}, {}]);
@@ -161,17 +161,16 @@ test("1台選択で実行ログビューはその台だけに絞り、グリッ�
   const previewGrid = document.getElementById("preview-grid");
   assert.ok(previewGrid.classList.contains("single-device"));
   const pair = previewGrid.querySelector(".lane-pair");
-  assert.ok(pair, "1台のときは .lane-pair で拡大表示と操作のカラムと操作パネルとログの複製を束ねる");
+  assert.ok(pair, "1台のときは .lane-pair で拡大表示と操作のカラムと操作パネルを束ねる");
+  assert.equal(pair.children.length, 3, "ログの複製は無い");
+  assert.equal(previewGrid.querySelector(".lane-log-mirror"), null);
   assert.equal(pair.children[0].className, "lane-preview", "左が動画");
   assert.equal(pair.children[1].id, "grid-live-controls", "動画の右隣が操作のカラム");
   assert.equal(pair.children[2].id, "grid-live-panel", "その右が操作パネル");
-  assert.equal(pair.children[3].id, "grid-live-panel-splitter", "操作パネルとログの複製の間に区切り");
-  assert.equal(pair.children[4].className, "lane lane-log-mirror", "右端がログの複製");
-  assert.equal(pair.children[4].querySelector(".lane-log-title").textContent, "実行ログ");
   assert.equal(document.getElementById("grid-view-title").textContent, "選択したデバイス");
 });
 
-test("1台選択の動画の幅は絵に合わせ、2台に増やすとログの複製を解いて幅の指定も外す", (t) => {
+test("1台選択の動画の幅は絵に合わせ、2台に増やすと組を解いて幅の指定も外す", (t) => {
   const { window, document } = createWebview();
   t.after(() => window.close());
   givePreviewGridSize(document, 1200, 500);
@@ -188,7 +187,7 @@ test("1台選択の動画の幅は絵に合わせ、2台に増やすとログの
   clickTile(document, 1);
   decodeFrame(window, document, 1, "QUJD", 390, 844);
   assert.equal(grid.classList.contains("single-device"), false);
-  assert.equal(grid.querySelector(".lane-pair"), null, "2台になったらログの複製の組は解く");
+  assert.equal(grid.querySelector(".lane-pair"), null, "2台になったら .lane-pair の組は解く");
   assert.equal(visiblePreviews(document).length, 2);
   assert.equal(visibleLogs(document).length, 2, "実行ログビューは選択台数ぶん出す(拡大表示とは独立)");
   assert.ok(visiblePreviews(document).every((el) => el.style.width === ""), "幅の指定を残さない");
@@ -208,7 +207,7 @@ test("グリッドビューの台をダブルクリックすると、その台�
   assert.equal(selectedTileCount(document), 1, "1台だけ選択");
   assert.equal(visiblePreviews(document).length, 1);
   assert.equal(previewDeviceName(visiblePreviews(document)[0]), "Dev 2", "ダブルクリックした台");
-  assert.ok(document.getElementById("preview-grid").classList.contains("single-device"), "1台なので左に絵・右にログの複製");
+  assert.ok(document.getElementById("preview-grid").classList.contains("single-device"), "1台なので .lane-pair の組");
 });
 
 test("このデバイスのみ選択の後、その台をダブルクリックすると直前の選択へ戻る", (t) => {

@@ -65,6 +65,24 @@ final class LiveOperationDSLTests: XCTestCase {
         XCTAssertEqual(dsl(["cmd": "tap", "x": 110, "y": 205], tree: anonymousTree), "tap(x: 110, y: 205)" + coordinateNote)
     }
 
+    /// 操作できない要素(地図等)の上は、その要素のセレクタの行に押した点の但し書きを付ける。
+    /// rendered は行が対象に書いたセレクタも返す(操作の列に添える)
+    func testCoordinateOnAMapBecomesItsSelectorWithThePressedPoint() {
+        let map = ElementInfo(ref: 1, type: "other", identifier: "pad_map", label: nil, value: nil, placeholder: nil,
+                              enabled: true, frame: FTRect(x: 0, y: 100, width: 400, height: 600), depth: 1)
+        let tree = SnapshotResponse(sessionBundleID: "com.example.app", screen: screen, elements: [map], truncatedCount: 0)
+        XCTAssertEqual(dsl(["cmd": "doubleTap", "x": 196.94, "y": 284.8], tree: tree),
+                       "doubleTap(\"#pad_map\")  // pressed at (196.9, 284.8); the selector form presses the centre of the element")
+        let rendered = LiveOperationDSL.rendered(
+            for: ApiLiveServeCommand(cmd: "doubleTap", raw: ["cmd": "doubleTap", "x": 196.94, "y": 284.8]),
+            platform: "ios", snapshot: tree, screen: screen)
+        XCTAssertEqual(rendered?.selector, "#pad_map")
+        // 座標の行は selector を持たない
+        XCTAssertNil(LiveOperationDSL.rendered(
+            for: ApiLiveServeCommand(cmd: "tap", raw: ["cmd": "tap", "x": 300, "y": 750]),
+            platform: "ios", snapshot: tree, screen: screen)?.selector)
+    }
+
     func testPressIsATapWithHoldSeconds() {
         XCTAssertEqual(dsl(["cmd": "press", "x": 1, "y": 2, "duration": 1.5]),
                        "tap(x: 1, y: 2, holdSeconds: 1.5)" + coordinateNote)

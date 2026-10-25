@@ -30,6 +30,9 @@ final class SelectorParseSourceScanTests: XCTestCase {
         // recordInteraction: `selector` は SelectorNaming(graded) が木から合成した文字列で、
         // 呼び手供給ではない(構文は常に正当)
         #"Sources/fleetest-mcp/MCPServer+Draft.swift#if let selector { step.locator = FTSelector.parse(selector).primary }"#,
+        // recordInteraction の座標の手: `graded.selector` は PointTarget(SelectorNaming)が木から合成した文字列で、
+        // 呼び手供給ではない(構文は常に正当)
+        #"Sources/fleetest-mcp/MCPServer+Draft.swift#locator: FTSelector.parse(graded.selector).primary)"#,
     ]
 
     private static let pattern = try! NSRegularExpression(pattern: #"\bFTSelector\.parse\("#)

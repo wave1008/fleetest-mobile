@@ -15,7 +15,6 @@ export const panelsStrings = {
   },
   "panels.tabs.processes": { ja: "プロセス", en: "Processes" },
   "panels.tabs.close": { ja: "タブを閉じる", en: "Close tab" },
-  "panels.live.panelSplitterTitle": { ja: "ドラッグで操作パネルと実行ログの幅を調整", en: "Drag to resize the panel and the run log" },
   "panels.live.showBoxes": { ja: "バウンディングボックスを表示", en: "Show bounding boxes" },
   "panels.tabs.recordings": { ja: "テストセッション", en: "Test Sessions" },
   "panels.tabs.settings": { ja: "設定", en: "Settings" },

@@ -219,7 +219,9 @@ extension MCPServer {
                let graded = PointTarget.writableSelector(atX: coordinate.x, y: coordinate.y, in: tree) {
                 step = FlowStep(action: isDoubleTap ? "doubleTap" : "tap",
                                 locator: FTSelector.parse(graded.selector).primary)
-                step.note = DraftNotes.selectorDurability(graded.durability)
+                step.note = DraftNotes.joined(
+                    DraftNotes.selectorDurability(graded.durability),
+                    graded.pressesThePoint ? nil : DraftNotes.pressedPoint(x: coordinate.x, y: coordinate.y))
             } else {
                 step = FlowStep(action: isDoubleTap ? "doubleTap" : "tap", x: coordinate.x, y: coordinate.y)
                 step.note = DraftNotes.coordinates

@@ -29,6 +29,7 @@ import {
   isListDevicesResult,
   parseLiveActionResult,
   parseLiveServeEvent,
+  withDslSelector,
   parseLiveSnapshotResult,
   parseListDevicesResult,
   pointFromClick,
@@ -222,28 +223,48 @@ test("parseLiveSnapshotResult: bridgeStarting が欠落/非boolean なら undefi
 // ---- parseLiveActionResult ----
 
 test("parseLiveActionResult: {ok:true} を { ok: true, bridgeStarting, dsl } に正規化する", () => {
-  assert.deepEqual(parseLiveActionResult({ ok: true, bridgeStarting: false, dsl: null }), {
-    ok: true, bridgeStarting: false, dsl: null,
+  assert.deepEqual(parseLiveActionResult({ ok: true, bridgeStarting: false, dsl: null, dslSelector: null }), {
+    ok: true, bridgeStarting: false, dsl: null, dslSelector: null,
   });
-  assert.deepEqual(parseLiveActionResult({ ok: true, bridgeStarting: true, dsl: 'tap("#login")' }), {
-    ok: true, bridgeStarting: true, dsl: 'tap("#login")',
+  assert.deepEqual(parseLiveActionResult({ ok: true, bridgeStarting: true, dsl: 'tap("#login")', dslSelector: null }), {
+    ok: true, bridgeStarting: true, dsl: 'tap("#login")', dslSelector: null,
   });
 });
 
 test("parseLiveActionResult: {ok:false,error} をそのまま返す", () => {
-  assert.deepEqual(parseLiveActionResult({ ok: false, error: "失敗しました", bridgeStarting: false, dsl: null }), {
+  assert.deepEqual(parseLiveActionResult({ ok: false, error: "失敗しました", bridgeStarting: false, dsl: null, dslSelector: null }), {
     ok: false,
     error: "失敗しました",
     bridgeStarting: false,
-    dsl: null,
+    dsl: null, dslSelector: null,
   });
 });
 
 test("parseLiveActionResult: 失敗した操作でも dsl(撃つ前に組めた行)を落とさない", () => {
   assert.deepEqual(
-    parseLiveActionResult({ ok: false, error: "x", bridgeStarting: false, dsl: "tap(x: 120, y: 340)" }),
-    { ok: false, error: "x", bridgeStarting: false, dsl: "tap(x: 120, y: 340)" },
+    parseLiveActionResult({ ok: false, error: "x", bridgeStarting: false, dsl: "tap(x: 120, y: 340)", dslSelector: null }),
+    { ok: false, error: "x", bridgeStarting: false, dsl: "tap(x: 120, y: 340)", dslSelector: null },
   );
+});
+
+test("parseLiveActionResult: dslSelector も必須(欠落・文字列でも null でもない値は undefined)・在れば落とさない", () => {
+  assert.equal(parseLiveActionResult({ ok: true, bridgeStarting: false, dsl: null }), undefined, "dslSelector 欠落");
+  assert.equal(parseLiveActionResult({ ok: true, bridgeStarting: false, dsl: null, dslSelector: 1 }), undefined, "数値");
+  assert.equal(
+    parseLiveActionResult({ ok: true, bridgeStarting: false, dsl: 'tap("#login")', dslSelector: "#login" })?.dslSelector,
+    "#login");
+});
+
+test("withDslSelector: 操作の列にセレクタを添える。ラベルに同じ文字列があれば重ねない・無ければそのまま", () => {
+  assert.equal(withDslSelector("タップ: Apple マップ", "#MapsSearchTextField"), 'タップ: Apple マップ("#MapsSearchTextField")');
+  assert.equal(withDslSelector("ダブルタップ: #ChromeViewController.Viewport", "#ChromeViewController.Viewport"),
+    "ダブルタップ: #ChromeViewController.Viewport");
+  assert.equal(withDslSelector("タップ: (120, 340)", null), "タップ: (120, 340)");
+  // 部分一致で「書かれている」と読まない(別の id の前方一致)
+  assert.equal(withDslSelector("タップ: #okButton", "#ok"), 'タップ: #okButton("#ok")');
+  assert.equal(withDslSelector("入力: abc", undefined), "入力: abc");
+  // セレクタの中の引用符はそのまま貼れる形(JSON の文字列)で出す
+  assert.equal(withDslSelector("タップ: OK", '"OK"'), 'タップ: OK("\\"OK\\"")');
 });
 
 test("parseLiveActionResult: dsl は必須(欠落・文字列でも null でもない値は undefined。後方互換の読み替えは置かない)", () => {
@@ -254,14 +275,14 @@ test("parseLiveActionResult: dsl は必須(欠落・文字列でも null でも�
 });
 
 test("parseLiveActionResult: ok が欠落/非boolean、error が非文字列、または bridgeStarting が欠落/非boolean なら undefined", () => {
-  assert.equal(parseLiveActionResult({ dsl: null }), undefined);
-  assert.equal(parseLiveActionResult({ ok: "true", dsl: null }), undefined);
-  assert.equal(parseLiveActionResult({ ok: false, dsl: null }), undefined);
-  assert.equal(parseLiveActionResult({ ok: false, error: 123, dsl: null }), undefined);
+  assert.equal(parseLiveActionResult({ dsl: null, dslSelector: null }), undefined);
+  assert.equal(parseLiveActionResult({ ok: "true", dsl: null, dslSelector: null }), undefined);
+  assert.equal(parseLiveActionResult({ ok: false, dsl: null, dslSelector: null }), undefined);
+  assert.equal(parseLiveActionResult({ ok: false, error: 123, dsl: null, dslSelector: null }), undefined);
   assert.equal(parseLiveActionResult(null), undefined);
-  assert.equal(parseLiveActionResult({ ok: true, dsl: null }), undefined, "bridgeStarting 欠落");
-  assert.equal(parseLiveActionResult({ ok: true, bridgeStarting: "false", dsl: null }), undefined, "bridgeStarting が文字列");
-  assert.equal(parseLiveActionResult({ ok: false, error: "x", dsl: null }), undefined, "エラー形も bridgeStarting 欠落は undefined");
+  assert.equal(parseLiveActionResult({ ok: true, dsl: null, dslSelector: null }), undefined, "bridgeStarting 欠落");
+  assert.equal(parseLiveActionResult({ ok: true, bridgeStarting: "false", dsl: null, dslSelector: null }), undefined, "bridgeStarting が文字列");
+  assert.equal(parseLiveActionResult({ ok: false, error: "x", dsl: null, dslSelector: null }), undefined, "エラー形も bridgeStarting 欠落は undefined");
 });
 
 // ---- serializeLiveServeCommand ----
@@ -292,55 +313,55 @@ test("serializeLiveServeCommand: JSON化して末尾に改行を付ける", () =
 // ---- parseLiveServeEvent ----
 
 test("parseLiveServeEvent: kind=actionResult の成功/失敗を判別する", () => {
-  assert.deepEqual(parseLiveServeEvent({ kind: "actionResult", ok: true, bridgeStarting: false, dsl: null }), {
+  assert.deepEqual(parseLiveServeEvent({ kind: "actionResult", ok: true, bridgeStarting: false, dsl: null, dslSelector: null }), {
     kind: "actionResult",
-    result: { ok: true, bridgeStarting: false, dsl: null },
+    result: { ok: true, bridgeStarting: false, dsl: null, dslSelector: null },
   });
   assert.deepEqual(
-    parseLiveServeEvent({ kind: "actionResult", ok: false, error: "失敗しました", bridgeStarting: false, dsl: null }),
+    parseLiveServeEvent({ kind: "actionResult", ok: false, error: "失敗しました", bridgeStarting: false, dsl: null, dslSelector: null }),
     {
       kind: "actionResult",
-      result: { ok: false, error: "失敗しました", bridgeStarting: false, dsl: null },
+      result: { ok: false, error: "失敗しました", bridgeStarting: false, dsl: null, dslSelector: null },
     },
   );
 });
 
 test("parseLiveServeEvent: actionResult の bridgeStarting(自動起動が進行中か)を落とさない", () => {
-  assert.deepEqual(parseLiveServeEvent({ kind: "actionResult", ok: false, error: "x", bridgeStarting: true, dsl: null }), {
+  assert.deepEqual(parseLiveServeEvent({ kind: "actionResult", ok: false, error: "x", bridgeStarting: true, dsl: null, dslSelector: null }), {
     kind: "actionResult",
-    result: { ok: false, error: "x", bridgeStarting: true, dsl: null },
+    result: { ok: false, error: "x", bridgeStarting: true, dsl: null, dslSelector: null },
   });
 });
 
 test("parseLiveServeEvent: actionResult の dsl(操作記録に出す DSL の1行)を落とさない・欠落は不正", () => {
   assert.deepEqual(
-    parseLiveServeEvent({ kind: "actionResult", ok: true, bridgeStarting: false, dsl: 'tap("#login")' }),
-    { kind: "actionResult", result: { ok: true, bridgeStarting: false, dsl: 'tap("#login")' } },
+    parseLiveServeEvent({ kind: "actionResult", ok: true, bridgeStarting: false, dsl: 'tap("#login")', dslSelector: null }),
+    { kind: "actionResult", result: { ok: true, bridgeStarting: false, dsl: 'tap("#login")', dslSelector: null } },
   );
   assert.equal(parseLiveServeEvent({ kind: "actionResult", ok: true, bridgeStarting: false }), undefined, "dsl 欠落");
 });
 
 test("parseLiveServeEvent: actionResult の app(操作を撃った先)を落とさない", () => {
   assert.deepEqual(
-    parseLiveServeEvent({ kind: "actionResult", ok: true, app: "com.example.app", bridgeStarting: false, dsl: null }),
+    parseLiveServeEvent({ kind: "actionResult", ok: true, app: "com.example.app", bridgeStarting: false, dsl: null, dslSelector: null }),
     {
       kind: "actionResult",
-      result: { ok: true, bridgeStarting: false, dsl: null, app: "com.example.app" },
+      result: { ok: true, bridgeStarting: false, dsl: null, dslSelector: null, app: "com.example.app" },
     },
   );
   assert.deepEqual(
     parseLiveServeEvent({
-      kind: "actionResult", ok: false, error: "x", app: "com.apple.springboard", bridgeStarting: false, dsl: null,
+      kind: "actionResult", ok: false, error: "x", app: "com.apple.springboard", bridgeStarting: false, dsl: null, dslSelector: null,
     }),
     {
       kind: "actionResult",
-      result: { ok: false, error: "x", bridgeStarting: false, dsl: null, app: "com.apple.springboard" },
+      result: { ok: false, error: "x", bridgeStarting: false, dsl: null, dslSelector: null, app: "com.apple.springboard" },
     },
   );
   // app が文字列でない/無い形では欄自体を作らない(undefined の欄で deepEqual を割らない)
-  assert.deepEqual(parseLiveServeEvent({ kind: "actionResult", ok: true, app: 12, bridgeStarting: false, dsl: null }), {
+  assert.deepEqual(parseLiveServeEvent({ kind: "actionResult", ok: true, app: 12, bridgeStarting: false, dsl: null, dslSelector: null }), {
     kind: "actionResult",
-    result: { ok: true, bridgeStarting: false, dsl: null },
+    result: { ok: true, bridgeStarting: false, dsl: null, dslSelector: null },
   });
 });
 
@@ -966,7 +987,7 @@ test("統合: mock-live.mjs live serve の tap は actionResult(ok:true) → sna
   const serve = spawnServe(process.execPath, [MOCK_LIVE, "live", "serve", "--platform", "ios"], process.cwd());
   const [actionLine, snapshotLine] = await serve.send({ cmd: "tap", ref: 1 }, 2);
   const actionEvent = parseLiveServeEvent(actionLine);
-  assert.deepEqual(actionEvent, { kind: "actionResult", result: { ok: true, bridgeStarting: false, dsl: 'tap("#mock")' } });
+  assert.deepEqual(actionEvent, { kind: "actionResult", result: { ok: true, bridgeStarting: false, dsl: 'tap("#mock")', dslSelector: "#mock" } });
   const snapshotEvent = parseLiveServeEvent(snapshotLine);
   assert.ok(snapshotEvent && snapshotEvent.kind === "snapshot" && snapshotEvent.result.ok);
   await serve.close();

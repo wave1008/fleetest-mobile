@@ -98,7 +98,7 @@ test("runAction: 操作記録に撃ったデバイスの id を付ける", () =>
   const start = source.indexOf("private async runAction(");
   const run = source.slice(start, source.indexOf("private async runTapAtPoint(", start));
   assert.match(run, /const loggedDeviceId = this\.selectedDeviceId;/);
-  assert.equal((run.match(/this\.postOperationLog\(options\.logLabel, (true|false), action\??\.dsl \?\? undefined, loggedDeviceId\)/g) ?? []).length, 2,
+  assert.equal((run.match(/this\.postOperationLog\(withDslSelector\(options\.logLabel, action\??\.dslSelector\), (true|false),\s*action\??\.dsl \?\? undefined, loggedDeviceId\)/g) ?? []).length, 2,
     "成功と失敗の両方の行にデバイスを付ける");
   assert.ok(!source.includes("injectTestStep"), "デバイスの分からない行は流さない");
   assert.match(source, /\.\.\.\(deviceId !== undefined \? \{ deviceId \} : \{\}\)/);
@@ -148,4 +148,7 @@ test("runAction: 操作記録の dsl は serve が返した actionResult.dsl を
   assert.match(run, /action\?\.dsl \?\? undefined/, "成功した操作の行に serve の dsl を流す");
   assert.match(source, /\.\.\.\(dsl !== undefined \? \{ dsl \} : \{\}\)/, "operationLog メッセージの欄名は dsl");
   assert.ok(!/\bmcp\b[^-]/.test(run), "runAction に mcp の欄が残っていない");
+  // 操作の列に serve が返したセレクタを添える(成功・失敗の両方。拡張は dsl の行から切り出さない)
+  assert.match(run, /withDslSelector\(options\.logLabel, action\.dslSelector\)/, "失敗した操作の列にセレクタを添える");
+  assert.match(run, /withDslSelector\(options\.logLabel, action\?\.dslSelector\)/, "成功した操作の列にセレクタを添える");
 });

@@ -51,8 +51,8 @@
 //
 // イベント(serve → stdout、1行1JSON。診断は stderr のみ):
 //   refresh 以外のコマンドはまず
-//     {"kind":"actionResult","ok":true,"error":null,"app":"<bundle ID>"|null,"dsl":"<DSL の1行>"|null,"bridgeStarting":<Bool>}
-//     {"kind":"actionResult","ok":false,"error":"<説明>","app":"<bundle ID>"|null,"dsl":"<DSL の1行>"|null,"bridgeStarting":<Bool>}
+//     {"kind":"actionResult","ok":true,"error":null,"app":"<bundle ID>"|null,"dsl":"<DSL の1行>"|null,"dslSelector":"<セレクタ>"|null,"bridgeStarting":<Bool>}
+//     {"kind":"actionResult","ok":false,"error":"<説明>","app":"<bundle ID>"|null,"dsl":"<DSL の1行>"|null,"dslSelector":"<セレクタ>"|null,"bridgeStarting":<Bool>}
 //   のどちらかを出し、続けて(操作の成否を問わず)観測イベント
 //     {"kind":"snapshot","ok":true,"error":null,"platform":"ios"|"android",
 //      "screen":{"width":..,"height":..},"image":"<base64 JPEG>",
@@ -77,9 +77,11 @@
 //   dsl: **必須(値は null 可)**。撃ったコマンドと同じ操作の Swift DSL の1行(行末コメントつき。
 //   `tap("#login")` / `tap(x: 120, y: 340)  // coordinates — …`)。拡張は操作記録の右列にそのまま出す。
 //   変換は LiveOperationDSL.swift の1箇所(MCP の下書きと同じ FlowStep → ScenarioCodeGen を通る)。
-//   ref は**撃つ前の**直近の観測の木で引く(失敗した操作でも撃つ前に組めた行は返す)。
+//   ref も座標の写し先(`PointTarget`)も**撃つ前の**直近の観測の木で引く(失敗した操作でも撃つ前に組めた行は返す)。
 //   組めない(refresh/frame/launch/activate/clearAppData/install・ref が木に無い・型違いの行・
 //   本人確認で断った行)は null。
+//   dslSelector: **必須(値は null 可)**。dsl の行が対象に書いたセレクタ(`#MapsSearchTextField` 等)。拡張は操作の列に
+//   `("…")` で添える(dsl の行から切り出さない)。座標の行・対象を取らない行・dsl が null なら null。
 //   bridgeStarting: **必須**。`LiveBridgeAutoStarter` が自動起動を進行中(.starting)かどうかを
 //   イベントの時点で読んだ値(starter が無ければ常に false)。ok の真偽を問わず全イベントに載る
 //   (annotated が noteConnectionRefused() で idle→starting へ遷移させ得るため、失敗イベントでは
@@ -326,7 +328,7 @@ struct ApiLiveServe: AsyncParsableCommand {
                     logStderr(refusal)
                     let starting = await bridgeStartingFlag(starter)
                     emitLine(ApiLiveActionResultEvent(ok: false, error: refusal, app: follower?.sessionTarget,
-                                                      dsl: nil, bridgeStarting: starting))
+                                                      dsl: nil, dslSelector: nil, bridgeStarting: starting))
                     await followFrontmost(follower, driver: driver)
                     await emitObservation(driver: driver, starter: starter, follower: follower, port: port,
                                           staleFrameTracker: staleFrameTracker, screenMemo: screenMemo,
@@ -739,7 +741,7 @@ struct ApiLiveServe: AsyncParsableCommand {
                 return
             }
             emitLine(ApiLiveActionResultEvent(ok: false, error: decodeError, app: follower?.sessionTarget,
-                                              dsl: nil, bridgeStarting: starting))
+                                              dsl: nil, dslSelector: nil, bridgeStarting: starting))
             await followFrontmost(follower, driver: driver)
             await emitObservation(driver: driver, starter: starter, follower: follower, port: port,
                                   staleFrameTracker: staleFrameTracker, screenMemo: screenMemo,
@@ -763,7 +765,7 @@ struct ApiLiveServe: AsyncParsableCommand {
             }()
             // **DSL の行も操作の前に組む**(ref は利用者が見ていた直近の観測の木で引く。撃つと木が変わる。
             // 失敗した操作の行も返す)。観測の控えは emitObservation が操作の後で更新する
-            let dsl = LiveOperationDSL.line(
+            let rendered = LiveOperationDSL.rendered(
                 for: command, platform: driverOptions.resolvedPlatform,
                 snapshot: await screenMemo.snapshot, screen: await screenMemo.screen)
             let operatedAt = Date()
@@ -772,13 +774,16 @@ struct ApiLiveServe: AsyncParsableCommand {
                                   ownAppBundleID: ownAppBundleID, screenMemo: screenMemo)
                 if let humanLabel { deviceLease?.recordHumanOperation(label: humanLabel, ok: true, at: operatedAt) }
                 emitLine(ApiLiveActionResultEvent(ok: true, error: nil, app: follower?.sessionTarget,
-                                                  dsl: dsl, bridgeStarting: await bridgeStartingFlag(starter)))
+                                                  dsl: rendered?.line, dslSelector: rendered?.selector,
+                                                  bridgeStarting: await bridgeStartingFlag(starter)))
             } catch {
                 if let humanLabel { deviceLease?.recordHumanOperation(label: humanLabel, ok: false, at: operatedAt) }
                 let message = await annotated(error, starter: starter, triggering: true, port: port)
                 // **annotated の後で読む**: noteConnectionRefused() が idle→starting へ遷移させ得るため
+                let starting = await bridgeStartingFlag(starter)
                 emitLine(ApiLiveActionResultEvent(ok: false, error: message, app: follower?.sessionTarget,
-                                                  dsl: dsl, bridgeStarting: await bridgeStartingFlag(starter)))
+                                                  dsl: rendered?.line, dslSelector: rendered?.selector,
+                                                  bridgeStarting: starting))
             }
         }
         // **観測の直前にもう一度追従させる**: 直前の操作で前面が変わっている(ホームへ戻った・
@@ -1758,10 +1763,12 @@ private struct ApiLiveActionResultEvent: Encodable {
     let app: String?
     /// 撃ったコマンドと同じ操作の DSL の1行(ファイル冒頭プロトコル・LiveOperationDSL 参照)。必須(null 可)
     let dsl: String?
+    /// dsl の行が対象に書いたセレクタ(ファイル冒頭プロトコル参照)。必須(null 可)
+    let dslSelector: String?
     /// LiveBridgeAutoStarter.isStarting(ファイル冒頭プロトコル・bridgeStartingFlag 参照)
     let bridgeStarting: Bool
 
-    private enum CodingKeys: String, CodingKey { case kind, ok, error, app, dsl, bridgeStarting }
+    private enum CodingKeys: String, CodingKey { case kind, ok, error, app, dsl, dslSelector, bridgeStarting }
 
     func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
@@ -1770,6 +1777,7 @@ private struct ApiLiveActionResultEvent: Encodable {
         try container.encode(error, forKey: .error)
         try container.encode(app, forKey: .app)
         try container.encode(dsl, forKey: .dsl)
+        try container.encode(dslSelector, forKey: .dslSelector)
         try container.encode(bridgeStarting, forKey: .bridgeStarting)
     }
 }

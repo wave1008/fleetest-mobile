@@ -82,20 +82,21 @@ polling (screenshots at a fixed interval); the choice is remembered per workspac
 - The Grid View and the Run Log View show **only the devices selected in the Line View**. Clicking
   anywhere on a tile toggles its selection; clicking outside the tiles clears the selection. With
   nothing selected both views say "Select a device" (provisioning progress during a run still appears
-  in the Run Log View). With exactly one device selected, the Grid View shows the enlarged screen and
-  that device's run log side by side, and the Run Log View below folds itself so the same log is not
-  shown twice.
+  in the Run Log View). With exactly one device selected, that device's run log still appears in the Run Log View below
+  (it does not fold itself).
   A column to the right of the enlarged screen then stacks **Back**, **Home**, **App Switcher**, **Zoom in** and **Zoom out** buttons, so you
   can operate that device in place (**Back** leaves the single-device view: it restores the selection you had before
   "Select only this device", or clears the selection if there was none). On the screen, **click taps**, **Command(⌘)+click double-taps**,
   **holding 500ms or more long-presses**, **dragging swipes** and **Option(⌥)+drag traces the exact finger
-  path** ("Double tap" lights up while Command is held, "Trace" while Option is held; keep holding to see its explanation). Between the enlarged screen and the run log you get the same
+  path** ("Double tap" lights up while Command is held, "Trace" while Option is held; keep holding to see its explanation). Next to the enlarged screen you get the same
   **element list** (Refresh re-reads it; "Show bounding boxes", next to the device count in the header, overlays frames on the screen;
-  long rows scroll sideways) and **operation log** (drag the border with the run log to resize them), and **text to type** (Enter sends) sits right below the enlarged screen. Selecting a device does not connect to it, so the
+  long rows scroll sideways) and **operation log**, and **text to type** (Enter sends) sits right below the enlarged screen. Selecting a device does not connect to it, so the
   element list appears after your first operation or Refresh (or right away when "Show bounding boxes" is on; that switch starts off each time the panel opens). The operation log is kept per device. Its right-hand column shows the DSL line
   for each operation as you would write it in a scenario; click it to copy. Pressing a button or another operable element gives a
-  selector line (`tap("#login")` and so on). Pressing a map or an empty spot, or an element with no selector, gives a coordinate line
-  with a trailing comment asking you to replace it with a selector.
+  selector line (`tap("#login")` and so on), and the operation column shows that selector too (`Tap: Log in("#login")`). Pressing a
+  wide element such as a map gives that element's selector line with the pressed point as a comment (the selector form presses the
+  element's centre, which can differ from where you pressed). Pressing an empty spot, or an element no stable selector can name,
+  gives a coordinate line with a trailing comment asking you to replace it with a selector.
   A double-click on the screen is two taps, so to toggle the selection
   double-click outside the screen (the device name row or the margin). On a foldable device (the iPhone Duo
   Simulator or a foldable Android Emulator) **Fold** and **Unfold** buttons appear as well (never for physical devices).

@@ -153,6 +153,20 @@ export interface LiveErrorResult {
  * 契約と変換は Sources/fleetest/ApiLiveCommand.swift 冒頭・LiveOperationDSL.swift。 */
 export interface LiveActionDsl {
   readonly dsl: string | null;
+  /** dsl の行が対象に書いたセレクタ(座標の行・対象を取らない行は null)。必須(値は null 可)。
+   * 操作の列に添える(withDslSelector)。dsl の行から切り出さない */
+  readonly dslSelector: string | null;
+}
+
+/** 操作の列(「タップ: Apple マップ」)に、DSL の行が対象に書いたセレクタを `("…")` で添える。
+ * **ラベルの末尾(要素名 = live.opLabel.* の `{target}`)がそのセレクタなら添えない**(要素名が id のとき =
+ * 「ダブルタップ: #Viewport」に同じ文字列を重ねない)。部分一致で見ない —— `#ok` と「タップ: #okButton」を同じと読む。
+ * セレクタが無い(座標の行等)ならラベルのまま */
+export function withDslSelector(label: string, selector: string | null | undefined): string {
+  if (!selector || label.endsWith(selector)) {
+    return label;
+  }
+  return `${label}(${JSON.stringify(selector)})`;
 }
 
 export type LiveActionResult = (LiveOkResult | LiveErrorResult) & LiveActionDsl;
@@ -225,19 +239,21 @@ export function parseLiveSnapshotResult(value: unknown): LiveSnapshot | LiveErro
 }
 
 export function parseLiveActionResult(value: unknown): LiveActionResult | undefined {
-  // dsl は必須(null 可)。欠落・文字列でも null でもない値は不正な actionResult として捨てる
+  // dsl・dslSelector は必須(null 可)。欠落・文字列でも null でもない値は不正な actionResult として捨てる
   // (後方互換の読み替えは置かない。版を揃える運用 = 版と契約の同期)
-  if (!isRecord(value) || !(value.dsl === null || typeof value.dsl === "string")) {
+  if (!isRecord(value) || !(value.dsl === null || typeof value.dsl === "string")
+      || !(value.dslSelector === null || typeof value.dslSelector === "string")) {
     return undefined;
   }
   const dsl = value.dsl;
+  const dslSelector = value.dslSelector;
   // app は**在るときだけ載せる**(undefined の欄を作らない。serve は分からなければ null を送る)
   const app = typeof value.app === "string" ? { app: value.app } : {};
   if (isLiveOkResult(value)) {
-    return { ok: true, bridgeStarting: value.bridgeStarting, dsl, ...app };
+    return { ok: true, bridgeStarting: value.bridgeStarting, dsl, dslSelector, ...app };
   }
   if (isLiveErrorResult(value)) {
-    return { ok: false, error: value.error, bridgeStarting: value.bridgeStarting, dsl, ...app };
+    return { ok: false, error: value.error, bridgeStarting: value.bridgeStarting, dsl, dslSelector, ...app };
   }
   return undefined;
 }

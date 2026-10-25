@@ -198,7 +198,7 @@ public struct SelectorNaming {
                             in snapshot: SnapshotResponse)
         -> [(selector: String, durability: Durability)] {
         var out: [(selector: String, durability: Durability)] = []
-        if let id = element.identifier, !id.isEmpty, idCounts[id] == 1 {
+        if let id = element.identifier, Self.isWritableIdentifier(id), idCounts[id] == 1 {
             out.append(("#\(id)", .stable))
         }
         // **切り詰め表示になるラベルは候補にしない**: 40字超は一覧に "…" 付きで出るので、
@@ -275,7 +275,7 @@ public struct SelectorNaming {
         }
         // **最後の砦**: 一意に書けない要素へ、近くの一意な要素からの相対セレクタを足す。
         // 既存の候補より後ろに置く = これまで書けた要素の提案は動かさない(書けなかった要素だけが救われる)
-        if !(element.identifier.map { !$0.isEmpty && idCounts[$0] == 1 } ?? false) {
+        if !(element.identifier.map { Self.isWritableIdentifier($0) && idCounts[$0] == 1 } ?? false) {
             out += relativeCandidates(for: element, in: snapshot).map { ($0, .relative) }
         }
         return out
@@ -318,7 +318,7 @@ public struct SelectorNaming {
     /// アンカーに使える**一意な名指し**(`#id` か素のラベル)。`:` を含むものは相対記法の区切りと
     /// 混ざるので使わない
     private func anchorName(for element: ElementInfo) -> String? {
-        if let id = element.identifier, !id.isEmpty, idCounts[id] == 1, !id.contains(":") {
+        if let id = element.identifier, Self.isWritableIdentifier(id), idCounts[id] == 1, !id.contains(":") {
             return "#\(id)"
         }
         let label = SnapshotRenderer.displayText(element.label ?? "")
@@ -355,6 +355,14 @@ public extension SelectorNaming {
         return LocatorResolver.resolvedCandidates(parsed.primary, elements: snapshot.elements)?.count == 1
     }
 
+    /// セレクタに書いてよい id か。**メモリアドレス入りの id は書かない** —— `IOSChromeViewController<0x808a60000>` の
+    /// ように起動のたびに変わる値で、シナリオに書いた瞬間に壊れる(実測: Apple の Chrome 系 UI)。
+    /// アドレスとみなすのは `0x` + 16進9桁以上: 64 ビットの heap アドレスは 4GB を超えるので9桁以上で印字される。
+    /// 8桁以下(`0xFF336699` のような色の値)は外さない
+    static func isWritableIdentifier(_ id: String) -> Bool {
+        !id.isEmpty && id.range(of: "0x[0-9a-fA-F]{9,}", options: .regularExpression) == nil
+    }
+
     /// 画面内の id 出現回数。**uniqueScopeID とページャ案内(pagerScrollFrameHint)が共有する
     /// 唯一の数え方** —— 別々に書くと「一意」の定義がずれる
     static func idCounts(in snapshot: SnapshotResponse) -> [String: Int] {
@@ -376,7 +384,7 @@ public extension SelectorNaming {
         let counts = precomputed ?? idCounts(in: snapshot)
         return TapTargetGeometry.ancestors(of: element, in: snapshot.elements)
             .first { ancestor in
-                guard let id = ancestor.identifier, !id.isEmpty, counts[id] == 1,
+                guard let id = ancestor.identifier, isWritableIdentifier(id), counts[id] == 1,
                       ancestor.frame.width > 0, ancestor.frame.height > 0 else { return false }
                 return TapTargetGeometry.contains(ancestor.frame, element.frame)
             }

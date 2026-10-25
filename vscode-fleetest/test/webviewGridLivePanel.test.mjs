@@ -156,8 +156,7 @@ test("パネルは1台選択のとき .lane-pair の中の操作カラムの右�
   assert.ok(panel.parentElement.classList.contains("lane-pair"), "1台なら .lane-pair の中");
   assert.equal(panel.previousElementSibling.id, "grid-live-controls", "操作カラムの右隣");
   assert.ok(panel.previousElementSibling.previousElementSibling.classList.contains("lane-preview"), "並びは 拡大表示 | 操作 | パネル");
-  assert.equal(panel.nextElementSibling.id, "grid-live-panel-splitter", "区切りを挟んで");
-  assert.ok(panel.nextElementSibling.nextElementSibling.classList.contains("lane-log-mirror"), "実行ログの複製の手前");
+  assert.equal(panel.nextElementSibling, null, "パネルが右端(実行ログの複製・区切りは置かない)");
   // インストール・レコーディング・アプリを起動は置かない
   assert.equal(panel.querySelector("#live-btn-install, #live-btn-record, #live-btn-launch"), null);
   assert.ok(panel.querySelector("#grid-live-elements-list.elements-list"));
@@ -826,52 +825,12 @@ test("文字カーソルの点滅のように描き替わり続けても枠は�
   assert.equal(refreshes(gridActions), before + 1, "打ち切りで1回撮り、木が同じならその後は点滅が続いても撮らない");
 });
 
-/** PointerEvent は jsdom に無いため MouseEvent に pointerId を後付けして代用する(webviewGridLiveControls.test.mjs と同じ) */
-function pointerAt(window, type, x) {
-  const event = new window.MouseEvent(type, { bubbles: true, cancelable: true, clientX: x, clientY: 10, button: 0 });
-  Object.defineProperty(event, "pointerId", { value: 1 });
-  return event;
-}
-
-test("操作パネルと実行ログの間に区切りを置き、1台表示をやめたら片付ける", (t) => {
+test("操作パネルと実行ログの間の区切りも、幅の割合の保存も無い", (t) => {
   const { window, document } = createWebview();
   t.after(() => window.close());
-  sendDevices(window, 2);
-  const splitter = document.getElementById("grid-live-panel-splitter");
-  assert.equal(splitter.parentElement.id, "grid-live-parking", "1台表示でなければ表に出さない");
-  clickTile(document, 0);
-  const panel = document.getElementById("grid-live-panel");
-  assert.equal(panel.nextElementSibling, splitter, "操作パネルの直後");
-  assert.ok(splitter.nextElementSibling.classList.contains("lane-log-mirror"), "実行ログの複製の直前");
-  clickTile(document, 1);
-  assert.equal(splitter.parentElement.id, "grid-live-parking", "2台表示に戻したら片付ける");
-});
-
-test("区切りのドラッグで操作パネルの幅の割合を変え、両側の下限で止め、離したら覚える(次に開いたら戻す)", (t) => {
-  const { window, document } = createWebview();
-  t.after(() => window.close());
-  window.HTMLElement.prototype.setPointerCapture = () => {};
-  window.HTMLElement.prototype.releasePointerCapture = () => {};
+  assert.equal(document.getElementById("grid-live-panel-splitter"), null);
   sendDevices(window, 1);
   clickTile(document, 0);
-  const panel = document.getElementById("grid-live-panel");
-  const splitter = document.getElementById("grid-live-panel-splitter");
-  const mirror = splitter.nextElementSibling;
-  panel.getBoundingClientRect = () => ({ width: 300 });
-  mirror.getBoundingClientRect = () => ({ width: 300 });
-  assert.equal(panel.style.flexGrow, "1", "既定は半々");
-
-  splitter.dispatchEvent(pointerAt(window, "pointerdown", 500));
-  splitter.dispatchEvent(pointerAt(window, "pointermove", 620)); // 300+120 / 600 = 0.7
-  assert.equal(Number(panel.style.flexGrow).toFixed(4), (0.7 / 0.3).toFixed(4));
-  splitter.dispatchEvent(pointerAt(window, "pointermove", 10)); // 左へ振り切る → 下限 120/600 = 0.2
-  assert.equal(Number(panel.style.flexGrow).toFixed(4), (0.2 / 0.8).toFixed(4), "下限で止める");
-  assert.equal(window.__state?.gridLivePanelRatio, undefined, "ドラッグ中は書かない");
-  splitter.dispatchEvent(pointerAt(window, "pointerup", 10));
-  assert.equal(window.__state.gridLivePanelRatio.toFixed(4), "0.2000", "離したら割合を覚える");
-
-  const reopened = createWebview({ gridLivePanelRatio: 0.25 });
-  t.after(() => reopened.window.close());
-  assert.equal(Number(reopened.document.getElementById("grid-live-panel").style.flexGrow).toFixed(4),
-    (0.25 / 0.75).toFixed(4), "覚えた割合で始める");
+  assert.equal(document.getElementById("grid-live-panel").style.flexGrow, "", "幅は CSS の flex に任せる");
+  assert.equal(document.querySelector("#preview-grid .lane-log-mirror"), null);
 });

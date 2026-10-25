@@ -427,7 +427,7 @@ function renderDevicesPanel(): string {
 
     <div id="splitter" class="splitter" role="separator" aria-orientation="horizontal" aria-label="${t("panels.devices.splitterAriaLabel")}"></div>
 
-    <!-- グリッドビュー(選択したデバイスの拡大表示。1台だけ選択のときは実行ログの複製も並べる)。
+    <!-- グリッドビュー(選択したデバイスの拡大表示)。
          id は据え置き(旧・出力ペイン)。開閉は splitter.js(gridViewVisible) -->
     <div id="output-pane" class="output-pane">
       <div id="grid-view-header" class="lanes-header pane-header">
@@ -478,8 +478,6 @@ function renderDevicesPanel(): string {
           <input id="grid-live-type-text" type="text" placeholder="${t("panels.live.typeTextPlaceholder")}">
         </div>
         <!-- 1台表示のとき gridLivePanel.js が .lane-pair の中の操作カラムの右隣へ移す(要素一覧・入力するテキスト・操作記録)。 -->
-        <!-- 操作パネルと実行ログの複製の間の区切り(gridLivePanel.js が操作パネルの直後へ移す。ドラッグで幅の割合を変える) -->
-        <div id="grid-live-panel-splitter" class="splitter splitter-vertical grid-live-panel-splitter" title="${t("panels.live.panelSplitterTitle")}"></div>
         <div id="grid-live-panel" class="grid-live-panel">
           <div class="grid-live-elements-section">
             <div class="elements-header">

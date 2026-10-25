@@ -40,20 +40,6 @@ let fleetVisible = persistedState.fleetVisible !== false;
 let logViewVisible = persistedState.logViewVisible !== false;
 let gridViewVisible = persistedState.gridViewVisible !== false;
 
-// **1台だけ選択した間は実行ログビューを自動で畳む**(ユーザー決定)——
-// グリッドビューの中に同じログの複製が出るため。利用者の設定(logViewVisible)は書き換えないので、
-// 選択が 1 台でなくなればこの旗を下ろすだけで元の開閉状態に戻る。
-// **畳む理由が生きているか(= 複製が見えているか)は旗と別に毎回導出する** —— グリッドビューを
-// 畳んでいる間は複製が見えないので効かせない。旗のほうを捨てると、グリッドビューを開き直した
-// ときに同じログが上下に2つ出たまま次の選択変更まで戻らない。
-let logViewAutoFolded = false;
-function autoFoldActive() {
-  return logViewAutoFolded && gridViewVisible;
-}
-function logViewShown() {
-  return logViewVisible && !autoFoldActive();
-}
-
 // null = 保存値が無い。**run ボードだけは既定比を持たない** —— ドラッグされるまでは高さを書かず、
 // 中身なりに伸び縮みする(従来の見え方)。
 let desiredRunBoardHeight =
@@ -302,7 +288,7 @@ export function setFleetVisible(visible) {
 // ---- 実行ログビュー(log-pane)の高さ ----
 
 function renderLogPaneHeight() {
-  if (!logViewShown()) {
+  if (!logViewVisible) {
     // 本体(.lanes-grid/プレースホルダ)は CSS(.log-view-hidden)で隠れるので、高さの指定も外して
     // 見出し行だけの高さへ縮める(desired は保持し、再度開いたときに使う)。
     logPane.style.height = '';
@@ -350,12 +336,12 @@ export function setLogPaneHeight(height) {
 // flex-grow を足す)。
 
 function renderPaneFlex() {
-  logPane.style.flex = (!gridViewVisible && logViewShown()) ? '1 1 auto' : '';
+  logPane.style.flex = (!gridViewVisible && logViewVisible) ? '1 1 auto' : '';
   outputPane.style.flex = gridViewVisible ? '' : '0 0 auto';
 }
 
 function renderLogViewVisible() {
-  const shown = logViewShown();
+  const shown = logViewVisible;
   devicesPanel.classList.toggle('log-view-hidden', !shown);
   logViewToggle.dataset.expanded = shown ? 'true' : 'false';
   logViewToggle.setAttribute('aria-expanded', shown ? 'true' : 'false');
@@ -383,7 +369,6 @@ function applyLogViewVisible(visible) {
 
 function applyGridViewVisible(visible) {
   gridViewVisible = visible;
-  // 旗は消さない(autoFoldActive が gridViewVisible を見るので、畳んでいる間は効かない)
   renderGridViewVisible();
   renderLogViewVisible();
   renderPaneFlex();
@@ -391,18 +376,7 @@ function applyGridViewVisible(visible) {
 }
 
 function toggleLogViewVisible() {
-  const shown = logViewShown();
-  if (!shown && autoFoldActive() && logViewVisible) {
-    // 自動で畳んだものを手で開く。**設定は変えていないので保存しない**
-    logViewAutoFolded = false;
-    renderLogViewVisible();
-    renderPaneFlex();
-    reapplyLogPaneHeight();
-    return;
-  }
-  // 手で決めたら自動の旗は下ろす(**見えている状態を反転する** = 押した見た目どおりに動かす)
-  logViewAutoFolded = false;
-  applyLogViewVisible(!shown);
+  applyLogViewVisible(!logViewVisible);
   vscode.setState(Object.assign({}, vscode.getState(), { logViewVisible }));
   vscode.postMessage({ type: 'setLogViewVisible', value: logViewVisible });
 }
@@ -421,26 +395,6 @@ export function setLogViewVisible(visible) {
     return;
   }
   applyLogViewVisible(visible);
-}
-
-// 呼び手は laneLog.js(選択の変化を1箇所で見ている)。fold = ちょうど1台選択で複製が出ている。
-export function setLogViewFoldedForSingleSelection(fold) {
-  if (fold) {
-    // 旗はグリッドビューの開閉に関わらず立てる(効かせるかは autoFoldActive が決める)——
-    // 畳んでいる間に選んだ1台でも、開き直した瞬間に複製が見えるため
-    if (logViewAutoFolded || !logViewVisible) {
-      return;
-    }
-    logViewAutoFolded = true;
-  } else {
-    if (!logViewAutoFolded) {
-      return;
-    }
-    logViewAutoFolded = false;
-  }
-  renderLogViewVisible();
-  renderPaneFlex();
-  reapplyLogPaneHeight();
 }
 
 export function setGridViewVisible(visible) {

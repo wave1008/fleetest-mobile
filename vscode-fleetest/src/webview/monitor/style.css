@@ -1495,7 +1495,7 @@ html.select-all-guard * {
   overflow: hidden;
 }
 /* lanes-grid の1列 = 1デバイス。中身は選択の有無で入れ替わる:
-   選択中は拡大表示(動画)だけ(1台だけなら左に拡大表示・右に実行ログ)・選択なしは従来どおり実行ログだけ(laneLog.js の
+   選択中は拡大表示(動画)だけ(1台だけなら拡大表示を .lane-pair で包んで操作カラム・操作パネルを並べる)・選択なしは従来どおり実行ログだけ(laneLog.js の
    updateLaneVisibility が display と .preview-only を切り替える)。 */
 .lane-pair {
   display: flex;
@@ -1503,19 +1503,9 @@ html.select-all-guard * {
   min-width: 0;
   min-height: 0;
 }
-.lane-pair > .lane {
-  flex: 1 1 auto;
-}
-/* 1台表示は3列(拡大表示 | 操作パネル | 実行ログの複製)。拡大表示の幅は laneLog.js が決め、残りを後ろ2つで等分する */
-.lane-pair > .lane-log-mirror {
-  flex: 1 1 0;
-}
-/* 1台だけ選択(左 = 拡大表示・右 = 実行ログ)。拡大表示の幅は laneLog.js が絵に合わせて決める */
+/* 1台表示は3列(拡大表示 | 操作 | 操作パネル)。拡大表示の幅は laneLog.js が絵に合わせて決め、操作パネルが残りを占める */
 .lanes-grid.single-device .lane-preview {
   flex: 0 0 auto;
-}
-.lanes-grid.single-device .lane-pair > .lane {
-  min-height: 0;
 }
 /* 拡大表示(上=タグ段 / 下=絵)。列いっぱいを使い、絵の縦横比は CSS で組み立てず
    実寸 + max-width/max-height に任せる(縦横比を CSS で作ると、高さが確定する前に幅を
@@ -1669,12 +1659,6 @@ html.select-all-guard * {
   padding: 6px;
   overflow: hidden;
 }
-/* 操作パネルと実行ログの間の区切り(6px)。負の margin で flex の gap(8px)の中に重ねる = 区切りを足しても
-   2列の間隔は 8px のまま(-7px = 左右に 1px ずつ空ける。.lane-pair の gap と揃えること) */
-.lane-pair > .grid-live-panel-splitter {
-  margin: 0 -7px;
-  border-radius: 3px;
-}
 .grid-live-elements-section,
 .grid-live-oplog-section {
   flex: 1 1 0;
@@ -1772,11 +1756,6 @@ html.select-all-guard * {
   border-bottom: 1px solid var(--vscode-widget-border, var(--vscode-panel-border));
   white-space: nowrap;
   overflow: hidden;
-}
-.lane-log-title {
-  justify-content: center;
-  font-weight: 600;
-  font-size: 12px;
 }
 /* .tile-name-ios/-android を共用する色付きピル(タイルのデバイス名と同じ表現) */
 /* **機械バッジはデバイス名の下**(ユーザー決定。タイルと同じ並び)。

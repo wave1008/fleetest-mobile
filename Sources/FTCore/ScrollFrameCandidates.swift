@@ -145,7 +145,8 @@ public enum ScrollFrameCandidates {
     /// `>>` を含むラベルも素通りする。`SelectorNaming` と同じ `=` 逃がしに揃えることで、
     /// 実際に `FTSelector.parse` で往復する値だけを返す
     static func selector(for element: ElementInfo) -> String? {
-        if let id = element.identifier, !id.isEmpty { return "#\(id)" }
+        // メモリアドレス入りの id は書かない(起動のたびに変わる。判定は SelectorNaming.isWritableIdentifier の1箇所)
+        if let id = element.identifier, SelectorNaming.isWritableIdentifier(id) { return "#\(id)" }
         if let label = element.label, !label.isEmpty, label.count <= maxLabelLength {
             return SelectorNaming.needsEscaping(label) ? "=\(label)" : label
         }

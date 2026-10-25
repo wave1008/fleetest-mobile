@@ -31,7 +31,8 @@ final class BridgeDocRouteSyncTests: XCTestCase {
         let text = try design
         // **数字だけを取り出す範囲を「上記」と「個」の間に限る**(文全体から数字を集めると
         // 「3実装」の 3 まで拾って 133 になる)
-        guard let range = text.range(of: #"上記\d+個は3実装共通のコア"#, options: .regularExpression),
+        // 「上記のうち `/hold` と `/gesture` を除く13個は…」のように間に但し書きが入る形も読む(但し書きに数字を書かない)
+        guard let range = text.range(of: #"上記[^。\n]*?\d+個は3実装共通のコア"#, options: .regularExpression),
               let digits = text[range].split(separator: "個").first?.filter(\.isNumber),
               let count = Int(digits) else {
             return XCTFail("design/bridge.md の「上記N個は3実装共通のコア」が見つかりません")

@@ -10,7 +10,6 @@
 // gridLiveAction 経由で起こる。
 // 絵はモニター自身の配信なので、host の snapshot の image は使わず screen と elements だけ採る。
 
-import { vscode, persistedState } from './vscodeApi.js';
 import { BOXES_SETTLE_CAP_MS, SETTLE_REFRESH_MS } from './liveConstants.js';
 import {
   clockText, createOplogView, frameToDisplayRect, hitTestRef, renderElementRows,
@@ -19,7 +18,6 @@ import {
 const OPLOG_MAX_ROWS = 200; // デバイスごとの控えの上限(liveListViews.js の一覧の上限と同じ)
 
 const panel = document.getElementById('grid-live-panel');
-const panelSplitter = document.getElementById('grid-live-panel-splitter');
 const parking = document.getElementById('grid-live-parking');
 const refreshBtn = document.getElementById('grid-live-btn-refresh-snapshot');
 const boxesToggle = document.getElementById('grid-live-show-boxes');
@@ -43,53 +41,6 @@ const hotBox = document.createElementNS(svgNS, 'rect');
 hotBox.setAttribute('class', 'hot');
 const hoverBox = document.createElement('div');
 hoverBox.className = 'grid-live-hover-box';
-
-// ---- 操作パネルと実行ログの複製の幅(区切りのドラッグ)------------------------------------------
-// 覚えるのは**割合**(操作パネル ÷ 2つの和)。px で覚えるとパネルの幅が変わったときに片方が潰れる。
-// 実行ログの複製(laneLog.js が組を作り直すたびに新しい要素)は flex: 1 1 0 のままにし、操作パネルの
-// flex-grow だけを r/(1-r) にする = 作り直しで比が消えない
-const PANEL_MIN_WIDTH_PX = 120; // 片側の下限。見出し(題名+ボタン1つ)が1行に収まる目安
-let panelRatio = typeof persistedState.gridLivePanelRatio === 'number'
-  && persistedState.gridLivePanelRatio > 0 && persistedState.gridLivePanelRatio < 1
-  ? persistedState.gridLivePanelRatio : 0.5;
-
-function applyPanelRatio() {
-  panel.style.flexGrow = String(panelRatio / (1 - panelRatio));
-}
-applyPanelRatio();
-
-let splitDrag = null; // { pointerId, startX, startPanelWidth, total }
-panelSplitter.addEventListener('pointerdown', (event) => {
-  const mirror = panelSplitter.nextElementSibling;
-  if (event.button !== 0 || !mirror) { return; }
-  const startPanelWidth = panel.getBoundingClientRect().width;
-  const total = startPanelWidth + mirror.getBoundingClientRect().width;
-  if (!(total > 0)) { return; }
-  splitDrag = { pointerId: event.pointerId, startX: event.clientX, startPanelWidth, total };
-  panelSplitter.setPointerCapture(event.pointerId);
-  panelSplitter.classList.add('dragging');
-  event.preventDefault();
-});
-panelSplitter.addEventListener('pointermove', (event) => {
-  if (!splitDrag || splitDrag.pointerId !== event.pointerId) { return; }
-  const { startX, startPanelWidth, total } = splitDrag;
-  // 両側の下限が取れない狭さでは半々に固定する
-  const min = total > PANEL_MIN_WIDTH_PX * 2 ? PANEL_MIN_WIDTH_PX / total : 0.5;
-  const ratio = (startPanelWidth + (event.clientX - startX)) / total;
-  panelRatio = Math.min(1 - min, Math.max(min, ratio));
-  applyPanelRatio();
-});
-const endSplitDrag = (event) => {
-  if (!splitDrag || splitDrag.pointerId !== event.pointerId) { return; }
-  splitDrag = null;
-  panelSplitter.classList.remove('dragging');
-  panelSplitter.releasePointerCapture(event.pointerId);
-  vscode.setState(Object.assign({}, vscode.getState(), { gridLivePanelRatio: panelRatio }));
-};
-panelSplitter.addEventListener('pointerup', endSplitDrag);
-panelSplitter.addEventListener('pointercancel', endSplitDrag);
-// 区切りのダブルクリック・右クリックを拡大表示の組(選択の切り替え・デバイスのメニュー)へ伝えない
-panelSplitter.addEventListener('dblclick', (event) => event.stopPropagation());
 
 const oplogView = createOplogView(oplogList, { persistKey: 'gridLiveOplogLabelWidth', defaultLabelWidth: 220 });
 const oplogByDevice = new Map(); // id → [{ time, label, ok, dsl }]
@@ -335,7 +286,6 @@ export function syncGridLivePanel(id, previewEl, anchorEl = previewEl) {
   }
   if (id === null || !previewEl) {
     if (panel.parentElement !== parking) { parking.appendChild(panel); }
-    if (panelSplitter.parentElement !== parking) { parking.appendChild(panelSplitter); }
     if (typeRow.parentElement !== parking) { parking.appendChild(typeRow); }
     boxesToggleLabel.hidden = true;
     return;
@@ -360,13 +310,10 @@ export function syncGridLivePanel(id, previewEl, anchorEl = previewEl) {
       });
     }
   }
-  // laneLog.js の syncLogMirror が組を作り直す(拡大表示を取り出して入れ直す)ので毎回位置を確かめる
+  // laneLog.js の syncSinglePair が組を作り直す(拡大表示を取り出して入れ直す)ので毎回位置を確かめる
   const anchor = anchorEl && anchorEl.parentElement === previewEl.parentElement ? anchorEl : previewEl;
   if (previewEl.parentElement && anchor.nextElementSibling !== panel) {
     anchor.after(panel);
-  }
-  if (panel.parentElement === previewEl.parentElement && panel.nextElementSibling !== panelSplitter) {
-    panel.after(panelSplitter);
   }
   // 拡大表示は作り直すときに中身を空にする(deviceTiles.js の attachDeviceMirror)ので毎回見る。
   // 入力欄は絵のすぐ下。**ずれているときだけ動かす**(入力中に動かすとフォーカスが外れる)。高さの固定費は
@@ -385,7 +332,6 @@ function detachPreview() {
   boxesOverlay.remove();
   hoverBox.remove();
   if (panel.parentElement !== parking) { parking.appendChild(panel); }
-  if (panelSplitter.parentElement !== parking) { parking.appendChild(panelSplitter); }
   if (typeRow.parentElement !== parking) { parking.appendChild(typeRow); }
 }
 

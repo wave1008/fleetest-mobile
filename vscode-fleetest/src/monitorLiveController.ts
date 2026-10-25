@@ -32,6 +32,7 @@ import {
   fallbackDeviceOption,
   hitTestElement,
   isTextInputElement,
+  withDslSelector,
   type LiveActionResult,
   type LiveDeviceOption,
   type LiveDeviceRef,
@@ -882,7 +883,7 @@ export class MonitorLiveController implements vscode.Disposable {
     // **bridgeStarting は常に false**(この経路は自動起動とは無関係の host 側の障害
     // [プロセス終了・応答タイムアウト]なので、デバイスが起動中かどうかは分からない・関係ない)
     this.settlePendingServeRequest({
-      action: pending.expectsAction ? { ok: false, error: message, bridgeStarting: false, dsl: null } : undefined,
+      action: pending.expectsAction ? { ok: false, error: message, bridgeStarting: false, dsl: null, dslSelector: null } : undefined,
       snapshot: { ok: false, error: message, bridgeStarting: false },
     });
   }
@@ -913,7 +914,7 @@ export class MonitorLiveController implements vscode.Disposable {
       const message = serveUnavailableMessage();
       // serve プロセス自体が居ない(bridgeStarting とは無関係の host 側の障害)
       return Promise.resolve({
-        action: command.cmd === "refresh" ? undefined : { ok: false, error: message, bridgeStarting: false, dsl: null },
+        action: command.cmd === "refresh" ? undefined : { ok: false, error: message, bridgeStarting: false, dsl: null, dslSelector: null },
         snapshot: { ok: false, error: message, bridgeStarting: false },
       });
     }
@@ -1020,7 +1021,8 @@ export class MonitorLiveController implements vscode.Disposable {
           this.postActionError(action.error);
         }
         if (options?.logLabel) {
-          this.postOperationLog(options.logLabel, false, action.dsl ?? undefined, loggedDeviceId);
+          this.postOperationLog(withDslSelector(options.logLabel, action.dslSelector), false,
+            action.dsl ?? undefined, loggedDeviceId);
         }
         return false;
       }
@@ -1030,7 +1032,8 @@ export class MonitorLiveController implements vscode.Disposable {
       this.post({ type: "actionError", message: "" });
       this.connectionBannerShown = false;
       if (options?.logLabel) {
-        this.postOperationLog(options.logLabel, true, action?.dsl ?? undefined, loggedDeviceId);
+        this.postOperationLog(withDslSelector(options.logLabel, action?.dslSelector), true,
+          action?.dsl ?? undefined, loggedDeviceId);
       }
       this.applySnapshotResult(snapshot);
       return snapshot.ok;

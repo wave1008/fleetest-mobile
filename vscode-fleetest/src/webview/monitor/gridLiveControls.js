@@ -102,8 +102,8 @@ export function syncGridLiveControls(id, previewEl) {
     previewEl.addEventListener('pointerdown', handlePointerDown);
     refreshFoldButtons();
   }
-  // 操作のカラムは .lane-pair の中で拡大表示の右隣(拡大表示 | 操作 | 操作パネル | 実行ログ)。laneLog.js の
-  // syncLogMirror が組を作り直す(拡大表示を取り出して入れ直す)ので毎回位置を確かめる。**ずれているときだけ動かす**
+  // 操作のカラムは .lane-pair の中で拡大表示の右隣(拡大表示 | 操作 | 操作パネル)。laneLog.js の
+  // syncSinglePair が組を作り直す(拡大表示を取り出して入れ直す)ので毎回位置を確かめる。**ずれているときだけ動かす**
   // (毎周動かすとマウスを載せたボタンのツールチップが点滅する)
   if (previewEl.parentElement && previewEl.nextElementSibling !== controls) {
     previewEl.after(controls);

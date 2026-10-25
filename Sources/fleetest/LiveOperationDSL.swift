@@ -32,12 +32,19 @@ enum LiveOperationDSL {
     /// - snapshot: 利用者が見ていた直近の観測の木(ref の解決用。操作の**前**のもの)
     static func line(for command: ApiLiveServeCommand, platform: String?,
                      snapshot: SnapshotResponse?, screen: FTRect?) -> String? {
+        rendered(for: command, platform: platform, snapshot: snapshot, screen: screen)?.line
+    }
+
+    /// 行と、その行が対象に書いたセレクタ(座標の行・対象を取らない行は nil)。
+    /// selector は操作記録の操作の列に添える(actionResult の `dslSelector`。拡張は行から切り出さない)
+    static func rendered(for command: ApiLiveServeCommand, platform: String?,
+                         snapshot: SnapshotResponse?, screen: FTRect?) -> (line: String, selector: String?)? {
         guard let step = step(for: command, platform: platform, snapshot: snapshot, screen: screen),
               var line = ScenarioCodeGen.command(for: step) else { return nil }
         if let comment = step.note, !comment.isEmpty {
             line += "  // \(comment.replacingOccurrences(of: "\n", with: " "))"
         }
-        return line
+        return (line, step.locator.map { FTSelector.serialize(primary: $0, fallbacks: []) })
     }
 
     /// 座標の表示は 0.1、秒は 0.001 に丸める(木の枠は 120.30000000000001 のような値で来る)
@@ -134,7 +141,8 @@ enum LiveOperationDSL {
             return coordinateStep(action: action, x: x, y: y)
         }
         var step = FlowStep(action: action, locator: FTSelector.parse(graded.selector).primary)
-        step.note = DraftNotes.selectorDurability(graded.durability)
+        step.note = DraftNotes.joined(DraftNotes.selectorDurability(graded.durability),
+                                      graded.pressesThePoint ? nil : DraftNotes.pressedPoint(x: x, y: y))
         return step
     }
 

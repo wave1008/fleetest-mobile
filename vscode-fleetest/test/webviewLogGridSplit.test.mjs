@@ -1,7 +1,7 @@
 // 「デバイスモニター」タブ下段の2ペイン化(実行ログビュー #log-pane / グリッドビュー #output-pane)の
 // DOM テスト。実 HTML+実バンドルを jsdom で動かす方式は webviewLanePreview.test.mjs と同じ。
 // 個々のレーンの選択絞り込み・段組みは webviewLanePreview.test.mjs が持つ。ここは
-// ①開閉(見出し行クリック)②スプリッターの出し入れ③1台選択時のログの複製(ミラー)④host との
+// ①開閉(見出し行クリック)②スプリッターの出し入れ③1台選択でも実行ログビューは畳まれずグリッドビューにログの複製を置かない④host との
 // 契約(setLogPaneHeight/setLogViewVisible/setGridViewVisible)を見る。
 // 末尾に「実行中」と「デバイス」の間のセパレーター(#devices-separator = run ボードの高さ)も持つ。
 
@@ -135,37 +135,38 @@ test("2台選択でログが2本に絞られ、拡大表示が2枚出る", (t) =
   assert.equal(visiblePreviews(document).length, 2);
 });
 
-// ---- ③: 1台選択でグリッドビューに拡大表示+ログのミラーが出て、appendLaneLine がミラーにも届く ----
+// ---- ③: 1台選択でグリッドビューに拡大表示+操作は出るが、ログの複製は無い ----
 
-test("1台選択でグリッドビューにログの複製が出て、実行ログの新しい行がミラーにも届く", (t) => {
+test("1台選択のグリッドビューに実行ログの複製は無く、拡大表示・操作カラム・操作パネルがある", (t) => {
   const { window, document } = createWebview();
   t.after(() => window.close());
   sendDevices(window, 2);
   clickTile(document, 0);
 
   const pair = document.querySelector("#preview-grid .lane-pair");
-  assert.ok(pair, "1台選択でミラーの組が出ること");
-  const mirrorBody = pair.querySelector(".lane-log-mirror .lane-body");
-  assert.ok(mirrorBody);
-  assert.equal(mirrorBody.querySelectorAll(".lane-line").length, 0, "前提: まだ行が無い");
+  assert.ok(pair, "操作カラム・操作パネルの置き場として .lane-pair は残る");
+  assert.equal(document.querySelector("#preview-grid .lane-log-mirror"), null, "ログの複製は無い");
+  assert.deepEqual(
+    [...pair.children].map((el) => el.id || el.className),
+    ["lane-preview", "grid-live-controls", "grid-live-panel"],
+    "拡大表示 | 操作 | 操作パネルだけ",
+  );
+});
+
+test("1台選択の間に届いた行は実行ログビューのレーンに出る(他の台の行は出ない)", (t) => {
+  const { window, document } = createWebview();
+  t.after(() => window.close());
+  sendDevices(window, 2);
+  clickTile(document, 0);
+  const lines = (body) => [...body.querySelectorAll(".lane-line")].map((el) => el.textContent);
+  assert.equal(visibleLogs(document).length, 1);
+  const body = visibleLogs(document)[0].querySelector(".lane-body");
 
   post(window, { type: "runEvent", action: { type: "line", laneId: "d0", text: "line A" } });
-  assert.deepEqual(
-    [...mirrorBody.querySelectorAll(".lane-line")].map((el) => el.textContent),
-    ["line A"],
-    "実行ログビュー本体に届いた行がミラーにも複製されること",
-  );
-  // 本体側(#lanes-grid)にも同じ行が届いている(ミラーは複製であって移動ではない)
-  const mainBody = visibleLogs(document)[0].querySelector(".lane-body");
-  assert.deepEqual([...mainBody.querySelectorAll(".lane-line")].map((el) => el.textContent), ["line A"]);
-
-  // 選択していないデバイス(d1)宛ての行はミラーに届かない
+  assert.deepEqual(lines(body), ["line A"]);
   post(window, { type: "runEvent", action: { type: "line", laneId: "d1", text: "line B" } });
-  assert.deepEqual(
-    [...mirrorBody.querySelectorAll(".lane-line")].map((el) => el.textContent),
-    ["line A"],
-    "他の台の行はミラーに漏れないこと",
-  );
+  assert.deepEqual(lines(body), ["line A"], "選択していない台の行は出ない");
+  assert.equal(document.querySelectorAll("#preview-grid .lane-line").length, 0, "グリッドビューにはログの行を置かない");
 });
 
 // ---- ④: 見出し行クリックで畳める・もう一度で戻る ----
@@ -344,105 +345,49 @@ test("style.css: 案内は畳んでいる側には出さない", () => {
   assert.match(styleCssSource, /:not\(\.log-view-hidden\):not\(\.log-has-overall-lines\) #lanes-empty/);
 });
 
-// ---- 1台だけ選択したときの実行ログビューの自動折り畳み(ユーザー決定 2026-09-21) ----
-// グリッドビューに同じログの複製が出るので上下に二重で出さない。**利用者の設定は書き換えない**
-// ので、1台でなくなれば元の開閉状態に戻る。
+// ---- 1台だけ選択しても実行ログビューは畳まれない(開閉は利用者の設定と見出しクリックだけ) ----
 
 const logHidden = (document) => document.getElementById("panel-devices").classList.contains("log-view-hidden");
 
-test("1台選択で実行ログビューを畳み、2台選ぶと戻す", (t) => {
-  const { window, document } = createWebview();
+test("1台選択にしても、前後で実行ログビューの開閉が変わらない", (t) => {
+  const { window, document, posted } = createWebview();
   t.after(() => window.close());
   sendDevices(window, 3);
-  assert.equal(logHidden(document), false, "前提: 両方開いている");
+  assert.equal(logHidden(document), false, "前提: 開いている");
 
   clickTile(document, 0);
-  assert.equal(logHidden(document), true, "1台選択で畳む");
+  assert.equal(logHidden(document), false, "1台選択でも畳まない");
+  assert.equal(document.getElementById("log-view-toggle").dataset.expanded, "true");
 
   clickTile(document, 1);
-  assert.equal(logHidden(document), false, "2台目を選ぶと戻す");
+  assert.equal(logHidden(document), false, "2台でも同じ");
+  clickTile(document, 1);
+  clickTile(document, 0);
+  assert.equal(logHidden(document), false, "0台でも同じ");
+  assert.deepEqual(posted.filter((m) => m?.type === "setLogViewVisible"), [], "設定は書かない");
 });
 
-test("選択を全部外したときも実行ログビューを戻す", (t) => {
+test("グリッドビューを畳んで開き直しても、1台選択の実行ログビューは開いたまま", (t) => {
   const { window, document } = createWebview();
   t.after(() => window.close());
   sendDevices(window, 2);
   clickTile(document, 0);
-  assert.equal(logHidden(document), true);
-  clickTile(document, 0);
-  assert.equal(logHidden(document), false, "0台でも畳んだままにしない");
-});
-
-test("グリッドビューを畳んでいる間は実行ログビューを畳まない", (t) => {
-  const { window, document } = createWebview();
-  t.after(() => window.close());
-  sendDevices(window, 2);
   document.getElementById("grid-view-header").click();
-  clickTile(document, 0);
-  assert.equal(logHidden(document), false, "複製が見えないので畳む理由が無い");
-});
-
-test("グリッドビューを開き直すと、1台選択のままなら実行ログビューを畳み直す", (t) => {
-  const { window, document, posted } = createWebview();
-  t.after(() => window.close());
-  sendDevices(window, 2);
-  clickTile(document, 0);
-  assert.equal(logHidden(document), true, "前提: 1台選択で畳んでいる");
-
+  assert.equal(logHidden(document), false);
   document.getElementById("grid-view-header").click();
-  assert.equal(logHidden(document), false, "複製が見えないので戻す");
-  document.getElementById("grid-view-header").click();
-  assert.equal(logHidden(document), true, "複製がまた見えるので畳み直す(同じログを上下に出さない)");
-  assert.deepEqual(
-    posted.filter((m) => m?.type === "setLogViewVisible"),
-    [],
-    "自動の畳みなので利用者の設定は保存しない",
-  );
+  assert.equal(logHidden(document), false);
 });
 
-test("グリッドビューを畳んでいる間の実行ログビューの見出しクリックは、見えている状態を反転する", (t) => {
-  const { window, document, posted } = createWebview();
-  t.after(() => window.close());
-  sendDevices(window, 2);
-  document.getElementById("grid-view-header").click();
-  clickTile(document, 0);
-  assert.equal(logHidden(document), false, "前提: 複製が見えないので開いている");
-
-  document.getElementById("log-view-header").click();
-  assert.equal(logHidden(document), true, "押した見た目どおりに畳む(空振りしない)");
-  assert.deepEqual(
-    posted.filter((m) => m?.type === "setLogViewVisible").map((m) => m.value),
-    [false],
-    "利用者の操作なので保存する",
-  );
-});
-
-test("自動で畳んだ実行ログビューは手で開ける・設定は保存しない", (t) => {
-  const { window, document, posted } = createWebview();
-  t.after(() => window.close());
-  sendDevices(window, 2);
-  clickTile(document, 0);
-  assert.equal(logHidden(document), true);
-
-  document.getElementById("log-view-header").click();
-  assert.equal(logHidden(document), false, "手で開ける");
-  assert.deepEqual(posted.filter((m) => m?.type === "setLogViewVisible"), [], "設定は変えていないので保存しない");
-
-  // 手で開けたあとに畳むと、これは利用者の操作なので保存する
-  document.getElementById("log-view-header").click();
-  // 値だけ見る(jsdom 側の realm のオブジェクトなので deepEqual は prototype で落ちる)
-  assert.deepEqual(posted.filter((m) => m?.type === "setLogViewVisible").map((m) => m.value), [false]);
-});
-
-test("利用者が畳んでいる実行ログビューを、選択の変化で勝手に開かない", (t) => {
+test("利用者が畳んでいる実行ログビューは、1台選択でも他の選択の変化でも開かない", (t) => {
   const { window, document } = createWebview();
   t.after(() => window.close());
   sendDevices(window, 3);
   document.getElementById("log-view-header").click();
   assert.equal(logHidden(document), true, "前提: 手で畳んだ");
   clickTile(document, 0);
+  assert.equal(logHidden(document), true, "1台選択でも開かない");
   clickTile(document, 1);
-  assert.equal(logHidden(document), true, "2台選んでも開かない(戻すのは自動で畳んだぶんだけ)");
+  assert.equal(logHidden(document), true, "2台選んでも開かない");
 });
 
 // ---- host との契約(setLogPaneHeight/setLogViewVisible/setGridViewVisible) ----

@@ -31,8 +31,12 @@ final class InterruptRelayEarlyRegistrationWiringTests: XCTestCase {
         try String(contentsOf: Self.repoRoot.appendingPathComponent(path), encoding: .utf8)
     }
 
+    /// **コメント行は数えない**(規則への参照としてコメントに `InterruptRelay.observing` が書かれる = 登録ではない)
     private func count(_ needle: String, in text: String) -> Int {
-        text.components(separatedBy: needle).count - 1
+        let code = text.split(separator: "\n", omittingEmptySubsequences: false)
+            .filter { !$0.trimmingCharacters(in: .whitespaces).hasPrefix("//") }
+            .joined(separator: "\n")
+        return code.components(separatedBy: needle).count - 1
     }
 
     /// `api run` の唯一の登録元は `ApiRunCommand.run()`(ロック取得の直前)。

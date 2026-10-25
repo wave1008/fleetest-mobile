@@ -394,7 +394,7 @@ test("操作のカラムは拡大表示の右隣・パネルの左隣に並び�
   clickTile(document, 0);
   const pair = document.querySelector("#preview-grid .lane-pair");
   assert.deepEqual([...pair.children].map((el) => el.id || el.className.split(" ")[0]),
-    ["lane-preview", "grid-live-controls", "grid-live-panel", "grid-live-panel-splitter", "lane"], "拡大表示 | 操作 | 操作パネル | 区切り | 実行ログ");
+    ["lane-preview", "grid-live-controls", "grid-live-panel"], "拡大表示 | 操作 | 操作パネル");
   assert.equal(document.querySelector("#preview-grid .lane-preview #grid-live-controls"), null, "絵の下には置かない");
 
   let moved = 0;

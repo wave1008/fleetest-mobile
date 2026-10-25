@@ -94,9 +94,7 @@ export const webviewMonitorBStrings = {
   },
 
   // laneLog.js
-  // 実行ログビューの見出し(常に titleRunLog。静的 HTML 側の既定は panels.common.runLog)。
-  // グリッドビューの見出しは常に titleDevices。1台選択時のミラー(実行ログの複製)の見出しにも titleRunLog を使う。
-  "wvMonitor2.laneLog.titleRunLog": { ja: "実行ログ", en: "Run Log" },
+  // グリッドビューの見出しは常に titleDevices(実行ログビューの見出しは静的 HTML の panels.common.runLog)。
   "wvMonitor2.laneLog.titleDevices": { ja: "選択したデバイス", en: "Selected devices" },
   // グリッドビューの見出しの台数 = **選択した台数**(ラインビュー側の
   // wvMonitor.lineView.deviceCount は全台)。数える対象は違うが形は揃える
