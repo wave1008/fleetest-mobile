@@ -29,7 +29,7 @@ public struct LocalConfig: Codable, Sendable, Equatable {
     /// **この機械**の FM 同時実行枠。nil なら `FMCallSlots.defaultConcurrency`。
     /// リモート機のぶんは `remoteHosts[].fmConcurrency` —— **"local" は登録簿の予約名**
     /// (RemoteHostRegistry.validateName)なので、手元だけはここに置く。
-    /// 機械によっては FM を2並列以上で呼ぶと壊れる(RR-19)
+    /// 既定と壊れる機械の扱いは FMCallSlots 冒頭
     public var fmConcurrency: Int?
     /// **この機械**の「マシン有効」(設定タブの固定行)。false だけを保存する(nil = 有効)。
     /// リモート機のぶんは `remoteHosts[].enabled`(fmConcurrency と同じ理由でここに置く)

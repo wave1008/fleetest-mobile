@@ -733,9 +733,9 @@ struct RemoteCommand: AsyncParsableCommand {
                 + "unless --remote-dir is given explicitly on the dispatch command)"))
             var dir: String?
 
-            @Option(help: ArgumentHelp("Cap concurrent FM calls on this machine. "
-                + "Some machines fail FM requests when two or more image inferences overlap "
-                + "(measurements: docs/remote-runner/). Omit to keep the current setting"))
+            @Option(help: ArgumentHelp("Cap concurrent FM calls on this machine (default: 1). "
+                + "Raising it reduces waiting for the FM slot but makes each call slower "
+                + "(measurements: docs/performance-tuning/). Omit to keep the current setting"))
             var fmConcurrency: Int?
 
             @Flag(help: "Drop this machine's FM concurrency setting (fall back to the runner's default)")

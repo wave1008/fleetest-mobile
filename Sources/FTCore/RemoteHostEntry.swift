@@ -16,7 +16,7 @@ public struct RemoteHostEntry: Codable, Equatable, Sendable {
     /// ベースディレクトリ。nil なら CLI 既定("~/fleetest-runner")
     public let dir: String?
     /// この機械での FM 呼び出しの同時実行枠。nil ならランナー側の既定(`FMCallSlots.defaultConcurrency`)。
-    /// **機械によっては 2 並列以上で FM が壊れる**(実測と経緯は docs/remote-runner/)。
+    /// 既定と壊れる機械の扱いは FMCallSlots 冒頭。
     /// ディスパッチが `FT_FM_CONCURRENCY` として運ぶ(FTRemote/RemoteDispatch.remoteRunCommand)
     public let fmConcurrency: Int?
     /// 設定タブのバッジ色(`MachineBadgeColor.palette` の鍵)。**唯一の決定点は

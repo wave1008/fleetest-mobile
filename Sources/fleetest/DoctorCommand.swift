@@ -534,7 +534,7 @@ struct Doctor: AsyncParsableCommand {
         ConsoleOut.out(String(format: "  calls         %5d", summary.calls))
         ConsoleOut.out(String(format: "  failures      %5d", summary.failures))
         // **「FM の天井」を断定しない**。この数字は FMCallAdmission/FMCallSlots を通していないので FM 単体の能力で、
-        // production の FM 呼び出しは全部あの門で許可枠(既定5・FT_FM_CONCURRENCY で調整)に絞られる
+        // production の FM 呼び出しは全部あの門で許可枠(既定1・FT_FM_CONCURRENCY で調整)に絞られる
         // (= run 中に見えるレートとは別物)。天井を文言に焼き付けると、環境が変わったときに
         // 数字と矛盾する断定を並べて出すことになる
         ConsoleOut.out(String(format: "  throughput    %.2f calls/s", summary.throughputPerSecond))

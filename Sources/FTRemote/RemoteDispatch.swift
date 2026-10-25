@@ -1196,8 +1196,7 @@ public enum RemoteShell {
     /// SSH の Background セッションのまま直接実行する(ユーザーの launchd ドメインへ昇格させる
     /// 処理は挟まない)。コンソールにログインしている限りそのままで launchd ドメイン
     /// (CoreSimulator 等)へ到達できる(実測)
-    /// `fmConcurrency` は登録簿の欄(`RemoteHostEntry`)。**機械によっては FM を 2 並列以上で
-    /// 呼ぶと壊れる**(実測と経緯は docs/remote-runner/)ので、枠を機械ごとに絞れるようにする。
+    /// `fmConcurrency` は登録簿の欄(`RemoteHostEntry`)。枠を機械ごとに変えられるようにする(経緯は FMCallSlots 冒頭)。
     /// nil のときは**1バイトも足さない** —— ランナー側の既定(`FMCallSlots.defaultConcurrency`)に任せる
     /// `developerDir` はディスパッチが選んだ Xcode(`FTRemote.XcodeSelection`。
     /// RR-7)。非 nil のときだけ `export DEVELOPER_DIR=` を足す
