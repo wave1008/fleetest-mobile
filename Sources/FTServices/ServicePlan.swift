@@ -1,5 +1,5 @@
 // ComposePolicy.Checked → 実行計画。純粋関数(ファイルシステム・ネットワーク・時刻・乱数に触れない)。
-// 2つのランタイム(Docker / Apple)は計画を実行するだけ。設計は docs/remote-runner.md §17。
+// 2つのランタイム(Docker / Apple)は計画を実行するだけ。設計は RR-17。
 
 import CryptoKit
 import Foundation

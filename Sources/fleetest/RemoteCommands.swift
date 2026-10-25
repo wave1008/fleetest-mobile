@@ -1,11 +1,11 @@
 // RemoteCommands.swift
-// `fleetest remote status` / `fleetest remote clean` (docs/remote-runner.md §16.4・§16.5)。
+// `fleetest remote status` / `fleetest remote clean` (RR-16.4・RR-16.5)。
 // フリート運用の診断・掃除。純粋ロジックは Sources/FTRemote/RemoteDispatch.swift 側
 // (RemoteStatusProbe/RemoteCleanPlan、単体テスト対象)。
 // `remote setup` / `remote exec` は Sources/fleetest/RemoteSetupCommand.swift(RemoteCommand の
 // extension として Setup/Exec/Align/Teardown を定義。ここではサブコマンド一覧への登録だけ行う)。
 // `remote machines` (list/add/remove) はここで定義する。登録簿(machine→ssh 実体)は
-// LocalConfig.remoteHosts に置く(docs/remote-runner.md §13・§15.2)。`--runner`(status/clean/
+// LocalConfig.remoteHosts に置く(RR-13・RR-15.2)。`--runner`(status/clean/
 // unlock)・`<runner>` positional(setup/align/exec/teardown)を受ける全コマンドは
 // RemoteHostResolver.resolve を通す(個別に登録簿を読む実装を増やさない)。
 
@@ -30,7 +30,7 @@ struct RemoteCommand: AsyncParsableCommand {
     struct Status: AsyncParsableCommand {
         static let configuration = CommandConfiguration(
             commandName: "status",
-            abstract: "Show reachability, login state, git revision, toolchain, and free disk space for a fleet of remote runners (docs/remote-runner.md §16.5)")
+            abstract: "Show reachability, login state, git revision, toolchain, and free disk space for a fleet of remote runners (RR-16.5)")
 
         @Option(name: .customLong("runner"), parsing: .upToNextOption,
                 help: "Remote runner to check: a registered machine (fleetest remote machines) or a raw user@host/host. Repeatable, required")
@@ -195,7 +195,7 @@ struct RemoteCommand: AsyncParsableCommand {
             return reading.text?.state == .alive && reading.vision?.state == .alive ? "ok" : "-"
         }
 
-        /// 占有の1セル。**「誰が使っているか」を毎回 ssh で見に行かせないための欄**(§18.1 #1)。
+        /// 占有の1セル。**「誰が使っているか」を毎回 ssh で見に行かせないための欄**(RR-18.1 #1)。
         /// 判定不能(旧ランナー・ブロックが読めない)は "-" で、空きと区別する
         static func lockCell(_ probe: RemoteDispatchLock.Probe?) -> String {
             switch probe {
@@ -261,7 +261,7 @@ struct RemoteCommand: AsyncParsableCommand {
             commandName: "unlock",
             abstract: "Release a dispatch lock that a dead dispatch left behind on a remote runner,"
                 + " or (--runner local) the one left on this Mac"
-                + " (never releases a lock whose run is still alive unless --force; docs/remote-runner.md §5)")
+                + " (never releases a lock whose run is still alive unless --force; RR-5)")
 
         @Option(name: .customLong("runner"), parsing: .upToNextOption,
                 help: "Remote runner: a registered machine (fleetest remote machines), a raw user@host/host, or `local` for this Mac. Repeatable, required")
@@ -479,7 +479,7 @@ struct RemoteCommand: AsyncParsableCommand {
     struct Clean: AsyncParsableCommand {
         static let configuration = CommandConfiguration(
             commandName: "clean",
-            abstract: "Stop orphaned bridges/simulators and delete results, reports, and dispatch leftovers older than --keep-days on remote runners (docs/remote-runner.md §16.4)")
+            abstract: "Stop orphaned bridges/simulators and delete results, reports, and dispatch leftovers older than --keep-days on remote runners (RR-16.4)")
 
         @Option(name: .customLong("runner"), parsing: .upToNextOption,
                 help: "Remote runner to clean: a registered machine (fleetest remote machines) or a raw user@host/host. Repeatable, required")
@@ -496,7 +496,7 @@ struct RemoteCommand: AsyncParsableCommand {
         var dryRun = false
 
         @Flag(name: .customLong("ignore-lock"),
-              help: "Clean even while a dispatch holds the host's lock (this kills that run; docs/remote-runner.md §18.1)")
+              help: "Clean even while a dispatch holds the host's lock (this kills that run; RR-18.1)")
         var ignoreLock = false
 
         func run() async throws {
@@ -508,7 +508,7 @@ struct RemoteCommand: AsyncParsableCommand {
                     + " Pass --dry-run first to preview what would be removed.")
             }
             var failures = 0
-            // 破壊的操作なので並列にしない(1台ずつ結果を見せる。docs/remote-runner.md §16.4)
+            // 破壊的操作なので並列にしない(1台ずつ結果を見せる。RR-16.4)
             for raw in hosts {
                 ConsoleOut.out("== \(raw) ==")
                 do {
@@ -549,7 +549,7 @@ struct RemoteCommand: AsyncParsableCommand {
             let target = resolved.hostSpec.sshTarget
             let layout = try Self.resolveLayout(target: target, remoteDirRaw: resolved.remoteDirRaw)
 
-            // **走っている run を殺さない**(docs/remote-runner.md §18.1 #6)。共有フリートでは
+            // **走っている run を殺さない**(RR-18.1 #6)。共有フリートでは
             // 掃除の相手が他人の実行中の環境でありうるので、デバイスに触る前に占有を見る。
             // **dry-run でも読む**(読むだけ・解放や変更はしない) —— 読まずに素通しすると、
             // 本番なら refuse するデバイスでも dry-run だけ「掃除する」と予告してしまう
@@ -565,7 +565,7 @@ struct RemoteCommand: AsyncParsableCommand {
                 case .refuse(let reason):
                     throw CleanRefused(reason: reason)
                 }
-                // デバイスを止める前に片付ける(docs/remote-runner.md §17)。順序は逆にしない ——
+                // デバイスを止める前に片付ける(RR-17)。順序は逆にしない ——
                 // 終了スクリプトはデバイスに触りうる(adb reverse の解除など)
                 ConsoleOut.out("→ running teardown scripts left behind by dead runs")
                 runReapAcrossIssuers(target: target, layout: layout)
@@ -622,7 +622,7 @@ struct RemoteCommand: AsyncParsableCommand {
         }
 
         /// 発行者ごとのディスク使用量(`users/*/work`)。**ディスクはホスト共有資源**
-        /// なので「誰のぶんが食っているか」が見えないと消す判断ができない(§18.1)。
+        /// なので「誰のぶんが食っているか」が見えないと消す判断ができない(RR-18.1)。
         /// du はツリーを歩くので遅い —— 掃除という重い操作の中でだけ撃つ(remote status には置かない)
         private func printDiskByIssuer(target: String, layout: RemoteLayout) {
             guard let result = try? Shell.run(remoteSSHBase + [target, RemoteDiskUsage.command(layout: layout)])
@@ -673,7 +673,7 @@ struct RemoteCommand: AsyncParsableCommand {
     struct Machines: AsyncParsableCommand {
         static let configuration = CommandConfiguration(
             commandName: "machines",
-            abstract: "Manage the machine registry (local alias -> ssh destination; docs/remote-runner.md §13)",
+            abstract: "Manage the machine registry (local alias -> ssh destination; RR-13)",
             subcommands: [List.self, Add.self, Remove.self],
             defaultSubcommand: List.self)
 
@@ -692,7 +692,7 @@ struct RemoteCommand: AsyncParsableCommand {
                     Self.emitTable(entries)
                     for target in RemoteHostRegistry.duplicateTargets(entries) {
                         ConsoleOut.out("⚠️ multiple entries point at the same host: \(target)"
-                            + " (dispatching to both fights over the same devices; docs/remote-runner.md §13)")
+                            + " (dispatching to both fights over the same devices; RR-13)")
                     }
                 }
             }
@@ -735,7 +735,7 @@ struct RemoteCommand: AsyncParsableCommand {
 
             @Option(help: ArgumentHelp("Cap concurrent FM calls on this machine. "
                 + "Some machines fail FM requests when two or more image inferences overlap "
-                + "(measurements: docs/remote-runner.md). Omit to keep the current setting"))
+                + "(measurements: docs/remote-runner/). Omit to keep the current setting"))
             var fmConcurrency: Int?
 
             @Flag(help: "Drop this machine's FM concurrency setting (fall back to the runner's default)")
@@ -754,7 +754,7 @@ struct RemoteCommand: AsyncParsableCommand {
             @Option(help: ArgumentHelp("Pin the Xcode this machine's dispatches use when it has more than one "
                 + "installed (path to the Xcode.app bundle, e.g. /Applications/Xcode_27.app). "
                 + "Omit to keep the current pin; without a pin, dispatch auto-selects by matching this Mac's "
-                + "toolchain (docs/remote-runner.md §7)"))
+                + "toolchain (RR-7)"))
             var developerDir: String?
 
             @Flag(help: "Drop this machine's Xcode pin (fall back to automatic selection)")
@@ -820,7 +820,7 @@ struct RemoteCommand: AsyncParsableCommand {
 }
 
 /// `fleetest remote machines list --json` の出力全体
-// MARK: - issuer resolution (choke point for every RemoteLayout construction; §18.2)
+// MARK: - issuer resolution (choke point for every RemoteLayout construction; RR-18.6)
 
 /// プロセス内で1回だけ、既定 issuer(USER@hostname フォールバック)を使った旨を stderr へ警告する
 /// (actor は使わない: probe() が並列に呼ぶため NSLock で足りる最小限の排他だけ持つ)
@@ -856,7 +856,7 @@ func resolveLayoutIssuer() throws -> String {
 // unlock の --runner、remote setup・align・exec・teardown の positional runner)
 
 /// `--host`/`--runner`/positional runner の解決結果。**登録簿が優先**: 同名の登録があればそれを
-/// 使い、無ければ raw をそのまま ssh 宛先として扱う(docs/remote-runner.md §13)
+/// 使い、無ければ raw をそのまま ssh 宛先として扱う(RR-13)
 struct ResolvedRemoteHost {
     let hostSpec: RemoteHostSpec
     /// 明示 `--remote-dir` > 登録簿の dir > CLI 既定("~/fleetest-runner")
@@ -865,7 +865,7 @@ struct ResolvedRemoteHost {
     let registeredName: String?
 
     /// 登録名を使ったときに実行冒頭で出す1行。黙って別のマシンへ送らない
-    /// (docs/remote-runner.md §13 レビュー指摘)
+    /// (RR-13 レビュー指摘)
     var announcement: String? {
         registeredName.map { "==> host \($0) → \(hostSpec.sshTarget)" }
     }
@@ -900,7 +900,7 @@ enum RemoteHostResolver {
             // (RemoteCommands.Clean.resolveLayout のコメントと同じ罠)
             throw RemoteDispatchError.invalidHost(
                 "must not be \"local\" or empty (\"local\" is reserved for local execution; "
-                + "docs/remote-runner.md §13): \"\(rawHost)\"")
+                + "RR-13): \"\(rawHost)\"")
         case .registered(let entry):
             let dir = remoteDirOverride ?? entry.dir ?? defaultRemoteDir
             try RemoteLayout.validateBase(dir)
@@ -1047,7 +1047,7 @@ enum RemoteStatusProbing {
             let layout = RemoteLayout(base: RemoteLayout.resolveBase(resolved.remoteDirRaw, home: "$HOME"),
                                       issuer: try resolveLayoutIssuer(), home: "$HOME")
             // **ディスパッチが実際に使う Xcode と同じ解決を通す**(RemoteRunDispatcher.checkCompatibility
-            // と同じ規律。docs/remote-runner.md §7)—— ここで ambient のまま toolchain を読むと、
+            // と同じ規律。RR-7)—— ここで ambient のまま toolchain を読むと、
             // 表と実際の run が食い違う
             let xcodeOutcome = resolveXcodeSelection(target: target)
             let command = RemoteStatusProbe.command(layout: layout, simulatorRuntime: wantRuntime,
@@ -1106,7 +1106,7 @@ struct HostRow: Sendable {
     let detail: String?
     let status: RemoteHostStatus?
     let fmOK: Bool?
-    /// 一致0個・複数(候補一覧つき。docs/remote-runner.md §7)。nil = pin 済み/自動選択できた/
+    /// 一致0個・複数(候補一覧つき。RR-7)。nil = pin 済み/自動選択できた/
     /// 候補が無く ambient。**HostReport.init がこれを verdict.blocking(toolchain 接頭辞)へ畳む**。
     /// 既定 nil ―― 既存の5引数呼び出し(不到達・接続失敗の早期 return)を壊さない。
     /// **`let` にしない** —— 既定値つきの `let` は memberwise init から欄ごと落ちる
@@ -1189,7 +1189,7 @@ private struct StatusHostJSON: Encodable {
     /// 占有("free" / "held by <issuer>" / "held (holder unknown)" / "-" = 判定不能)。
     /// 文字列1つに畳むのは表示用の欄だから(機械判定に使うなら probe をそのまま出す)
     let lock: String?
-    /// Xcode の選択が一致0個・複数で拒否されたときの候補一覧つきメッセージ(docs/remote-runner.md §7)。
+    /// Xcode の選択が一致0個・複数で拒否されたときの候補一覧つきメッセージ(RR-7)。
     /// non-nil なら `toolchainCompatible` は false(TOOLCHAIN の ❌ と同じ判定)
     let xcodeSelectionError: String?
     let error: String?
@@ -1219,7 +1219,7 @@ func revisionIsPublished(repoRoot: URL, revision: String) -> Bool {
     return !result.output.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
 }
 
-/// rev 不一致の解消の向き(docs/remote-runner.md §18.3 規則1)。**fetch はしない**
+/// rev 不一致の解消の向き(RR-18.3 規則1)。**fetch はしない**
 /// (チェック経路にネットワーク副作用を持ち込まない。update-check.sh と同じ思想) ——
 /// remoteRevision がこの clone に無ければ .unknown。RemoteRunDispatcher.checkCompatibility /
 /// ApiRemoteCompatCommand が共有する

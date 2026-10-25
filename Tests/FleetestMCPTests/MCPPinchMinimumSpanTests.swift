@@ -1,5 +1,5 @@
 // Android の座標ピンチの既定半径は、指の最大間隔が最小スケール距離(27 mm)を超えるように広げる
-// (§19 M5: Pixel 3a で既定 238 px = 間隔 428 px が 468 px を下回り、一切ズームしなかった)。
+// (Pixel 3a で既定 238 px = 間隔 428 px が 468 px を下回り、一切ズームしなかった)。
 // 判定は純関数 `MCPServer.pinchRadiusHonouringMinimumSpan` に置く(AndroidDriver は FakeDriver から模せない)
 
 import XCTest

@@ -1,5 +1,5 @@
 // HooksCommand.swift
-// 実行プロファイルの開始/終了スクリプト(docs/remote-runner.md §17)の保守口。
+// 実行プロファイルの開始/終了スクリプト(RR-17)の保守口。
 // 実行そのものは run が行う(RunHookRunner)。ここにあるのは、run が defer に到達できずに
 // 死んだあとの後始末だけ ―― `remote clean` が誰も見ていないランナー機に対して撃つ。
 

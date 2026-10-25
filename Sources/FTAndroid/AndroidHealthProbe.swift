@@ -39,7 +39,7 @@ public enum AndroidHealthProbe {
     public static let blankScreenMaxPNGBytes = 30_000
 
     /// `dumpsys SurfaceFlinger` の GLES 行から実描画モードを判定する(判定基準は
-    /// docs/performance-tuning.md §7)。SwiftShader は文字列上 Metal と共起しうるため
+    /// PT-7)。SwiftShader は文字列上 Metal と共起しうるため
     /// 安全側(cpu 判定)を優先して先にチェックする
     static func renderMode(fromSurfaceFlinger output: String) -> String? {
         guard let glesLine = output.split(separator: "\n").first(where: { $0.contains("GLES:") }) else {
@@ -150,7 +150,7 @@ public enum AndroidHealthProbe {
     /// 固着した表示凍結(blank)を画面 sleep→wake で修復する。凍結は複数エミュレータ同時描画時の
     /// ホスト GPU(-gpu host)側の合成バッファ固着で、表示パイプラインの無効化→再合成が唯一の
     /// 軽量修復(readback = screencap/screenrecord では回復しない。adb reboot ~60s は不要。
-    /// 対照実験、docs/performance-tuning.md §7)。
+    /// 対照実験、PT-7)。
     /// 1サイクル(dwell 1.5s ≈4s)で直らない抵抗性の変種が実在し(wake 後 6s 待っても blank)、
     /// dwell 3s の2サイクル目で回復する(実測)。成功時 ~4s・抵抗変種のみ ~11s。
     /// 注入は gRPC 優先(sleep/wake ≈1.2ms×2・adb 死亡個体にも届く)・adb フォールバック

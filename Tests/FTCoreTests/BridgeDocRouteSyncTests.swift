@@ -1,8 +1,8 @@
-// docs/design.md のエンドポイント表が**実態(BridgeContractTests のルート表)とズレていない**ことを守る。
+// docs/design/bridge.md のエンドポイント表が**実態(BridgeContractTests のルート表)とズレていない**ことを守る。
 //
 // 設計文書は受け手も保守者も最初に読む場所なので、本数が古いと「ここに無いルートは無い」と
 // 誤読される。実際 2026-08-04 にジェスチャ2本を足したとき、表は 11/16/13/13 のまま残った。
-// **唯一の正は BridgeContractTests のルート表**で、design.md はその写し(あちらにもそう書いてある)。
+// **唯一の正は BridgeContractTests のルート表**で、design/bridge.md はその写し(あちらにもそう書いてある)。
 
 import XCTest
 @testable import FTCore
@@ -15,7 +15,7 @@ final class BridgeDocRouteSyncTests: XCTestCase {
                 .deletingLastPathComponent()   // FTCoreTests
                 .deletingLastPathComponent()   // Tests
                 .deletingLastPathComponent()   // リポジトリルート
-                .appendingPathComponent("docs/design.md")
+                .appendingPathComponent("docs/design/bridge.md")
             return try String(contentsOf: url, encoding: .utf8)
         }
     }
@@ -34,10 +34,10 @@ final class BridgeDocRouteSyncTests: XCTestCase {
         guard let range = text.range(of: #"上記\d+個は3実装共通のコア"#, options: .regularExpression),
               let digits = text[range].split(separator: "個").first?.filter(\.isNumber),
               let count = Int(digits) else {
-            return XCTFail("design.md の「上記N個は3実装共通のコア」が見つかりません")
+            return XCTFail("design/bridge.md の「上記N個は3実装共通のコア」が見つかりません")
         }
         XCTAssertEqual(count, commonCore.count,
-                       "design.md の共通コア本数が実態とズレています(唯一の正は BridgeContractTests)")
+                       "design/bridge.md の共通コア本数が実態とズレています(唯一の正は BridgeContractTests)")
     }
 
     /// 各ブリッジの合計本数(表の右端の数)
@@ -52,7 +52,7 @@ final class BridgeDocRouteSyncTests: XCTestCase {
             guard let line = text.split(separator: "\n").first(where: {
                 $0.hasPrefix("| \(label) |")
             }) else {
-                XCTFail("design.md に \(label) の行がありません")
+                XCTFail("design/bridge.md に \(label) の行がありません")
                 continue
             }
             let cells = line.split(separator: "|").map { $0.trimmingCharacters(in: .whitespaces) }

@@ -1,6 +1,6 @@
 // 座標形の ft_tap / ft_double_tap / ft_long_press が**ソフトキーボードの中**を撃つときの警告。
 // ref 形(RefGuard.keyboardWarning)は言うのに座標形は無警告で done と返し、実機 Pixel 3a では
-// 欄にスペースが入った(§19 担当報告の再現)。拒否はしない(キーを押す意図があり得る)。
+// 欄にスペースが入った。拒否はしない(キーを押す意図があり得る)。
 
 import XCTest
 import FTCore

@@ -2,7 +2,7 @@
 // `<data>/Library/Application Support/PRBPosterExtensionDataStore/…/versions/<N>/scratch/
 // SnapshotCache.cachedb`(壁紙プレビュー画像のキャッシュ)を作り、古い版の分を消さない
 // (Apple の公式な認知は確認できていない。起動のたびではない —— 消さずに再起動しても束は増えず、版の数が増えた。
-// 実測 15 台で合計約 187GB・1台最大 30GB。docs/design.md §12.4.2)。
+// 実測 15 台で合計約 187GB・1台最大 30GB。DS-12.4.2)。
 // 起動の直前の呼び出しは `SimulatorBootCleanup.beforeBoot` が入口(呼び出し口の一覧は
 // Tests/FTCoreTests/SimulatorPosterCachePurgeWiringTests.swift が固定する)。ここを直接呼ぶのは `fleetest clean`。
 //
@@ -14,7 +14,7 @@
 // ②名前が `RuntimeSnapshot` で始まるファイル(ホーム画面の描画スナップショット `RuntimeSnapshot-<hash>-home.atx`
 // と対のメタデータ plist。今の壁紙の `configurations/<UUID>/versions/<N>/` の直下にハッシュ違いで作り足され、
 // 古いものが消えない。1枚約 3MB・1台 81〜271 枚を実測)。どちらも停止中に全部消して起動すると、今の分だけが
-// 作り直され、ホーム画面・壁紙・シナリオが正常だった(docs/design.md §12.4.2)。
+// 作り直され、ホーム画面・壁紙・シナリオが正常だった(DS-12.4.2)。
 // それ以外(configurations・descriptors の本体・壁紙の設定・データベース)には一切触れない。
 // 失敗(権限・途中で消えた等)は無視して次へ進む(起動を止めない)。
 

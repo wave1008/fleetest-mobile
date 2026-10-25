@@ -219,7 +219,7 @@ struct Doctor: AsyncParsableCommand {
         await reportUnmanagedBridges()
 
         // Docker の管理口が TCP で LAN に出ていると、fleetest が起こすコンテナからホストのファイルをマウントできる
-        // (docs/remote-runner.md §17)。サービスの起動は断る側・ここは警告(サービスを使わない機械の doctor を赤にしない)
+        // (RR-17)。サービスの起動は断る側・ここは警告(サービスを使わない機械の doctor を赤にしない)
         switch DockerTCPExposure.scan() {
         case .clear: break
         case .exposed(let listeners):

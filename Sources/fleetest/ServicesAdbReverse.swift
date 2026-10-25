@@ -1,4 +1,4 @@
-// Android 実機への `adb reverse`(docs/remote-runner.md §17「実機」)。親(fleetest)が撃つ —— スクリプトとシナリオは adb に繋げない。
+// Android 実機への `adb reverse`(RR-17「実機」)。親(fleetest)が撃つ —— スクリプトとシナリオは adb に繋げない。
 // 張るのは TCP の公開ポートごと(デバイスの <port> → ホストの 127.0.0.1:<port>。同じ番号)。解除は控えの `adbReverse` から
 // (通常終了・孤児の回収・`services down` が同じ `ServicesTeardown.remove` を通る)。
 // 解除に失敗した転送(adb が応答しない等)はデバイスに残る = 既知の制約: 次の起動は同じ宛先なら触らず、公開ポートを変えたら旧い

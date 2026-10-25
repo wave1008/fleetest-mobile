@@ -4,9 +4,9 @@
 // FM と同一の矩形**を切り出すので、両者が食い違わない。
 //
 // 既定は on: FM の段に届いた実 run の crop 163 枚のうち **97% が OCR で片付き**、残りは FM に回るので
-// 誤った赤は増えない(docs/poc-fm-occlusion-guard.md §5.17)。**「丸ごと読めなかった」だけを反転の根拠に
+// 誤った赤は増えない(OG-5.17)。**「丸ごと読めなかった」だけを反転の根拠に
 // しない** —— 日本語モデルを載せた版では可視なテキストの 29% が1文字誤読(`swipe=down`→`swipe=aown`)した。
-// 反転するのは FM と突き合わせて両方が見えないと言った回か、FM の段が無い・使えないときの OCROnlyVisibility だけ(§5.22)。
+// 反転するのは FM と突き合わせて両方が見えないと言った回か、FM の段が無い・使えないときの OCROnlyVisibility だけ(OG-5.22)。
 
 import CoreGraphics
 import CoreText
@@ -347,7 +347,7 @@ public enum RegionText {
         // (待つものが無いのに子→親の deadlineExclusion を毎ステップ 2 行ずつ流すことになる)
         // ただし**探り直しは頼む**(待たない)。開始時の探りは予算(modelCompileRetryBudget)内に読めなかっただけで、
         // 負荷の下ではそれが普通に起きる(実測: 負荷の高い時間帯のシナリオの約 6 割が開始時に読めず、そのプロセスでは
-        // 一度も近道を撃てなかった = 可読の文字への FM の空振りがそのまま赤になった。maintainer-notes §84.4)
+        // 一度も近道を撃てなかった = 可読の文字への FM の空振りがそのまま赤になった。MN-84.4)
         if modelCompileFinishOverrideForTesting == nil, modelCompileFinishSignal.isFinished {
             requestReprobeIfDue()
             return .finishedUnready(waited: .zero)
@@ -376,7 +376,7 @@ public enum RegionText {
     /// 鍵は**プロセス名とコード署名の Identifier の組**(中身・置き場所は見ない)。SwiftPM の Debug ビルドは
     /// Identifier が `<名前>-55554944<LC_UUID>` で中身が変わるたびに変わるので、`ScenarioHost.build` が
     /// 製品名に揃える(`pinSigningIdentifier`。揃えないと作り直すたびにコールド)。モデルごとに最新の 1 つしか持たない。
-    /// 実測は docs/performance-tuning.md §3.33。
+    /// 実測は PT-3.33。
     /// つまり保守者はコミットのたびに SUT ごと 1 回払い直す(背景・供給と並行)。受け手は導入ごとに 1 回。
     /// だから **同じプロセス名の、待てるプロセス**(`fleetest-scenarios-<project> compile-ocr`)で
     /// 1回撃ち切る。以後そのプロセス名の初回読みは 160〜290ms になる。
@@ -735,7 +735,7 @@ public enum RegionText {
     /// ANE を避ける理由は実行時のほう: ANE は FM フラップ(fm-flap)と同じ部品なので、判定の近道をそこに依存させない
     /// (定常の所要は英語なら装置で同じ・日本語は CPU のほうが速い = 130〜139ms 対 ANE 228〜242ms)。
     /// **指定しても `_e5` の検出・向き・ラテンの認識器は aned に ANE のプログラムとして読み込まれる**(実行装置は未確認)。
-    /// 指定がそのまま効くのは日本語の認識器(旧形式)だけ(docs/performance-tuning.md §3.33)。
+    /// 指定がそのまま効くのは日本語の認識器(旧形式)だけ(PT-3.33)。
     /// 装置を変えると読みが変わる(固定コーパス: selected-row40 の ja+en ×3 は ANE では読めて CPU では
     /// 読めない。production の言語規則の経路は両装置で同じ)。
     /// `FT_OCR_COMPUTE=default` は Vision の既定(ANE 込み)へ戻す**計測用の口**

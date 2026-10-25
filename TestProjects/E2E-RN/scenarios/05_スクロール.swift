@@ -1,6 +1,6 @@
 // 05_スクロール.swift
 // fleetest 機能: `scrollTo` による要素到達と、「exist/textIs は非スクロール(現在画面のみ判定)」の
-// 契約検証(docs/design.md §10)・ラベルセレクタでの行タップ・`swipeElementToElement` /
+// 契約検証(DS-10)・ラベルセレクタでの行タップ・`swipeElementToElement` /
 // `notExist(scroll:)` / 固定ヘッダを指定した `scrollFrame` / `textContains`・`textMatches` /
 // Shirates 準拠のスクロールコマンド(`scrollToBottom`/`scrollToTop`/`scrollDown(repeat:)`/
 // `withScrollDown`/`tap(scroll:)`)をまとめて検証する。

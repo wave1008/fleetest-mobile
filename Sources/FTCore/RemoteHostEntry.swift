@@ -16,7 +16,7 @@ public struct RemoteHostEntry: Codable, Equatable, Sendable {
     /// ベースディレクトリ。nil なら CLI 既定("~/fleetest-runner")
     public let dir: String?
     /// この機械での FM 呼び出しの同時実行枠。nil ならランナー側の既定(`FMCallSlots.defaultConcurrency`)。
-    /// **機械によっては 2 並列以上で FM が壊れる**(実測と経緯は docs/remote-runner.md)。
+    /// **機械によっては 2 並列以上で FM が壊れる**(実測と経緯は docs/remote-runner/)。
     /// ディスパッチが `FT_FM_CONCURRENCY` として運ぶ(FTRemote/RemoteDispatch.remoteRunCommand)
     public let fmConcurrency: Int?
     /// 設定タブのバッジ色(`MachineBadgeColor.palette` の鍵)。**唯一の決定点は
@@ -31,7 +31,7 @@ public struct RemoteHostEntry: Codable, Equatable, Sendable {
     /// 実際に export する `DEVELOPER_DIR` は `FTRemote.XcodeSelection.resolve` がここから
     /// "/Contents/Developer" を補って作る。nil ならディスパッチが指紋照合で自動選択する。
     /// **存在確認はしない** —— 誤った pin は後段の toolchain 照合が blocking で捕まえる
-    /// (docs/remote-runner.md §7)。
+    /// (RR-7)。
     /// **`fmConcurrency` と同じ規律**: upsert はここを素通しするだけで、「省略したら既存を保つ・
     /// 消すのは明示操作だけ」は呼び出し側(`remote machines add` の --clear-developer-dir、
     /// `ApiRemoteHostsCommand.mergingDeveloperDir`)が持つ

@@ -157,7 +157,7 @@ public struct FlowStep: Codable, Sendable {
     public var scrollFrameRect: FTRect?
     /// 指を置く側 / 離す側の余白比(領域の高さ・幅に対する比)。nil = `FTScrollDefaults` の用途別既定。
     /// **`scrollFrame` が nil のときは無視される**(全画面固定のままスパンを広げると始点が
-    /// スクロール領域の外に出て 1 ミリも動かない。docs/performance-tuning.md §3.16)
+    /// スクロール領域の外に出て 1 ミリも動かない。PT-3.16)
     public var startMarginRatio: Double?
     public var endMarginRatio: Double?
     /// flick の repeat 間隔(秒)。**flick 以外は未使用**。nil = `FlowStep.defaultFlickIntervalSeconds`
@@ -512,7 +512,7 @@ public struct FlowLocator: Codable, Equatable, Sendable {
 }
 
 /// 相対セレクタの向き(`通知:rightSwitch`)。**基準要素から見た**対象の位置を限定する。
-/// 判定規則は LocatorResolver.directionalCandidates に1箇所だけ置く(記法↔意味の対応表は docs/design.md §10)
+/// 判定規則は LocatorResolver.directionalCandidates に1箇所だけ置く(記法↔意味の対応表は DS-10)
 public enum FlowDirection: String, Codable, Equatable, Sendable {
     case right, left, above, below
 }

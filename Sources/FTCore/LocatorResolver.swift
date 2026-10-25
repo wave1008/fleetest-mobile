@@ -453,7 +453,7 @@ public enum LocatorResolver {
                     + partialMatchTarget(first, count: hits.count, name: first.label ?? "", quoted: true)
             }
         }
-        // id も同じ形で拾う。**記法は `#*foo*`**(docs/design.md の idContains)であって
+        // id も同じ形で拾う。**記法は `#*foo*`**(docs/design/ の idContains)であって
         // `*foo*` ではない —— `*foo*` はラベルの部分一致なので id には一生当たらない
         if let id = locator.id, !id.isEmpty,
            (locator.idMatch ?? .exact) == .exact,

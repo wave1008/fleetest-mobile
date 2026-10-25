@@ -1,5 +1,5 @@
 // `fleetest services up` が起こす常駐の所有者(`fleetest api services-owner`)の起こし方と、上がるまでの観測
-// (docs/remote-runner.md §17「調停」)。所有者は親より長く生きる(FT_PARENT_PID を消す・stdin は /dev/null・出力はログファイル)
+// (RR-17「調停」)。所有者は親より長く生きる(FT_PARENT_PID を消す・stdin は /dev/null・出力はログファイル)
 // = fm-serve と同じ形。**上がったかは所有者が書く控え**(kind = owner・phase = running)で見る。待ちに期限は置かない ——
 // 所有者の終了(失敗)か控えの running のどちらかは必ず起きる(起動の上限は healthcheck が決める。pull / build はネットワーク次第)。
 // `services up` への Ctrl-C は所有者へ SIGTERM を転送する(所有者はプロセスグループの長なので端末の Ctrl-C は届かない)。

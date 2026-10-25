@@ -81,8 +81,8 @@ export class MonitorDeviceStreamController {
    * 非対応はデバイス側でなく webview 側の恒常的な制約のため)。 */
   private readonly mjpegFallbackIds = new Set<string>();
   /** 誰かの run が走っている(dispatch.lock を保持している)リモート機。**その機械の配信は
-   * 起こさない・張っているものは畳む**(docs/remote-runner.md §18.2 M2)。
-   * 配信を張ったままの run は実際に赤くなる(docs/verification.md の実測)ので、**保持者が
+   * 起こさない・張っているものは畳む**(RR-18.2 M2)。
+   * 配信を張ったままの run は実際に赤くなる(docs/verification/ の実測)ので、**保持者が
    * 自分か他人かは問わない**。ポーリングのフレームは止めないのでタイルは更新され続ける。 */
   private occupiedMachines: ReadonlySet<string> = new Set();
   private visible = true;
@@ -185,7 +185,7 @@ export class MonitorDeviceStreamController {
       const codecArgs = codec === "h264" ? ["--codec", "h264"] : [];
       // **占有中の機械・そのデバイス自身が run 中・他の発行者が配信中のデバイスは起こさない**(共有ランナー。
       // 「ライブ更新」が ON のとき、occupiedMachines は自分の run のぶんを含まず inRun も見ない。
-      // §18.7 M2)。occupiedMachines(機械単位。dispatch.lock)と inRun(デバイス単位。RunLease)は
+      // RR-18.7 M2)。occupiedMachines(機械単位。dispatch.lock)と inRun(デバイス単位。RunLease)は
       // 粒度が違う信号で、**どちらか一方が立てば畳む**。**手元も機械単位で判定する**(デバイスの
       // machine 欠落は LOCAL_MACHINE_KEY)—— 他人がこの Mac へディスパッチして保持していると
       // inRun は立たない(RunLease は同じ機械の run が置くが、畳むべき根拠は機械のロック)。
@@ -196,7 +196,7 @@ export class MonitorDeviceStreamController {
       }
       if (!showStreamDuringRun && device.inRun === true) {
         // 「ライブ更新」が ON(既定)なら run 中も配信を続ける(利用者の選択。配信を張ったままの run は赤くなり得る =
-        // docs/verification.md)。
+        // docs/verification/)。
         // RunLease は pid 生存 + mtime 15 秒で自ら失効する(解除条件はこの2つだけ)ので、
         // run が死ねば次の applyDevices(最大 monitorInterval 秒後)で配信は自動的に戻る。
         continue;

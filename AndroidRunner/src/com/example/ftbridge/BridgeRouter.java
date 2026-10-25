@@ -90,7 +90,7 @@ final class BridgeRouter implements BridgeHttpServer.Handler {
      * handleSnapshot が「a11y 根が無い」で断るときの本文接頭辞(422)。
      * 同期相手: Sources/FTCore/BridgeDTO.swift の BridgeAPI.androidNoActiveWindowRootPrefix
      * (片方だけ変えない。AndroidNoReadableWindowSyncTests が固定)。
-     * status は 422 —— 400/404/409/500 は既に別の意味で使用中(表は docs/design.md §4.3)。
+     * status は 422 —— 400/404/409/500 は既に別の意味で使用中(表は DS-4.3)。
      * 409 は Android では「対象なし/SET_TEXT 拒否 = ホストの typeDriver フォールバックの合図」
      * なので使えない。422 は InputInjector.rejectMaskedAppend が /type で使っているが、
      * エンドポイントが違うので衝突しない。
@@ -1139,7 +1139,7 @@ final class BridgeRouter implements BridgeHttpServer.Handler {
         ImeOnboarding.primeOnce(instrumentation, ua());
         if (attemptLaunch(bundleID)) return ok();
         // 前面判定が別パッケージの居座りで詰んだ。前面を掃除して1回だけ再試行する。
-        // force-stop が bundleID しか殺さないと以後の launchApp が全滅する既知の罠(design.md §8.7)。
+        // force-stop が bundleID しか殺さないと以後の launchApp が全滅する既知の罠(DS-8.7)。
         // 掃除対象は bundleID 自身・ブリッジ自身・HOME ランチャー・システムのダイアログ
         // (SYSTEM_DIALOG_PACKAGES)を除いた前面パッケージのみ。
         String stuck = activePackage();
@@ -1147,7 +1147,7 @@ final class BridgeRouter implements BridgeHttpServer.Handler {
             // 権限ダイアログ・Custom Tab 等がアプリの上に乗っている(アプリの窓は見えている)。
             // 殺すとアプリの権限フローが壊れ、再試行の force-stop がアプリごと畳んで「前面に来ない」を
             // 作る。前面として成功を返し、ダイアログの扱いはホスト(system-alert の注記・操作)に委ねる。
-            // **アプリの窓が見えない全画面の居座り**(設定の上の SafetyCenter = design.md §8.7)は
+            // **アプリの窓が見えない全画面の居座り**(設定の上の SafetyCenter = DS-8.7)は
             // 従来どおり下の掃除+再試行へ落とす
             android.util.Log.i(BridgeInstrumentation.TAG, "launch: " + bundleID
                     + " reported as in front under a system dialog (" + stuck + "); not force-stopping");

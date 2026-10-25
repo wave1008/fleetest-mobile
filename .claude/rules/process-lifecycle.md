@@ -85,7 +85,7 @@ CLAUDE.md から移した規則(本文は移設前と同一)。この領域の�
   `attachLateSubscriber` で合流・`LocalDispatchLock.acquire(interruptCheck:)` に同じ状態を渡して待機用の2組目を立てない)。
   段の境目で中断を見て既存の早期失敗の出口で抜ける(teardown・ロック解放は defer)。遅く登録すると、その間のシグナル
   (fan-out の子は ssh 切断の SIGHUP)が OS 既定の即死になり、teardown が走らず dispatch.lock が死んだ pid のまま残り、
-  孤児のビルド・供給と次の run が重なる(`InterruptRelayEarlyRegistrationWiringTests`)→ maintainer-notes §51。
+  孤児のビルド・供給と次の run が重なる(`InterruptRelayEarlyRegistrationWiringTests`)→ MN-51。
   **限界: `swift build` の実行中の中断は、ビルドが終わってから拾う**(ビルドの子は interruptState に登録していない)。
   **run-setup.sh / run-teardown.sh は `registerChildProcess` で中断を受け、終了は終了通知で待ち(パイプの EOF と独立)、終わったら
   プロセスグループに残った子孫へ SIGTERM → 2 s → SIGKILL**(`RunHookRunner.sweepProcessGroup`。`setsid` で離脱した子孫は検出できない)。
@@ -95,8 +95,8 @@ CLAUDE.md から移した規則(本文は移設前と同一)。この領域の�
   要らない長生きの孫。親の SIGKILL と子への SIGTERM の両方)
 - **シナリオの watchdog(`ScenarioHost`。全体の上限と出力の途切れ(idle)の2系統)は打ち切る前に子の生存を見る・時計は SuspendingClock**
   (親の一時停止・Mac のスリープからの再開で、終わっていた緑の子を timeout の赤に書き換えていた。
-  `ScenarioHostWatchdogExitedChildTests`)→ maintainer-notes §32。
-  idle の出力の到着はパイプの受け口(`lineStream(onChunk:)`)で数え、打つ直前にパイプの未読も見る(docs/design.md の @Test 節の下)
+  `ScenarioHostWatchdogExitedChildTests`)→ MN-32。
+  idle の出力の到着はパイプの受け口(`lineStream(onChunk:)`)で数え、打つ直前にパイプの未読も見る(docs/design/ の @Test 節の下)
 - **`Shell.run` は子孫ごと止め、出力の EOF を待ち切らない**(Codex 指摘 2026-09-05): timeout の
   SIGTERM/SIGKILL は `killpg`(Foundation.Process の子はグループリーダー)で孫まで届かせる ——
   `kill(pid,…)` だけだと `trap '' TERM` を継いだ孫がパイプを握り続けて 30 秒返らなかった。
@@ -116,7 +116,7 @@ CLAUDE.md から移した規則(本文は移設前と同一)。この領域の�
   **戻らない `dispatch_main()` も囲むので一度も空にならない** —— フレームは gQueue(GCD)の上で処理され、
   暗黙の pool はキューが空になるまで空かないので、**1フレームごとに入る関数の本体を pool で始める**
   (Swift のトップレベルには pool が1つも無い。どちらの言語も区切りは自分で置く)。`StreamingHelperAutoreleaseScanTests` が
-  取り込みヘルパーの集合と「画像を作る行が pool の内側にあること」(ObjC は1フレームごとの関数を名前で固定)を固定する → maintainer-notes §43。
+  取り込みヘルパーの集合と「画像を作る行が pool の内側にあること」(ObjC は1フレームごとの関数を名前で固定)を固定する → MN-43。
   **グループの残存は直接の子の終了と独立に見る**(Codex 指摘 2026-09-06: 子が SIGTERM で素直に
   終わっても `trap '' TERM` の孫は残る。猶予が尽きたら `killpg(pgid, 0)` で残りを確かめ SIGKILL)。
   witness は `ShellTimeoutTests` の孫3本
@@ -146,7 +146,7 @@ CLAUDE.md から移した規則(本文は移設前と同一)。この領域の�
   `FileHandle.write` は EPIPE を ObjC 例外にするので abort し、**SIGTERM に到達せず後始末が1つも走らない**
   (2026-09-16 の負荷テストで実測。9/05 以来ずっとこの形だった)。**この経路のテストは子の出力を
   パイプ/FIFO にする** —— ファイルへリダイレクトすると write が失敗せず、砦が1度も踏まない
-  → maintainer-notes §24)
+  → MN-24)
   ③**台帳(`.fleetest/bridge-<port>.pid/.inapp/.endpoint/.device/.toolchain/.ready`)はプロセスの実体で掃除し、
   中身は読む側が検証する**(`.endpoint` の1行目 = host が URL に使えなければ「記録が無い」へ倒す
   = `BridgeEndpoint.isUsableHost`。**台帳由来の文字列を強制開封しない** —— 壊れた1行が
@@ -156,7 +156,7 @@ CLAUDE.md から移した規則(本文は移設前と同一)。この領域の�
   対の `.pid` の生死。**`/status` 応答で生死を決めない**)。
   **`.ready` は「このランナーが一度でも準備完了になった」**(`BridgeReadyLedger`。起動しきれない
   ランナーの掃除が止めてよいかの門)で、**中身の pid が今の `.pid` と一致するときだけ数える**
-  (ポートは同じ番号で起動し直されるので、在否だけだと前世代の印が新しいランナーを守る → maintainer-notes §51.11)。
+  (ポートは同じ番号で起動し直されるので、在否だけだと前世代の印が新しいランナーを守る → MN-51.11)。
   **`.toolchain` は「そのブリッジをビルドしたツールチェーン」**(`BridgeToolchainLedger`)で、
   **生きているブリッジを再利用してよいかの門**。守る規律4つ: **①起動より前に控える**
   (ready の後に書くと、別プロセスが `.adopt` で引き取るときに「控え無し」を見て**正常な
@@ -166,14 +166,14 @@ CLAUDE.md から移した規則(本文は移設前と同一)。この領域の�
   両方で見る**(起動し直しの判定が走るのは**起動するとき**だけなので、生きたブリッジはここでしか
   捕まらない)/ **④リースのあるデバイスは止めない代わりに1行言う**(`hasForeignLease` は run と MCP の
   印を両方数える。止めると他プロセスの run を壊すが、版の違うブリッジを駆動している事実は
-  黙らない)。仕分けは `BridgeToolchainLedger.decide` の1箇所 → maintainer-notes §3.8。
+  黙らない)。仕分けは `BridgeToolchainLedger.decide` の1箇所 → MN-3.8。
   採番は `ProvisionLock` の内側でだけ行う
   (`provision` / `XCUIBridgeResolver` / `LiveBridgeAutoStarter` / **`ApiLiveCommand`**(要求されたデバイスの
   ブリッジがどこにも無いとき空きポートを充てる)の4経路。`ProvisionLockStartupPathsSyncTests` が
   集合を固定する。**ライブ操作の1件は「選ぶだけで起動しない」= 予約ではない**ので、
   起動までに埋まったら `LiveBridgeAutoStarter` が占有者を名指しして諦め、**自動起動を待つ間も毎コマンドの
   本人確認を撃ち**(placeholder の期待ブリッジを nil にしない)、別のデバイスが答えたら解決し直して別の空きポートへ移る
-  (`LivePlaceholderIdentityScanTests` → maintainer-notes §73.1))。拡張の孤児掃除(`orphanSweep.ts`)は配信
+  (`LivePlaceholderIdentityScanTests` → MN-73.1))。拡張の孤児掃除(`orphanSweep.ts`)は配信
   (`api device-stream`・`fleetest-*stream` / `devicepoll`)も対象。**殺すのは PPID=1 かつ環境に
   `FT_PARENT_PID` を持つもの(= 拡張 / fleetest が起こしたもの)だけ** —— 手で `nohup` した同名の
   プロセスはコマンド文字列では区別できないので、所有の印で絞る(Codex 指摘 2026-09-05)

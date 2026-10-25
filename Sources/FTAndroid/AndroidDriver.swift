@@ -434,10 +434,10 @@ public final class AndroidDriver: AppDriver {
     /// 状態を保持したまま前面化する。ブリッジの launch(force-stop+再起動)は使わず adb 直で
 
     /// ブリッジを経由せず画面を変えた後の整定。**ブリッジの QuietWaiter(a11y イベント駆動)**を
-    /// 呼ぶ(プッシュ型。performance-tuning.md §2 の第1原則)。
+    /// 呼ぶ(プッシュ型。PT-2 の第1原則)。
     ///
     /// **固定 sleep にしない**: 固定値はマシン性能・並列負荷・アニメーション長で過不足が出る
-    /// (iOS 側で同じ問題を実測した。§3.8)。ブリッジが応答しない・旧版(v19 未満)で
+    /// (iOS 側で同じ問題を実測した。PT-3.8)。ブリッジが応答しない・旧版(v19 未満)で
     /// ルートが無い等で失敗したときだけ 800ms へ落ちる(整定ゼロで進むと直後の
     /// snapshot が遷移前の画面を掴むため、黙って素通ししない)。
     private func settleViaBridge() async {
@@ -495,7 +495,7 @@ public final class AndroidDriver: AppDriver {
     /// キーが届かない無音 no-op(emulator 36.5.10 / API 36 の2台で確認。
     /// GoHome も AppSwitch も前面が変わらず、adb keyevent なら戻る。送出中の getevent は1イベントも
     /// 受けず、guest の入力デバイスは gpio-keys と multi-touch だけ = キーの載る先が無い。
-    /// gpio-keys に載る KEY_POWER/KEY_SLEEP = sleepWake だけは届く。docs/design.md §16.3)。
+    /// gpio-keys に載る KEY_POWER/KEY_SLEEP = sleepWake だけは届く。DS-16.3)。
     /// adb keyevent 直行。
     public func home() async throws {
         let result = try adbAnswering(["shell", "input", "keyevent", "KEYCODE_HOME"])
@@ -533,7 +533,7 @@ public final class AndroidDriver: AppDriver {
         return value
     }
 
-    /// InputInjector が ACTION_SET_TEXT のたび自前で読み返す(docs/design.md §Android のテキスト注入の規律)
+    /// InputInjector が ACTION_SET_TEXT のたび自前で読み返す(DS-8.7「Android のテキスト注入の規律」)
     public var verifiesTypedText: Bool { true }
 
     static let bottomGestureBandFallbackDp = BottomGestureBandTap.maxBandHeightDp
@@ -912,7 +912,7 @@ public final class AndroidDriver: AppDriver {
     ///   待つので二重になる。drag 経路はブリッジを通らないため、待ちはホストの1回だけになる
     ///
     /// **探索(search)には使わない** —— 1回の移動量がビューポートを超えると要素を飛び越す。
-    /// 端送りは行き過ぎても端で止まるので安全(§3.16 と同じ線引き)
+    /// 端送りは行き過ぎても端で止まるので安全(PT-3.16 と同じ線引き)
     private func edgeStroke(_ direction: FTSwipeDirection,
                             path: FTSwipePath?) -> FTSwipePath? {
         Self.edgeStroke(direction, path: path, screen: screen)
@@ -940,7 +940,7 @@ public final class AndroidDriver: AppDriver {
 
     /// 端送りストロークの所要(秒)。**flick の既定と同じ値**にしてある ——
     /// この値で「1本 14 行」を実測した(短くすると距離が伸びる可能性はあるが、
-    /// §3.16 の較正をやり直す話になるので別立て)
+    /// PT-3.16 の較正をやり直す話になるので別立て)
     private static let edgeStrokeSeconds: Double = FlowStep.defaultFlickDurationSeconds
 
     /// CDP でページを端まで飛ばせたか。**使えないと分かったら以後は試さない**
@@ -1205,7 +1205,7 @@ public final class AndroidDriver: AppDriver {
     /// 50〜60000ms(= `BridgeAPI.gestureSecondsCeiling`)にクランプ。**方針の判定
     /// (既定10秒・maxGestureSeconds での上書き)はホスト側の StepExecutor / ArgumentBounds が持つ**
     /// ので、ここは絶対上限の最後の砦(丸め先が絶対上限より低いと、上書きした長押しがここで
-    /// 短く切られて誤った成功になる → maintainer-notes §49.1)。
+    /// 短く切られて誤った成功になる → MN-49.1)。
     public func drag(fromX: Double, fromY: Double, toX: Double, toY: Double,
                      pressSeconds: Double, durationSeconds: Double) async throws {
         let durationMs = min(max(Int((durationSeconds * 1000).rounded()), 50),

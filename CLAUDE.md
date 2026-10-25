@@ -8,7 +8,7 @@
 - **このツール本体を「改造する」保守者**: 以下すべてが適用対象。
 
 **この文書は規則だけを持つ。**「なぜその形なのか」「一度実際に壊した記録」は
-**docs/maintainer-notes.md**(規則を緩めたくなったときに読む)。subsystem の設計・計測は
+**docs/maintainer-notes/**(規則を緩めたくなったときに読む)。subsystem の設計・計測は
 各 docs が正典。
 
 ## ドキュメント
@@ -40,7 +40,7 @@
 - **割り込みに吸われた操作は撃ち直さない**(届いていた場合に二重実行 = 送信・購入で取り返しが
   つかない)。ツールが閉じるのは**ステップ開始時点で出ている割り込み**まで(加えて、前のシナリオが残した
   システムアラートはシナリオの開始前に消す。押すのは何も決めないボタンと権限の拒否側と、ソフトウェアアップデートの保留(「あとで」。開始前に残っている分だけ)だけ・無ければ Simulator は
-  SpringBoard の起こし直し = maintainer-notes §72)。**間に湧いた分の
+  SpringBoard の起こし直し = MN-72)。**間に湧いた分の
   復帰はシナリオ側**(docs/commands.md §割り込みが「操作を吸った」ときの扱い)。
   **自動リトライを再提案しない**
 
@@ -58,7 +58,7 @@
 
 **共通契約に載らない定番部品の SUT が別に5つ**(`E2EXAppCMP/`・`E2EXAppFlutter/`・`E2EXAppRN/`・`E2EXAppAndroid/`・
 `E2EXAppIOS/` → TestProjects/E2EX-*。回すのは `Scripts/e2ex.sh`・`e2e.sh` の対象外)。契約は `E2EXAppCMP/docs/ui-contract.md` と
-`ui-contract-wave2.md`、書き方と癖は docs/user-docs/reference/writing/ui_component_patterns_ja.md、差の索引は docs/framework-differences.md §5.1
+`ui-contract-wave2.md`、書き方と癖は docs/user-docs/reference/writing/ui_component_patterns_ja.md、差の索引は FD-5.1
 
 **実アプリで頻出しツールの判定を直撃する作りの SUT がさらに5つ**(`E2EYAppCMP/` 等 → TestProjects/E2EY-*。
 入れ子スクロール・反転チャット・読み込み中の骨組み・途中まで払うスワイプ 等の12画面。回すのは `Scripts/e2ey.sh`)。
@@ -112,14 +112,14 @@ grep やシェル(`cat`)で見るだけのとき・新しいファイルを読�
   `ParentBoundCommand` で包む(process-lifecycle.md / remote.md)
 - fleetest 自身の実行ファイル(隣の製品を含む)を子として起こす → `ExecutablePath.current` / `.resolved`(実体のパス。`.build/debug` は
   SwiftPM がビルドのたびに作り直すリンクで、その間 ENOENT。`Bundle.main.executableURL` の直読みは `ExecutablePathTests` の許可表)。拡張は
-  `resolveBinaryPath` が実体へ解決する → maintainer-notes §82.8・§82.9
+  `resolveBinaryPath` が実体へ解決する → MN-82.8・MN-82.9
 - 子プロセスのパイプを読む → `readDataToEndOfFile` を使わない・`availableData` のループは
   `autoreleasepool` で区切る・生死判定は `ProcessLiveness.isAlive`(process-lifecycle.md)
 - 外部コマンドの出力から値を作る → **終了コードを見る**(`Shell.run` は非ゼロで投げない。
   `Shell.Result.outputIfSucceeded`。失敗の出力から「無い」「止まった」が確定する。`ToolOutputStatusScanTests`)
-  → maintainer-notes §56.10
+  → MN-56.10
 - FM を呼ぶ → `FMCallAdmission` を通す・オンデバイスだけ・**画像を伴う呼び出しは FM の常駐プロセス(`fleetest api fm-serve`)へ頼む**
-  (自分で `LanguageModelSession` を作らない。fm-occlusion.md → maintainer-notes §81)
+  (自分で `LanguageModelSession` を作らない。fm-occlusion.md → MN-81)
 - MCP のツール・引数を足す → `ArgumentBounds` に載せる・ツールの集合を固定するテスト
   (`MCPToolCallTests` の driverBackedTools 等)を更新する・DSL と同じ判定は共有する(mcp.md)
 - compose.yaml に読めるキーを足す → `ComposeNormalizer` の許可表・`ComposePolicy` の検査・`ComposePolicyTests` / スクリプトの中継
@@ -139,21 +139,21 @@ grep やシェル(`cat`)で見るだけのとき・新しいファイルを読�
   画面の外の矩形で来る。`KeyboardShownJudgmentTests`)/ シミュレータのアプリを「止めた」と言う・止めてから壊す →
   `BridgeClient.stopOnSimulator`(ランナーの terminate はセッションが起動したアプリにしか効かない。`ClearAppDataContractTests`)
 - iOS Simulator を起動する経路を足す → **`SimulatorBoot.ensureBooted(udid:log:)` を通す**(起動前の掃除 `SimulatorBootCleanup.beforeBoot(udid:)` と、機械全体で同時2台の枠 `SimulatorBootSlots`。直接 simctl boot / bootstatus を撃たない = `SimulatorBootSingleEntryTests`)
-  (`SimulatorPosterCachePurgeWiringTests`。docs/design.md §12.4.2・§12.4.3)
+  (`SimulatorPosterCachePurgeWiringTests`。DS-12.4.2・DS-12.4.3)
 - モニターの周期に計測を足す → 周期の中で待たない(裏で回して控えを読むだけ。`DeviceStorageSampler`)
 - 待ち受けのソケットを足す → `FTCore.AcceptLoop` を通す(**fd を閉じるのは、その fd で待っているスレッドだけ** = 別のスレッドが閉じると
   番号が再利用され、受付が無関係の待ち受けの接続を奪う。中継中の接続も一覧から外してから待っていた側が閉じる。`AcceptLoopTests`)
-  → maintainer-notes §96
+  → MN-96
 - 並行なクロージャ(Task・concurrentPerform・完了ハンドラ・Thread)へ値を渡す → 捕捉した `var` は `FTCore.LockedValue`、
   スレッド安全の契約が無い呼び手の log / emit は `SerializedSink`、子タスクへ渡す非 Sendable(主に `AppDriver`)は
   `UncheckedTransfer`(`Sources/FTCore/LockedValue.swift`)。`@unchecked Sendable` には守っている不変条件を1行書く。
-  **in-app dylib に単体でコンパイルされるファイル**(`InAppBridge/build.sh` の一覧)からは FTCore の他の型を使わない → maintainer-notes §66
-  → maintainer-notes §55
+  **in-app dylib に単体でコンパイルされるファイル**(`InAppBridge/build.sh` の一覧)からは FTCore の他の型を使わない → MN-66
+  → MN-55
 
 ## ビルド・検証
 
 **検証の詳細な罠と判定規律(flake/性能の判定・macOS/Xcode ベータ整合・常駐プロセス掃除・
-「Application is not running」全滅時の切り分け・`Scripts/e2e.sh` の各オプション)は docs/verification.md**。
+「Application is not running」全滅時の切り分け・`Scripts/e2e.sh` の各オプション)は docs/verification/**。
 以下は毎回効く最重要ゲートだけ。
 
 ### Swift
@@ -171,10 +171,10 @@ grep やシェル(`cat`)で見るだけのとき・新しいファイルを読�
   全体テストは作業の区切りにユーザーが回す運用 —— **全実施を頼まれたときだけ**コマンドに `FT_FULL_TEST=1` を書く
 - **合否は exit code で見る**(パイプすると grep 等の exit code に化けて失敗を握りつぶす)
 - **並列はテストプロセスを分けるので、ホストの共有資源に触るテストは自分で隔離する**
-  → maintainer-notes §4.9。**隔離できないホストの実体**(simctl/adb・起動中の Simulator/Emulator・
+  → MN-4.9。**隔離できないホストの実体**(simctl/adb・起動中の Simulator/Emulator・
   固定パス)と、`.fleetest/` の台帳・`DiagnosticReports` の走査は
   `Sources/FTTestSupport/SharedResource.swift` の `SharedResource.<key>.locked { }` で
-  資源キーごとに直列化する(詳細は docs/verification.md)
+  資源キーごとに直列化する(詳細は docs/verification/)
 - 実行ファイル差し替えは `swift build --product <名>`。`--target` はリンクせず旧バイナリを実行する
 
 ### デバイス実行(E2E)
@@ -192,16 +192,16 @@ grep やシェル(`cat`)で見るだけのとき・新しいファイルを読�
   (向こうで動くのは align 済みのコミット)。E2EX の SUT は M1Ultra でビルドする(競合しない・負荷分散)
 - **1シナリオの確認にフリート全台を用意しない**。`ProfileRunner` は回す本数から台数を絞る
   (`ResolvedProfile.deviceKeepCount` = 本数ぶん)。実測で iOS の1本実行が 21.8s → 9.3s。
-  **予備は置かない**(欠けた台のぶんは残りの台が消化する。予備を起こして待つ・後から合流させる形の不採用理由は maintainer-notes §103)。
+  **予備は置かない**(欠けた台のぶんは残りの台が消化する。予備を起こして待つ・後から合流させる形の不採用理由は MN-103)。
   **例外は `--broadcast`** —— 各デバイスで1回ずつ回すのが目的なので絞らない(分配だけ
   `ScenarioDispatch.broadcast` に差し替え、他は同じ経路)。`fleetest api run` と、ビルドが要る回の
   `fleetest run --profile` はシナリオ一覧をビルドと並行に解決するので一覧を待てない —— 確定している `--scenario` の指定
   だけで判断する(`ApiRun.exactScenarioCount`)
-- **E2E 実行中に `swift build` / `swift test` を打たない** → maintainer-notes §4.1。
+- **E2E 実行中に `swift build` / `swift test` を打たない** → MN-4.1。
   **E2E を投げたらビルドを伴う作業は止める**
 - **モニターを止めるのは性能を測るときだけ**(ユーザー決定。合否を見るだけの実行では止めない)。
   **止めるのは `fleetest monitor pause [--for <分>]` / 再開は `resume`**(kill では止まらない ——
-  拡張が数秒で再起動する。効くのはこの機械だけ。docs/verification.md §モニターと E2E)。
+  拡張が数秒で再起動する。効くのはこの機械だけ。docs/verification/ §モニターと E2E)。
   拡張が動いていないときの旧手段は pkill 3連打(`fleetest api monitor` /
   `fleetest-androidstream` / `screenrecord --output-format=h264`)。
   **中途半端に止めた対照は誤った結論を出す**。
@@ -209,7 +209,7 @@ grep やシェル(`cat`)で見るだけのとき・新しいファイルを読�
   (3/4 プロファイル失敗・接続断11件 → 完全停止で 4/4・接続断0)。遅くなるだけでなく**落ちる**。
   **赤が出たら真っ先に配信の有無を疑う**(判定材料: run.json の `workerAnomalies` に
   `degraded` / `requeued` が出ているか)
-- **長時間ジョブ(E2E 等)の完了を「プロセスの生死」で待たない** → maintainer-notes §4.2。
+- **長時間ジョブ(E2E 等)の完了を「プロセスの生死」で待たない** → MN-4.2。
   **ジョブ自身が出す成果物で待つ**:
   `nohup bash -c '<job> > log 2>&1; echo "exit=$?" > log.done' &` で起動し `log.done` を待つ。
   併せて**起動を報告する前にログの実在を確かめる**(「開始しました」は観測ではなく期待になりやすい)
@@ -220,7 +220,7 @@ grep やシェル(`cat`)で見るだけのとき・新しいファイルを読�
   セレクタ/スナップショット/自己修復(指紋照合)/FM 呼び出し(`FTFoundationModels`)を変えたら `Scripts/e2e.sh`**
   (ユニットテストはデバイス境界のバグを1つも捕まえない)。**ブリッジのスナップショット/型写像と、
   StepExecutor の操作合成(タップ/ドラッグ/スクロール探索の終端処理)を触ったら SUT を絞らず全部**
-  回す(フレームワーク差の退行は SUT を跨がないと出ない)→ maintainer-notes §4.4.1
+  回す(フレームワーク差の退行は SUT を跨がないと出ない)→ MN-4.4.1
 - **既定の e2e.sh は iOS を inapp モードで回す**(**利用者の既定も inapp モード**
   なので、既定スイートが見るべきはそちら)。**フル E2E は引数なしの `Scripts/e2e.sh` だけ**
   (xcuitest は含めない)。**XCUITest ブリッジを触ったときだけ `--ios-xcuitest` を的を絞って回す**。
@@ -232,8 +232,8 @@ grep やシェル(`cat`)で見るだけのとき・新しいファイルを読�
   —— **xcuitest の警告は 2026-08-30〜09-14 のあいだ鳴りっぱなしだった**(既知の打鍵中抜け2本で
   E2E-RN が赤 → 全緑が条件の印が更新されなかった)。**v104 で中抜けを直した**(`TypeReadback.plan`
   の `.retype`。打ち直しは1回まで・ヒント欄では前方一致の説明を先に採る)。経緯は
-  docs/verification.md の該当節
-  → maintainer-notes §4.5
+  docs/verification/ の該当節
+  → MN-4.5
 
 **e2e の実行範囲はリスクとコストで決める**(上のゲートは「最低限ここまでは回す」の下限で、
 常に全部回す意味ではない。フルスイートは10分超かかるので、**何も足さない実行はしない**):
@@ -244,8 +244,8 @@ grep やシェル(`cat`)で見るだけのとき・新しいファイルを読�
 | ホスト側ロジック(`StepExecutor` の分岐・セレクタ解決) | `swift test` + **該当シナリオ1〜2本** |
 | ブリッジの挙動(注入・スナップショット・型写像) | 該当 SUT の**1プロファイル**。フレームワーク差が絡むなら全 SUT |
 | 入力・キー・IME 系 | 上記 + **`--ios-xcuitest`**(既定は inapp モードなので、もう片方のモード) |
-| **幾何・容器推定・整定**(実ジェスチャの慣性で挙動が変わるもの) | 上記 + **`--ios-xcuitest`**。**in-app ブリッジは慣性を持たない**ので、この種の退行は既定スイートでは原理的に出ない(maintainer-notes §4.5.1) |
-| flake 調査・性能 | 該当プロファイルを**反復10周**(docs/verification.md) |
+| **幾何・容器推定・整定**(実ジェスチャの慣性で挙動が変わるもの) | 上記 + **`--ios-xcuitest`**。**in-app ブリッジは慣性を持たない**ので、この種の退行は既定スイートでは原理的に出ない(MN-4.5.1) |
+| flake 調査・性能 | 該当プロファイルを**反復10周**(docs/verification/) |
 | run 制御(再キュー・ワーカー離脱など。シナリオ実行の中身を触らない) | `swift test` + **その経路を強制的に通す陽性対照**。緑の run では1度も実行されないのでフルは情報ゼロ |
 | リリース前・大きな統合の締め | **フルスイート = `Scripts/e2e.sh`(引数なし)だけ** |
 
@@ -256,19 +256,19 @@ grep やシェル(`cat`)で見るだけのとき・新しいファイルを読�
 ### 判定の規律
 
 - **受け手が受け取る経路も一度は通す** —— **コードの正しさと、それが受け手へ届くことは別に
-  確かめる** → maintainer-notes §4.6
+  確かめる** → MN-4.6
 - **flake の修正は1回グリーンで判定しない・単発の観測で性能を断じない**(反復+負荷で叩く。
-  手順は docs/verification.md)
+  手順は docs/verification/)
 - **「読む回数を減らす」最適化は、その読みが担っている砦を先に列挙する**。**節約できるのは
-  誰も見ていない読みだけ** → maintainer-notes §4.7。**読みを新しくする最適化も同じ** —— 待ちが担っていた
-  「次の読みも追いついている」を消す(Android の迂回はキャッシュを更新しない。`nextResolveBypassesCache`)→ §38
+  誰も見ていない読みだけ** → MN-4.7。**読みを新しくする最適化も同じ** —— 待ちが担っていた
+  「次の読みも追いついている」を消す(Android の迂回はキャッシュを更新しない。`nextResolveBypassesCache`)→ MN-38
 - **単体テストが緑でも実データで1回動かすまで信用しない**(テストは書いた本人の前提を共有するので、
-  前提が誤っていると実装とテストが同じ誤りを持ったまま緑になる。実害3件は docs/verification.md)
+  前提が誤っていると実装とテストが同じ誤りを持ったまま緑になる。実害3件は docs/verification/)
 - **定数を置くときは根拠・単位・尽きたときの発話を書く**(ユーザー方針「根拠のない定数は排除したい」)。
   書けないなら数字を調整するのではなく**数字への依存を消す**(観測可能な事象を待つ・デバイスの
   応答が要らない情報源から導く)。**片方の文脈で詰めた値を別の文脈へ流用しない** —— 読み手の
   予算・シミュレータの実測・pt で測った床は、読み手のいない経路・実機・px の木では
-  **遅くなるのではなく黙って誤る**(実例と直し方は docs/verification.md)。残す数字は名前を付けて
+  **遅くなるのではなく黙って誤る**(実例と直し方は docs/verification/)。残す数字は名前を付けて
   1箇所に置く。**既定値はリテラルで固定するテストを置く** —— 他のテストが差し替え口で値を
   明示していると production の既定を1度も通らず、既定を戻す変更が緑のまま通る
   (`FMCallSlotsTests.testDefaultConcurrencyIsPinned`)。**既定を変える変更は、その既定に依存している
@@ -277,20 +277,20 @@ grep やシェル(`cat`)で見るだけのとき・新しいファイルを読�
   待ち行列はできる。**待ちそのものを測る**(FM なら結果 JSON の `fm.gateWait*`)。さらに
   **掃引だけで決めない**: スループットの膝と実 run の最適は一致しない ——
   判断軸は**「待ち + 実働」の和**で、片方だけ見ると必ず誤る(実測は
-  docs/performance-tuning.md §3.5)
-- **陽性対照は pass/fail でなく出力の文言まで読む** → maintainer-notes §4.14
+  PT-3.5)
+- **陽性対照は pass/fail でなく出力の文言まで読む** → MN-4.14
 - **回復の操作(起動し直し・再起動)は、効いたかを直後に測る**。効かなければ同じ操作を繰り返さず、
   測った事実を 1 行言う(`RunnerRestartFutility`。XCUITest ランナーの起動し直しが緑のたびに約 10 秒ずつ
   空振りしていた)。**遅さ・失敗の帰属は、それを分ける測定をしたときだけ書く** —— 検知の入力から
   導けない帰属を文言に入れない(遅いレーンの警告と供給時プローブが同じデバイスに正反対の帰属を出した)
-  → maintainer-notes §29
+  → MN-29
 - **失敗の帰属は「HEAD での対照」で決める**(`git stash push -u` → HEAD で1シナリオ →
-  `git stash pop`。3〜4分。docs/verification.md)
+  `git stash pop`。3〜4分。docs/verification/)
 - **「差が出ない」ときは仮説より先に実験系を疑う**。**陽性対照を先に通す**(マーカーを書くだけの版で
   差し替えが効くことを確認してから本番)。判定に使うシナリオは **`clearAppData()` から始める**
-  → maintainer-notes §4.8
+  → MN-4.8
 - **不具合を直したら「同じ型が他に無いか」を機械的に掃討する**(grep で同じ呼び出し形・同じ定数・
-  同じ既定実装依存を列挙してから潰す)。同じ型はほぼ必ず複数ある(→ maintainer-notes §4.6.1)。**再現しない同型でも、
+  同じ既定実装依存を列挙してから潰す)。同じ型はほぼ必ず複数ある(→ MN-4.6.1)。**再現しない同型でも、
   失敗モードが沈黙(誤った成功)なら塞ぐ価値がある**(その場合は「再現していない」と明記する)。
   可能なら**同型の再発を落とすテスト**まで足す(`SwipeForScrollForwardingTests` = ソース走査 /
   `BridgeRouterStatusContractTests` = 本数固定 / `AppDriverDefaultDispatchTests` = 宣言の突き合わせ)
@@ -301,18 +301,18 @@ grep やシェル(`cat`)で見るだけのとき・新しいファイルを読�
 ### 検知を足すとき
 
 - **新しい検知(警告・lint・修正提案)は「既存資産の全数に当てて誤検知0」まで確認する**。
-  dry-run はデバイス不要なので全数が安い(レシピと実例は docs/verification.md)。
+  dry-run はデバイス不要なので全数が安い(レシピと実例は docs/verification/)。
   **ただしスナップショットの検知(遮蔽・積み重なり・ghost)は自前 SUT では代表できない**
   (木が要るので dry-run では当てられない)。**「出ない」ことを設計の根拠にするなら、
   コーパスとデバイス実行の両方で確かめる**
-  → maintainer-notes §4.10
+  → MN-4.10
 - **実アプリのスナップショットは `Tests/Fixtures/RealAppSnapshots/` に固定してあり、
   `SweepHarnessTests` が `swift test` で毎回当てる**(件数の基準値+タップ対象に対する警告率の上限)。
   **基準値を上げるのは増えた分を1件ずつ見て真陽性だと確かめてから** —— 黙って上げるとこの砦は
   現状の追認装置になる。採り直しは `FT_SWEEP_BASELINE=1`
 - **凍結・a11y 異常など「意図的に起こせない事象」の検知には注入口を用意する**
   (`FrozenInjection` / `FT_FAKE_FROZEN_KEYS`)。**陰性(誤検知0)の確認は「常に false を返す
-  検出器」と区別できない** → maintainer-notes §4.11。注入は**観測と公表の経路だけ**を通し、
+  検出器」と区別できない** → MN-4.11。注入は**観測と公表の経路だけ**を通し、
   回復・除外のような**デバイスを触る動作は撃たない**(`FrozenVerdict.isInjectedOnly`)
 - **「観測」と「配信(表示の最適化)」を同じループに書かない**。抑制は配信段だけに効かせ、
   観測は cadence を落として続ける(`ApiMonitorCommand.capturePlan` = 純粋関数)
@@ -325,10 +325,10 @@ grep やシェル(`cat`)で見るだけのとき・新しいファイルを読�
   壊して実行→復元(**復元に `git checkout <file>` を使わない** = 未コミットの変更ごと消える)
 - **検知の類は両方向に掛ける**(出さなくする変異 / 常に出す変異)—— 片方だけだと
   「常に空を返す」変異を「空を期待するテスト」に当てて素通しする
-- **テストが production の関数を通っているかも見る**(→ maintainer-notes §4.13)。検出できない変異が出たらテストを境界へ
+- **テストが production の関数を通っているかも見る**(→ MN-4.13)。検出できない変異が出たらテストを境界へ
   寄せる(要素数を増やす・既定値でなく限界値で呼ぶ)
-- **テストが production の代わりに正規化・整形していないか** → maintainer-notes §4.13.1
-- **変異が生き残ったら、まずテストの置き場所とフィルタを疑う** → maintainer-notes §4.12。
+- **テストが production の代わりに正規化・整形していないか** → MN-4.13.1
+- **変異が生き残ったら、まずテストの置き場所とフィルタを疑う** → MN-4.12。
   **「殺せた」も exit code で数えない** —— 変異がコンパイルエラーでも exit 1 になる。狙ったテスト名の失敗行で取る
 
 ### 版と契約の同期(片方だけ変えない)
@@ -359,27 +359,27 @@ grep やシェル(`cat`)で見るだけのとき・新しいファイルを読�
   判定軸が別 = 面積比 vs 中心点。統合しない理由は両型の doc)、「絵が古いか」は
   `FTCore.StaleFrameDetector`、焦点待ちの定数は `FTCore.FocusWait` の1箇所だけに置き、
   `RefGuard`/MCP は転送する。別々に持つと**同じ画面で MCP と DSL の判断が食い違う**
-  (実例は maintainer-notes §5)。移設したときは**掃討ゲート(`SweepHarnessTests`)が
+  (実例は MN-5)。移設したときは**掃討ゲート(`SweepHarnessTests`)が
   実アプリのコーパスで等価性を検証する**
 - **判定の関数を `StepExecutor` の static に置かない**。置くと判定の型が実行機に依存する(依存は実行機 → 判定の
-  一方向。ロケータ解決は `LocatorResolver`・容器推定は `ContainerGeometry`)。コンパイラは止めない → maintainer-notes §57
+  一方向。ロケータ解決は `LocatorResolver`・容器推定は `ContainerGeometry`)。コンパイラは止めない → MN-57
 - **前面にあると観測しただけの相手へ、画面を動かす操作を撃たない**。セッションの向け直しは
   `AppDriver.attach`(前面確認だけ・非破壊)で、**activate は使わない** —— Spotlight のような
   SpringBoard の拡張を activate すると**ホーム画面が描画を失って真っ黒になり**、自アプリなら
-  in-app の既定実装から launch = 注入付きの再起動へ落ちる(実測 2026-09-22 → maintainer-notes §40)。
+  in-app の既定実装から launch = 注入付きの再起動へ落ちる(実測 2026-09-22 → MN-40)。
   `attach` の既定実装は activate へ倒さず 501 を投げる(向け直せないことより画面を壊すほうが害が大きい)
 - **FM の失敗トリアージ(分類・要約・修正案)は置かない**(ユーザー決定 2026-09-15)。照合相手の無い自由文で、
   実レポート 30 件のうち要約 13 件が事実を誤り(数の向き・引用・帰属)、分類は環境の問題を `appBug` にし
   (ブリッジ不達 5/6・a11y 無効 3/3)、修正案は別要素への差し替えを勧めた。「環境の問題」と「アプリの不具合」を
   分けること自体、ツールには判定できない(失敗の記録に分類を置かないのと同じ理由)。起きたことはレポートに
   事実として並ぶ(失敗文言・要素一覧・スクリーンショット)。`FMTriageRemovedTests` が Sources への再混入を落とす。
-  **戻すなら §21 の測り方で誤りの率を測ってから** → maintainer-notes §21
+  **戻すなら MN-21 の測り方で誤りの率を測ってから** → MN-21
 - **FM によるロケータ自己修復(FM ヒール)とヒールキャッシュは置かない**(ユーザー決定 2026-09-15)。採用門
   (自己申告 confidence == "high")が実測で1度も開かず(日英 272 件で high 0 件・E2E の witness は全 run で却下)、
   confidence は正誤と相関しない(正解に low・誤答に medium/high)ので門の置き場が無い。典型的なドリフト(id だけ
   変わりラベル不変)は指紋照合が決定的に拾う。**`heal` は指紋照合だけのスイッチで、FM を使わないので FM の
   トグルと独立**(ユーザー決定)。`FMHealRemovedTests` が Sources への再混入を落とす。
-  **戻すなら §21 の測り方で誤りの率を測ってから** → maintainer-notes §22
+  **戻すなら MN-21 の測り方で誤りの率を測ってから** → MN-22
 - **共有するのは「判定」であって「文言」ではない**。正しい形は**①判定・順序・当たり判定を
   FTCore に1つ ②文言は呼び手ごとに持つ**。**呼び手は中核を呼んで写すだけ**にする。中核は `TapTargetGeometry.advisoryKind` /
   `FTCore.SimilarLabels` / `FTCore.BackEffect` / `FTCore.SnapshotTruncation.remedy` /
@@ -406,7 +406,7 @@ grep やシェル(`cat`)で見るだけのとき・新しいファイルを読�
   `PrivateCloudComputeProhibitionTests` のソース走査(①PCC の型名を名指ししない
   ②セッションに `model:` を明示的に渡さない ③走査が Sources に届いていることの確認)。
   **PCC のインスタンスは型名を書かずに得られない**ので①だけで経路は閉じ、②は二重の備え。
-  経緯と SDK の実地調査は docs/design.md §1.1 末尾
+  経緯と SDK の実地調査は DS-1.1 末尾
 
 ## 実装の委譲
 
@@ -436,7 +436,7 @@ grep やシェル(`cat`)で見るだけのとき・新しいファイルを読�
   `CLIEnglishStringsScanTests` が走査し、日本語を正しく持つファイルだけを理由付きの表で通す
   (ステップ説明の日英生成・日本語入力の照合表・FM の `@Guide`・生成物・受け手の Package.swift へ
   書くマーカー)。**中黒 `・` を日本語と数えない**(英語の出力でも箇条書きに使う)
-  → maintainer-notes §44.3
+  → MN-44.3
 
 ## コメント規約
 
@@ -461,7 +461,7 @@ grep やシェル(`cat`)で見るだけのとき・新しいファイルを読�
 **「仮想デバイス」「デバイス」「Simulator」「Emulator」**と書く(「実デバイス」も使わない ——
 実機と紛らわしい)。デバイス上での実行一般は「デバイス実行」「デバイス上」でよい。
 **「デバイスで動かした」と書きたくなった瞬間に、何の上で動かしたかを確認する**
-→ maintainer-notes §7
+→ MN-7
 
 **用語(iOS のモードとブリッジ)**: 利用者が選ぶ設定は**モード**(`iosMode` / `devices[].mode` の値 `inapp` / `xcuitest`。
 「`inapp` モード」= in-app ブリッジ主 + XCUITest ブリッジの合成)、部品は**ブリッジ**(「in-app ブリッジ」「XCUITest ブリッジ」と
@@ -471,7 +471,7 @@ grep やシェル(`cat`)で見るだけのとき・新しいファイルを読�
 **用語(モニターのペイン)**: 「デバイスモニター」タブは上から**ラインビュー**(タイルの並び)・
 **グリッドビュー**(選択したデバイスの拡大表示)・**実行ログビュー**(選択したデバイスの実行ログ)の
 **常設の3ペイン**(ユーザー決定 2026-09-17、3ペイン化は 2026-09-21。**契約は
-docs/design.md §12.6 が唯一の定義元**)。**両ビューに出るのはラインビューで選択したデバイスだけ**で、
+DS-12.6 が唯一の定義元**)。**両ビューに出るのはラインビューで選択したデバイスだけ**で、
 **全体レーン(`__overall__`)だけは選択に関わらず実行ログビューに残す**(供給の進行の受け皿)。
 **ちょうど1台選択のときだけ**グリッドビューの中に「拡大表示 | 実行ログの複製」を並べ、その間は
 実行ログビューを自動で畳む。ペインを「フリート」と呼ばない —— **「フリート」は複数機械・
@@ -493,4 +493,4 @@ docs/design.md §12.6 が唯一の定義元**)。**両ビューに出るのは�
 `ocrTextVisibilityCheck`**(ユーザー決定 2026-09-15・名前・キー・フラグは 2026-10-14 に変更。拡張のチェックボックス・キー・CLI フラグ
 `--no-fm-text-visibility-check`・docs・コメントとも。OCR 段は「OCR を使ったテキストの可視性検証」)。**走査は受け手向けの面(docs/user-docs/・拡張の i18n 文字列)も含む** ——
 どちらも対の英語があるので、直すときは ja/en を同時に直す。**対象外は TestProjects/(ユーザー資産)と
-reports/(.gitignore 済み。Apple へ提出済みの資料)だけ** → maintainer-notes §11
+reports/(.gitignore 済み。Apple へ提出済みの資料)だけ** → MN-11

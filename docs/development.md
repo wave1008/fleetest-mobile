@@ -2,9 +2,9 @@
 
 | 種別 | 範囲 | 読む場面 | 扱わないこと |
 |---|---|---|---|
-| 手順 | 本体を改造するためのビルド手順・リポジトリの構成・全体の構造 | クローン直後・どこに何があるかを探すとき | 利用者の導入(→ [user-docs/quick-start_ja.md](user-docs/quick-start_ja.md))・設計の詳細(→ [design.md](design.md))・検証の規律(→ CLAUDE.md「ビルド・検証」・[verification.md](verification.md)) |
+| 手順 | 本体を改造するためのビルド手順・リポジトリの構成・全体の構造 | クローン直後・どこに何があるかを探すとき | 利用者の導入(→ [user-docs/quick-start_ja.md](user-docs/quick-start_ja.md))・設計の詳細(→ [design/](design/README.md))・検証の規律(→ CLAUDE.md「ビルド・検証」・[verification/](verification/README.md)) |
 
-fleetest 本体を改造する保守者向けの、最初の一歩と地図。設計の判断はここに書かず design.md に置く。
+fleetest 本体を改造する保守者向けの、最初の一歩と地図。設計の判断はここに書かず design/ に置く。
 
 ## ビルド
 
@@ -32,7 +32,7 @@ fleetest CLI / MCP ──(サブプロセス)──▶ fleetest-scenarios-<proje
 ```
 
 - プラットフォーム境界は `AppDriver` プロトコルだけ。FM 呼び出しと再生器は iOS / Android で共通
-- iOS のモード(`inapp` / `xcuitest`)とブリッジの関係は design.md
+- iOS のモード(`inapp` / `xcuitest`)とブリッジの関係は design/
 
 ## リポジトリ構成
 

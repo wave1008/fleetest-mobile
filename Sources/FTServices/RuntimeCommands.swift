@@ -85,7 +85,7 @@ private enum RuntimeArgv {
         return argv
     }
 
-    /// `nodelay` は両側に付ける: 付けないと Nagle で p99 が張り付く(§17「中継のコンテナ」)。
+    /// `nodelay` は両側に付ける: 付けないと Nagle で p99 が張り付く(RR-17「中継のコンテナ」)。
     static func relayScript(plan: RelayPlan) -> String {
         var lines: [String] = []
         for f in plan.forwards {

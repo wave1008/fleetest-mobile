@@ -1,6 +1,6 @@
 // 05_スクロール.swift
 // fleetest 機能: `scrollTo` による要素到達と、「exist/textIs は非スクロール(現在画面のみ判定)」の
-// 契約検証(docs/design.md §10)・Cell 型ラベルでのタップ・`swipeElementToElement` /
+// 契約検証(DS-10)・Cell 型ラベルでのタップ・`swipeElementToElement` /
 // `notExist(scroll:)` / 固定ヘッダを指定した `scrollFrame` / `textContains`・`textMatches` /
 // Shirates 準拠のスクロールコマンド(`scrollToBottom`/`scrollToTop`/`scrollDown(repeat:)`/
 // `withScrollDown`)・`tap(scroll:)` をまとめて検証する。
@@ -158,7 +158,7 @@ class スクロールで折り返し下の要素に到達できること {
                     tap("#nav_scroll")
                 }.action {
                     // 狙うのは一覧末尾(07 と同じ `#row_40`)。中間行も通るようになったが
-                    // (docs/verification.md「スクロールした直後のタップ」)、この SUT
+                    // (docs/verification/traps.md「スクロールした直後のタップ」)、この SUT
                     // (RecyclerView)は行リサイクル起因の不安定さが残るため末尾を使う
                     tap("#row_40", scroll: .down, maxSwipes: 15)
                 }.expectation {

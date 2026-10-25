@@ -1,4 +1,4 @@
-// マシン側 config.json の `hooks` 欄(docs/remote-runner.md §17 の「スクリプト(Seatbelt の中)」)。
+// マシン側 config.json の `hooks` 欄(RR-17 の「スクリプト(Seatbelt の中)」)。
 // 読むファイルは `ScenarioSandbox.machineSettingsURL()` = 実ホームの固定パス
 // (`XDG_CONFIG_HOME` で別の設定へ向けて書ける場所を広げさせない)。
 

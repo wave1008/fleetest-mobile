@@ -1,6 +1,6 @@
 // 05_スクロール.swift
 // fleetest 機能: `scrollTo` による要素到達と、「exist/textIs は非スクロール(現在画面のみ判定)」の
-// 契約検証(docs/design.md §10)。折り返し下の要素は直前に scrollTo が必須であることを確認する。
+// 契約検証(DS-10)。折り返し下の要素は直前に scrollTo が必須であることを確認する。
 // あわせて `textContains`/`textMatches`・Shirates 準拠のスクロールコマンド群(`scrollToBottom`/
 // `scrollToTop`/`scrollDown(repeat:)`/`withScrollDown`/`tap(scroll:)`)・型付きセレクタ(Sel)の
 // スコープ・状態フィルタ・`scroll:` 引数(`.down`/`.up`/
@@ -8,7 +8,7 @@
 // 旧シナリオ境界は tap("#tab_home") でホームへ戻ってから叩き直す形に置き換えてある
 // (App() はタブ/子画面切替で remember 状態を破棄するため、selected=- 等の初期値はこれだけで戻る)。
 // **統合B は2本の @Test に分けてある**(ios-xcuitest の壁時計対策。1本に畳むとスクロール操作の
-// 直列化で最長シナリオが伸び、レーンを増やしても縮まない。docs/performance-tuning.md §3.6)。
+// 直列化で最長シナリオが伸び、レーンを増やしても縮まない。PT-3.6)。
 // **S0060/S0080/S0090/S0091/S0100/S0110 は重量級(scrollFrame 本丸・古いツリー検出・横縦同居・
 // 状態不変性・領域指定なし探索の回帰)のため統合しない**(各自 launchApp を残す独立 @Test のまま)。
 
@@ -235,7 +235,7 @@ class スクロールで折り返し下の要素に到達できること {
                     countIs(.type(.button).enabled(false), 1)
                 }
             }
-            /// Shirates 由来のスクロール別名族は String 版と Sel 版が1対1(design.md §型付きセレクタ)。
+            /// Shirates 由来のスクロール別名族は String 版と Sel 版が1対1(docs/design/dsl-syntax.md「型付きセレクタ」)。
             /// 委譲先の方向を取り違えても**コンパイルは通る**ので、実際に届くことをここで固定する
             /// (方向の転記ミス自体は SelScrollVariantDispatchTests がユニットで押さえる)
             scene(3, "15.S0030: スクロール別名族の Sel 版が文字列版と同じ挙動になる") {
@@ -326,7 +326,7 @@ class スクロールで折り返し下の要素に到達できること {
     /// Android の間欠ずれは「Compose の a11y ツリーがスワイプ応答より数十 ms 遅れて公開される」
     /// のが根因で、探索の snapshot をキャッシュ迂回にして解決した。
     /// **領域指定なしの形は S0110** に分けてある(別の原因を見ているので両方要る。
-    /// docs/verification.md「Compose の探索直後タップ」の回帰テスト表)
+    /// docs/verification/judgment.md「Compose の探索直後タップ」の回帰テスト表)
     @Test("先頭へ戻した直後に領域指定で探索してタップしても狙った行が選ばれる")
     func S0080() {
         scenario {
@@ -349,7 +349,7 @@ class スクロールで折り返し下の要素に到達できること {
 
     // **CMP 固有の制限は 2026-08-03 にすべて解消した**(原因は3つあり別物 ——
     // 容器の外に出る ghost 要素 / a11y ツリーの公開遅れ / 空打ちドラッグのクリック成立。
-    // docs/verification.md「Compose の探索直後タップ」)。回帰テストは S0080 / S0110 / S0100
+    // docs/verification/judgment.md「Compose の探索直後タップ」)。回帰テストは S0080 / S0110 / S0100
 
     // --- 縦と横のスクロール領域が同居する画面での領域指定 ---
     // これが `scrollFrame` の本丸: 2つのスクロール領域があるとき、**指定した方だけ**が動くこと。
@@ -534,7 +534,7 @@ class スクロールで折り返し下の要素に到達できること {
     /// **効くのは iOS 8 レーン同時稼働**(スイート実行)。単独実行では出ない:
     /// スイート **3/10(30%)** / 単独 **2/96(2%)**。
     /// **計装を入れると消える**(0/13)—— probe の I/O がタイミングを変える heisenbug。
-    /// 追い方と未検証の仮説は docs/verification.md「Compose の探索直後タップ」原因1 の「残存」
+    /// 追い方と未検証の仮説は docs/verification/judgment.md「Compose の探索直後タップ」原因1 の「残存」
     @Test("領域を指定しない探索でも狙った行をタップできる")
     func S0110() {
         scenario {

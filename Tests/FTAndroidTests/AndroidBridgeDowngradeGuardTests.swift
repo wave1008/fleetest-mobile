@@ -1,7 +1,7 @@
 // installBridgeIfNeeded が adb install を試みる前の fail-fast 判定(AndroidDriver.downgradeRefusal)。
 // Android は versionCode の引き下げインストールを拒否するため、より新しいブリッジが載ったデバイスに
 // 古い fleetest が古い APK を当てると INSTALL_FAILED_VERSION_DOWNGRADE か無応答になる
-// (2026-08-14 にフリート8台が全滅した実害。docs/remote-runner.md §18.5)。
+// (2026-08-14 にフリート8台が全滅した実害。RR-18.5)。
 
 import XCTest
 @testable import FTAndroid

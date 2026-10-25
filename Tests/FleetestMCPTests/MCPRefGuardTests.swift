@@ -589,7 +589,7 @@ final class MCPRefGuardTests: XCTestCase {
         XCTAssertTrue(text.contains("[1] #row_40"), "掴んだ要素を名指しすること: \(text)")
     }
 
-    // MARK: - Android には無い「XCUITest の木」の注意を名指ししない(§19.3 M5)
+    // MARK: - Android には無い「XCUITest の木」の注意を名指ししない
 
     /// スクロール容器が1つも申告されない iOS の木では、XCUITest の木の限界を事実として言う
     /// (**in-app を勧めない** —— MCP の iOS は常に XCUITest なので、エージェントが選べない手になる)

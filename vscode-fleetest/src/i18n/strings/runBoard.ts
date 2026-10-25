@@ -1,5 +1,5 @@
 // 辞書(webview 側)。namespace: runBoard.
-// 対象ソース: webview/monitor/runBoard.js(デバイスモニターの「run ボード」。docs/design.md §18)。
+// 対象ソース: webview/monitor/runBoard.js(デバイスモニターの「run ボード」。DS-18)。
 // webview バンドル(src/webview/i18n.js)から import される。**vscode 非依存**を保つこと。
 // キーは "runBoard." 始まり。
 import type { MessageDict } from "../core";

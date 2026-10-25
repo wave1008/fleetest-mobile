@@ -52,7 +52,7 @@ public enum PortHolder {
     /// **台帳の有無では持ち主を決められない** —— `.fleetest/` はクローンごとなので、別のクローン
     /// (ランナー用クローン・受け手の構成・テストの一時ディレクトリ)から見ると、生きた実機ブリッジの
     /// トンネルも「台帳の無いポート」に見える(実測: `swift test` のたびに駆動中の実機のトンネルが止まった
-    /// → maintainer-notes §61)。ランナーは `FleetestRunner-<port>.xctestrun` と `-destination …,id=<UDID>`・
+    /// → MN-61)。ランナーは `FleetestRunner-<port>.xctestrun` と `-destination …,id=<UDID>`・
     /// トンネルは `-u <UDID>` を持つ。**ポートも合わせる** —— 同じデバイスの生きたランナーが別のポートに
     /// 居るだけなら、このポートのトンネルは残骸(1台に同居できるトンネルは1本)。
     /// トンネルの宛先を読めなければ false(= 持ち主を言えない残骸として止める側)
@@ -90,7 +90,7 @@ public enum PortHolder {
 
     /// `udidFromListener` の I/O ラッパー(lsof/ps → 純粋関数)。`bridge down` の口が呼ぶ。
     /// **トンネルだけが握るポート(ブリッジは死んでいる)は nil** —— 印を照合して断ると、
-    /// 止めることが唯一の回復手段なのに「使用中」と言い続ける袋小路になる(maintainer-notes §46.4)
+    /// 止めることが唯一の回復手段なのに「使用中」と言い続ける袋小路になる(MN-46.4)
     public static func deviceUDID(fromListenerOn port: UInt16) -> String? {
         guard let (_, command) = lookup(port: port), !commandIsIproxyForPort(command, port: port) else {
             return nil

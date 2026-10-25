@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # 状態判定(読み取りのみ・何も変更しない)。既定モードはインストール前の判定(カレント = WORK_DIR
-# 候補)。`--runner` はランナー機(`fleetest run --runner` / docs/remote-runner.md §5・§14)としての判定。
+# 候補)。`--runner` はランナー機(`fleetest run --runner` / RR-5・RR-14)としての判定。
 #
 #   bash <SCRIPTS>/preflight.sh(<SCRIPTS> はスキルと一緒に届いた Scripts/ かクローンの Scripts/。
 #   スキルからは curl | bash で呼ばない = エージェントの安全確認に止められる)
@@ -10,7 +10,7 @@
 # 既定モード: **カレントディレクトリ(または --work-dir)だけを判定対象**にする(どこで実行したかが
 # 答えを変えるため)。
 # --runner モード: `<base>/foundation-tester`(クローン)・`<base>/work`(WORK_DIR)を判定対象にする
-# (docs/remote-runner.md §14「構成」)。**sudo を使わない・何も書き換えない** — FileVault・
+# (RR-14「構成」)。**sudo を使わない・何も書き換えない** — FileVault・
 # 自動ログイン・スリープ・sshd の有効化はここでは行わず、人間がやる手順を案内するだけ。
 #
 # 出力は `key=value` 行(機械可読)+ 末尾の判定。判定は verdict= と終了コードの両方に出る:
@@ -43,7 +43,7 @@ MODE=default
 # `--remote-dir` の既定値(Sources/fleetest/Fleetest.swift・ApiRunCommand.swift・RemoteCommands.swift)と
 # 揃える。ズレるとディスパッチ側とランナー判定が別ディレクトリを見る
 BASE="~/fleetest-runner"
-# 両モード共通。--runner では発行者ネームスペース化(§18.2)で work が `$BASE/users/<issuer>/work`
+# 両モード共通。--runner では発行者ネームスペース化(RR-18.6)で work が `$BASE/users/<issuer>/work`
 # になり既定の `$BASE/work` と一致しなくなったため、呼び出し側(RemoteSetupPlan.preflightArgs)が
 # 実際の WORK_DIR を渡す(未指定なら旧来どおり `$BASE/work`)。既定モードでは判定対象の
 # ディレクトリ(未指定ならカレント。**未指定時の出力は1バイトも変えない**)
@@ -79,7 +79,7 @@ esac
 
 blocked_reasons=()
 
-# ---- 共通判定(既定モード・--runner の両方が呼ぶ。docs/remote-runner.md §14 表の
+# ---- 共通判定(既定モード・--runner の両方が呼ぶ。RR-14 表の
 #      「既存の判定をそのまま再利用(コピーせず共通部分を関数に括り出す)」) -----------------
 check_core_toolchain() {
   local os xcode_select_path xcode_out xcode_usable installed_xcode xcode_num
@@ -142,7 +142,7 @@ check_adb() {
   command -v adb >/dev/null 2>&1 && kv adb yes || kv adb no
 }
 
-# コンテナランタイム(scripts/compose.yaml を持つプロジェクトの run だけが要る。docs/remote-runner.md §17)。
+# コンテナランタイム(scripts/compose.yaml を持つプロジェクトの run だけが要る。RR-17)。
 # 情報だけ —— 無くても ready(サービスを使わない受け手を止めない)。無い機械へ compose を持つ run を送ると、その run が
 # 「no container runtime」で始まらずに言う
 check_container_runtime() {
@@ -152,13 +152,13 @@ check_container_runtime() {
 
 if [ "$MODE" = "runner" ]; then
   # ===============================================================================
-  # --runner: ランナー機としての判定(docs/remote-runner.md §5・§14)。読み取りのみ・sudo 不使用。
+  # --runner: ランナー機としての判定(RR-5・RR-14)。読み取りのみ・sudo 不使用。
   # ===============================================================================
   runner_manual=()
 
   kv base "$BASE"
 
-  # ---- Aqua セッション在否。§5「準備状態の判定は両モード共通で stat -f%Su /dev/console」 ------
+  # ---- Aqua セッション在否。RR-5「準備状態の判定は両モード共通で stat -f%Su /dev/console」 ------
   console_user="$(stat -f%Su /dev/console 2>/dev/null || echo unknown)"
   runner_user="$(id -un)"
   kv console_user "$console_user"
@@ -199,7 +199,7 @@ PMSET_OUT
     kv screen_sharing no
   fi
 
-  # ---- モード A/B(§5)。**blocked/needs-manual にはしない** — 案内文の出し分けにだけ使う
+  # ---- モード A/B(RR-5)。**blocked/needs-manual にはしない** — 案内文の出し分けにだけ使う
   fv_out="$(fdesetup status 2>/dev/null || echo unknown)"
   case "$fv_out" in
     *"is On"*)  filevault=on ;;
@@ -215,7 +215,7 @@ PMSET_OUT
   check_adb
   check_container_runtime
 
-  # ---- ツール本体・作業場所(§14「構成」)。未導入は `fleetest remote setup` が作るので情報のみ ----
+  # ---- ツール本体・作業場所(RR-14「構成」)。未導入は `fleetest remote setup` が作るので情報のみ ----
   tool_root="$BASE/foundation-tester"
   work_dir="${WORK_DIR_ARG:-$BASE/work}"
   kv tool_root "$tool_root"

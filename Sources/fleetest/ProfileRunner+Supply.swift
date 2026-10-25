@@ -98,7 +98,7 @@ extension ProfileRunner {
         if broadcast, resolvedAll.responseMeasurement {
             throw ValidationError(ResponseMeasurementPolicy.combinationRejection(flag: "--broadcast"))
         }
-        // ワークスペースは常に有効(既定 `<project.rootURL>/workspace`。docs/remote-runner.md §17)
+        // ワークスペースは常に有効(既定 `<project.rootURL>/workspace`。RR-17)
         // なので毎回雛形作成(既に揃っていれば何もしない。WorkspaceScaffold の宣言)。
         // リモートディスパッチはこれとは別に、ミラー前のローカル側で同じ呼び出しを行う
         // (RemoteRunDispatcher.prepareWorkspace)。続けて appPath の原本を apps/ へ
@@ -152,7 +152,7 @@ extension ProfileRunner {
         }
         for warning in resolved.warnings + mcpWarnings { ConsoleOut.out("⚠️ \(warning)") }
 
-        // 開始スクリプト(docs/remote-runner.md §17)。**デバイスに触る前**に撃つ ——
+        // 開始スクリプト(RR-17)。**デバイスに触る前**に撃つ ——
         // 依存サービスが上がっていない状態でシミュレータを起こしてアプリを入れても、
         // 全シナリオが「アプリの不具合」の顔で落ちるだけ。渡すのは絞り込み後の resolved
         // (スクリプトが受け取るデバイス一覧を、この run が実際に使うデバイスと一致させる)。

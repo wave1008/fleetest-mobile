@@ -1450,7 +1450,7 @@ let lastDevices = [];
 // 「起動中のデバイス」(設定 fleetest.monitorDeviceFilter)。**ここで落とすのはタイル側だけ** ——
 // run ボードのツリー(devicesOnMachine)はこの値を見ない。停止中・観測できないデバイスを消すと、
 // ビルド中の run の下からデバイスが丸ごと消えてフリートに何が居るのか分からなくなる
-// (ユーザー決定。docs/design.md §18.5)。**知らない値は 'all' へ倒す**
+// (ユーザー決定。DS-18.5)。**知らない値は 'all' へ倒す**
 let deviceStateFilter = 'all';
 const platformFilterListeners = [];
 // ダッシュボードの「デバイスの健全性」表(dashboard/deviceHealth.js)向けの読み取り専用の窓口。

@@ -3,7 +3,7 @@
 // (ユーザー決定: 日本語モードならコメントも日本語)。
 //
 // 中身は実行規則の説明そのものなので、規則を変えたら Sources/FTCore/RunHooks.swift・
-// Sources/fleetest/RunHookRunner.swift・docs/remote-runner.md §17(スクリプトの枠)と一緒に直す。
+// Sources/fleetest/RunHookRunner.swift・RR-17(スクリプトの枠)と一緒に直す。
 // **ja/en は同じ内容を書く**(片方だけ詳しい状態にしない)。
 
 import type { MessageDict } from "../core";

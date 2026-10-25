@@ -1,4 +1,4 @@
-// ScaleGestureDetector の最小スケール距離 = 27 mm を density から px に換算する(§19 M5)
+// ScaleGestureDetector の最小スケール距離 = 27 mm を density から px に換算する
 
 import XCTest
 @testable import FTAndroid

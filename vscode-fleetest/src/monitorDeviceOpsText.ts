@@ -6,7 +6,7 @@ import { type MachineLock, isConfirmedHeld } from "./machineLockModel";
 import { formatBytesAuto } from "./retentionModel";
 import { type DeviceCommandSource } from "./remoteRunArgs";
 
-/** エラーメッセージへマシン名を付記する(§13 段2「失敗時はマシン名込みのメッセージにする」)。
+/** エラーメッセージへマシン名を付記する(RR-13 段2「失敗時はマシン名込みのメッセージにする」)。
  * ローカルは素通し(既存の文言を変えない)。 */
 export function withSourceContext(message: string, source: DeviceCommandSource): string {
   return source.kind === "remote" ? t("deviceOps.remoteMachineSuffix", { machine: source.machine, message }) : message;
@@ -220,7 +220,7 @@ export function installRuntimeBatchConfirmMessage(params: {
  * 破壊的操作の確認に添える占有の1行(その機械で run が走っているときだけ)。
  * **`machine === null` は手元**で、呼び名は既存の1つ(`deviceOps.machineLocalLabel`)。
  * **占有が不明(観測できていない)なら何も足さない** —— 「走っていない」と請け合わないための沈黙
- * (docs/remote-runner.md §18.1 #6)。控えは呼び手が引いて渡す(純粋関数)。
+ * (RR-18.1 #6)。控えは呼び手が引いて渡す(純粋関数)。
  */
 export function occupancyDetailLine(
   machine: string | null,

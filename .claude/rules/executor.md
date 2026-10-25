@@ -53,7 +53,7 @@ paths:
   - "Tests/FTDSLTests/FTRuntimeFailureKindTests.swift"
   - "Tests/FTDSLTests/FTRuntimeLifecycleTests.swift"
   - "Tests/FleetestTests/ResolvedProfileDeviceScopeTests.swift"
-  - "docs/design.md"
+  - "docs/design/*.md"
 ---
 
 # StepExecutor(実行時設定・失敗の文言・システムアラート) の規律
@@ -62,14 +62,14 @@ CLAUDE.md から移した規則(本文は移設前と同一)。この領域の�
 
 - **失敗の文言は構成(OS・ブリッジ・実機か)を知っている必要がある**(`FTCore.DriverErrorContext` を
   `DriverError` の同伴データに必須で持たせる。既定値を置かない = 新しい経路が渡し忘れたらコンパイルで止まる)。
-  **detail に渡すのは一次情報だけ**(完成した説明文を渡すと固定文が二重に出る)→ maintainer-notes §27
+  **detail に渡すのは一次情報だけ**(完成した説明文を渡すと固定文が二重に出る)→ MN-27
 - **type の読み返しの有無はドライバの能力**(`AppDriver.verifiesTypedText`。xcuitest ランナー/
   Android 注入器 = true・in-app = false で、false のときだけ `StepExecutor` がホスト側で読み返す)
 - **実行時設定は継ぎ目で解かない**。`fm`(`FMConfig`)/ `heal` / `occlusionOCR` / `containerInference` / timeouts は
   `FTCore.ScenarioExecutionSettings` 1つに束ね、`runSequential`/`runParallel` → `RunOrchestrator` →
   `ScenarioRunner.runOne` → `ScenarioHost.run` をそのまま通す。**既定値はこの型の init 1箇所だけ**
   —— 層ごとに引数へ解くと、その層の既定が**渡し忘れを合法にする**(コンパイルでも実行でも
-  見えない)→ maintainer-notes §17。プロファイル由来の値の写像元は変換 init
+  見えない)→ MN-17。プロファイル由来の値の写像元は変換 init
   (`ResolvedProfile` / `DeviceIndependentRunSettings` から)**だけ**で、欄を足して写像を忘れると
   `ScenarioExecutionSettingsTests` の `Mirror` 走査が落とす。
   **走査テストは型の効かない継ぎ目にだけ置く**(`OCRToggleWiringTests` に残すのは子プロセス境界の
@@ -79,7 +79,7 @@ CLAUDE.md から移した規則(本文は移設前と同一)。この領域の�
   **FM / OCR の親スイッチ(`fm` / `ocr`)は置かない**(ユーザー決定 2026-09-15。キーも
   チェックボックスも無い)—— FM を呼ぶかは `FMConfig.enabled = fmTextVisibilityCheck || screenLooksLike`
   で導く(両方 false なら実行バイナリへ `--no-fm`)。親と子で同じ状態を2か所に持っていた
-  → maintainer-notes §23
+  → MN-23
 - **受け手の環境で正解が変わる既定(待ち・締切・操作の所要)は `FTCore.RunTunables` に置く**
   (`ScenarioExecutionSettings.tunables` で運び、子へは `--tunables` の JSON 1つ)。欄名は将来の
   プロファイルのキー名。開放は `RunProfileDocument` に欄を足して変換 init で写すだけ。判定の閾値・
@@ -107,8 +107,8 @@ CLAUDE.md から移した規則(本文は移設前と同一)。この領域の�
   **③緩める口をプロジェクトと環境変数に置かない**(設定はマシン側の固定パスだけ・`HOME` / `TMPDIR` /
   `XDG_CONFIG_HOME` / `FT_*_DIR` から書ける場所や読ませない場所を広げない)/
   **④開けるものは名指しで足す**(全許可へ戻さない。全許可の枠からは `simctl spawn` と `open -a` で外へ出られた)/
-  **⑤拒否は先に起こした `log stream` で拾う**。規則の形・書式の罠・壁の外に残るものは docs/design.md §11.7
-- **サービスの宣言(compose.yaml)の解釈・検査・計画は `Sources/FTServices`**(docs/remote-runner.md §17。利用側は fleetest CLI と
+  **⑤拒否は先に起こした `log stream` で拾う**。規則の形・書式の罠・壁の外に残るものは DS-11.7
+- **サービスの宣言(compose.yaml)の解釈・検査・計画は `Sources/FTServices`**(RR-17。利用側は fleetest CLI と
   fleetest-mcp だけ = 受け手のシナリオ実行バイナリには Yams ごとリンクしない。`PackageLinkageTests` が Package.swift の推移的な
   リンク依存を走査で固定)。**FTCore から FTServices を参照しない**(broker へ方針を差し込む口だけ FTCore に置く)。守る規律4つ:
   **①経路は1本** —— 読む(`ComposeReader`)→ 展開(`ComposeTreeExpander` = 正規化の前・秘密は `environment` の値だけ)→
@@ -139,4 +139,4 @@ CLAUDE.md から移した規則(本文は移設前と同一)。この領域の�
 - **ブリッジの ref は、そのドライバが最後に撮った木の中でだけ有効**(ランナー・in-app・Android のブリッジは撮るたびに ref の表を作り直す)。
   **撮ったら、その後に撃つ ref はその木から引き直す**(`liftCoveredTarget` / `ClearOutcome.cleared(actingDriverSnapshot:)` /
   `awaitTypeCommit` の `liveRef`)。事後確認・読み返しの撮影の後に撃つ前の `element.ref` を使うと、番号のずれた別の要素に撃って
-  成功を返す(E2E-CMP S0040 で replace の打鍵がパスワード欄へ入った = maintainer-notes §92.4)。引き直せなければ撃たずに失敗にする
+  成功を返す(E2E-CMP S0040 で replace の打鍵がパスワード欄へ入った = MN-92.4)。引き直せなければ撃たずに失敗にする

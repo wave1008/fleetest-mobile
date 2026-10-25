@@ -1,5 +1,5 @@
 // ft_launch の門(launchGuardDecision)の固定。未インストールのまま launch を撃つと
-// XCUIApplication.launch() が返らずランナーが死ぬ(docs/verification.md)ため、
+// XCUIApplication.launch() が返らずランナーが死ぬ(docs/verification/)ため、
 // 「確かめられない」を in-app/Android では素通し・それ以外では拒否に振り分ける規律を守る。
 
 import XCTest

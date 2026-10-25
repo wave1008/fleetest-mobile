@@ -47,12 +47,12 @@ paths:
 CLAUDE.md から移した規則(本文は移設前と同一)。この領域のファイルを Read したときに自動で読み込まれる。
 
 - **モニターの run ボード**(フリート横断の実行状況。**誰の run でも**「何本中何本」を出す。
-  拡張が起こした run しか見えない `runEvent` の穴を塞ぐ): 契約は **docs/design.md §18 が唯一の定義元**。
+  拡張が起こした run しか見えない `runEvent` の穴を塞ぐ): 契約は **DS-18 が唯一の定義元**。
   供給は機械グローバルの台帳 `~/.fleetest/runs/<pid>.json`(`FTCore.RunProgressLedger`。
   **プロジェクトの `.fleetest/` に置かない** = ランナー機では発行者ごとに work が分かれ他人の run が
   見えなくなる)→ `api monitor` が `monitorRuns` で配る → リモートは fan-out が machine を埋める。
   **準備中の端末ごとの供給の段階(`supply`)は `RunSupplyProgress` の箱で運び、台帳の書き手3つ
-  (`PreparingProgressWriter` の2用途・`RunProgressState`)が必ず snapshot を載せる**(§18.1)。
+  (`PreparingProgressWriter` の2用途・`RunProgressState`)が必ず snapshot を載せる**(DS-18.1)。
   守る規律5つ: **①記帳は `RunOrchestrator` の1箇所・注入は run / api run の2経路**
   (`RunProgressLedgerWiringTests` が走査で固定。片方だけだとその経路の run が緑のまま映らない)/
   **②生存判定は pid と `startedAt` の開始時刻照合**(mtime を見ない。pid の再利用は `ProcessLiveness.isAliveAndNotStartedAfter` が弾く)/ **③死んだ控えは書き手が run 開始時に掃く**
@@ -99,9 +99,9 @@ CLAUDE.md から移した規則(本文は移設前と同一)。この領域の�
 - **run.json(記録)に残るキーを改名・必須化するときは、既存の記録の移行を同じ変更に入れる**(互換の読み替えは置かない)。
   `RunResultsStore` は `try?` で読むので、読めない run.json は run ごと LPT・`fleetest results`・履歴から黙って消える
   (拡張は欠けた欄を null で読むので気付かない)。移行前後で `fleetest results list` の stderr の件数を比べて確かめ、
-  リモートは align と同時に流す(先に書き換えると旧いバイナリが読めなくなる)→ maintainer-notes §54
+  リモートは align と同時に流す(先に書き換えると旧いバイナリが読めなくなる)→ MN-54
 - **デバイスの事象(`workerAnomalies` の `cause` / `recovery`・run 前の `preRunExcluded` / `preRunRepaired`)と
   アプリのクラッシュ(`appCrash`)は、起きた箇所で型として立てる**(reason・失敗文言の後解析で作らない)。
   run 前の点検の結果は**デバイスそのもの**(`excludedWorkers` / `repairedWorkers`)から変換する —— iOS は回復で
-  ポートが変わり label も変わるので、label からデバイスを引き直すと修復したデバイスが黙って数から落ちる → maintainer-notes §55.2。
+  ポートが変わり label も変わるので、label からデバイスを引き直すと修復したデバイスが黙って数から落ちる → MN-55.2。
   集計(`RunResultsQuery.deviceHealth`)の鍵は (host, worker)(worker だけだとフリートの同名のデバイスが混ざる)

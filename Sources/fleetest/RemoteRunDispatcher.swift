@@ -1,7 +1,7 @@
 // RemoteRunDispatcher.swift
 // `fleetest run --runner` のプロセス起動(ssh/rsync)を集約する。純粋ロジックは
 // Sources/FTRemote/RemoteDispatch.swift 側(単体テスト対象)。同一ホストへの二重ディスパッチ防止
-// (dispatch.lock の取得・解放。docs/remote-runner.md §5)もここで行う。純粋ロジックは
+// (dispatch.lock の取得・解放。RR-5)もここで行う。純粋ロジックは
 // Sources/FTRemote/RemoteDispatchLock.swift 側。
 
 import FTAndroid
@@ -65,14 +65,14 @@ struct RemoteRunDispatcher {
     let localRepoRoot: URL
     // var: default 付き let は memberwise init から除外され .apiRun を注入できない
     var mode: RemoteDispatchMode = .cliRun
-    /// `--force-lock`: 既存の dispatch.lock を奪ってから取得する(docs/remote-runner.md §5)。
+    /// `--force-lock`: 既存の dispatch.lock を奪ってから取得する(RR-5)。
     /// 既定では奪わない(stuck なロックを機械的に stale 判定しない)
     var forceLock: Bool = false
     /// `--wait-lock <秒>`: 取得できない間、解放をポーリングして待つ(forceLock と併用不可 ——
     /// FTRemote.RemoteDispatchFlagPolicy.waitLockConflictsWithForceLock が入口で弾く)
     var waitLock: Int? = nil
     /// `--runner` の生値(登録簿名 or 生 ssh 宛先)。RemoteHostFactsStore の鍵として使う
-    /// (FleetSplit の機械別見積りの供給源。docs/remote-runner.md §13)。nil のまま渡された
+    /// (FleetSplit の機械別見積りの供給源。RR-13)。nil のまま渡された
     /// 構築箇所(facts を書く必要のない経路)では facts の保存をスキップする
     var hostLabel: String? = nil
 
@@ -294,8 +294,8 @@ struct RemoteRunDispatcher {
     /// remoteDirRaw を絶対パスへ解決する。到達性プローブ兼用の1往復
     /// (`echo $HOME; <RemoteProbe.consoleUserCommand>; id -un; sysctl -n machdep.cpu.brand_string 2>/dev/null;
     /// sysctl -n hw.ncpu 2>/dev/null; <RemoteProbe.hardwareUUIDCommand>`)に相乗りさせて、
-    /// コンソールユーザー(§16.3)と CPU 情報(RemoteHostFacts の processorModel/coreCount。
-    /// §8 の事前係数)とハードウェア UUID(同 hardwareUUID)を同時に取る —— 別の ssh を
+    /// コンソールユーザー(RR-16.3)と CPU 情報(RemoteHostFacts の processorModel/coreCount。
+    /// RR-8 の事前係数)とハードウェア UUID(同 hardwareUUID)を同時に取る —— 別の ssh を
     /// 足すと往復が増える。戻り値の session は 3行形(古い macOS 等・parseSessionInfo が判定不能で
     /// ログインチェックだけスキップした経路)では nil になり、saveHostFacts は既存値を保持する
     private func resolveLayout() throws -> (layout: RemoteLayout, session: RemoteSessionInfo?) {
@@ -328,7 +328,7 @@ struct RemoteRunDispatcher {
             throw RemoteDispatchError.remoteSetupFailed(
                 "\(host.sshTarget) is sitting at the login window (console user: \(session.consoleUser), "
                 + "expected: \(session.sshUser)) — unlock and log in on the runner, then retry"
-                + " (docs/remote-runner.md §5)")
+                + " (RR-5)")
         }
         return (RemoteLayout(base: RemoteLayout.resolveBase(remoteDirRaw, home: session.home),
                              issuer: try resolveLayoutIssuer(), home: session.home), session)
@@ -346,7 +346,7 @@ struct RemoteRunDispatcher {
 
     /// `git status --porcelain`(未フィルタ)の出力から、`TestProjects/` 配下**以外**
     /// (= ツール本体)に変更があるかを判定する。`TestProjects/<project>/` は run のたびに
-    /// rsync で運ばれる(§13)ので、そこだけの変更を「リモートへ届かない」と警告するのは誤誘導 ——
+    /// rsync で運ばれる(RR-13)ので、そこだけの変更を「リモートへ届かない」と警告するのは誤誘導 ——
     /// 未追跡のプロファイル JSON 等、受け手が日常的に持つ差分で毎回鳴っていた。
     /// **rename 行("R  old -> new")は新パスで判定する**(旧パスがツール本体でも、置き場所が
     /// 最終的に TestProjects 配下なら rsync で届く)。空・空白のみは false
@@ -373,7 +373,7 @@ struct RemoteRunDispatcher {
     /// 食い違う(緑のまま別の Xcode で走る沈黙の退行)
     private func checkCompatibility(layout: RemoteLayout) throws -> String? {
         let localRevision = localCapture(["git", "-C", localRepoRoot.path, "rev-parse", "HEAD"])
-        // TestProjects/<project>/ は run のたびに rsync で届く(§13)ので、そこだけの変更
+        // TestProjects/<project>/ は run のたびに rsync で届く(RR-13)ので、そこだけの変更
         // (未追跡のプロファイル JSON 等)で鳴らすのは誤誘導 —— 判定は hasUncommittedToolChanges の1箇所
         let status = localCapture(["git", "-C", localRepoRoot.path, "status", "--porcelain"])
         if Self.hasUncommittedToolChanges(porcelain: status) {
@@ -386,7 +386,7 @@ struct RemoteRunDispatcher {
         }
         let localToolchain = ToolchainFingerprint.current()
 
-        // Xcode の選択(docs/remote-runner.md §7)。**適合照合(toolchain probe)より前に解決する**
+        // Xcode の選択(RR-7)。**適合照合(toolchain probe)より前に解決する**
         // —— refused はここで即座に止め、選べた場合はその DEVELOPER_DIR を toolchain probe に
         // 使わせる(ambient のまま照合すると、あとで run が選ぶ Xcode と食い違いうる)
         let xcodeOutcome = resolveXcodeSelection(layout: layout)
@@ -419,17 +419,17 @@ struct RemoteRunDispatcher {
         }
         guard reasons.isEmpty else { throw RemoteDispatchError.incompatible(reasons) }
 
-        // ワークスペースの実在は転送より前に確かめる(§18.6)。remoteRunCommand の 91 ガードに
+        // ワークスペースの実在は転送より前に確かめる(RR-18.6)。remoteRunCommand の 91 ガードに
         // 任せると、その前の rsync が users/<issuer>/work/TestProjects/… を部分的に作ってしまい、
         // 後から remote setup してもプロジェクト作成がディレクトリ存在でスキップされて壊れる
-        // (§12 の既知の罠と同型。実ディスパッチで確認)
+        // (RR-12 の既知の罠と同型。実ディスパッチで確認)
         let workspaceProbe = try sshCapture(
             "test -f \(RemoteShell.quote(layout.workDir))/Package.swift && echo yes || echo no")
         guard workspaceProbe.trimmingCharacters(in: .whitespacesAndNewlines) == "yes" else {
             throw RemoteDispatchError.remoteSetupFailed(
                 "no runner workspace at \(layout.workDir) on \(host.sshTarget)"
                 + " — run `fleetest remote setup \(host.sshTarget)` once for this issuer"
-                + " (docs/remote-runner.md §18)")
+                + " (RR-18)")
         }
         return developerDir
     }
@@ -452,7 +452,7 @@ struct RemoteRunDispatcher {
         return ToolchainFingerprint.compose(xcodeVersionOutput: xcodeVersion, sdkBuild: sdkBuild)
     }
 
-    // MARK: - 2. 同一ホストへの二重ディスパッチ防止(docs/remote-runner.md §5)
+    // MARK: - 2. 同一ホストへの二重ディスパッチ防止(RR-5)
 
     /// **この宛先の**ロックを親(fan-out)が先に取っているか(`FT_DISPATCH_LOCK_HELD`)。
     /// 印が無ければ自分で取る —— 単発 `run --runner`(親が居ない)はこの縮退で
@@ -748,7 +748,7 @@ struct RemoteRunDispatcher {
         return RemoteDispatchLock.heldMessage(lockRead.flatMap(RemoteDispatchLock.decode), scope: scope)
     }
 
-    /// **ロックを取った直後に、全発行者ぶんの孤児 hooks を代行実行する**(§18.1 #6)。
+    /// **ロックを取った直後に、全発行者ぶんの孤児 hooks を代行実行する**(RR-18.1 #6)。
     /// 孤児が掴んでいるのはポート = ホスト全体の資源なので、他人の死んだ run の残骸でも自分の
     /// run が詰まる。ロック保持中に撃つので、**生きている run の hooks を触ることはない**
     /// (加えて `hooks reap` 自身が pid の生死で判定する)。
@@ -884,7 +884,7 @@ struct RemoteRunDispatcher {
         guard let names = try? FileManager.default.contentsOfDirectory(atPath: localDir.path),
               names.contains(where: { $0.hasSuffix(".apk") }) else { return }
         let remoteDir = "Library/Caches/fleetest/webview"
-        // グロブ無しの固定コマンド(ssh 越しのグロブ禁止。docs/remote-runner.md §18.7)。
+        // グロブ無しの固定コマンド(ssh 越しのグロブ禁止。RR-18.7)。
         // sshBase を通す(BatchMode/ConnectTimeout 無しだとパスワード入力で止まる・75 秒固まる)
         guard (try? runInherited(sshBase + [host.sshTarget, "mkdir -p \(remoteDir)"])) == 0 else {
             log("⚠️ could not prepare the WebView cache directory on \(host.sshTarget)"
@@ -899,7 +899,7 @@ struct RemoteRunDispatcher {
         }
     }
 
-    /// ワークスペース(既定 `<project.rootURL>/workspace`。常に有効 = docs/remote-runner.md §17)を
+    /// ワークスペース(既定 `<project.rootURL>/workspace`。常に有効 = RR-17)を
     /// 用意し、リモートの子へ渡す `--workspace` の絶対パスを返す。**呼び出しは
     /// transfer() より先であること**(プロジェクトルート配下のときはここでのステージングだけを
     /// 行い、専用の rsync は行わない —— project の rsync(transfer)がそのまま運ぶので、
@@ -997,7 +997,7 @@ struct RemoteRunDispatcher {
     /// ここまで来た時点でエイリアスは解決済みで、手元にあるのが ssh 実体だから。
     /// 未登録・未設定なら nil = ランナー側の既定に任せる
     /// 登録簿のこの機械の行。**鍵は host(ssh 実体)** —— エイリアス(machine)は頻繁に変わりうるので
-    /// 引く鍵にしない(docs/remote-runner.md §0)
+    /// 引く鍵にしない(RR-0)
     private var registeredEntry: RemoteHostEntry? {
         LocalConfig.load().remoteHosts?.first { $0.host == host.sshTarget }
     }
@@ -1025,7 +1025,7 @@ struct RemoteRunDispatcher {
                 + " (swift build --product fleetest)")
         } else if status == 91 {
             log("==> this issuer has no runner workspace on \(host.sshTarget) yet"
-                + " — run `fleetest remote setup \(host.sshTarget)` once for this issuer (docs/remote-runner.md §18)")
+                + " — run `fleetest remote setup \(host.sshTarget)` once for this issuer (RR-18)")
         }
         return status
     }
@@ -1069,7 +1069,7 @@ struct RemoteRunDispatcher {
         let (collected, output) = collectRsyncCapturingOutput(
             args, what: "recordings and run logs",
             missingNote: "note: the remote produced no recordings or run logs")
-        // **回収できたときだけ**リモートの録画を消す(docs/remote-runner.md §15.4:
+        // **回収できたときだけ**リモートの録画を消す(RR-15.4:
         // 録画にはテスト資格情報の入力画面が写り込み、共有ランナーでは同じ UNIX アカウントの
         // 全員が読める)。回収に失敗したまま消すと唯一の証拠を失うので、失敗時は残す
         if collected { deleteRemoteRecordings(project: project, layout: layout) }
@@ -1134,7 +1134,7 @@ struct RemoteRunDispatcher {
         return String(rest[open.upperBound..<close.lowerBound])
     }
 
-    /// FleetSplit の機械別見積り(ディスパッチ固定費・実績のホスト解決・§8 の事前係数)の供給源として、
+    /// FleetSplit の機械別見積り(ディスパッチ固定費・実績のホスト解決・RR-8 の事前係数)の供給源として、
     /// このディスパッチが分かったホストの事実をキャッシュする。**鍵は ssh 宛先(ホスト名/IP)**で、
     /// ローカルエイリアスは使わない(RemoteHostFactsStore.fileKey)。host はプローブでなく
     /// 回収済みレコードから採る —— プローブの推測は FT_MACHINE 上書きやホスト名変化とズレるが、
@@ -1341,7 +1341,7 @@ struct RemoteRunDispatcher {
         let reportsRedirected = RemoteReportLink.rewriteDispatchReportPaths(
             xml, stamp: stamp, project: project)
         // **写す先は workDir**(base ではない)。base のまま置換すると `users/<issuer>/work` が
-        // 残って手元に存在しないパスができる(実害。§18.2 の発行者ネームスペースを
+        // 残って手元に存在しないパスができる(実害。RR-18.6 の発行者ネームスペースを
         // 足したときに追随し損ねていた)
         let rewritten = RemotePathRewrite.rewrite(
             reportsRedirected, remoteRoot: layout.workDir, localRoot: localRepoRoot.path)
@@ -1399,7 +1399,7 @@ struct RemoteRunDispatcher {
         ["ssh"] + SSHOptions.batchConnectArgs + SSHOptions.keepAliveArgs
     }
 
-    /// リモート実行専用(§16.1): `-tt` で疑似 TTY を強制割り当てると、ローカル ssh が
+    /// リモート実行専用(RR-16.1): `-tt` で疑似 TTY を強制割り当てると、ローカル ssh が
     /// SIGTERM/SIGKILL で落ちたとき SIGHUP がリモートのプロセスグループへ伝わり、キャンセルが
     /// 伝播する。照会系(sshBase)には付けない — TTY 化で stdout に CR が混ざり
     /// git rev-parse 等のキャプチャ結果を汚す
@@ -1534,7 +1534,7 @@ struct RemoteRunDispatcher {
         if interruptFlag.interrupted { process.terminate() }
         let deadline = timeoutSeconds.map { DispatchTime.now() + .seconds($0) } ?? .distantFuture
         if waitExit(deadline) == .timedOut {
-            process.terminate()                        // SIGTERM; -tt が SIGHUP をリモートへ伝える(§16.1)
+            process.terminate()                        // SIGTERM; -tt が SIGHUP をリモートへ伝える(RR-16.1)
             if waitExit(.now() + 2.0) == .timedOut {   // 猶予後も生存していれば強制終了
                 kill(process.processIdentifier, SIGKILL)
                 _ = waitExit(.distantFuture)            // reap(terminationHandler 発火)を待つ

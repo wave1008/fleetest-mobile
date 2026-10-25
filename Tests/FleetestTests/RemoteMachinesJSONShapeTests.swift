@@ -1,4 +1,4 @@
-// `remote machines list --json` と `api remote-machines` の JSON は同じ 1 形(§18 の残件: 2 形あった)。
+// `remote machines list --json` と `api remote-machines` の JSON は同じ 1 形(2 形あった)。
 // 出力は ConsoleOut 経由なので、口が 1 つであることをソース走査で固定する
 
 import XCTest

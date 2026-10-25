@@ -1,4 +1,4 @@
-// 実行プロファイルの `remoteControl.workspace`(docs/remote-runner.md §17)の純粋ロジックと
+// 実行プロファイルの `remoteControl.workspace`(RR-17)の純粋ロジックと
 // resolve() への配線。デバイス・リモートは要らない(rsync/ssh はここでは扱わない —
 // RemoteDispatchTests.swift の workspaceRsyncArgs / RemoteRunArgs 側で固定する)。
 // appPath の原本(sourcePath)は常にリポジトリルート基準 —— ワークスペース宣言時は
@@ -179,7 +179,7 @@ final class RemoteControlWorkspaceTests: XCTestCase {
     // MARK: - resolve(): remoteControl.workspace 宣言時は「インストールに使うパス」だけが
     // ワークスペース基準へ切り替わる。**原本(sourcePath)の解決基準はリポジトリルートのまま不変**
     // (appPath の相対パス解決そのものの基準は切り替えない —— 原本の置き場所と
-    // インストールに使う場所は別物。docs/remote-runner.md §17)
+    // インストールに使う場所は別物。RR-17)
 
     func testDeclaredWorkspaceRedirectsInstallPathButKeepsSourceAtRepoRoot() throws {
         try writeApp(appPath: "apps/SampleApp.app")

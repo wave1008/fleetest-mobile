@@ -220,7 +220,7 @@ final class MCPSnapshotAfterSettleLiteTests: XCTestCase {
     }
 
     /// 操作前の木を知らない(lastSnapshots が無い)ときは何もしない —— 判断材料が無いので待たない。
-    /// **座標の範囲判定の生読み(tap の前の1枚・§19 M4)は世代を作らない**ので、それを基準に
+    /// **座標の範囲判定の生読み(tap の前の1枚)は世代を作らない**ので、それを基準に
     /// 待つこともない(snapshot は範囲判定の1枚 + snapshotAfter の1枚 = 2)
     func testNoPriorSnapshotSkipsSettleLiteEntirely() async throws {
         driver.snapshotResponse = settleSnapshot([settleElement(ref: 1, id: "login_btn")])

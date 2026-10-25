@@ -91,7 +91,7 @@ final class AdbInstallVerifierTests: XCTestCase {
 
     /// **本題の回帰**: 同じ端末(同じ get-serialno)への2つの install が重ならず直列化される。
     /// 錠が無いと、片方の restore がもう片方の install の途中で発火して検証を再び有効化しうる
-    /// (§3 要調査の実害)。この検知は「body の実行区間が重ならない」で行う ——
+    /// (実害あり)。この検知は「body の実行区間が重ならない」で行う ——
     /// 錠が効いていなければ DispatchQueue.global() の2並列でほぼ確実に重なる
     func testConcurrentInstallsOnTheSameDeviceAreSerialized() {
         final class Overlap: @unchecked Sendable {

@@ -1,6 +1,6 @@
 // `fleetest api remote-compat` が問い合わせるリモートホスト集合の導出(純粋関数)。
 // I/O は一切行わない ApiRemoteCompat.remoteMachineLabels だけを対象にする
-// (ssh を伴う本体は Tests/FleetestTests では検証しない=デバイス境界のバグは docs/verification.md 方針)。
+// (ssh を伴う本体は Tests/FleetestTests では検証しない=デバイス境界のバグは docs/verification/ 方針)。
 
 import FTCore
 import XCTest

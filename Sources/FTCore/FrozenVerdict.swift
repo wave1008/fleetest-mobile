@@ -4,10 +4,10 @@
 // (ApiMonitorCommand)は自前の真偽値を持たず、ここが返す `FrozenVerdict` を配る。
 // 別々に持つと同じデバイスについて答えが食い違う —— 実際に起きた:
 // run は「9台が凍結」と言って回復まで実行したのに、モニターの `Frozen:` は 0 のままだった。
-// 判定の共有は docs/design.md の「判定は MCP と DSL で共有する」と同じ規律。
+// 判定の共有は docs/design/ の「判定は MCP と DSL で共有する」と同じ規律。
 //
 // **判定材料は一様フレーム(uniformBlank)**。拍動は判定材料に使わない ——
-// 本物の wedge でも拍動は回り続ける(実験記録は docs/verification.md)。誤検知(アプリの
+// 本物の wedge でも拍動は回り続ける(実験記録は docs/verification/)。誤検知(アプリの
 // 初回描画待ち)との区別は**観測窓の長さ**で行う(`BlankWorkerTriage.samples` / `intervalMs`)。
 // 根拠を列挙して束ねる形なので、証拠の追加は enum の1ケースで済む。
 

@@ -34,7 +34,7 @@ CLAUDE.md から移した規則(本文は移設前と同一)。この領域の�
   `checkIsON(prefer:)` / `checkIsOFF(prefer:)`(`CheckStateSource`。決めるのは `executeAssertChecked` の1箇所 =
   ステップ指定 > プロファイル)。**DSL の写像は `CheckStatePreferDSLTests` が通しで縛る** —— FTCore の単体は
   FlowStep を直接作り、E2E の 21 は合否しか見ないので、写像の反転・渡し忘れはどちらも緑のまま通る。
-  **アプリの領域(ステータスバーと下端の帯を除く)が一色のスクショでは分類しない・照合しない**(`BlankFrameDetector.isUnjudgeable`。黒でも白でも・ステータスバーの有無で分けない = アイコンの数でセル平均が割れたり割れなかったりする。テキストの可視性検証は黒だけを外す(白は「描かれていない」事実)。分類器は一色の切り出しを ON の要素でも [OFF]・確信度 1.00 と答え、findImage は「見つからない」= `isEmpty` の誤った緑。分類器は a11y へ・findImage は待って撮り直す。凍結の根拠にはしない)。**findImage は絵が木に追いついていない間も照合しない**(視覚検証と同じ `StaleFrameDetector` の控えを共有・`staleRetryDelays` で待って撮り直す。**尽きたら最新の絵で照合する = 赤にしない**(失敗にした版は CMP の iOS in-app で 20 秒以上同じ絵が続き、緑のシナリオを毎周赤にした))。**見本は推論と同じ a11y の枠で切る**(docs/design.md の checkIsON の節)。
+  **アプリの領域(ステータスバーと下端の帯を除く)が一色のスクショでは分類しない・照合しない**(`BlankFrameDetector.isUnjudgeable`。黒でも白でも・ステータスバーの有無で分けない = アイコンの数でセル平均が割れたり割れなかったりする。テキストの可視性検証は黒だけを外す(白は「描かれていない」事実)。分類器は一色の切り出しを ON の要素でも [OFF]・確信度 1.00 と答え、findImage は「見つからない」= `isEmpty` の誤った緑。分類器は a11y へ・findImage は待って撮り直す。凍結の根拠にはしない)。**findImage は絵が木に追いついていない間も照合しない**(視覚検証と同じ `StaleFrameDetector` の控えを共有・`staleRetryDelays` で待って撮り直す。**尽きたら最新の絵で照合する = 赤にしない**(失敗にした版は CMP の iOS in-app で 20 秒以上同じ絵が続き、緑のシナリオを毎周赤にした))。**見本は推論と同じ a11y の枠で切る**(docs/design/ の checkIsON の節)。
   **分類器の答えは推論のたびに対照(ラベルの違う見本2枚)で確かめ、外れたら使わない**(`VisionClassifier.Model.classify`。
   壊れた Vision / Core ML はエラーを返さず全部に同じラベルを確信度 1.00 で答える = checkIsOFF の誤った緑。
   findImage の縮退の門は特徴量の経路だけで Core ML の経路には効かない)。
@@ -54,22 +54,22 @@ CLAUDE.md から移した規則(本文は移設前と同一)。この領域の�
   最初の候補を「発見」して別の要素を叩く。Vision の失敗としては記録されない。**半端な異常も止める** = 見本を取り直し、
   控えと一致しなければ断る(`isConsistent`。健全なら 4 機 1,200 回とも距離 0)。取り直すのは**走査の最初の見本(= 今の機械の状態)と、
   プロセスで初めて計算した見本(= その控えの正しさ)だけ**・永続控えから読んだ見本は門を通ったもの = 確かめ済み・
-  白紙も走査で1回(機械の異常は見本を選ばない)。**どちらの異常も待って走査ごとやり直す**(`FindImage.anomalyRetryDelays`・計 15.5 秒・待ちは締め切りから差し引く・注記 `vision-anomaly-retried`。異常はプロセスで最初の照合でだけ起き数秒で戻る実測。**すぐの撃ち直し 1〜2 回では戻らない**・**CPU 固定は悪化するので不採用**。**先にシナリオ開始時の暖機 `FindImage.prewarmIfNeeded` がその時間を使い切る** —— OCR の暖機は別のモデル・装置で効かない。**待ちの前に1回だけ**、run が起こした長寿命の補助プロセス(`fleetest api vision-serve`・`FT_VISION_HELPER_SOCKET`)に特徴量を計算させて走査をやり直す(通れば注記 `vision-helper-rescued`・補助が頼れなければ `vision-helper-unavailable` で既存の待ちへ)。**門は補助の値にもそのまま掛ける(外さない)・平常時は補助に触れない** → maintainer-notes §67))/ **③見つからないことは失敗に
+  白紙も走査で1回(機械の異常は見本を選ばない)。**どちらの異常も待って走査ごとやり直す**(`FindImage.anomalyRetryDelays`・計 15.5 秒・待ちは締め切りから差し引く・注記 `vision-anomaly-retried`。異常はプロセスで最初の照合でだけ起き数秒で戻る実測。**すぐの撃ち直し 1〜2 回では戻らない**・**CPU 固定は悪化するので不採用**。**先にシナリオ開始時の暖機 `FindImage.prewarmIfNeeded` がその時間を使い切る** —— OCR の暖機は別のモデル・装置で効かない。**待ちの前に1回だけ**、run が起こした長寿命の補助プロセス(`fleetest api vision-serve`・`FT_VISION_HELPER_SOCKET`)に特徴量を計算させて走査をやり直す(通れば注記 `vision-helper-rescued`・補助が頼れなければ `vision-helper-unavailable` で既存の待ちへ)。**門は補助の値にもそのまま掛ける(外さない)・平常時は補助に触れない** → MN-67))/ **③見つからないことは失敗に
   しない**(select と同じ。失敗は設定の誤りと Vision が答えを出せない状態だけ。**existImage だけが見つからないことを失敗にする**)/
   **④findImage の `waitSeconds` の既定は 0**(`FindImage.defaultWaitSeconds`。待つのは existImage の側 = 既定は実行プロファイルの defaultTimeout)。**文字だけが違う同じ形の部品は距離
-  0.08〜0.15 に並ぶ**ので、既定の閾値のまま行を探す書き方を E2E に置かない → maintainer-notes §37。
+  0.08〜0.15 に並ぶ**ので、既定の閾値のまま行を探す書き方を E2E に置かない → MN-37。
   **findImages もラベルの見本を全部使う**(Shirates は1枚 = shirates-parity.md の差分)。特徴量は計算の回数だけが
   費用(大きさ・並列で変わらない)なので、候補の特徴量は走査の中で使い回し(`FindImage.CandidatePrints`)、
   見本の特徴量は `TemplatePrintStore`(`<project>/.fleetest/vision/template-prints.json`)に永続化する ——
-  **中身の sha256 と OS の版で差分更新・書くのは門を通った特徴量だけ・門で落ちたら消す**(docs/performance-tuning.md §3.30)。
+  **中身の sha256 と OS の版で差分更新・書くのは門を通った特徴量だけ・門で落ちたら消す**(PT-3.30)。
   **掴めなかったときの「飾りの名前」(`<image "…": not found>`)は利用者が書いたセレクタではないので
   構文検証に掛けない**(`FTElement.placeholderSelector` の `structured: true`)—— 掛けると連鎖した
   アサーションが `invalid selector syntax` で落ち、**書いた本人のセレクタを誤って名指し**する。
   dry-run は画像を探せないので必ずこの形になり、**画像で探す手を含むプロジェクトは dry-run が丸ごと赤**
-  になっていた(実地 2026-09-23 → maintainer-notes §46.6)
+  になっていた(実地 2026-09-23 → MN-46.6)
 - **in-app のスクリーンショットは、自前描画(`isSelfRendered`)で木が絵より先に進んでいる間は撮らない**
   (`InAppRenderCatchUp`・v117)。操作を起こす2経路(`tapByRef` / `performSettlingIfMoved`)が直前に画素と木の
   指紋を控え、`/screenshot` は**木が変わったのに画素が控えのままの間だけ**待つ。**遷移の完了は待たない**
   (ユーザー決定。ループするアニメーションで毎回上限まで待つ形を作らない)。**木の指紋は枠だけで取らない**
   (スイッチのオン/オフは枠を変えない = 型・id・ラベル・value・checked・enabled も畳む)。**門は層の型でなく
-  フレームワークの自己申告**(Compose の `CMPMetalLayer` は `CAMetalLayer` の子孫ではない)→ maintainer-notes §37
+  フレームワークの自己申告**(Compose の `CMPMetalLayer` は `CAMetalLayer` の子孫ではない)→ MN-37

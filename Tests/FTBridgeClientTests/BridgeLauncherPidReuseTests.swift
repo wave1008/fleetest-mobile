@@ -1,4 +1,4 @@
-// PID 再利用ガード: TTL 自主終了(design.md §4.1)後に bridge-<port>.pid が残ったまま、その pid が
+// PID 再利用ガード: TTL 自主終了(DS-4.1)後に bridge-<port>.pid が残ったまま、その pid が
 // 数日後に無関係なプロセスへ再利用されると、`fleetest bridge down --port N` がその無関係プロセスを
 // 撃ってしまう欠陥が指摘された。stop()/stopAndWait() は kill する前に
 // BridgeLauncher.isOurRunner(pid:port:) でコマンドラインを確認し、一致しなければ撃たず

@@ -8,7 +8,7 @@
 // Flutter は Switch/Button とも iOS/Android 同型(<SUT>/docs/ui-contract.md 表 B)なので型の分岐は不要。
 // **id の無いテキストは 2026-07-26 のブリッジ型正規化まで Android のスナップショットに出なかった**
 // (className=android.view.View → 既定分岐)。葉+contentDesc を StaticText に写像したことで
-// 両 OS 同一のシナリオで書けるようになった経緯がある(docs/design.md §10)。
+// 両 OS 同一のシナリオで書けるようになった経緯がある(DS-10)。
 
 import FTDSL
 

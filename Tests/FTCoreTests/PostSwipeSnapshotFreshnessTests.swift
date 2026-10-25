@@ -10,7 +10,7 @@
 // 戻ると、失敗モードは沈黙(緑のまま誤った要素を掴む)なのでテストでは捕まらない。
 // 撮り直す理由は `SnapshotFreshness` で書くので、走査もその語彙で行う(理由を書く形にしても
 // 「素取得に戻す」「swiped を false 固定にする」は**コンパイラでは防げない**ため、この検査は残す)。
-// 機構と実測は docs/verification.md「Compose の探索直後タップ」。
+// 機構と実測は docs/verification/judgment.md「Compose の探索直後タップ」。
 
 import XCTest
 

@@ -18,7 +18,7 @@ cd "$(git rev-parse --show-toplevel)"
 # `--force` は **preflight を飛ばさない**。飛ばしても `remote align` 自身が同じロックで止まるので
 # 素通しにはならず、素通しにできてしまうと**走っている他人の run を殺す**(向こうで
 # `git checkout` + `swift build` をするので、実行中のバイナリが差し替わって SIGKILL される。
-# maintainer-notes §4.1 と同じ事故がリモートで起きる)。
+# MN-4.1 と同じ事故がリモートで起きる)。
 # 代わりに **`remote unlock` を試みてから測り直す** —— あれは「**自分の**死んだディスパッチの
 # ロックだけ」を外すので、生きている run と他人のロックは残り、そのときは従来どおり落ちる。
 # `--force-lock` は**持ち主を問わず奪う**(`remote unlock --force`)。その run が止まっていると

@@ -15,7 +15,7 @@ const INDEX = readFileSync(path.join(DOCS, "README.md"), "utf8");
 // 参照を探す範囲。TestProjects/(ユーザー資産)と生成物は見ない
 const SCAN_ROOTS = ["CLAUDE.md", "AGENTS.md", ".claude/rules", "docs", "Sources", "Tests", "Scripts",
   "vscode-fleetest/src", "vscode-fleetest/test"];
-const SCAN_EXT = /\.(md|swift|ts|mjs|js|py|sh)$/;
+const SCAN_EXT = /\.(md|swift|ts|mjs|js|py|sh|css)$/;
 const SKIP_DIR = new Set(["node_modules", ".build", "Fixtures", "fixtures"]);
 
 function walk(rel) {
@@ -125,6 +125,62 @@ test("台帳の項目は状態と確認の行を持つ", () => {
   assert.ok(ledgers.includes("open-issues.md"), "索引から台帳が読めない");
   const bad = ledgers.flatMap((doc) => ledgerItemsMissingState(readFileSync(path.join(DOCS, doc), "utf8")).map((id) => `${doc}: ${id}`));
   assert.deepEqual(bad, [], "状態・確認の行が無い/状態の値が規約外(docs/README.md「台帳の項目」)");
+});
+
+/** 文書名の無い `§N`(どの文書の節か grep で決まらない。docs/README.md「節の ID」)。 */
+export function bareSectionRefs(text) {
+  return [...text.matchAll(/§\s?\d/g)].length;
+}
+
+/** `## 目次` の行が本文の `##` 見出しを全部載せていなければ、欠けた見出しを返す。 */
+export function tocMissing(text) {
+  const body = text.replace(/```[\s\S]*?```/g, "");
+  const toc = body.split(/^## 目次$/m)[1]?.split(/^## /m)[0] ?? "";
+  return [...body.matchAll(/^## (.+)$/gm)].map((m) => m[1])
+    .filter((h) => h !== "目次" && !toc.includes(h.split(" ")[0].match(/^[A-Z]{2,3}-/) ? h.split(" ")[0] : h));
+}
+
+test("文書名の無い §N を書かない(ID で参照する)", () => {
+  const roots = [...SCAN_ROOTS, ".claude/skills", "Runner", "InAppBridge", "AndroidRunner", "Package.swift"];
+  const self = "vscode-fleetest/test/docsIndex.test.mjs";
+  const hits = roots.flatMap(walk)
+    .filter((f) => f !== self && !f.startsWith("docs/user-docs/"))
+    .filter((f) => bareSectionRefs(readFileSync(path.join(ROOT, f), "utf8")) > 0);
+  assert.deepEqual(hits, [], "§N が残っている(MN-72 等の ID へ書き換える)");
+});
+
+test("文書は 1600 行以内で、1000 行を超えるものは目次を持つ", () => {
+  const bad = [];
+  for (const doc of maintainerDocs()) {
+    const text = readFileSync(path.join(DOCS, doc), "utf8");
+    const n = text.split("\n").length;
+    if (n > 1600) bad.push(`${doc}: ${n} 行(分割する)`);
+    else if (n > 1000 && tocMissing(text).length) bad.push(`${doc}: 目次に無い見出し ${tocMissing(text).slice(0, 3).join(" / ")}`);
+  }
+  assert.deepEqual(bad, [], "docs/README.md「大きさ」");
+});
+
+test("分割したフォルダの README はフォルダ内の全 ## ID を載せる", () => {
+  const prefixes = prefixesFrom(INDEX);
+  const folders = [...new Set(maintainerDocs().filter((d) => d.includes("/")).map((d) => d.split("/")[0]))];
+  assert.ok(folders.includes("maintainer-notes"), `分割したフォルダが読めない: ${folders}`);
+  const missing = [];
+  for (const folder of folders) {
+    const readme = readFileSync(path.join(DOCS, folder, "README.md"), "utf8");
+    for (const doc of maintainerDocs().filter((d) => d.startsWith(`${folder}/`) && !d.endsWith("/README.md"))) {
+      const text = readFileSync(path.join(DOCS, doc), "utf8");
+      for (const m of text.matchAll(new RegExp(`^## ((?:${prefixes.join("|")})-[\\d.]+) `, "gm"))) {
+        if (!new RegExp(`^- ${m[1].replace(/\./g, "\\.")} `, "m").test(readme)) missing.push(`${folder}/README.md: ${m[1]}`);
+      }
+    }
+  }
+  assert.deepEqual(missing, [], "フォルダの README(目次)に節が載っていない");
+});
+
+test("§ と目次の検出器は形の崩れを拾う", () => {
+  assert.equal(bareSectionRefs("MN-72 と §3.1 と §メモ"), 1);
+  assert.deepEqual(tocMissing("# T\n\n## 目次\n\n- MN-1 a\n\n## MN-1 a\n## MN-2 b\n"), ["MN-2 b"]);
+  assert.deepEqual(tocMissing("# T\n\n## 目次\n\n- 見出し\n\n## 見出し\n"), []);
 });
 
 test("冒頭の表と台帳の検出器は形の崩れを拾う", () => {

@@ -911,7 +911,7 @@ public enum ProfileWorkerFactory {
     }
 
     /// guest reboot(adb reboot・不可なら gRPC RESET=VM リセット)を発行し、ブート完了まで待つ。
-    /// sleep/wake が効かない難治型の凍結に唯一効くのが guest reboot(実測。docs/performance-tuning.md §7)。
+    /// sleep/wake が効かない難治型の凍結に唯一効くのが guest reboot(実測。PT-7)。
     /// emulator プロセスは生かしたままなので serial・adb forward は維持される(デバイス常駐ブリッジは
     /// 死ぬが AndroidDriver.ensureBridge が次の操作で貼り直す)。
     /// 戻り値 false = 発行不能 or ブート完了を確認できず(呼び出し側は blank 再判定で最終判断する)

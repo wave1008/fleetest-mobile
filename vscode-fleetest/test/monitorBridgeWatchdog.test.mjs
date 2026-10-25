@@ -380,7 +380,7 @@ test("無応答検知の後に run が始まったら修復を保留し(ログ�
 });
 
 // **MCP・ライブ操作の使用中のデバイスも数えない**。XCUITest のランナーは操作の処理中 /status に答えず booted に見え、
-// 使用中の端末は start-device が止めずに断る(maintainer-notes §84.8)。数えると誤警告と失敗する修復だけが出る
+// 使用中の端末は start-device が止めずに断る(MN-84.8)。数えると誤警告と失敗する修復だけが出る
 test("inSession の間は booted が連続しても unresponsive にも修復にもならず(ログは1回)、解けたら0から数え直す", () => {
   const h = createHarness();
   h.watchdog.observe([device("Sim1", "connected")]);

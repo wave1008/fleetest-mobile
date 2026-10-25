@@ -1019,7 +1019,7 @@ final class RunResultsQueryTests: XCTestCase {
         XCTAssertEqual(row?.count, 1)
     }
 
-    /// **同じ機械で pid が生きている未完了 run は「実行中」= 数えない**(§18 の残件: insights が
+    /// **同じ機械で pid が生きている未完了 run は「実行中」= 数えない**(insights が
     /// 実行中の run も crash と言っていた)。別の機械の pid・pid の無い旧記録は従来どおり数える
     func testInsightsUnfinishedRunsSkipsRunsStillAliveOnThisMachine() {
         var running = makeMeta(runID: "20260101-000000Z-m-0001", finishedAt: nil, host: "here")

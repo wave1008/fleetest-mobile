@@ -9,7 +9,7 @@
 //
 // 併せて Scripts/e2e-align-plan.py の判定(どの関係のときに align するか)も実際に走らせて固定する。
 // **align してよいのは remoteBehind だけ** —— 向きを取り違えると、こちらが古いときに
-// ランナーを引き下げる(docs/remote-runner.md §18.3 規則1)。
+// ランナーを引き下げる(RR-18.3 規則1)。
 
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";

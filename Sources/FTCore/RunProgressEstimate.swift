@@ -1,8 +1,8 @@
-// run 進捗の残り見積もり(段5。docs/design.md §18.4)。純粋関数のみ —— I/O は呼び手
+// run 進捗の残り見積もり(段5。DS-18.4)。純粋関数のみ —— I/O は呼び手
 // (RunOrchestrator.run。同じファイル内で RunResultsStore.scanRecords + LPTScheduler.durations を
 // 読む)が持つ。ここでは「実績の表 + 未着手/実行中の集合」から makespan の下界を1つ計算するだけ。
 //
-// 式は §18.4 のまま(水増ししない・新しい定数を置かない):
+// 式は DS-18.4 のまま(水増ししない・新しい定数を置かない):
 //   残り = Σ(未着手の推定) + Σ(実行中レーンの max(0, 推定 − そのシナリオの経過))
 //   eta  = max( 残っている単一ジョブの最大, 残り ÷ 生きているレーン数 )
 // 並列スケジューリングの makespan は「最長ジョブ」と「総和 ÷ 台数」のどちらも下回れないので、
@@ -42,7 +42,7 @@ public enum RunProgressEstimate {
     }
 
     /// 未着手/実行中レーンから残り見積もり(秒)を作る。**makespan の下界**であって実測ではない
-    /// (呼び手は必ず `~` 付きで表示する。docs/design.md §18.4)。
+    /// (呼び手は必ず `~` 付きで表示する。DS-18.4)。
     /// - table: `estimateTable` の結果(ms)。空 = 実績ゼロ → nil を返す
     /// - pending: 未着手ジョブ。同じ (scenarioID, platform) が複数残っていれば
     ///   そのぶん複数渡す(multiset。broadcast は同じシナリオが複数レーンぶん残りうる)
@@ -74,7 +74,7 @@ public enum RunProgressEstimate {
 
         let perLane = remainingSeconds / Double(liveLanes)
         // 下界であって実測ではないので、丸めで実際より早く終わるように見せない = 切り上げ
-        // (切り捨てると「もう終わっているはず」の見た目を作ってしまう。超過表示は §18.4 が想定内)
+        // (切り捨てると「もう終わっているはず」の見た目を作ってしまう。超過表示は DS-18.4 が想定内)
         return Int(max(longestSingleRemainingSeconds, perLane).rounded(.up))
     }
 

@@ -1,5 +1,5 @@
 // runBoardModel.test.mjs
-// run ボード(フリート横断の実行状況。docs/design.md §18)の純粋ロジック(src/runBoardModel.ts)。
+// run ボード(フリート横断の実行状況。DS-18)の純粋ロジック(src/runBoardModel.ts)。
 // machineLockModel.test.mjs と同じ方針: 「不明」「空き」「実行中」の3値を混ぜないこと・
 // observed:false で控えを消さないことを中心に見る。末尾で isMonitorEvent/toWebviewMessage の
 // "monitorRuns" 往復(型検査の効かない webview 境界)も縛る。

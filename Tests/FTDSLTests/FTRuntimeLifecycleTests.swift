@@ -66,7 +66,7 @@ final class FTRuntimeLifecycleTests: XCTestCase {
     }
 
     /// dry-run はガードを撃たないので OCR のコンパイルを頼まない(短命で途中で捨て、キャッシュの 1 モデルを
-    /// 上書きして次の run に払い直させる。docs/performance-tuning.md §3.33)。dry-run でない側はここでは組まない
+    /// 上書きして次の run に払い直させる。PT-3.33)。dry-run でない側はここでは組まない
     /// (本物の Vision のコンパイルを始めてしまう)ので、頼まれうる条件(既定の両スイッチ on・モードが off でない)を前提で縛る
     func testDryRunDoesNotRequestTheOCRModelCompile() {
         XCTAssertNotEqual(RegionText.mode(environment: ProcessInfo.processInfo.environment), .off,

@@ -1,4 +1,4 @@
-// run ボード(デバイスモニターの実行状況表示。docs/design.md §18)の DOM テスト。
+// run ボード(デバイスモニターの実行状況表示。DS-18)の DOM テスト。
 // 実 HTML+実バンドルを jsdom で動かす方式は webviewSelectOnlyDevice.test.mjs と同じ
 // (型検査の効かない postMessage 境界を実データで縛る)。
 
@@ -167,7 +167,7 @@ test("準備中の run は本数でなく「準備中」を出し、進捗バー
   assert.deepEqual(idle, ["local—"], "準備中でも M1Max は使用中(空きに出さない)");
 });
 
-// 準備中の端末ごとの供給の段階(台帳の supply。docs/design.md §18.1)。1つだけ出す(台数は出さない)
+// 準備中の端末ごとの供給の段階(台帳の supply。DS-18.1)。1つだけ出す(台数は出さない)
 test("準備中の run は供給の段階を1つ出す(ランナーのビルドが最優先・端末はいちばん進んでいる段階)", (t) => {
   const { window, document } = createWebview();
   t.after(() => window.close());
@@ -634,7 +634,7 @@ test("レーンにしか無い台も run の行に残る", (t) => {
 
 // 「起動中のデバイス」(設定 fleetest.monitorDeviceFilter)はタイル側だけの表示フィルタ ——
 // ツリーにも効かせると、**ビルド中の run の下からデバイスが丸ごと消える**(供給前なのでどのデバイスも
-// まだ起動していない)。ユーザー指摘 2026-09-22 / docs/design.md §18.5。
+// まだ起動していない)。ユーザー指摘 2026-09-22 / DS-18.5。
 test("「起動中のデバイス」で絞っていてもツリーの台は消えない(消えるのはタイルだけ)", (t) => {
   const { window, document } = createWebview();
   t.after(() => window.close());

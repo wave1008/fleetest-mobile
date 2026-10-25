@@ -1087,7 +1087,7 @@ final class FTInAppBridge {
         return ok()
     }
 
-    /// **iOS ではキーボードを閉じられない**(docs/design.md に不採用の記録)。resignFirstResponder は
+    /// **iOS ではキーボードを閉じられない**(docs/design/ に不採用の記録)。resignFirstResponder は
     /// 直接送っても nil ターゲットの sendAction でも閉じず(Compose の受け口が自前でフォーカスを
     /// 保持する)、xcuitest の Esc も不発。**嘘の成功を返さない**ため 501 を返す
     private func handleHideKeyboard() throws -> InAppHTTPServer.Response {

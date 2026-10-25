@@ -109,7 +109,7 @@ pipeline {
   (vision)経路を別々に撃ち、どちらが死んでも exit 1** —— 両者は独立に死ぬので、片方しか見ない
   ゲートは occlusion-guard が全滅した機械で「FM は使える」と答えてしまう
   (macOS が画像入力に対応していないだけのときは死に数えない)
-- FM はホスト全体で共有される資源で、許可枠(既定1・詳細と実測は performance-tuning.md §3.5)で
+- FM はホスト全体で共有される資源で、許可枠(既定1・詳細と実測は PT-3.5)で
   制限される。screenLooksLike を多用するスイートは壁時計が伸びる
 - 自己修復(ロケータの指紋照合)は FM を使わないので、この節(Apple Intelligence の有効化)とは
   無関係に CI で動く。`heal` を CI で有効にするかはチーム方針: 有効なら UI 変更起因の失敗は
@@ -128,14 +128,14 @@ CI 用のシナリオ単位リトライは**実装していない**。自動リ�
 - デバイス凍結など**インフラ起因の失敗は run 内で自動で振り直される**(結果取り消し+
   再実行。JUnit には最終結果だけが載る)。ここはリトライではなく回復処理
 - **振り直しはシナリオ単位の再実行**(同じデバイスのことも別のデバイスのこともある。`RunOrchestrator.requeuesWithoutRetiring`)。
-  表示の凍結を確定したデバイスでは直前の**成功**も捨てて振り直す(docs/design.md の DisplayFreezeWatch)。
+  表示の凍結を確定したデバイスでは直前の**成功**も捨てて振り直す(docs/design/ の DisplayFreezeWatch)。
   ステップ単位の「撃ち直さない」原則(CLAUDE.md)の例外で、取り消せない操作を含むシナリオは1 run で2回走りうる。
   **止める口は作らない**(ユーザー決定: シナリオは再実行される前提で作るもの。利用者向けは
   docs/user-docs/in_action/ci_ja.md と reference/writing/writing_robust_scenarios_ja.md に明記)
 
 ## 関連
 
-- 検証の詳細な罠(flake 判定の規律・ベータ整合): [docs/verification.md](verification.md)
+- 検証の詳細な罠(flake 判定の規律・ベータ整合): [docs/verification/](verification/README.md)
 - 結果 JSON のスキーマと、落ちた run の仕分け(フェーズ・素性・ワーカー異常):
   [docs/results-json.md](results-json.md)
 - 結果 DB の分析コマンド: `fleetest results --help`(サブコマンドの一覧は

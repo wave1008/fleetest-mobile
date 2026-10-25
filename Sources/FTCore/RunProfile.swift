@@ -338,7 +338,7 @@ public struct FMConfig: Sendable, Equatable {
     }
 }
 
-/// リモート実行の制御(docs/remote-runner.md §17)。ワークスペース(アプリのパッケージと
+/// リモート実行の制御(RR-17)。ワークスペース(アプリのパッケージと
 /// 資材を揃える共有ディレクトリ。中身の規約 apps/scripts/data は WorkspaceScaffold)の宣言。
 /// run 前後のスクリプトはここでは宣言しない —— ワークスペースの `scripts/run-setup.sh` /
 /// `scripts/run-teardown.sh` があれば実行される(`RunHookPlan`)。
@@ -347,7 +347,7 @@ public struct RemoteControlSection: Codable, Sendable, Equatable {
     /// ワークスペースのルート。絶対パス、または**リポジトリルート基準**の相対パス。
     /// appPath の解決基準には使わない(常にリポジトリルート基準のまま)——
     /// 実行時に appPath の原本をここ配下の `apps/<ファイル名>` へコピー(ステージング)し、
-    /// インストールにはそちらを使う(`WorkspaceAppStaging`。docs/remote-runner.md §17)。
+    /// インストールにはそちらを使う(`WorkspaceAppStaging`。RR-17)。
     /// **省略時の既定は `<project.rootURL>/workspace`**(ワークスペースは常に有効
     /// —— ここを省略しても appPath はリポジトリルート基準のままではなく、既定ワークスペースの
     /// `apps/` へ切り替わる)。優先順位・既定値の算出は `ProfileResolver.resolveWorkspaceRoot`。
@@ -406,18 +406,18 @@ public struct RunProfileDocument: Codable, Sendable, Equatable {
     /// 実行開始時に、画面凍結で CPU 描画(swiftshader)へフォールバック済みの Android エミュレータを
     /// GPU(-gpu host)で起動し直すか(既定 false=OFF)。GPU モードは emulator プロセスの起動引数で
     /// 決まるためプロセス再起動が必須で、該当機1台につき run 開始が約1分延びる。戻した先で再び凍結
-    /// すればモニターの watchdog がまた CPU に落とす(design.md §12.4 のトレードオフ)。
+    /// すればモニターの watchdog がまた CPU に落とす(DS-12.4 のトレードオフ)。
     /// 同期相手: vscode-fleetest/schemas/run-profile.schema.json と
     /// src/monitorModel.ts の RunProfileFormFields
     public var recoverCpuFallbackToGpu: Bool?
     /// Android エミュレータのブート完了時(Wipe Data 後の再起動を含む)にブリッジ /locale で
     /// 適用するロケール(既定 "ja_JP"。Play イメージでは -change-locale 等が無効なため。
-    /// design.md §11.2)。iOS には影響しない。同期相手: vscode-fleetest/schemas/run-profile.schema.json
+    /// DS-11.2)。iOS には影響しない。同期相手: vscode-fleetest/schemas/run-profile.schema.json
     /// と src/monitorModel.ts の RunProfileFormFields
     public var locale: String?
     /// **interop WebView 画面の委譲イベント直前にランナーへ1回接続確認(木を1回読ませる)するか**(既定 true)。
     /// attach したままの XCUITest セッションは放置後の座標イベントを 200 のまま届け損なう
-    /// (実測 ~13% → 接続確認で 0/50。A/B は docs/verification.md §interop WebView)。false で
+    /// (実測 ~13% → 接続確認で 0/50。A/B は docs/verification/ §interop WebView)。false で
     /// FT_PRE_ACTION_PING=0 を注入し接続確認を止める(WebViewDelegatingDriver が受ける)。
     /// 効くのは inapp モードの domInterop 経路だけ(xcuitest モードには元から不要)
     public var iosPreActionPing: Bool?
@@ -1056,7 +1056,7 @@ public struct ResolvedProfile: Sendable {
     ///
     /// **予備は置かない**(本数ぶんだけ)。欠けた台のぶんは残りの台が消化する(供給は部分失敗を許容)。止まるのは
     /// その OS の台が1台も残らないときだけ。予備を起こして待つと全台の合流が遅れ、待たずに後から合流させると
-    /// 起動の負荷がテストに重なる → maintainer-notes §103。
+    /// 起動の負荷がテストに重なる → MN-103。
     /// 用意する台数。**判断はここだけ**(テストはこの純粋関数を直接叩く)。
     /// `scenarios == nil` は「本数が分からない」(一覧の前に台数を決める経路で、ID が `Class.method` だけでない)= 絞らない。
     /// **0 は「分からない」ではない** —— 一覧が確定していて、その OS で走るシナリオが無い = 1台も用意しない
@@ -1518,7 +1518,7 @@ public enum ProfileResolver {
         // appPath の相対パスは常に「リポジトリルート」基準(project.rootURL =
         // <repoRoot>/TestProjects/<name> の2階層上。= アプリの原本の場所)。**ワークスペースの
         // 有無・既定/明示のどれでもこの基準は変えない**(ワークスペース基準へ切り替えない ——
-        // 原本の置き場所とインストールに使う場所は別物。docs/remote-runner.md §17)。packageRoot() の CWD 走査は使わない(単体テストでは CWD が
+        // 原本の置き場所とインストールに使う場所は別物。RR-17)。packageRoot() の CWD 走査は使わない(単体テストでは CWD が
         // 本体リポジトリを指し誤基準になる。project.rootURL からの決定的導出で統一)。
         // reportDir だけはプロジェクト直下に出すため下記で project.rootURL 基準のまま
         // (基準が異なるので resolvePath の base で使い分ける)。

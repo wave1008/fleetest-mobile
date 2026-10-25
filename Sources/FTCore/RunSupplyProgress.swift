@@ -1,4 +1,4 @@
-// run の「準備中」の間の端末ごとの供給の段階(docs/design.md §18.1)。
+// run の「準備中」の間の端末ごとの供給の段階(DS-18.1)。
 // 供給側(BridgeProvisioner / ProfileWorkerFactory / AndroidLaneRecovery)が `report` で知らせ、
 // 台帳の3つの書き手(入口の writeProgress・ProfileRunOrchestrator.writePreparingProgress・RunProgressState)が
 // `snapshot()` を record の supply に載せる。段階の語彙は `RunProgressSupply.Step` の1箇所だけ。

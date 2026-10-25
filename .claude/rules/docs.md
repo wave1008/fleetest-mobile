@@ -1,6 +1,11 @@
 ---
 paths:
   - "docs/*.md"
+  - "docs/design/*.md"
+  - "docs/maintainer-notes/*.md"
+  - "docs/remote-runner/*.md"
+  - "docs/performance-tuning/*.md"
+  - "docs/verification/*.md"
 ---
 
 # 保守者向けドキュメントの規律

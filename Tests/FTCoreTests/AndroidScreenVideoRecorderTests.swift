@@ -68,7 +68,7 @@ final class AndroidScreenVideoRecorderTests: XCTestCase {
         XCTAssertEqual(offenders, [], "AndroidScreenVideoRecorder.swift に無差別の pidof kill が残っている(行: \(offenders))")
     }
 
-    // MARK: - stop() と再 spawn の直列実行(§3 要調査「録画の再 spawn 中 stop」)
+    // MARK: - stop() と再 spawn の直列実行(録画の再 spawn 中の stop)
     //
     // actor は真の suspension でしか他ジョブに譲らないため、spawnNextSegment()/
     // handleSegmentExited() の中に await が無い限り、stop() はこの2つの間に割り込めない

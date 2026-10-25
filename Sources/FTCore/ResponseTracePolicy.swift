@@ -15,7 +15,7 @@ public enum ResponseTracePolicy {
     }
 
     /// 記録の上限。xctrace が止められずに残ったときの安全弁(`--time-limit`)。
-    /// 根拠: ディスクは 約 3 MB/秒(iPhone SE3 の実測。docs/response-measurement.md §8.5)なので 2 時間 ≒ 21 GB。
+    /// 根拠: ディスクは 約 3 MB/秒(iPhone SE3 の実測。RM-8.5)なので 2 時間 ≒ 21 GB。
     /// これを超えて走った run は、範囲の外の注入が空のまま残る(`ResponseTracePatch.apply` の outside)
     public static let recordTimeLimit = "2h"
 

@@ -44,4 +44,4 @@ CLAUDE.md から移した規則(本文は移設前と同一)。この領域の�
   半分の確率で欄でなく FlutterView の入れ物を返す。ref なしの clear / IME Enter は
   `focusedEditable` = 編集可能でなければ木から `isFocused && isEditable` を探す。実機 10 周中 5 周)」
   — と不採用案(`ACTION_FOCUS`・ホスト側のキーボード回避)は
-  docs/design.md §Android のテキスト注入の規律
+  docs/design/ §Android のテキスト注入の規律

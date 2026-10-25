@@ -1,6 +1,6 @@
 // 05_スクロール.swift
 // fleetest 機能: `scrollTo` による要素到達と、「exist/textIs は非スクロール(現在画面のみ判定)」の
-// 契約検証(docs/design.md §10)・Cell 型ラベルでのタップ・`swipeElementToElement` /
+// 契約検証(DS-10)・Cell 型ラベルでのタップ・`swipeElementToElement` /
 // `notExist(scroll:)` / 固定ヘッダを指定した `scrollFrame` / `textContains`・`textMatches` /
 // Shirates 準拠のスクロールコマンド(`scrollToBottom`/`scrollToTop`/`scrollDown(repeat:)`/
 // `withScrollDown`/`tap(scroll:)`)をまとめて検証する
@@ -14,7 +14,7 @@
 // ため統合しない**(各自 launchApp を残す独立 @Test のまま)。
 // **14.S0010→16.S0020→16.S0030 は2 @Test に分割**(S0020/S0030)。1本に畳むと Android で 27.0s・
 // iOS で 41.5s かかり、8 レーンあってもこの1本がスイート全体の壁時計を決めていた
-// (2026-08-01 実測。レーン追加では縮まない = docs/performance-tuning.md §3.6)。
+// (2026-08-01 実測。レーン追加では縮まない = PT-3.6)。
 
 import FTDSL
 

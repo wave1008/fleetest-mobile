@@ -9,14 +9,21 @@
 
 ## 索引
 
-種別の意味: **正典** = 現在の仕様(食い違ったらこちらが正しい)/ **手順** = 作業の進め方と判定の規律 /
+種別の意味: **索引** = フォルダの目次 / **正典** = 現在の仕様(食い違ったらこちらが正しい)/ **手順** = 作業の進め方と判定の規律 /
 **台帳** = 状態を持つ項目の一覧 / **記録** = 経緯・実測・事故(現在の仕様ではない)。
 
 ### 設計と仕様
 
 | 文書 | 種別 | 読む場面 |
 |---|---|---|
-| [design.md](design.md) | 正典 | アーキテクチャ・ブリッジ・DSL・セレクタ・プロファイル・モニターの設計を変える前 |
+| [design/README.md](design/README.md) | 索引 | 設計書のどのファイルに何があるかを探すとき(節の一覧) |
+| [design/overview.md](design/overview.md) | 正典 | 全体の構成・FM 呼び出し・CLI の方針を変える前 |
+| [design/bridge.md](design/bridge.md) | 正典 | ブリッジの挙動・エンドポイントを変える前 |
+| [design/webview.md](design/webview.md) | 正典 | WebView / ブラウザの読み取りを変える前 |
+| [design/dsl-syntax.md](design/dsl-syntax.md) | 正典 | DSL の記述・語彙・セレクタ・検証・スクロールを変える前 |
+| [design/dsl-execution.md](design/dsl-execution.md) | 正典 | 失敗時の情報・実行・自己修復を変える前 |
+| [design/profiles.md](design/profiles.md) | 正典 | プロファイル・実行の入口・結果の保存・配布を変える前 |
+| [design/monitor.md](design/monitor.md) | 正典 | モニターの配信・回復・表示を変える前 |
 | [commands.md](commands.md) | 正典 | DSL コマンドの引数・挙動を確かめる/変えるとき(読者は利用者。user-docs と併せて直す) |
 | [results-json.md](results-json.md) | 正典 | 結果 JSON のスキーマを読む/変えるとき(唯一の定義元) |
 | [framework-differences.md](framework-differences.md) | 正典 | UI フレームワークで挙動が割れる変更を入れるとき(表に1行足す) |
@@ -26,9 +33,17 @@
 
 | 文書 | 種別 | 読む場面 |
 |---|---|---|
+| [verification/README.md](verification/README.md) | 索引 | 検証の罠と規律の節を探すとき |
+| [verification/environment.md](verification/environment.md) | 手順 | E2E を回す前・OS や Xcode を上げた後 |
+| [verification/judgment.md](verification/judgment.md) | 手順 | flake・性能を判定するとき・A/B を取るとき |
+| [verification/detection-and-tests.md](verification/detection-and-tests.md) | 手順 | 検知やテストを足すとき・切り分けるとき |
+| [verification/traps.md](verification/traps.md) | 手順 | 画面や操作の不具合を調べるとき |
+| [verification/triage.md](verification/triage.md) | 手順 | テストが全滅したとき・実機や録画を検証するとき |
+| [performance-tuning/README.md](performance-tuning/README.md) | 索引 | 性能の節を探すとき |
+| [performance-tuning/guide.md](performance-tuning/guide.md) | 手順 | 速さに手を入れる前(不採用の施策を先に読む) |
+| [performance-tuning/breakdown-1.md](performance-tuning/breakdown-1.md) | 手順 | 特定の操作の所要に手を入れる前(時間の内訳の前半) |
+| [performance-tuning/breakdown-2.md](performance-tuning/breakdown-2.md) | 手順 | 特定の操作の所要に手を入れる前(時間の内訳の後半) |
 | [development.md](development.md) | 手順 | クローン直後のビルド・どこに何があるかを探すとき |
-| [verification.md](verification.md) | 手順 | E2E・flake・性能の判定に迷うとき・全滅時の切り分け |
-| [performance-tuning.md](performance-tuning.md) | 手順 | 速さに手を入れる前(不採用の施策と再検討の条件を先に読む) |
 | [releasing.md](releasing.md) | 手順 | リリースタグを打つとき |
 | [sut-framework-upgrade.md](sut-framework-upgrade.md) | 手順 | SUT の Flutter・RN・CMP の版を上げるとき |
 | [remote-runner-setup.md](remote-runner-setup.md) | 手順 | ランナー機を用意するとき |
@@ -45,12 +60,25 @@
 
 | 文書 | 種別 | 読む場面 |
 |---|---|---|
-| [maintainer-notes.md](maintainer-notes.md) | 記録 | CLAUDE.md の規則を緩めたく/消したくなったとき・同じ型の設計判断をするとき |
-| [remote-runner.md](remote-runner.md) | 記録 | リモート実行(SSH ディスパッチ・監視・ロックと待機列・占有)の設計を変える前 |
+| [maintainer-notes/README.md](maintainer-notes/README.md) | 索引 | 事故台帳の節を探すとき(全節の一覧) |
+| [maintainer-notes/001-004.md](maintainer-notes/001-004.md) | 記録 | 規則を緩めたく/消したくなったとき・同じ型の判断をするとき(MN-1〜4) |
+| [maintainer-notes/005-041.md](maintainer-notes/005-041.md) | 記録 | 規則を緩めたく/消したくなったとき・同じ型の判断をするとき(MN-5〜41) |
+| [maintainer-notes/042-056.md](maintainer-notes/042-056.md) | 記録 | 規則を緩めたく/消したくなったとき・同じ型の判断をするとき(MN-42〜56) |
+| [maintainer-notes/057-073.md](maintainer-notes/057-073.md) | 記録 | 規則を緩めたく/消したくなったとき・同じ型の判断をするとき(MN-57〜73) |
+| [maintainer-notes/074-088.md](maintainer-notes/074-088.md) | 記録 | 規則を緩めたく/消したくなったとき・同じ型の判断をするとき(MN-74〜88) |
+| [maintainer-notes/089-106.md](maintainer-notes/089-106.md) | 記録 | 規則を緩めたく/消したくなったとき・同じ型の判断をするとき(MN-89〜106) |
+| [remote-runner/README.md](remote-runner/README.md) | 索引 | リモート実行の設計の節を探すとき |
+| [remote-runner/00-12.md](remote-runner/00-12.md) | 記録 | リモート実行の基本設計を変える前(用語の定義を含む) |
+| [remote-runner/13.md](remote-runner/13.md) | 記録 | フリート実行・監視の fan-out を変える前 |
+| [remote-runner/14-16.md](remote-runner/14-16.md) | 記録 | ランナー機の導入や運用コマンドを変える前 |
+| [remote-runner/17.md](remote-runner/17.md) | 記録 | リモート制御・スクリプト・サービスを変える前 |
+| [remote-runner/18-22.md](remote-runner/18-22.md) | 記録 | 共有の規律やマシン設定を変える前 |
+| [design/history.md](design/history.md) | 記録 | 設計の経緯や過去に踏んだ実装の罠を確かめるとき |
+| [performance-tuning/records.md](performance-tuning/records.md) | 記録 | 過去の実測を確かめるとき |
 | [sandbox-seatbelt.md](sandbox-seatbelt.md) | 記録 | シナリオのサンドボックスに許可を足す/調べるとき |
 | [response-measurement.md](response-measurement.md) | 記録 | レスポンス計測の設計を変えるとき |
 | [poc-fm-occlusion-guard.md](poc-fm-occlusion-guard.md) | 記録 | テキストの可視性検証(FM)の判定の根拠を確かめるとき |
-| [driver-improvements-verification.md](driver-improvements-verification.md) | 記録 | ドライバ改良の効果の実測を確かめるとき |
+| [performance-tuning/records.md](performance-tuning/records.md) | 記録 | ドライバ改良の効果の実測を確かめるとき |
 
 ## 書き方
 
@@ -73,7 +101,7 @@ H1 の直後に次の表を置き、その下に1〜2文の導入を書く(こ�
 
 - 参照される節の見出しは `## <接頭辞>-<番号> <意味の読める見出し>` と書く(例: `## MN-0 残ったシステムアラートの消し方`)
 - 参照は ID で書き、人のために短い名前を添える: `MN-0(アラートの消し方)`。リンクにするときはファイルまで
-  (`[MN-0](maintainer-notes.md)`)とし、見出しのアンカーは使わない(見出しを直すと切れる)
+  (`[MN-0](maintainer-notes/README.md)`)とし、見出しのアンカーは使わない(見出しを直すと切れる)
 - ID はファイルを分割・移動しても変えない。番号は再利用しない
 - 番号 0(`MN-0` 等)は例示用に予約し、定義しない(検査も対象外)
 - 文書名の無い `§N` は書かない(どの文書の節か grep で決まらない)
@@ -90,6 +118,7 @@ H1 の直後に次の表を置き、その下に1〜2文の導入を書く(こ�
 | `FD` | framework-differences |
 | `SB` | sandbox-seatbelt |
 | `RM` | response-measurement |
+| `OG` | poc-fm-occlusion-guard |
 | `OI` | open-issues |
 
 ### 正典と記録

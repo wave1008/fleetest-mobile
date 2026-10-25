@@ -2,7 +2,7 @@
 // **同じ Mac で同じデバイスの画面配信を二重に張らない**ための判定(手元版)。VSCode のウィンドウを2つ
 // 開くと拡張ホストが2つ立ち、それぞれが監視(`api monitor`)と配信ヘルパー(`fleetest-simstream` /
 // `fleetest-androidstream` / `fleetest-devicepoll`)を起こすので、同じデバイスに配信が2本重なる
-// (端末側の捕捉コストが2倍。Android は配信の重なりで run が赤になった実測がある。docs/verification.md)。
+// (端末側の捕捉コストが2倍。Android は配信の重なりで run が赤になった実測がある。docs/verification/)。
 //
 // 別の発行者(共有ランナー)の同型は `StreamLease`(台帳 + 発行者)だが、こちらは**台帳を置かず
 // プロセスの実体で判定する** —— 拡張はヘルパーを直接 spawn する(`api device-stream` を通らない)ので

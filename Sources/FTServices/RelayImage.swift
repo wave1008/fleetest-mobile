@@ -1,4 +1,4 @@
-// 中継とエコーのイメージの定義(docs/remote-runner.md §17「中継のコンテナ」)。純粋。
+// 中継とエコーのイメージの定義(RR-17「中継のコンテナ」)。純粋。
 // 公式の alpine を digest で固定し、socat を版を指定して入れる(タグの付け替えで中身が変わらない)。
 
 public enum RelayImage {

@@ -2,10 +2,10 @@
 
 | 種別 | 範囲 | 読む場面 | 扱わないこと |
 |---|---|---|---|
-| 手順 | ランナー機(別の Mac)を用意してディスパッチできる状態にする | ランナー機を用意するとき | 設計と背景(→ [remote-runner.md](remote-runner.md))・利用者向けの手順(→ [user-docs/fleet/adding_mac_ja.md](user-docs/fleet/adding_mac_ja.md)) |
+| 手順 | ランナー機(別の Mac)を用意してディスパッチできる状態にする | ランナー機を用意するとき | 設計と背景(→ [remote-runner/](remote-runner/README.md))・利用者向けの手順(→ [user-docs/fleet/adding_mac_ja.md](user-docs/fleet/adding_mac_ja.md)) |
 
 **別の Mac(ランナー機)へ SSH でジョブを投げ、結果を手元に受け取る**ための手順書。
-設計と背景は [remote-runner.md](remote-runner.md)(こちらは読まなくてよい)。
+設計と背景は [remote-runner/](remote-runner/README.md)(こちらは読まなくてよい)。
 
 ## できること・できないこと
 
@@ -112,7 +112,7 @@ ssh -o BatchMode=yes <ユーザー>@<ホスト> 'echo ok'   # これが ok を�
 
 **同じ LAN に居る必要はない。** `ssh <宛先> 'echo ok'` が通る Mac ならディスパッチできる
 —— ブリッジ層を遠隔化する案(ステップ毎の chatty なやりとりに RTT が乗る)は設計時に却下
-してあり、**遠隔化されているのは run 単位のジョブだけ**だから([remote-runner.md](remote-runner.md) §2)。
+してあり、**遠隔化されているのは run 単位のジョブだけ**だから(RR-2)。
 
 **ポート番号や踏み台は `~/.ssh/config` に書く。** ホスト文字列は `ssh`/`scp`/`rsync` にそのまま
 渡され、ツールは `-p` も `-J` も付けない。`:` を含む宛先(`host:2222`)・空白・`-` 始まりは
@@ -136,7 +136,7 @@ fleetest remote setup mac2 --project <プロジェクト名>
 1箇所書けば揃う。
 
 **露出は最小にする。** 信頼モデルは「ランナー機そのものは信頼、返ってくる出力は不信」で、
-**同一信頼グループ内での共有**が前提(remote-runner.md §15)。素のインターネットに 22 を
+**同一信頼グループ内での共有**が前提(RR-15)。素のインターネットに 22 を
 晒す形はこの前提から外れる。
 
 | | 設定 |
@@ -149,7 +149,7 @@ fleetest remote setup mac2 --project <プロジェクト名>
 **回線が細いときに起きること**(どれも壊れずに退化する):
 
 - **ライブ映像が張れずポーリングへ落ちる** —— 静止画で運用は続く(全タイル常時配信は
-  そもそも LAN 帯域でも成立しない。remote-runner.md §13)
+  そもそも LAN 帯域でも成立しない。RR-13)
 - **成果物の回収が重い** —— 効くのは録画。要らなければ実行プロファイルの録画を切る
 - **瞬断するとタイルが `unknown` になる** —— 「観測できていない」であって「空き」ではない。
   この間は配信を畳んだまま観測だけ続く
@@ -378,7 +378,7 @@ user@mac2     yes        yes    ✅ 9655a21…  ✅ Xcode27…   ✅ iOS 27.0: 2
   ❌ は、その製品版の Xcode をランナーへ追加で入れる(既存を消さなくてよい)か、
   複数あって絞れないなら登録簿へ `--developer-dir` で pin すれば直る
 - `TOOLCHAIN` に ⚠️ → ベータの seed 違い。ディスパッチは止まらないが、赤が偏ったら疑う対象として
-  覚えておく(揃えたいなら §3 の手順で片方の Xcode を更新)
+  覚えておく(揃えたいなら 「ステップ3: 版を揃える」の手順で片方の Xcode を更新)
 - `RUNTIME` に ⚠️ → その機械の iOS シミュレータのランタイムが手元と違う。とくに `(beta)` は
   **正式版の Xcode ではシミュレータが起動できないことがある**(一覧には使える形で出るので気づけない)。
   その機械で `xcodebuild -downloadPlatform iOS` を打つ。**警告だけ**で exit code は変えない。
@@ -509,9 +509,9 @@ fleetest run --project <プロジェクト> --fleet <名前> --split --junit rep
 重複していれば送らない(CLI 側も `--import` / `remote machines add` で別名の同じ宛先を拒否する =
 `RemoteHostRegistry.validateUniqueHost`)。行の削除はホスト側のモーダルで確認する。
 「バッジ色」列のボタンでバッジの色をパレットから選べる(未選択なら他のマシンと重ならない色が
-自動で付く。docs/remote-runner.md §20)。
+自動で付く。RR-20)。
 その右の「マシン有効」(既定 ON)を外すと、そのマシンへはテストを振り分けない(機械分担・
-全台が1機械の自動ディスパッチ・`--fleet`。明示の `--runner` は除く。docs/remote-runner.md §21)。
+全台が1機械の自動ディスパッチ・`--fleet`。明示の `--runner` は除く。RR-21)。
 この機械の行にもあり、外すと手元のデバイスへ振り分けない。
 
 **これは VSCode の設定ではなく CLI の登録簿**(`~/.config/fleetest/config.json`)を読み書きしている
@@ -654,7 +654,7 @@ fleetest remote exec <ランナー> -- <サブコマンド>                 # �
 前提は**同一の信頼グループ**(同じチーム)での共有。認証・隔離の仕組みはない —
 ssh で入れる人はそのランナーで何でもできる。チームを跨いだ隔離が要るなら、
 **機械ごと割り当てる**(チーム A は mac-a、チーム B は mac-b。フリート定義で表現できる)。
-設計の背景は [remote-runner.md](remote-runner.md) §18。
+設計の背景は RR-18。
 
 ### 1人1鍵(失効できるようにする)
 
@@ -797,6 +797,6 @@ cd ~/fleetest-runner/users/<自分の issuerId>/work
 
 ## 関連
 
-- 設計・判断の背景(なぜ SSH なのか・却下した案・セキュリティ前提): [remote-runner.md](remote-runner.md)
+- 設計・判断の背景(なぜ SSH なのか・却下した案・セキュリティ前提): [remote-runner/](remote-runner/README.md)
 - CI での実行(Jenkins / EC2 Mac): [ci.md](ci.md)
 - 一般的な導入(手元のマシン): [user-docs/quick-start_ja.md](user-docs/quick-start_ja.md)

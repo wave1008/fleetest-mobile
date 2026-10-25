@@ -1,4 +1,4 @@
-// docs/remote-runner.md §18.7 規律④「他人の run を殺す操作はロックを読む」を停止系にも適用した分。
+// RR-18.7 規律④「他人の run を殺す操作はロックを読む」を停止系にも適用した分。
 // DeviceBooter.stopRefusal は判定の唯一の定義元(holderPID を注入する純粋関数。RunLeaseGuardTests と
 // 同じ形で I/O を持たない)。shutdownAll の統合テストは実機 spec(udid/serial を直値で宣言)だけを
 // 使う —— DeviceBooter.leaseKey は実機なら simctl/adb を叩かずに解決できるため、実デバイスにも

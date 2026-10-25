@@ -1,5 +1,5 @@
 // RemoteSetup.swift
-// `fleetest remote setup` (docs/remote-runner.md §14) の純粋ロジック。
+// `fleetest remote setup` (RR-14) の純粋ロジック。
 // scp/ssh の起動・確認プロンプトは Sources/fleetest/RemoteSetupCommand.swift 側(単体テスト対象外)。
 // RemoteShell/RemoteLayout/RemoteProbe 等は Sources/FTRemote/RemoteDispatch.swift(同じ規律を踏襲する)。
 
@@ -20,7 +20,7 @@ public enum RemoteSetupError: Error, LocalizedError, Equatable {
     }
 }
 
-/// `Scripts/preflight.sh --runner` の exit code(docs/remote-runner.md §14「構成」)。
+/// `Scripts/preflight.sh --runner` の exit code(RR-14「構成」)。
 /// ready=0 / needsManual=2 / blocked=1。それ以外は想定外(unknown)として扱う
 public enum RemotePreflightVerdict: Equatable, Sendable {
     case ready
@@ -30,7 +30,7 @@ public enum RemotePreflightVerdict: Equatable, Sendable {
 }
 
 /// `Scripts/install.sh` の `record()` が使う4状態と同じ語彙(1ステップ1行の逐次表示。
-/// docs/remote-runner.md §14「構成」/ CLAUDE.md「画面は各ステップ1行(逐次)」)
+/// RR-14「構成」/ CLAUDE.md「画面は各ステップ1行(逐次)」)
 public enum RemoteSetupStepStatus: String, Equatable, Sendable {
     case ok, warn, fail, skip
 }
@@ -72,8 +72,8 @@ public struct RemoteSetupSummary: Equatable, Sendable {
 
 public enum RemoteSetupPlan {
 
-    /// `Scripts/install.sh` へ渡す引数列(docs/remote-runner.md §14「構成」の並びのまま)。
-    /// **`--tool-root` を明示する**(§18.2: work が `<base>/users/<issuer>/work` へ2階層深くなり、
+    /// `Scripts/install.sh` へ渡す引数列(RR-14「構成」の並びのまま)。
+    /// **`--tool-root` を明示する**(RR-18.6: work が `<base>/users/<issuer>/work` へ2階層深くなり、
     /// install.sh の既定 `<work-dir>/../foundation-tester` が `RemoteLayout.toolRoot`
     /// (`<base>/foundation-tester`)と一致しなくなったため)
     public static func installArgs(workDir: String, projectName: String, toolRoot: String) -> [String] {
@@ -93,7 +93,7 @@ public enum RemoteSetupPlan {
         ]
     }
 
-    /// `Scripts/preflight.sh` へ渡す引数列。`--work-dir` は §18.2 で work が発行者ごとに分かれた
+    /// `Scripts/preflight.sh` へ渡す引数列。`--work-dir` は RR-18.6 で work が発行者ごとに分かれた
     /// ため必須(既定の `<base>/work` は見に行かない)
     public static func preflightArgs(base: String, workDir: String) -> [String] {
         ["--runner", "--base", base, "--work-dir", workDir]
@@ -148,7 +148,7 @@ public enum RemoteSetupPlan {
     private static let hexDigits = CharacterSet(charactersIn: "0123456789abcdefABCDEF")
 
     /// リモートのクローンを発行側と同じコミットへ合わせ、`fleetest` と**配信ヘルパー**を
-    /// 作り直し、稼働中の FM 常駐プロセスも揃える(docs/remote-runner.md §14 ステップ3 相当)。
+    /// 作り直し、稼働中の FM 常駐プロセスも揃える(RR-14 ステップ3 相当)。
     /// 呼び出し側は `validateRevision` を先に通し、独立した一時ディレクトリへ転送した現在の実行ファイルを
     /// helperPath へ渡す。保守の親自身をビルドで差し替えず、FM の安全な退役から新版の身元確認まで枠を保持する。
     ///
@@ -178,11 +178,11 @@ public enum RemoteSetupPlan {
             + "--target-executable \(RemoteShell.quote(target)) --build-command \(RemoteShell.quote(buildCommand))"
     }
 
-    /// `remote teardown` が base ごと削除してよいかの判定(docs/remote-runner.md §14 撤去)。
+    /// `remote teardown` が base ごと削除してよいかの判定(RR-14 撤去)。
     /// 拒否理由: ①空・相対パス(想定外の解決) ②"/" 丸ごと ③$HOME そのもの(ランナーのホームごと
     /// 消す) ④浅すぎる絶対パス(ルート直下1階層。例 "/tmp" "/etc" はシステムディレクトリ・
     /// 他用途のディレクトリと衝突しやすい)。**$HOME 配下限定はしない** — `--remote-dir` は
-    /// home 外の専用ディスク(EC2 Mac 等)も許容する設計(docs/remote-runner.md §14)なので、
+    /// home 外の専用ディスク(EC2 Mac 等)も許容する設計(RR-14)なので、
     /// 深さと明白な危険パスだけで判定する
     public static func validateUninstallBase(_ base: String, home: String) throws {
         guard !base.isEmpty else {

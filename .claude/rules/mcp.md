@@ -49,7 +49,7 @@ CLAUDE.md から移した規則(本文は移設前と同一)。この領域の�
 - MCP 監査ラウンドの回し方(**1ラウンド = 初見の「形」1つ。アプリ名は軸ではない**。
   軸①画面の形 / 軸②セッションの形・拾ったものを**バグ / 自作機構の欠陥 / 言い回し**の3つに
   分ける規律・**増設と検分は交互**・停止規則・台帳): docs/mcp-audit-rounds.md。
-  **地図の反復監査は閉じた。天気サイトはもう足さない**(→ maintainer-notes §9)
+  **地図の反復監査は閉じた。天気サイトはもう足さない**(→ MN-9)
 - MCP の使い勝手の計測(まっさらなエージェントがタスクを終えられたか・何手かかったか):
   Bench/README.md(`Scripts/mcp-bench.sh`)。**実 web ページの形も盤面で測れる**
   (`Bench/boards/` に HTML を置きホストで配信。**ライブの web は叩かない** = 盤面が毎日変わると
@@ -63,10 +63,10 @@ CLAUDE.md から移した規則(本文は移設前と同一)。この領域の�
   塞がない(漏れる)。**返らない呼び出しの切り分け**は `.fleetest/mcp-rpc.log`(要求の受信・応答の送信・段階の内訳を
   1行ずつ)と `.fleetest/mcp-slow-calls.log`(60 秒を超えた呼び出しの段階とブリッジへ出している要求。
   `SlowCallWatchdog`)で、サーバに届いたか・応答を書いたかを先に分ける。JSON にできない応答は捨てずに同じ id でエラーを返す
-  (`MCPServer.send`)→ maintainer-notes §79
+  (`MCPServer.send`)→ MN-79
 - **診断のために外部コマンドを撃つ経路も、協調スレッドプールにブロッキングを載せない**
   (ft_status の udid 診断が全ポートへ `lsof` を同時に撃ってプールを塞ぎ、200 秒返らなくなった。
-  台帳から候補を絞る → `ps` 1 回 + `isBound` 数本で 1.2 秒)→ maintainer-notes §27
+  台帳から候補を絞る → `ps` 1 回 + `isBound` 数本で 1.2 秒)→ MN-27
 - **引数の値域は `FTCore.ArgumentBounds` の1箇所**(MCP の `intArgument`/`doubleArgument`/
   `stringArgument` と、ライブ操作の `intField`/`doubleField`/`stringField` が同じ表を引く)。
   守る規律3つ: **①値域を持たない引数も `.unbounded` で表に載せる**(載せ忘れと「縛らないと決めた」を
@@ -78,7 +78,7 @@ CLAUDE.md から移した規則(本文は移設前と同一)。この領域の�
   `as? Int` / `as? Bool` が互いに通すので `isJSONBoolean` で分ける。型違いに専用の文言を持つ引数は
   `argumentsWithTheirOwnTypeMessage` に載せる)。**スキーマに無い引数名は断らずに注記する**
   (`unknownArgumentNote`。警告から)。必須の文字列は空文字・空白のみを断る
-  (省略は断らない = 呼び手ごとに既定が違う)→ maintainer-notes §44.2。**長押し・ジェスチャの秒数は
+  (省略は断らない = 呼び手ごとに既定が違う)→ MN-44.2。**長押し・ジェスチャの秒数は
   既定 10 秒まで、コマンドの `maxGestureSeconds:` 引数でその1回だけ最大 60 秒まで上書きできる**
   (ユーザー決定 2026-09-24)。**方針の判定(既定10・上書き上限60)はホスト側**(DSL は
   `StepExecutor.executeAction` の入口 = `FlowStep.gestureDurationViolation`・MCP/ライブ操作は
@@ -86,13 +86,13 @@ CLAUDE.md から移した規則(本文は移設前と同一)。この領域の�
   `BridgeAPI.gestureSecondsCeiling`**。
   **ランナー(iOS)と Android の注入層は 60 秒(ceiling)を絶対上限として最後に断る**
   (要求ごとの上書きは受け取らない・ホストの門をどちらも通らない経路の最後の砦。超過は
-  testmanagerd が合成列を作り続けて肥大化する → maintainer-notes §49.1)。
+  testmanagerd が合成列を作り続けて肥大化する → MN-49.1)。
   **同じ的を指す引数の併用(ref と x/y 等)は入口で断る**(`targetExclusivityViolation`)
 - **失敗の「出口」(次の一手)を配る経路は MCP とライブ操作の2つ**。判定(`BridgeDiscovery.probeStatus` /
   `DriverError.isNoReadableWindow` / `FTCore.StaleFrameDetector` 等)は FTCore・FTBridgeClient に1つ置いて
   共有するが、**それを呼んで文言にするのは呼び手ごと** —— **片方にだけ配線すると、同じ状況で一方は
   出口を案内し他方は一次情報しか返さない**(実際にこの形で同じ型の不具合が3回続けて出た。
-  直すたびに MCP にだけ足していた → maintainer-notes §45)。**run(DSL)は別扱い** —— あちらは失敗を
+  直すたびに MCP にだけ足していた → MN-45)。**run(DSL)は別扱い** —— あちらは失敗を
   レポートへ残して自動回復する経路で、人がその場で次の一手を打つ場ではない。集合は
   `LiveControlExitParityTests` が等号で固定する(**走査はコメントを落としてから** = 判定の名前は
   doc コメントにも出るので、素のまま検索すると配線を消してもコメントだけで通る)。
@@ -113,13 +113,13 @@ CLAUDE.md から移した規則(本文は移設前と同一)。この領域の�
   MCP のキャッシュ命中とライブ操作の命令ごとが共有。主の udid だけ見ると、起動し直しで予備ポートが別のデバイス・
   in-app に化けても home/drag を撃ち続ける。**`BridgeIdentityCheck.verdict` は udid が両側にあるとブリッジの種別を
   見ない**ので、種別の決まった片側は `hybridFallbackDrift` で先に見る)。**ずれは3値で扱う** (`BridgeIdentityCheck.HybridFallbackDrift`: none / sameDeviceBridgeChanged / differentDevice)—— **別のデバイス(differentDevice)は ref の有無を問わず断り、記憶を捨てない**(捨てると次の同じ呼び出しが `keyChangedDevice` の previous=nil を通って黙って別のデバイスに固定される。抜けるのは呼び手が `udid` を明示したとき)。ライブ操作も別のデバイスなら同じポートで作り直さず、そのコマンドを撃たずに失敗を返す。**udid の診断が予算切れなら
-  「確認できなかった」と言い、不在も `bridge up` も言わない**(`diagnosisTimedOut`)→ maintainer-notes §51
+  「確認できなかった」と言い、不在も `bridge up` も言わない**(`diagnosisTimedOut`)→ MN-51
 - **座標を整数へ畳む所は trap しない側に倒す**(座標は `.unbounded`。入口の画面内判定
   `TapTargetGeometry.isPointOnScreen` は MCP とライブ操作が共有するが、DSL も届くので最後の砦
   `AndroidDriver.checkedInt32` は別に要る)
 - **座標で撃つ操作は、撃つ前に前面のアプリを確かめて警告する**(`coordinateFrontAppWarning`。ref の門
   `verifiedRef` を通らないので、アプリを抜けた後の操作が他のアプリへ黙って届く)。断らない・Android だけ
-  (iOS はランナーが断る)。座標の経路を足したら `CoordinateFrontAppWarningTests` の本数も増やす → maintainer-notes §60.5
+  (iOS はランナーが断る)。座標の経路を足したら `CoordinateFrontAppWarningTests` の本数も増やす → MN-60.5
 - **MCP の sessionKey ごとの記憶は `DeviceSession`(`Sources/fleetest-mcp/DeviceSession.swift`)の欄だけ**。
   `MCPServer` の `drivers` / `lastSnapshots` 等は `sessions` を見る窓(`SessionMap` / `SessionFlags`)で、
   `forgetDeviceState` はセッションを丸ごと捨てる。**並列の `[String: …]` / `Set<String>` を戻さない**
@@ -128,7 +128,7 @@ CLAUDE.md から移した規則(本文は移設前と同一)。この領域の�
   **`ft_logs` は udid を宣言するが畳まない**(`toolsResolvingUDIDWithoutBridge`。ブリッジが死んだ後に読むツールなので
   走査で落とさない)—— udid は `ftLogs` がセッションの記憶(`rememberedPort(forUDID:)`)と `BridgeDeviceRecord` だけで
   解決する。**入口で畳まないツールは sessionKey がポート無しになる**ので、ポート入りの鍵で持つ記憶
-  (`connectedPorts` / `launchedBundleIDs`)を引く前に自分でポートを載せる → maintainer-notes §60.1
+  (`connectedPorts` / `launchedBundleIDs`)を引く前に自分でポートを載せる → MN-60.1
 - **platform と宛先(udid/port は iOS・serial は Android)の食い違いは畳む前に断る**(判定は
   `FTCore.DeviceTargetConsistency` の1箇所。CLI の `DriverOptions.rejectDeviceTargetMismatch` と共有 ——
   片方だけ持つと同じ食い違いが片方でだけ弾かれる)。呼ぶのは `call()` の入口・
@@ -139,10 +139,10 @@ CLAUDE.md から移した規則(本文は移設前と同一)。この領域の�
   分岐1箇所)。畳み込み(`foldingUDIDIntoPort`)はブリッジ走査を撃ち、居なければ落ちるので、
   1台を駆動している呼び手(`udid` を毎回添える)はブリッジが死んだ瞬間に**一覧・診断のツールまで
   道連れ**になり、文面が案内する `ft_list_devices` 自身が同じエラーを返す袋小路になる
-  (実地 2026-09-23 → maintainer-notes §46.5)。集合は
+  (実地 2026-09-23 → MN-46.5)。集合は
   `DeviceIndependentToolsIgnoreTargetTests` が等号で固定する
 - **MCP(`ft_*`)は DSL と別経路なので、鮮度・防御を DSL 側に入れただけでは届かない**
-  → maintainer-notes §5。**ただし同じ判定をそのまま強い挙動へ流用しない**。探索ロジックは
+  → MN-5。**ただし同じ判定をそのまま強い挙動へ流用しない**。探索ロジックは
   **MCP に2つ目の実装を書かず `StepExecutor` へ委ねる**(`ft_scroll_to`)。
   **逆に、同じ門が両側にあるなら倒す向きも揃える** —— 未インストールのまま
   `XCUIApplication.launch()` を撃つとハンドラが 60 秒で自壊してブリッジごと消えるので、
@@ -153,7 +153,7 @@ CLAUDE.md から移した規則(本文は移設前と同一)。この領域の�
   **判定は `InstalledAppCheck.launchGuard` の1箇所で、MCP の `ft_launch` と
   ライブ操作(`api live serve` の `launch` / `activate`)が共有する** —— ライブ操作に門が無かったため、
   空文字列や端末に無い bundleID を渡すと**そのコマンドが 30 秒刺さって watchdog が serve を
-  force-quit し、健全なブリッジまで起動し直しになった**(T1 と同じ型の掃討漏れ → maintainer-notes §42.7)。
+  force-quit し、健全なブリッジまで起動し直しになった**(T1 と同じ型の掃討漏れ → MN-42.7)。
   **ライブ操作の NDJSON は型違いを黙殺しない** —— `cmd` が読めた行は
   `{"kind":"actionResult","ok":false,"error":"<欄> must be …"}` を返す(文言は MCP の
   `intArgument`/`doubleArgument` と同じ)。黙殺すると拡張は応答を待って固まり、serve の再起動に至る。

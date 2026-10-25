@@ -14,7 +14,7 @@ final class NoReadableWindowClassificationTests: XCTestCase {
     }
 
     func testDoesNotMatchOtherStatus422Bodies() {
-        // 422 は他の一時的競合にも広く使われる(docs/design.md §4.3)。前置がなければ拾わない
+        // 422 は他の一時的競合にも広く使われる(DS-4.3)。前置がなければ拾わない
         XCTAssertFalse(DriverError.isNoReadableWindow(DriverError.badResponse(
             status: 422, body: "cannot append to a password field")))
     }

@@ -1,4 +1,4 @@
-// Apple Container のコンテナ → 親のプロキシの道(docs/remote-runner.md §17「ネットワーク」)。
+// Apple Container のコンテナ → 親のプロキシの道(RR-17「ネットワーク」)。
 // 内部ネットワークのゲートウェイの IP で待ち受け、127.0.0.1 の run 専用プロキシへそのまま流す TCP の転送器。
 // **BSD ソケットで待ち受ける**: Network.framework の NWListener は vmnet のブリッジ(bridge1xx)上のアドレスに bind できない
 // (`Can't assign requested address` が続く。実測)が、BSD の bind は通り、コンテナから届く(実測)。

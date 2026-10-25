@@ -1,5 +1,5 @@
 // runBoardModel.ts
-// デバイスモニターの「run ボード」(フリート横断の実行状況。docs/design.md §18)の純粋ロジック。
+// デバイスモニターの「run ボード」(フリート横断の実行状況。DS-18)の純粋ロジック。
 // vscode に依存しない(machineLockModel.ts と同じ立場)。**表示文字列は置かない** —— この
 // ファイルは拡張バンドルと webview バンドルの両方に入る(src/webview/monitor/runBoard.js が
 // 直接 import する。runLaneModel.ts と同じ形)ため、i18n/index.ts を import できない
@@ -71,7 +71,7 @@ export interface RunBoardVideoClips {
 export interface RunBoardRun extends RunBoardRawRun {
   readonly machine?: string;
   /** applyMonitorRunsEvent がこの run を畳んだ時刻(ms)。elapsedSeconds/etaSeconds はこの時刻
-   * 時点の値なので、秒読みは読み手が (now - receivedAtMs)/1000 を足して進める(docs/design.md §18.3)。 */
+   * 時点の値なので、秒読みは読み手が (now - receivedAtMs)/1000 を足して進める(DS-18.3)。 */
   readonly receivedAtMs: number;
 }
 
@@ -131,7 +131,7 @@ export function machineRunStatus(
 
 export interface RunBoardGroup {
   /** runGroup → runID → `<machine>#<pid>` の順(単機 run はそれ自身で1グループ。
-   * docs/design.md §18.5)。runID も省略されうる経路(--dry-run/--debug 等)があるので
+   * DS-18.5)。runID も省略されうる経路(--dry-run/--debug 等)があるので
    * pid まで落ちるが、**pid は機械ごとの番号なので機械名で名前空間を切る**。 */
   readonly groupKey: string;
   readonly mine: boolean;
@@ -143,7 +143,7 @@ export interface RunBoardGroup {
   /** **束ねた run の中で最も進んだ段階**(1つでも走り出していれば "running")。機械分担の run は
    * 機械ごとに進みが違うので、片方が走り出したら進捗を出す。 */
   readonly phase: "building" | "preparing" | "compiling" | "running";
-  /** 束ねた run の合計。**事実だけ**(判定・警告はしない。docs/design.md §18.5)。 */
+  /** 束ねた run の合計。**事実だけ**(判定・警告はしない。DS-18.5)。 */
   readonly requeued: number;
   readonly laneDropouts: number;
   /** 束ねた run の供給の段階の連結(machine 昇順の runs の順)。 */
@@ -166,7 +166,7 @@ export interface RunBoardGroup {
   readonly runs: readonly RunBoardRun[];
 }
 
-/** observed:true の機械の run だけを runGroup で束ねる(docs/design.md §18.1/§18.5)。
+/** observed:true の機械の run だけを runGroup で束ねる(DS-18.1/DS-18.5)。
  * unobserved の機械は丸ごと数えない・出さない(不明を実行中に混ぜない)。
  * 並びは「手元を含むグループ優先 → 先頭 run の machine 名 → groupKey」——
  * 複数 run が同時に走っているときの表示順を安定させるための判断で、設計に明記は無い。 */
@@ -304,7 +304,7 @@ function sum(values: readonly number[]): number {
   return values.reduce((total, value) => total + value, 0);
 }
 
-/** 経過秒の秒読み(webview の時計で進める。docs/design.md §18.3)。負にはならない。 */
+/** 経過秒の秒読み(webview の時計で進める。DS-18.3)。負にはならない。 */
 export function liveElapsedSeconds(baseSeconds: number, receivedAtMs: number, nowMs: number): number {
   return baseSeconds + Math.max(0, (nowMs - receivedAtMs) / 1000);
 }
@@ -317,7 +317,7 @@ export interface LiveRemaining {
 }
 
 /** 残り見積もりの秒読み。etaSeconds は受信時点の値なので、経過した分だけ差し引く
- * (docs/design.md §18.4 の「残り ~0:00(+M:SS 超過)」を作るための値)。undefined(見積もり無し)
+ * (DS-18.4 の「残り ~0:00(+M:SS 超過)」を作るための値)。undefined(見積もり無し)
  * は undefined のまま返す = 呼び手は「—」を出す。 */
 export function liveRemaining(
   etaSeconds: number | undefined,

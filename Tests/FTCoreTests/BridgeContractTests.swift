@@ -24,7 +24,7 @@ import FTCore
 final class BridgeContractTests: XCTestCase {
 
     // 期待するルート表。**変更したら対応する版数を必ず上げること**:
-    // (この3つは internal = docs/design.md のエンドポイント表と突き合わせる
+    // (この3つは internal = docs/design/ のエンドポイント表と突き合わせる
     //  BridgeDocRouteSyncTests から参照する。**唯一の正はここ**で、あちらは写し)
     //   in-app / XCUITest ランナー → Sources/FTCore/BridgeDTO.swift の bridgeProtocolVersion
     //   Android                    → AndroidRunner/build.sh の VERSION_CODE と

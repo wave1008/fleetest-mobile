@@ -281,8 +281,8 @@ const remoteDevice = {
   detail: "",
 };
 
-// 共有ランナーの配信の退避(docs/remote-runner.md §18.2 M2)。**保持者が自分か他人かは問わない** ——
-// 配信を張ったままの run は実際に赤くなる(docs/verification.md の実測)。
+// 共有ランナーの配信の退避(RR-18.2 M2)。**保持者が自分か他人かは問わない** ——
+// 配信を張ったままの run は実際に赤くなる(docs/verification/ の実測)。
 test("占有中の機械の配信は起こさず、張っていれば畳む", async () => {
   const { dir, binaryPath } = makeMockBinaryDir(["fleetest-simstream", "fleetest"]);
   const { deps } = makeDeps(binaryPath);

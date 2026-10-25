@@ -1,4 +1,4 @@
-// マシン側 config.json の `services` 欄(docs/remote-runner.md §17)。
+// マシン側 config.json の `services` 欄(RR-17)。
 // 読むファイルは `LocalConfig.url()` が返す場所(環境変数で別の場所へ向ける口は新設しない)。
 
 import Foundation

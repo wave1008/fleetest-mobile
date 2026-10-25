@@ -1,4 +1,4 @@
-// compose.yaml の検査(§17「compose.yaml の検査」「ビルドとデータ投入の規則」)。純粋関数:
+// compose.yaml の検査(RR-17「compose.yaml の検査」「ビルドとデータ投入の規則」)。純粋関数:
 // ファイルシステムは読まない。パスの実体・symlink・存在は呼び手が PathFact で渡す(枠の外の親が埋める)。
 
 public enum ServiceRuntime: String, Sendable { case docker, apple }

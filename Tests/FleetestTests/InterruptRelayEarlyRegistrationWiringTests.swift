@@ -1,4 +1,4 @@
-// maintainer-notes §51.4: リモートディスパッチの子が「供給フェーズ(ブリッジ起動・凍結triage・
+// MN-51.4: リモートディスパッチの子が「供給フェーズ(ブリッジ起動・凍結triage・
 // install)」の最中に SIGHUP/SIGTERM/SIGINT を受けると、InterruptRelay がまだ1つも登録
 // されていなかった(runDirect/runWithProfile/runWithProfileParallel/runSequential/runParallel
 // が自分で登録するのは供給が終わった後だった)。その直しは「recorder 確定直後」に登録したが、

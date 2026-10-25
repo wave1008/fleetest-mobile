@@ -19,9 +19,9 @@ public struct LocalConfig: Codable, Sendable, Equatable {
     /// iOS 実機ブリッジの bundle id プレフィックス(既定 "com.example")。
     /// 既定のままだと他チームが登録済みの App ID と衝突して自動署名が失敗することがある
     public var bundleIDPrefix: String?
-    /// `--host` の論理名 → ssh 実体の登録簿(docs/remote-runner.md §13)。VSCode 設定
+    /// `--host` の論理名 → ssh 実体の登録簿(RR-13)。VSCode 設定
     /// (`fleetest.remote.hosts`)ではなくここに置くのは、①CLI が解決の主体になるため
-    /// ②ワークスペース設定でディスパッチ先を差し替えられる余地を消すため(§15.2)
+    /// ②ワークスペース設定でディスパッチ先を差し替えられる余地を消すため(RR-15.2)
     public var remoteHosts: [RemoteHostEntry]?
     /// 自己申告の帰属(認証ではない)。run.json/dispatch.lock に「誰が起動したか」を記す。
     /// 空文字列は未設定と同じ扱い(resolveIssuerId が既定値へフォールバックする)
@@ -29,7 +29,7 @@ public struct LocalConfig: Codable, Sendable, Equatable {
     /// **この機械**の FM 同時実行枠。nil なら `FMCallSlots.defaultConcurrency`。
     /// リモート機のぶんは `remoteHosts[].fmConcurrency` —— **"local" は登録簿の予約名**
     /// (RemoteHostRegistry.validateName)なので、手元だけはここに置く。
-    /// 機械によっては FM を2並列以上で呼ぶと壊れる(docs/remote-runner.md §19)
+    /// 機械によっては FM を2並列以上で呼ぶと壊れる(RR-19)
     public var fmConcurrency: Int?
     /// **この機械**の「マシン有効」(設定タブの固定行)。false だけを保存する(nil = 有効)。
     /// リモート機のぶんは `remoteHosts[].enabled`(fmConcurrency と同じ理由でここに置く)
@@ -91,7 +91,7 @@ public struct LocalConfig: Codable, Sendable, Equatable {
         return (team, prefix)
     }
 
-    /// 自己申告の帰属(認証ではない。docs/remote-runner.md §15.1 の適合チェックと同じ規律)。
+    /// 自己申告の帰属(認証ではない。RR-15.1 の適合チェックと同じ規律)。
     /// 優先順位: 環境変数 FT_ISSUER > 設定ファイル > USER@hostname(codeSigning と同じ規律)。
     /// FT_ISSUER はリモートディスパッチが子へ発行者を運ぶ口(RemoteShell.remoteRunCommand が
     /// export する)—— ランナー機側で解決すると全員が共有アカウントの同じ値になり、帰属が消える
@@ -103,7 +103,7 @@ public struct LocalConfig: Codable, Sendable, Equatable {
     }
 
     /// resolveIssuerId と同じ優先順位だが、値が明示設定(FT_ISSUER/config の issuerId)由来か
-    /// USER@hostname フォールバックかを併せて返す。§18.2: フォールバックはネットワークで
+    /// USER@hostname フォールバックかを併せて返す。RR-18.2: フォールバックはネットワークで
     /// 変わり得るホスト名を含むため、リモートのネームスペース鍵として使うときは
     /// 呼び出し側(resolveLayoutIssuer)が explicit==false のときだけ1回警告する
     public static func resolveIssuer(

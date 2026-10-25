@@ -134,7 +134,7 @@ export interface MonitorPanelDeps {
   /** 機械の占有(dispatch.lock)が変わったときに MonitorProcessManager が呼ぶ。
    * **手元も含む**(キーは runBoardModel の LOCAL_MACHINE_KEY)。**配信の自動退避**
    * (占有中の機械のライブ配信を畳んでポーリングへ落とす)の入口
-   * (docs/remote-runner.md §18.7 M2)。 */
+   * (RR-18.7 M2)。 */
   notifyMachineLocks(locks: ReadonlyMap<string, MachineLock>): void;
   /** その機械で run が走っているか(MonitorProcessManager.machineLock への委譲)。
    * **undefined は「不明」**(観測していない・旧ランナー)で、「走っていない」ではない。 */
@@ -303,7 +303,7 @@ export class MonitorPanelController implements vscode.Disposable {
   /** 実行ログビュー・グリッドビューの開閉。fleetVisible と同じ契約(splitter.js と対)。 */
   private logViewVisible: boolean;
   private gridViewVisible: boolean;
-  /** run ボード(docs/design.md §18)の折りたたみ(workspaceState の "monitor.runBoardCollapsed")。
+  /** run ボード(DS-18)の折りたたみ(workspaceState の "monitor.runBoardCollapsed")。
    * ヘッダの ▸/▾(個々の run 行の展開)は webview 側だけで持つ(runBoard.js。ephemeral な groupKey
    * ごとの状態はセッションを跨いで意味を持たない)。 */
   private runBoardCollapsed: boolean;
@@ -334,7 +334,7 @@ export class MonitorPanelController implements vscode.Disposable {
   private runStartAborted = false;
   /** 直近に CLI(`fleetest api remote-machines`)から取得・同期した登録簿。setRemoteConfig の
    * 差分計算(diffRemoteHostsForSync)の基準に使うだけで、これ自体が正ではない
-   * (docs/remote-runner.md §13「原則」。正は CLI の LocalConfig)。 */
+   * (RR-13「原則」。正は CLI の LocalConfig)。 */
   private lastKnownRemoteHosts: RemoteHostEntry[] = [];
   /** 未設定時の FM 枠(CLI が返す既定)。**拡張は値を持たず、読めたものをそのまま配る** */
   private lastKnownDefaultFMConcurrency: number | undefined;
@@ -991,7 +991,7 @@ export class MonitorPanelController implements vscode.Disposable {
         this.deviceOps.cancelBulkUp();
         break;
       case "devicesDown":
-        // **他人(あるいは自分)の run が走っている機械があれば先に言う**(§18.1 #6)。
+        // **他人(あるいは自分)の run が走っている機械があれば先に言う**(RR-18.1 #6)。
         // 一括停止はリモート機のブリッジとシミュレータも畳むので、走っている run は必ず落ちる。
         // 手元の run は全掃討のときだけ止める(CLI も同じ lease で断る。bulkDownGate)。
         // 占有も手元の run も無いときは確認を挟まない(単独利用の手数を増やさない)
@@ -1386,7 +1386,7 @@ export class MonitorPanelController implements vscode.Disposable {
       value: vscode.workspace.getConfiguration("fleetest").get<"auto" | "ja" | "en">("language", "auto"),
     });
     {
-      // hosts の正は CLI の LocalConfig(docs/remote-runner.md §13「原則」)。fetch は非同期なので
+      // hosts の正は CLI の LocalConfig(RR-13「原則」)。fetch は非同期なので
       // fire-and-forget で送り直す(失敗しても他の初期化を止めない。update-check と同じ方針)。
       void fetchRemoteHosts(this.remoteHostsDeps()).then((result) => {
         this.lastKnownRemoteHosts = result.hosts ?? [];

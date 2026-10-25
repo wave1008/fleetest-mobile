@@ -562,7 +562,7 @@ struct RunScenarios: AsyncParsableCommand {
         let testProject = try ScenarioHost.project(named: common.project)
         PhaseLog.mark("project-resolved")
 
-        // run 進捗の記帳(docs/design.md §18.1)。**ビルドより前に1本書く** —— 実測でシナリオの
+        // run 進捗の記帳(DS-18.1)。**ビルドより前に1本書く** —— 実測でシナリオの
         // swift build から供給の記帳が出るまで ~15秒あり、書かないとその間ボードに1本も出ない。
         // 総本数・レーンはまだ未確定(total: 0・lanes: [])。`ProfileRunner.run` が同じ pid
         // ファイルを上書きする。**この build 呼び出しは ProfileRunner.swift の外(ここ)にある**
@@ -1017,7 +1017,7 @@ struct RunScenarios: AsyncParsableCommand {
 
     /// `--runner` または(自動)全台が居るリモートの機械: ローカルビルド・実行をせず、対等ピア
     /// (SSH 到達可能な foundation-tester clone)に丸ごとディスパッチする
-    /// (docs/remote-runner.md §3・§7・Phase 1)。デバイス割当競合を避けるためリモート1本での
+    /// (RR-3・RR-7・Phase 1)。デバイス割当競合を避けるためリモート1本での
     /// 実行のみサポートし、ローカル専用オプションは併用不可にする
     private func dispatchToRemoteHost(_ dispatch: EffectiveDispatchTarget) async throws {
         guard let profile = common.profile else {
@@ -1082,8 +1082,8 @@ struct RunScenarios: AsyncParsableCommand {
         }
     }
 
-    /// `--fleet`: profiles/fleets/<name>.json の全エントリを並行実行する(docs/remote-runner.md
-    /// §13)。検証は投入前に全部済ませる(FleetProfile.validate)。実体は FleetRunner
+    /// `--fleet`: profiles/fleets/<name>.json の全エントリを並行実行する(docs/remote-runner/
+    /// RR-13)。検証は投入前に全部済ませる(FleetProfile.validate)。実体は FleetRunner
     /// (エントリごとに子プロセスを起動し、出力を host 名で前置する)
     private func dispatchToFleet(_ fleetName: String) async throws {
         let testProject = try ScenarioHost.project(named: common.project)
@@ -1472,7 +1472,7 @@ struct RunScenarios: AsyncParsableCommand {
                                            recorder: recorder,
                                            recordingConfig: recordingConfig,
                                            // このパス(プロファイル無し run)は writeRunProgress を
-                                           // 注入しない(docs/design.md §18.1: 注入は2経路だけ)ので
+                                           // 注入しない(DS-18.1: 注入は2経路だけ)ので
                                            // 残り見積もりの実績も読まれない。値自体は LPTOrdering.apply
                                            // (直前)と揃える —— 将来ここへ注入するときに窓がズレない
                                            progressHistoryRuns: common.lptHistoryRuns ?? LPTOrdering.defaultHistoryRuns,

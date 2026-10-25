@@ -1,6 +1,6 @@
 // 再利用する XCUITest ランナーが「AX 照会のたびに数秒待つ」状態に落ちていないかの判定(純粋関数)。
 //
-// 実測(台帳 §19.27): 3 時間生きたランナーが、SpringBoard の remote element(DragUI の druid)を
+// 実測: 3 時間生きたランナーが、SpringBoard の remote element(DragUI の druid)を
 // 引けなくなった後も参照し続け、**存在確認 1 回ごとに約 3.7 秒**(XCTest が remote element を諦める時間)
 // 待つようになった。同じ木の照会が隣のデバイスでは 0.03〜0.27 秒。run のすべての XCUITest 照会に乗るので、
 // 1 シナリオ 6 秒が 22 秒になり、in-app の tap も(前面確認で fallback を引くため)0.5 秒が 4 秒になる。
@@ -261,7 +261,7 @@ public enum RunnerAccessibilityHealth {
 
     /// run-lease / MCP の印のどちらかを**他プロセス**が持っているか(純粋関数)。自分自身が持つ
     /// run-lease は「使用中」に数えない(この run 自身が供給の中で自分のデバイスに触るのは正常)。
-    /// `DeviceBooter.deviceInUseRefusal`(docs/remote-runner.md §18.7 規律④)と同じ規律だが、
+    /// `DeviceBooter.deviceInUseRefusal`(RR-18.7 規律④)と同じ規律だが、
     /// FTAndroid → FTBridgeClient の依存方向のためあちらを直接呼べない(循環)。RunLease/MCPDeviceLease は
     /// 同じモジュール(FTBridgeClient)に居るので、判定だけをここへ複製する
     static func hasForeignLease(runLeaseHolder: Int32?, mcpLeaseHolder: Int32?, selfPID: Int32) -> Bool {

@@ -1,6 +1,6 @@
 // RemoteDispatchLock.swift
 // **1つの Mac で同時に走る run は1本**(ユーザー決定。高負荷はテストを不安定にする)を
-// 守るロック。docs/remote-runner.md §5「ジョブは直列化」。
+// 守るロック。RR-5「ジョブは直列化」。
 // フリート内の重複は FleetProfile.validate で防げるが、別フリート・別人・CLI/GUI 併走による
 // 同一ホストへの二重実行は防げない ―― そこをその機械のロックファイルで塞ぐ。
 // **手元で直接打った run も同じロックを取る**(Sources/fleetest/LocalDispatchLock.swift。
@@ -31,7 +31,7 @@ public struct RemoteDispatchLockInfo: Codable, Equatable, Sendable {
     /// kill(pid,0) は無意味)。表示専用
     public let pid: Int32
     /// 取得時刻(UTC, ISO8601)。表示専用 ―― stale 判定に時刻を機械的には使わない
-    /// (docs/remote-runner.md §5「既定では奪わない」。長時間 run を誤って殺さないため)
+    /// (RR-5「既定では奪わない」。長時間 run を誤って殺さないため)
     public let acquiredAt: String
     /// 自己申告の帰属(LocalConfig.resolveIssuerId)。unlock の可否(`RemoteDispatchUnlock`)の照合に使う。
     /// 既定値を置かない = 書き手の渡し忘れをコンパイルで止める
@@ -103,7 +103,7 @@ public enum RemoteDispatchLock {
             return "another dispatch is already running on this remote host (\(holderDescription(info)))"
                 + " — wait for it to finish, run `fleetest remote unlock --runner <machine>` if it is your own"
                 + " dispatch that died, or pass --force-lock if it is stuck"
-                + " (docs/remote-runner.md §5)"
+                + " (RR-5)"
         case .thisMachine:
             // `remote unlock` は案内しない —— 手元のロックは同じ機械の pid なので、死んでいれば
             // 次の run が自分で回収する(decideLocalSweep)。残っているなら生きている run のもの
@@ -111,18 +111,18 @@ public enum RemoteDispatchLock {
                 + " — this machine runs one run at a time (two runs fight over the same"
                 + " CoreSimulatorService and the same loopback ports). Wait for it to finish,"
                 + " or pass --wait-lock <seconds> to queue for it"
-                + " (docs/remote-runner.md §5)"
+                + " (RR-5)"
         }
     }
 
-    /// align/setup 用の取得失敗メッセージ(docs/remote-runner.md §18.3 規則2)。align/install は
+    /// align/setup 用の取得失敗メッセージ(RR-18.3 規則2)。align/install は
     /// 実行中バイナリを差し替えるので、稼働中の dispatch へ重ねると SIGKILL する。align/setup に
     /// `--force-lock` は無い(stale 判定を機械的に行わない既定を、稼働中バイナリの差し替えという
     /// 一段重い操作でまで崩さない)ので、heldMessage と違い --force-lock は案内しない
     public static func alignHeldMessage(_ info: RemoteDispatchLockInfo?) -> String {
         "another dispatch is running on this remote host (\(holderDescription(info)))"
             + " — aligning now would replace the binary under the running dispatch and kill it."
-            + " Wait for it to finish and retry (docs/remote-runner.md §18.3)"
+            + " Wait for it to finish and retry (RR-18.3)"
     }
 
     private static func holderDescription(_ info: RemoteDispatchLockInfo?) -> String {
@@ -139,7 +139,7 @@ public enum RemoteDispatchLock {
     // シングルクォートで無害化する ―― JSON 本文にそれらの文字が来ても展開されない)
 
     /// 取得コマンド。**`mkdir <leaf>` の原子性がロックの実体**(`test -e` → 作成の2段は
-    /// 競合に対して無意味 ―― docs/remote-runner.md §5)。親ディレクトリ(.fleetest/)だけは
+    /// 競合に対して無意味 ―― RR-5)。親ディレクトリ(.fleetest/)だけは
     /// `mkdir -p` で先に用意する(-p は「既存なら成功」なので、こちらに原子性を持たせては
     /// いけない。leaf の `mkdir` に -p を付けないのはそのため)。mkdir が失敗(既存)すれば
     /// この1本のコマンド全体が非0で終わり、info.json は書かれない

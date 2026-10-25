@@ -884,7 +884,7 @@ extension MCPServer {
     }
 
     /// `truncationHint`/`truncationNote` の2呼び手が使う逃げ道文言。
-    /// **文言は呼び手ごとに意図して別々のまま並置している**(docs/design.md の規律:
+    /// **文言は呼び手ごとに意図して別々のまま並置している**(docs/design/ の規律:
     /// 「判定は共有・文言は呼び手ごと」)—— ここへ同居させているのは統一するためではなく、
     /// 次に文言を調整するとき両方が編集者の目に入るようにするため。**片方だけ直すな**
     private enum TruncationEscapeStyle {
@@ -1173,7 +1173,7 @@ extension MCPServer {
     static let pinchRadiusFallback: Double = 100
 
     /// **Android の座標ピンチの既定半径は、指の最大間隔が最小スケール距離を超えるように広げる**
-    /// (§19 M5: 既定 238 px = 間隔 428 px は 440 dpi の 27 mm = 468 px を下回り、一切ズームしない)。
+    /// (既定 238 px = 間隔 428 px は 440 dpi の 27 mm = 468 px を下回り、一切ズームしない)。
     /// ブリッジは領域の短辺 × 0.9 を最大間隔にする(AndroidRunner BridgeRouter.handlePinch)ので、
     /// 間隔が `minimumSpan × headroom` に届く半径 = `minimumSpan × headroom / (2 × 0.9)`。
     /// headroom は「超えた分だけがスケールとして数えられる」ための余裕(1.25 = 25%)。
@@ -1215,10 +1215,10 @@ extension MCPServer {
     /// 「外れている」と読むと、画面を知らないだけの正常な呼び出しまで拒否することになる。
     /// ただし**「まだ ft_snapshot を撮っていない」は分からないうちに入れない**: 呼び手は
     /// `coordinateScreen` で直近の木の screen を採り、無ければ1枚読んでから判定する
-    /// (snapshot 前の `tap (5000, -20)` が done になっていた = §19 M4)。
+    /// (snapshot 前の `tap (5000, -20)` が done になっていた )。
     ///
     /// **縁は外**(`<`): 幅 1080 の画面で x=1080 は画素の外(0…1079)。iOS の pt も同じ。
-    /// 含み側にすると `(1080, 2220)` が done になる(§19 M4・担当)
+    /// 含み側にすると `(1080, 2220)` が done になる
     /// MCP の iOS は常に XCUITest なので、in-app の当たり判定を理由に挙げない(木は画面外にも要素を持つ
     /// ことがある、という事実は bridge を問わず有効)
     static func offscreenCoordinateError(x: Double, y: Double, screen: FTRect?,
@@ -1240,7 +1240,7 @@ extension MCPServer {
 
     /// **座標がソフトキーボードの中にある**ときの警告(ft_tap / ft_double_tap / ft_long_press の座標形)。
     /// ref 形は RefGuard.keyboardWarning が言うのに、座標形は無警告で done と返し、実機 Pixel 3a では
-    /// 欄にスペースが入った(§19 担当報告の再現)。**拒否はしない**(キーそのものを押す意図があり得る)。
+    /// 欄にスペースが入った。**拒否はしない**(キーそのものを押す意図があり得る)。
     /// 判定は直近の木の申告(`KeyboardOcclusion` = ref 形・DSL と同じ型)。木が無ければ黙る
     func keyboardCoordinateWarning(x: Double, y: Double, args: [String: Any]) -> String {
         guard let snapshot = lastSnapshots[Self.sessionKey(args)] else { return "" }
@@ -1257,7 +1257,7 @@ extension MCPServer {
     /// **座標で撃つ操作の前に、このセッションが起動したアプリが前面かを確かめる**警告。ref の操作は
     /// 撮り直した木で「前面が別アプリ」と断る(verifiedRef)が、座標の操作は木を読まないので、`back` で
     /// アプリを抜けた後のタップ・スワイプがランチャーや他のアプリへ黙って届いた(実機 Pixel で実測 →
-    /// maintainer-notes §60)。**断らない**(ホーム画面を座標で触る意図があり得る)。
+    /// MN-60)。**断らない**(ホーム画面を座標で触る意図があり得る)。
     /// 撃つ**前**に読む(その操作自身がアプリを離れた回に警告しない)。
     /// **判定材料が無いときは黙る**: ft_launch していない・ドライバが前面のアプリ名を答えない。
     /// **iOS には問い合わせない**(`foregroundAppID` は通信せず nil)—— XCUITest のランナーは前面に無い

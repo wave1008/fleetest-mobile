@@ -223,7 +223,7 @@ enum CoordinatePinch {
                                    orientation: UIInterfaceOrientation, display: DisplayRouting.Target?) throws {
         guard let classes, let synthesizer else {
             // **422(501 ではない)**: 501 はホストが「このブリッジでは不可」= XCUITest へフォールバックと読むので、
-            // XCUITest 自身が返すとフォールバック先が自分になる(docs/design.md §4.3)
+            // XCUITest 自身が返すとフォールバック先が自分になる(DS-4.3)
             throw BridgeError(422, "this Xcode has no coordinate gesture support"
                 + " (XCPointerEventPath / XCSynthesizedEventRecord are gone)")
         }
@@ -243,7 +243,7 @@ enum CoordinatePinch {
                              orientation: UIInterfaceOrientation, display: DisplayRouting.Target?, systemUI: Bool) throws {
         guard let classes, let synthesizer else {
             // **422(501 ではない)**: 501 はホストが「このブリッジでは不可」= XCUITest へフォールバックと読むので、
-            // XCUITest 自身が返すとフォールバック先が自分になる(docs/design.md §4.3)
+            // XCUITest 自身が返すとフォールバック先が自分になる(DS-4.3)
             throw BridgeError(422, "this Xcode has no coordinate gesture support"
                 + " (XCPointerEventPath / XCSynthesizedEventRecord are gone)")
         }

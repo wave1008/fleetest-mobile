@@ -23,7 +23,7 @@ export interface RemoteHostEntry {
    * 指定してはならない — rsync --delete がユーザー資産を消す・SPM ビルドロックが競合する)。 */
   readonly dir: string;
   /// FM 並列枠。**0 = 未設定**(dir の "" に相当。CLI 側の契約はファイル冒頭)。
-  /// 機械によっては FM を2並列以上で呼ぶと壊れるため機械ごとに絞る(docs/remote-runner.md §19)
+  /// 機械によっては FM を2並列以上で呼ぶと壊れるため機械ごとに絞る(RR-19)
   readonly fmConcurrency?: number;
   /** バッジ色パレットの鍵(machineColors[] の key)。**""  = 未設定**(dir/fmConcurrency と同じ
    * 「常にキーがあり空は未設定」の契約)。パレットの定義自体は持たない(CLI 側)。 */
@@ -38,18 +38,18 @@ export interface RemoteHostEntry {
   readonly developerDir?: string;
 }
 
-/** 「+既存から選択」ダイアログ「デバイス候補のマシン」(§13 段2)。machine は登録簿のマシン名
+/** 「+既存から選択」ダイアログ「デバイス候補のマシン」(RR-13 段2)。machine は登録簿のマシン名
  * (= この Mac だけのエイリアス。`remote exec <machine>` の第1引数で、raw な ssh 宛先ではなく
- * 登録名を渡す契約)。**ホスト名/IP ではない**(用語は docs/remote-runner.md §0)。 */
+ * 登録名を渡す契約)。**ホスト名/IP ではない**(用語は RR-0)。 */
 export type DeviceCommandSource =
   | { readonly kind: "local" }
   | { readonly kind: "remote"; readonly machine: string };
 
 /**
  * device-catalog/installed-devices/create-device を取得元のマシンに応じた CLI 引数へ組み立てる
- * (docs/remote-runner.md §13「プロファイルのリモート対応」・§14「単発コマンドの転送は汎用化する」)。
+ * (RR-13「プロファイルのリモート対応」・RR-14「単発コマンドの転送は汎用化する」)。
  * リモートは既存の汎用転送 `remote exec <machine> -- <apiArgs>` を使うだけで、個別 ssh 実装は書かない。
- * ローカルは apiArgs をそのまま返す(§13 段2 の「ローカルの挙動を1バイトも変えない」契約 —
+ * ローカルは apiArgs をそのまま返す(RR-13 段2 の「ローカルの挙動を1バイトも変えない」契約 —
  * この分岐が無いと既存の spawn 引数が変わってしまう)。
  */
 export function deviceCommandArgs(source: DeviceCommandSource, apiArgs: readonly string[]): string[] {

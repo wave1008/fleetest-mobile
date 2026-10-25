@@ -1,5 +1,5 @@
 // 準備中("preparing"/"building")の台帳の書き手。run の入口(Fleetest.swift / ApiRunCommand.swift の
-// writeProgress)と ProfileRunOrchestrator.writePreparingProgress が使う(docs/design.md §18.1)。
+// writeProgress)と ProfileRunOrchestrator.writePreparingProgress が使う(DS-18.1)。
 // 供給の段階(RunSupplyProgress)が変わったら、直前の phase のまま supply だけ載せ替えて書き直す。
 // 3つ目の書き手 RunProgressState(RunOrchestrator)は最初の書き込みの後に通知を引き継ぐ。
 

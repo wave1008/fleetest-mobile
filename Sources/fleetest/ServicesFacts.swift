@@ -1,5 +1,5 @@
 // compose.yaml の検査・計画(FTServices の純粋関数)へ渡す入力を、ファイルシステムと設定から集める。
-// ここは I/O だけ。判定はしない(パスの実体・symlink・存在は PathFact として渡す)。docs/remote-runner.md §17。
+// ここは I/O だけ。判定はしない(パスの実体・symlink・存在は PathFact として渡す)。RR-17。
 
 import Darwin
 import FTBridgeClient

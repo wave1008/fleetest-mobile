@@ -40,7 +40,7 @@ tag 定数は `src/tags.ts` に集約する(値は共通契約の表と byte 一
 `other`・非 scrollable)に付き、実際にスクロールするノードは**同 frame の別要素**に割れる。
 Android は `scrollView id=list_rows scroll` の理想形でそのまま出る。
 → **ホスト側で「同一 frame の id 付きラッパー + 匿名 scroll ノード」を統合する正規化**を入れて
-両モード・両 OS で吸収している(design.md §「スコープ `祖先 >> 子孫`」参照)。SUT 側の対処は不要。
+両モード・両 OS で吸収している(docs/design/ の「スコープ `祖先 >> 子孫`」参照)。SUT 側の対処は不要。
 
 ### B. Android は Pressable の内側 Text が別ノードとして出る(ツール側で畳み込み済み)
 
@@ -122,7 +122,7 @@ xcuitest は Modal の内容だけを見るが、**in-app は背景ツリーと�
 **入力欄がネイティブ SUT(SwiftUI/View)と同型になるのが RN の特徴**(`RCTUITextField` は
 `UITextField` 派生・`ReactEditText` は `EditText` 派生のため)。CMP(iOS は入力欄が全部 `textView`)とも
 Flutter(in-app では `other`)とも違い、新しい型分岐をホスト側に足す必要が無かった
-(design.md §「入力欄は『モード間で揃える』ところまでが担保」)。
+(docs/design/ の「入力欄は『モード間で揃える』ところまでが担保」)。
 
 `type` / `pressEnter` は両 OS・両モードで既存経路がそのまま通る(controlled `TextInput` の値
 巻き戻しは起きない。in-app の `pressEnter` も UIKit 経路で発火し、Flutter のような engine 私有 API

@@ -1,4 +1,4 @@
-// run 進捗(docs/design.md §18)の記帳の注入をソース走査で固定する。
+// run 進捗(DS-18)の記帳の注入をソース走査で固定する。
 //
 // **型では守れない継ぎ目**: `writeRunProgress`/`removeRunProgress` を RunOrchestrator へ渡し
 // 忘れても run は緑のまま通り、その経路(`fleetest run --profile` または `fleetest api run`)は

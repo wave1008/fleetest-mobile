@@ -245,7 +245,7 @@ extension MCPServer {
             // **`ft_tap(容器)` → ref なし `ft_type` を成立させる**(DSL の `retypeTargetIfUnfocused` と
             // 同じ規律・判定は `InputFocusRescue` を共有)。Android は容器を叩いても前の欄の焦点を
             // 外さないので、ref なし type は**前の欄へ入って「Typed」とだけ返していた**
-            // (Pixel 3a・§19 F13 の MCP 版)。払うのは tap の直後の1枚だけ。
+            // (Pixel 3a。DSL の同じ救済の MCP 版)。払うのは tap の直後の1枚だけ。
             // **生読み**(adoptSnapshot を通さない)= 返る ref は native なのでそのまま撃てる。
             // 入れ先が一意に決まらなければ焦点の欄へ送るが、**焦点が叩いた欄の外に
             // あることは警告に出す**(typedIntoNote の「どこへ入ったか」と対で読める)

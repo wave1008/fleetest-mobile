@@ -187,7 +187,7 @@ public enum ProjectScaffold {
         }
         permissions["ask"] = ask
         offered.formUnion(mcpAskPermissions)
-        // クローンを読み取り専用にする(maintainer-notes §2.5)。Read の allow = 外を初めて読むときの確認を省く・
+        // クローンを読み取り専用にする(MN-2.5)。Read の allow = 外を初めて読むときの確認を省く・
         // Edit の deny = 編集ツールと Claude Code が認識する Bash のファイル操作を止める。
         // **クローン構成(作業フォルダがクローンの内側)では書かない**(自分の作業ツリーを読み取り専用にする)。
         // deny は Read の allow を初めて足すときだけ書く(ask と同じ: 利用者が外した deny を補修で戻さない)

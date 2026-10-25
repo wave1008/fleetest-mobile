@@ -1,4 +1,4 @@
-// 実行プロファイルの開始/終了スクリプト(docs/remote-runner.md §17)の純粋ロジック。
+// 実行プロファイルの開始/終了スクリプト(RR-17)の純粋ロジック。
 // 実際の起動・孤児の回収は Sources/fleetest/RunHookRunner.swift(プロセス起動が要るのでここでは扱わない)。
 
 import Foundation
@@ -40,7 +40,7 @@ final class RunHookEnvironmentTests: XCTestCase {
         // 回収経路は run の文脈を持たないが、キーを落とすと利用者の `set -u` が落ちる
         XCTAssertEqual(Set(env.keys), ["FT_HOOK", "FT_WORKSPACE", "FT_PROJECT", "FT_PROFILE",
                                         "FT_REPORT_DIR", "FT_IOS_DEVICES", "FT_ANDROID_DEVICES"],
-                       "利用者のスクリプトが読む契約(docs/remote-runner.md §17)")
+                       "利用者のスクリプトが読む契約(RR-17)")
         XCTAssertEqual(env["FT_HOOK"], "teardown")
         XCTAssertEqual(env["FT_WORKSPACE"], "/ws")
         XCTAssertEqual(env["FT_PROFILE"], "android-1")

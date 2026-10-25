@@ -1,6 +1,6 @@
 // machineLockModel.ts
 // **どの機械で誰の run が走っているか**の控え(vscode 非依存の純粋関数。
-// docs/remote-runner.md §18.7 M2)。供給元は `api monitor` の monitorLock イベント
+// RR-18.7 M2)。供給元は `api monitor` の monitorLock イベント
 // (その機械で走っている監視プロセスが dispatch.lock をローカルで読む。リモートぶんは
 // fan-out の子が読んで親が machine を埋め、**手元ぶんは machine 欠落のまま届く**)。
 // **手元も対象**: dispatch.lock は機械に1本で、リモートへのディスパッチもローカル run も
@@ -9,7 +9,7 @@
 // 使い道は3つ。**どれも「新しい ssh を張らない」ことが前提**(この控えは既に流れている
 // モニターの副産物):
 //   1. 配信の自動退避 —— 占有中の機械のライブ配信を畳んでポーリングへ落とす
-//      (配信を張ったままの run は実際に赤くなる。docs/verification.md)
+//      (配信を張ったままの run は実際に赤くなる。docs/verification/)
 //   2. 占有の表示 —— ツールバーの機械の行に「誰の run が実行中か」を出す
 //   3. 破壊的操作の確認 —— リモートの devices down / デバイス削除の modal に添える
 //
@@ -76,7 +76,7 @@ export function applyMachineLockEvent(
 // (monitorProcessManager.ts が起動時に空へ戻す)。
 
 /** 配信を畳むべき機械。**保持者が誰かによらない** —— 自分の run でも配信との干渉は同じ
- * (docs/verification.md の実測: 配信ありのフル E2E で Android が実際に赤になった)。
+ * (docs/verification/ の実測: 配信ありのフル E2E で Android が実際に赤になった)。
  *
  * **観測できなくなった機械(observed:false)も畳んだままにする** —— 走っているかどうかが
  * 分からない以上、配信を再開する側に倒さない(その機械のタイルはどのみち state:"unknown" で
@@ -93,7 +93,7 @@ export function occupiedMachines(locks: ReadonlyMap<string, MachineLock>): Set<s
 
 /** 配信を畳む機械(「ライブ更新」チェックボックスの反映)。OFF = occupiedMachines と同じ
  * (保持者を問わない)。ON = **他人の run の機械だけ**畳む —— 他人の run を配信で赤くしない
- * (共有ランナーの規律。docs/remote-runner.md §18.7)。観測できない機械は保持者も分からないので
+ * (共有ランナーの規律。RR-18.7)。観測できない機械は保持者も分からないので
  * ON でも畳む(`mine` は「他人」と「不明」を区別しない)。
  *
  * **手元(`LOCAL_MACHINE_KEY`)も同じ規則で通る** —— 自分の run は `mine:true` なので ON では

@@ -1,5 +1,5 @@
 // RemoteMonitorFanout.swift
-// **リモート機のデバイスの状態と画面を、手元のモニターへ合流させる**(docs/remote-runner.md §13)。
+// **リモート機のデバイスの状態と画面を、手元のモニターへ合流させる**(RR-13)。
 //
 // 手元の `fleetest api monitor` は simctl/adb を叩くので**この機械のデバイスしか観測できない**。
 // 別の機械のデバイスは、その機械で `api monitor --device-machine local` を1本走らせ、その
@@ -18,7 +18,7 @@
 //     再接続した子は既定(pause なし・抑制なし)のまま動く。1回きりの指示(storageRefresh)は送り直さない
 //
 // **子は必ず `remote exec` 経由**(ssh の張り方・PATH 補正・マシン解決を委ねる。専用の ssh 経路を
-// 新設しない = docs/remote-runner.md §14)。**先にプロジェクトを rsync する**(RemoteProjectSync)。
+// 新設しない = RR-14)。**先にプロジェクトを rsync する**(RemoteProjectSync)。
 //
 // 子が落ちたら、そのマシンのデバイスは**「状態を取得できない」に戻す**(古い状態を出し続けない ——
 // 向こうが落ちているのに connected と言い続けるのが最悪)。再接続は指数的に間隔を空けて試み、
@@ -316,7 +316,7 @@ final class RemoteMonitorFanout: @unchecked Sendable {
               let kind = (try? JSONDecoder().decode(KindOnly.self, from: data))?.kind
         else { return }
         if kind == "monitorLock" {
-            // ランナー機の dispatch.lock の状態(§18.7 M2)。**マシン名は親が埋める** ——
+            // ランナー機の dispatch.lock の状態(RR-18.7 M2)。**マシン名は親が埋める** ——
             // 子は machine 欄を出さない(= 手元の綴り)ので、そのまま流すと拡張が手元の
             // 占有として読む(monitorDevices の id・monitorRuns と同じ理由)
             guard var event = try? JSONDecoder().decode(ApiMonitorLockEvent.self, from: data) else {
@@ -332,7 +332,7 @@ final class RemoteMonitorFanout: @unchecked Sendable {
             return
         }
         if kind == "monitorRuns" {
-            // フリート横断の run 進捗(docs/design.md §18.2)。**マシン名は親が埋める** ——
+            // フリート横断の run 進捗(DS-18.2)。**マシン名は親が埋める** ——
             // 子は `--device-machine local` で自分を "local" としか名乗れない(monitorLock と同じ理由)
             guard var event = try? JSONDecoder().decode(ApiMonitorRunsEvent.self, from: data) else {
                 log("[monitor] \(machine): cannot read the remote monitorRuns line")

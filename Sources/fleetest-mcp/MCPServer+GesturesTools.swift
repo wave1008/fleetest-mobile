@@ -164,7 +164,7 @@ extension MCPServer {
         // 控えを保つ = 次に portrait へ戻すまで端末の設定はそのまま)。
         // **戻すのは元が auto-rotate だったときだけ**(`restoreAutoRotateIfItWasOn`)—— 元から
         // 横に固定されていた端末で `restoreOrientationIfNeeded` を呼ぶと、明示された portrait を
-        // 横へ取り消しながら縦の木を返していた(Pixel 3a・§19 R1)。
+        // 横へ取り消しながら縦の木を返していた(Pixel 3a)。
         // driver は `drivers[key]` にキャッシュされ同じインスタンスを使い続けるので控えは生きる ——
         // 接続が切れて再生成されたときだけ戻せない(その場合は次に立ち上げた側の責任)。
         //

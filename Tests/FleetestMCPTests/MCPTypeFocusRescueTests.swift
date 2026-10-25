@@ -1,4 +1,4 @@
-// `ft_tap(容器)` → ref なし `ft_type` の救済(§19 F13 の MCP 版)。
+// `ft_tap(容器)` → ref なし `ft_type` の救済。
 // Android は容器を叩いても前の欄の焦点を外さないので、ref なし type は前の欄へ入って
 // 「Typed」とだけ返していた(Pixel 3a)。DSL の `retypeTargetIfUnfocused` と同じ規律で、
 // 判定は `InputFocusRescue`(FTCore)を共有する: ①焦点が叩いた要素の外にあり、内側の入力欄が

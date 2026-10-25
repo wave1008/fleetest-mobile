@@ -84,7 +84,7 @@ final class RemoteStatusToolchainCellTests: XCTestCase {
         XCTAssertFalse(r.compatible)
     }
 
-    // MARK: - Xcode 選択の拒否(docs/remote-runner.md §7)
+    // MARK: - Xcode 選択の拒否(RR-7)
 
     /// XcodeSelection が refused(候補が複数/0個)のときは、**toolchain の文字列が一致していても**
     /// TOOLCHAIN が ❌ になる ―― これが無いと「ambient がたまたま一致した」ときだけ緑になる

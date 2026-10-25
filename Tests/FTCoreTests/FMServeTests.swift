@@ -240,7 +240,7 @@ final class FMServeTests: XCTestCase {
 
     /// **LanguageModelSession を作ってよいのは決まったファイルだけ**。画像を伴う呼び出し(テキストの可視性検証・
     /// screenLooksLike・死活の確かめ)は常駐プロセスだけが撃つ —— シナリオのプロセスや常駐ヘルパーが各自
-    /// セッションを作ると、モデルの載せ直しが絶えず起きて FM が死んだ(docs/maintainer-notes.md §81)
+    /// セッションを作ると、モデルの載せ直しが絶えず起きて FM が死んだ(MN-81)
     func testOnlyTheFMProcessAndAuthoringToolsCreateSessions() throws {
         let sources = Self.repoRoot.appendingPathComponent("Sources")
         var owners: Set<String> = []

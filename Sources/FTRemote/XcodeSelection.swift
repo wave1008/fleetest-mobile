@@ -1,6 +1,6 @@
 // XcodeSelection.swift
 // ランナー機に複数の Xcode が入っているとき、発行側の Xcode に一致するものを自動選択する
-// (docs/remote-runner.md §7)。選択は `DEVELOPER_DIR` の export(プロセス単位・sudo 不要)で行う
+// (RR-7)。選択は `DEVELOPER_DIR` の export(プロセス単位・sudo 不要)で行う
 // —— `xcode-select -s` は機械全体に効き sudo が要るため使わない(共有ランナーで他利用者の run を壊す)。
 // プロセス起動・ssh は置かない(呼び出し側 = Sources/fleetest/RemoteRunDispatcher.swift・
 // Sources/fleetest/RemoteCommands.swift)。
@@ -111,7 +111,7 @@ public enum XcodeSelection {
         "could not tell which installed Xcode to dispatch with: none of the \(installed.count)"
             + " installed Xcode(s) matches this Mac's toolchain by build or product version"
             + " (installed: \(list(installed))) — install the matching Xcode on that runner"
-            + " (docs/remote-runner.md §7)"
+            + " (RR-7)"
     }
 
     /// 同じ製品版が複数ある。**対処は pin**(どれを使うかはツールには決められない)
@@ -119,7 +119,7 @@ public enum XcodeSelection {
         "could not tell which installed Xcode to dispatch with: \(matching.count) installed Xcodes"
             + " match this Mac's product version (matching: \(list(matching)))"
             + " — pin one for this machine with `fleetest remote machines add <name> --host <host>"
-            + " --developer-dir <path>` (docs/remote-runner.md §7)"
+            + " --developer-dir <path>` (RR-7)"
     }
 
     private static func list(_ installed: [Installed]) -> String {

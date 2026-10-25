@@ -1,8 +1,8 @@
-// フリート横断の run 進捗(docs/design.md §18)を `api monitor` が拡張へ渡す形に直す
+// フリート横断の run 進捗(DS-18)を `api monitor` が拡張へ渡す形に直す
 // `ApiMonitorCommand.monitorRuns` の検証。守るもの: ①経過は台帳の ISO8601 をそのまま流さず
-// 呼び出し側の `now` で秒に直す(§18.3) ②issuer が nil のときは mine=false
+// 呼び出し側の `now` で秒に直す(DS-18.3) ②issuer が nil のときは mine=false
 // (不明を自分扱いにしない。HostOccupancy と同じ向き) ③etaSeconds は台帳の値をそのまま運ぶ
-// (§18.4。計算自体は RunOrchestrator/RunProgressEstimate の責務で、ここでは中継するだけ)。
+// (DS-18.4。計算自体は RunOrchestrator/RunProgressEstimate の責務で、ここでは中継するだけ)。
 
 import FTCore
 import XCTest
@@ -52,7 +52,7 @@ final class ApiMonitorRunProgressTests: XCTestCase {
         XCTAssertNil(out.first?.lanes[1].scenarioElapsedSeconds, "scenario が nil のレーンは経過も nil")
     }
 
-    /// **詰まりの事実**(§18.5 段6)は台帳の値をそのまま運ぶ(ここで別途 nil化・再計算しない)
+    /// **詰まりの事実**(DS-18.5 段6)は台帳の値をそのまま運ぶ(ここで別途 nil化・再計算しない)
     func testRequeuedAndLaneDropoutsArePassedThroughFromTheLedger() {
         let out = ApiMonitorCommand.monitorRuns(
             records: [record(requeued: 3, laneDropouts: 1)], now: now, myIssuer: "bob@office")
@@ -85,7 +85,7 @@ final class ApiMonitorRunProgressTests: XCTestCase {
         XCTAssertEqual(out.first?.mine, false)
     }
 
-    /// 残り見積もり(§18.4)は台帳の値をそのまま運ぶ(ここで別途 nil化・再計算しない)
+    /// 残り見積もり(DS-18.4)は台帳の値をそのまま運ぶ(ここで別途 nil化・再計算しない)
     func testEtaSecondsIsPassedThroughFromTheLedger() {
         let out = ApiMonitorCommand.monitorRuns(records: [record()], now: now, myIssuer: "bob@office")
         XCTAssertEqual(out.first?.etaSeconds, 999)

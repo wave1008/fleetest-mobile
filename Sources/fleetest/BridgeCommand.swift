@@ -256,7 +256,7 @@ struct Bridge: AsyncParsableCommand {
                 let silentPorts = BridgeDiscovery.portRange.filter { candidate in
                     !found.contains(where: { $0.port == candidate })
                 }
-                // **busy と「固まった転送」を分ける**ので isBound では足りない(§44.1 の4値)
+                // **busy と「固まった転送」を分ける**ので isBound では足りない(MN-44.1 の4値)
                 let silentProbes = await BridgeDiscovery.probeStatuses(ports: silentPorts, repoRoot: root)
                 // 応答しないポートも listener からデバイスが特定できれば掃討の対象に含める。
                 // 特定できないポートは対象外(= 掃討ごと断る理由にしない。固まったブリッジを

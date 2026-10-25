@@ -1,5 +1,5 @@
 // FleetSplit.swift
-// `fleetest run --fleet <name> --split`(docs/remote-runner.md §8「シナリオバッチを複数 Mac に
+// `fleetest run --fleet <name> --split`(RR-8「シナリオバッチを複数 Mac に
 // 割り当てる」)の純粋ロジック。実績の中央値は既存の LPTScheduler.Duration / durations(from:) を
 // そのまま使う(中央値算出を二重に持たない)。ssh・プロセス起動・ローカルビルド・ホスト→
 // platform の解決は呼び出し側(Sources/fleetest/FleetRunner.swift)に置く。

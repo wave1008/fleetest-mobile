@@ -242,7 +242,7 @@ function stateCell(monitor) {
   if (monitor.frozen) {
     cell.appendChild(chip('dh-chip-frozen', '❄️ ' + t('wvDashboard.deviceHealth.frozen')));
   }
-  // metal-errors はタイルと同じく出さない(全機に同時に出る背景現象。docs/design.md §12.4)。
+  // metal-errors はタイルと同じく出さない(全機に同時に出る背景現象。DS-12.4)。
   // 未知の種別は訳さず原文のまま出す(判定しない)
   for (const flag of Array.isArray(monitor.health) ? monitor.health : []) {
     if (flag === 'metal-errors') continue;

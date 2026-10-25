@@ -1,6 +1,6 @@
 import Foundation
 
-/// run 進捗の記帳(docs/design.md §18。段1・2)。RunLeaseLedger と同じ形 —— 書き手の実体
+/// run 進捗の記帳(DS-18。段1・2)。RunLeaseLedger と同じ形 —— 書き手の実体
 /// (`RunProgressLedger.write/remove`)は fleetest ターゲットが注入する(FTCore は書き込み先の
 /// 生成規約を持つが、pid・プロセス起動の知識は呼び出し側に残す既存の注入規律に揃える)。
 /// **書くのは変化した瞬間だけ**(前回の record と比較して同じなら書かない。Equatable)。
@@ -19,7 +19,7 @@ actor RunProgressState {
     private let total: Int
     private var done = 0
     private var failed = 0
-    /// **詰まりの事実だけ**(docs/design.md §18.1 段6)。判定・閾値は作らない —— laneIdled/laneLeft
+    /// **詰まりの事実だけ**(DS-18.1 段6)。判定・閾値は作らない —— laneIdled/laneLeft
     /// が成立した回数をそのまま数えるだけ
     private var requeuedCount = 0
     private var laneDropoutsCount = 0
@@ -31,7 +31,7 @@ actor RunProgressState {
     private let supply: RunSupplyProgress?
     /// finish() の後に箱の通知で台帳を作り直さない
     private var finished = false
-    /// 残り見積もり(docs/design.md §18.4)の実績表(ms)。空 = 実績ゼロ → etaSeconds は常に nil
+    /// 残り見積もり(DS-18.4)の実績表(ms)。空 = 実績ゼロ → etaSeconds は常に nil
     private let estimates: [RunProgressEstimate.ScenarioKey: Double]
     /// 未着手ジョブの多重集合(件数)。同じ (scenarioID, platform) が複数残ることがある
     /// (broadcast は同じシナリオが複数レーンぶん残る)。scenarioStarted で1減らし、
@@ -81,9 +81,9 @@ actor RunProgressState {
         }
     }
 
-    /// §18.4 の式そのもの。**未着手はレーンから独立**(pendingCounts)・**実行中はレーンから直接**
+    /// DS-18.4 の式そのもの。**未着手はレーンから独立**(pendingCounts)・**実行中はレーンから直接**
     /// (lanesByKey の scenario/scenarioStartedAt)。同じ機械・同じプロセスの時計を使うだけなので
-    /// (§18.3 が扱う「向こうの時計とのずれ」はここには無い)、経過は Date() との差でそのまま出す
+    /// (DS-18.3 が扱う「向こうの時計とのずれ」はここには無い)、経過は Date() との差でそのまま出す
     private func currentEtaSeconds() -> Int? {
         let pending = pendingCounts.flatMap { key, count in Array(repeating: key, count: count) }
         let running: [(scenario: RunProgressEstimate.ScenarioKey, elapsedSeconds: Double)] =

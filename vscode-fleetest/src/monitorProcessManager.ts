@@ -193,7 +193,7 @@ export type HostMetricsToWebviewMessage =
     }
   /** 行の集合(手元 + このリモート機。値より先に配る)。消えた機械の行は webview 側で捨てる。 */
   | { readonly type: "hostMetricsMachines"; readonly machines: readonly string[] }
-  /** その機械で誰かの run が走っているか(docs/remote-runner.md §18.7 M2)。
+  /** その機械で誰かの run が走っているか(RR-18.7 M2)。
    *  ツールバーの機械の行に錠前を出す(**手元の行も同じ** —— machine は LOCAL_MACHINE_KEY =
    *  空文字で、hostCharts.js の行キーと一致する)。**held:false は「空き」**で、控えを消す
    *  (不明へ戻す)ときは送らない —— 表示は「錠前が出るか出ないか」の2値で足りる。 */
@@ -250,7 +250,7 @@ export class MonitorProcessManager {
   /**
    * host-metrics 子プロセス(常駐。monitor プロセスとは独立に管理する)。**機械ごとに1本**で、
    * キーは機械名(手元は "")。リモートは `remote exec <machine> -- api host-metrics` ——
-   * 専用の ssh 経路は書かない(docs/remote-runner.md §14。配信 = device-stream と同じ規律)。
+   * 専用の ssh 経路は書かない(RR-14。配信 = device-stream と同じ規律)。
    */
   private readonly hostMetricsChildren = new Map<string, HostMetricsChild>();
   /**
@@ -264,8 +264,8 @@ export class MonitorProcessManager {
    * **「観測できない → 観測できる」への遷移だけ**を諦めの取り消しに使うので、前回の値が要る。
    */
   private hostMetricsObservations: ReadonlyMap<string, MachineObservation> = new Map();
-  /** 機械ごとの占有(dispatch.lock)。供給元は monitorLock イベント(docs/remote-runner.md
-   * §18.7 M2)。**手元も入る**(キーは LOCAL_MACHINE_KEY = 空文字)。
+  /** 機械ごとの占有(dispatch.lock)。供給元は monitorLock イベント(docs/remote-runner/
+   * RR-18.7 M2)。**手元も入る**(キーは LOCAL_MACHINE_KEY = 空文字)。
    * **控えが無い機械は「不明」**で、空きとは区別する(machineLockModel.ts)。 */
   private machineLocks: ReadonlyMap<string, MachineLock> = new Map();
   /**
@@ -393,7 +393,7 @@ export class MonitorProcessManager {
     // false 始まりなので、保持中に起動し直せば active=true が改めて届く)
     this.monitorHoldActive = false;
     this.deps.notifyMachineLocks(this.machineLocks);
-    // run ボード(docs/design.md §18)の控えも同じ寿命 —— webview 側は runBoardModel.ts の状態を
+    // run ボード(DS-18)の控えも同じ寿命 —— webview 側は runBoardModel.ts の状態を
     // 持つ独立モジュールなので、ホスト側に控えは無く明示的なリセット合図で畳む。
     this.deps.post({ type: "runBoardReset" });
     // 「ストレージ使用を更新」の要求も前のモニターと寿命を共にする(DashboardToWebviewMessage の doc)
@@ -827,7 +827,7 @@ export class MonitorProcessManager {
     readonly mine: boolean;
   }): void {
     // **machine 欠落 = 手元**(LOCAL_MACHINE_KEY)。捨てない —— 手元の run も dispatch.lock を
-    // 取るので、錠前も配信の退避も手元に効かせる(docs/remote-runner.md §18.7)
+    // 取るので、錠前も配信の退避も手元に効かせる(RR-18.7)
     const machine = event.machine ?? LOCAL_MACHINE_KEY;
     const before = this.machineLocks.get(machine);
     this.machineLocks = applyMachineLockEvent(this.machineLocks, event);
@@ -1115,7 +1115,7 @@ export class MonitorProcessManager {
     // リモート機の host-metrics(行が増える)。表示フィルタ前の一覧で判定する
     this.syncHostMetricsMachines(this.latestDevices);
     // **表示フィルタは畳まずに送る** —— run ボードのツリーはこのフィルタを通さない
-    // (ビルド中・停止中のデバイスも出す。docs/design.md §18.5)。落とすのは webview の入口。
+    // (ビルド中・停止中のデバイスも出す。DS-18.5)。落とすのは webview の入口。
     this.deps.post(
       devicesToWebviewMessage(this.latestDevices, this.deps.getConfig().monitorDeviceFilter),
     );

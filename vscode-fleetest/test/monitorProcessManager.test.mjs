@@ -269,7 +269,7 @@ test("再起動が古いプロセスの close を待ち切れなかった後に�
 // ---- リモート機の host-metrics(モニターのグラフをマシンごとに出す) ----
 // 手元の `api host-metrics` は**この機械しか観測できない**ので、リモート機のぶんはその機械で
 // 1本ずつ立てる。専用の ssh 経路は書かず既存の汎用転送(`remote exec`)を使う契約
-// (docs/remote-runner.md §14。配信 = device-stream と同じ)。
+// (RR-14。配信 = device-stream と同じ)。
 
 /** monitorDevices を1行流す(machine 付きのデバイスでリモート機を名乗らせる)。 */
 function feedMonitorDevices(proc, devices) {

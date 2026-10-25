@@ -205,7 +205,7 @@ struct ApiMonitorCommand: AsyncParsableCommand {
         // 中継しながら機械名を埋める
         let myIssuer = LocalConfig.resolveIssuerId()
         var lastOccupancy: HostOccupancy?
-        // フリート横断の run 進捗(docs/design.md §18)。読む場所は機械グローバル
+        // フリート横断の run 進捗(DS-18)。読む場所は機械グローバル
         // (~/.fleetest/runs)なので、ここでは fan-out の子(--device-machine 付き)かどうかも
         // 問わない —— 手元で走る CLI 実行の run もここで見せるのが目的
         let runProgressDir = RunProgressLedger.directory()
@@ -672,7 +672,7 @@ struct ApiMonitorCommand: AsyncParsableCommand {
     }
 
     /// `RunProgressRecord`(台帳。ISO8601 を持つ)→ 拡張へ渡す形(秒に直し、mine を判定する)。
-    /// **経過は呼び出し側の `now`**(docs/design.md §18.3: 同じ機械の時計で計算する。台帳の
+    /// **経過は呼び出し側の `now`**(DS-18.3: 同じ機械の時計で計算する。台帳の
     /// ISO8601 をそのまま流さない)。**issuer が nil の record は mine=false**
     /// (HostOccupancy.interpret と同じ向き)。並びは pid 昇順に固定する(readAll はディレクトリ
     /// 列挙順=不定なので、固定しないと変化していない run でも比較のたびに emit してしまう)。
@@ -696,7 +696,7 @@ struct ApiMonitorCommand: AsyncParsableCommand {
                     total: record.total, done: record.done, failed: record.failed,
                     // 詰まりの事実(段6)。台帳の値をそのまま運ぶ(判定・文言は作らない)
                     requeued: record.requeued, laneDropouts: record.laneDropouts,
-                    // 段5(残り見積もり。docs/design.md §18.4)。台帳の値をそのまま運ぶ ——
+                    // 段5(残り見積もり。DS-18.4)。台帳の値をそのまま運ぶ ——
                     // 実績ゼロの run は台帳側が既に nil を書いているので、ここで別途判定しない
                     etaSeconds: record.etaSeconds,
                     lanes: record.lanes.map { lane in

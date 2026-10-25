@@ -5,7 +5,7 @@ import XCTest
 /// live serve の command watchdog は「進まない時間」を測る。観測の各段(前面追従・screenshot・snapshot・
 /// springboard 退避・失敗の注記)は個別に期限があるので、段の手前で窓を張り直す
 /// (`ResidentProcessGuard.noteCommandProgress`)。命令全体を1本の窓で数えると、劣化したランナー
-/// (AX の1問に 20 秒超)で進んでいるのに serve ごと強制終了する(maintainer-notes §68.1)。
+/// (AX の1問に 20 秒超)で進んでいるのに serve ごと強制終了する(MN-68.1)。
 /// ①張り直しの意味(アイドル中は何もしない)②観測の段の手前に張り直しがあることをソース走査で固定する。
 final class LiveWatchdogProgressScanTests: XCTestCase {
 

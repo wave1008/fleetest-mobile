@@ -1,5 +1,5 @@
 // remoteHostsController.ts
-// リモートホスト登録簿の CLI 越しの読み書き(docs/remote-runner.md §13「原則」)。
+// リモートホスト登録簿の CLI 越しの読み書き(RR-13「原則」)。
 // 正は CLI の LocalConfig(~/.config/fleetest/config.json)、拡張はここでは保持しない
 // (monitorPanel.ts が直近取得分を lastKnownRemoteHosts に控えるのは差分計算のためだけ)。
 //

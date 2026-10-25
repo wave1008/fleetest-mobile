@@ -1,4 +1,4 @@
-// SpringBoard への1問(`GET /systemalert`)が**失敗した**回を「アラート無し」に畳まない(§19 P2)。
+// SpringBoard への1問(`GET /systemalert`)が**失敗した**回を「アラート無し」に畳まない。
 // USB の token 無し・WiFi の待ち受け断・ランナーの死亡で照会が落ちると、`iosAlertHandler` を
 // 登録したのにアラートへ吸われた操作が注記なしの緑になっていた(実機 SE3)。
 // 規律: 操作は進める(新しい検知は警告から)が、注記 `system-alert-probe-failed` を立て、

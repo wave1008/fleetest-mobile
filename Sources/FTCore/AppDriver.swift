@@ -135,7 +135,7 @@ public protocol AppDriver {
     /// フォーカス中の入力欄で Enter を押す(ref なし。Shirates pressEnter 相当)。
     /// iOS はソフトキー tap ができない(キーボード要素を snapshot から除外しているため)代替経路を
     /// ドライバごとに持つ: xcuitest は typeText("\n")、inapp は Compose 入力欄への insertText("\n")
-    /// (design.md 承認済み差分)。inapp が 409(UIKit 入力欄・フォーカス無し)を返したときの
+    /// (design/ 承認済み差分)。inapp が 409(UIKit 入力欄・フォーカス無し)を返したときの
     /// xcuitest フォールバックは StepExecutor が担う
     func pressEnter() async throws
     func swipe(_ direction: FTSwipeDirection) async throws
@@ -148,7 +148,7 @@ public protocol AppDriver {
     /// 既定 nil = 分からない(ホストは木の署名が2回続けて不変になるまで読む)。
     ///
     /// 端送りの所要は、スクロールそのものではなく**この判定のための読み**が支配する
-    /// (ページを1回で飛ばせる画面では 2.3s のほぼ全部。docs/performance-tuning.md §3.27)。
+    /// (ページを1回で飛ばせる画面では 2.3s のほぼ全部。PT-3.27)。
     /// 位置を直接動かせるドライバは「余地が無い」を**事実として**知っているので、
     /// 推測(署名の比較)より強い。**プロトコル要件として宣言すること**(既定実装だけだと
     /// 存在型越しの呼び出しが静的ディスパッチで既定へ落ち、ドライバの答えが捨てられる)

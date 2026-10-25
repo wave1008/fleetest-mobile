@@ -1,6 +1,6 @@
 // iOS 実機のレスポンス計測で、run の間だけ xctrace(Display + Hangs)を録り、終わりに最初のフレームを結果へ入れる。
 // `fleetest run --profile`(ProfileRunner)と `fleetest api run`(ApiRunCommand)が同じ型を呼ぶ(2実装の差を作らない)。
-// 契約: docs/response-measurement.md §5・§8.5。判定・換算は FTCore の ResponseTracePolicy / ResponseTracePatch(純粋関数)。
+// 契約: RM-5・RM-8.5。判定・換算は FTCore の ResponseTracePolicy / ResponseTracePatch(純粋関数)。
 //
 // 寿命の束ね方:
 // - 正常・エラーの終わり: 呼び手の `defer { cleanup() }`(SIGINT で止めて待ち、一時フォルダを消す)。正常は先に `finish`

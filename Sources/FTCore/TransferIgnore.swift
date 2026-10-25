@@ -1,6 +1,6 @@
 // TransferIgnore.swift
 // `--host` ディスパッチの転送(rsync)から外すパスを、転送対象のツリーの中の
-// `.fleetest-transfer-ignore` で宣言する口(docs/remote-runner.md §17「転送から外す」)。
+// `.fleetest-transfer-ignore` で宣言する口(RR-17「転送から外す」)。
 //
 // rsync 自身にも同じ機構(`-F` = dir-merge `.rsync-filter`)があるのに自前で読む理由:
 // **macOS 標準の rsync(openrsync)では dir-merge の規則が `--delete` から受け側を守らない**

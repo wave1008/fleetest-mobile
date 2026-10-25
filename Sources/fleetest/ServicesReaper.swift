@@ -1,5 +1,5 @@
 // サービスの控え(`.fleetest/hooks/<pid>~<接頭辞>.json`)の読み取りと、控えの ID による資源の削除
-// (docs/remote-runner.md §17「片付けの保証」)。通常終了(ServicesSession.down)・孤児の回収(hooks reap / 次の run)・
+// (RR-17「片付けの保証」)。通常終了(ServicesSession.down)・孤児の回収(hooks reap / 次の run)・
 // `services reset` が同じ削除を使う。**回収は控えの計画で動き、現在の compose.yaml から作り直さない**。
 
 import FTCore

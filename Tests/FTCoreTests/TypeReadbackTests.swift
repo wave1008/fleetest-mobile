@@ -16,7 +16,7 @@ final class TypeReadbackTests: XCTestCase {
     }
 
     func testPlanResendsOnlyTheMissingSuffix() {
-        // 実測の取りこぼしの形: 毎周 6 割前後しか入らない(docs/verification.md)
+        // 実測の取りこぼしの形: 毎周 6 割前後しか入らない(docs/verification/)
         XCTAssertEqual(TypeReadback.plan(expected: "hello123", actual: "hel"),
                        .resend("lo123"))
         // 1文字も入らなかった周(空文字は「未入力」であって「読めない」ではない)

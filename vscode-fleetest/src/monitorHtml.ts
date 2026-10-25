@@ -363,7 +363,7 @@ function renderDevicesPanel(): string {
            **title/aria-label は webview 側(deviceTiles.js)が入れる** —— 押すたびに
            「すべて選択」⇄「すべて解除」で入れ替わるので、静的 HTML に置くと二重管理になる。 -->
     </div>
-    <!-- run ボード(フリート横断の実行状況。docs/design.md §18)。ツールバー直下・ラインビューの上
+    <!-- run ボード(フリート横断の実行状況。DS-18)。ツールバー直下・ラインビューの上
          (グリッド表示中も進捗が見えることを優先。ユーザー決定)。run 0本でもヘッダは残す
          (main.js の 'monitorRuns'/'runBoardReset'/'runBoardCollapsed' ケースが runBoard.js へ渡す)。 -->
     <div id="run-board" class="run-board">
@@ -964,7 +964,7 @@ function renderSettingsPanel(): string {
         <div class="settings-hint">${t("panels.settings.pollingModeHint")}</div>
       </div>
       <!-- 実体は CLI のホスト登録簿("fleetest api remote-machines")。ここはもう1つの操作口
-           (docs/remote-runner.md §12)。ホスト一覧(#settings-remote-hosts-body)は行数が可変のため
+           (RR-12)。ホスト一覧(#settings-remote-hosts-body)は行数が可変のため
            settingsTab.js が動的に組み立てる。「追加」で足した行は name/host が埋まって行内の
            「確定」ボタンを押すまで CLI へ送らない(未確定のまま送ると空の name を CLI が拒否し、
            失敗経路が旧一覧を再送して行が消える)。
@@ -1103,7 +1103,7 @@ function renderDeviceAddOverlay(): string {
     <div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="device-add-title">
       <div class="modal-title device-pick-title-row">
         <span id="device-add-title">${t("panels.deviceAdd.title")}</span>
-        <!-- どのホストから作成するかを常時表示(§13 段2。黙って別マシンを操作しない)。このダイアログは
+        <!-- どのホストから作成するかを常時表示(RR-13 段2。黙って別マシンを操作しない)。このダイアログは
              常に #device-pick-overlay の中から開くので、読み取り専用でその時点の選択(host select)を
              映すだけ(devicePickMachine.js の refreshDeviceAddBadge)。 -->
         <span id="device-add-source-badge" class="modal-hint"></span>

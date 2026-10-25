@@ -1,7 +1,7 @@
 // FM によるロケータ自己修復(FM ヒール)とヒールキャッシュは 2026-09-15 に撤去した(ユーザー決定。
-// docs/maintainer-notes.md §22)。採用門(自己申告 confidence == "high")が実測で1度も開かず(0/272・
+// MN-22)。採用門(自己申告 confidence == "high")が実測で1度も開かず(0/272・
 // E2E の witness は全 run で却下)、confidence は正誤と相関しなかった。修復はロケータの指紋照合だけが担う。
-// 戻すなら、§21 と同じ手順で誤りの率を測ってから。
+// 戻すなら、MN-21 と同じ手順で誤りの率を測ってから。
 
 import XCTest
 
@@ -25,6 +25,6 @@ final class FMHealRemovedTests: XCTestCase {
             }
         }
         XCTAssertGreaterThan(scanned, 100, "走査が Sources に届いていない")
-        XCTAssertEqual(hits, [], "FM ヒールかヒールキャッシュが戻っている(§21 の測り方で誤りの率を測ってから)")
+        XCTAssertEqual(hits, [], "FM ヒールかヒールキャッシュが戻っている(MN-21 の測り方で誤りの率を測ってから)")
     }
 }

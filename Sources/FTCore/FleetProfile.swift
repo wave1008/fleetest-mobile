@@ -1,13 +1,13 @@
 // FleetProfile.swift
-// フリート定義(TestProjects/<project>/profiles/fleets/<name>.json。docs/remote-runner.md
-// §13「フリート実行」)。ssh・プロセス起動はここに置かない(呼び出し側 =
+// フリート定義(TestProjects/<project>/profiles/fleets/<name>.json。docs/remote-runner/
+// RR-13「フリート実行」)。ssh・プロセス起動はここに置かない(呼び出し側 =
 // Sources/fleetest/FleetRunner.swift)。ここは読み込み・検証・exit code 集約だけの純粋関数。
 
 import Foundation
 
 /// フリートの1エントリ。`host` は "local"(予約語)か RemoteHostRegistry の登録名のみ ——
 /// 生の ssh 宛先(user@host)は受け付けない。プロジェクト資産(git 管理)に ssh の実体を
-/// 混ぜないため(§13「実行プロファイルに host は埋めない」と同じ理由)。登録名かどうかの
+/// 混ぜないため(RR-13「実行プロファイルに host は埋めない」と同じ理由)。登録名かどうかの
 /// 判定は validate(_:project:registeredHostNames:) 側で行う(ここは形だけを保持する)
 public struct FleetRunEntry: Codable, Equatable, Sendable {
     public let host: String
@@ -62,7 +62,7 @@ public enum FleetValidationIssue: Equatable, Sendable, CustomStringConvertible {
             return "fleet has no \"runs\""
         case .duplicateHost(let host):
             return "duplicate entry for host \"\(host)\""
-                + " (dispatching to both fights over the same devices; docs/remote-runner.md §13)"
+                + " (dispatching to both fights over the same devices; RR-13)"
         case .unregisteredHost(let host):
             return "host \"\(host)\" is neither \"local\" nor a registered host"
                 + " (register it with: fleetest remote machines add \(host) --host <user@host>;"

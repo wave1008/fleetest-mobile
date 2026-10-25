@@ -75,7 +75,7 @@ final class RemoteMonitorFanoutIDTests: XCTestCase {
     }
 
     /// 占有(monitorLock)も**マシン名は親が埋める**。埋め忘れると拡張がどの機械の占有か分からず、
-    /// 配信の退避も占有表示も効かない(§18.2 M2)
+    /// 配信の退避も占有表示も効かない(RR-18.2 M2)
     func testLockLineGetsTheMachineStamped() {
         let relayed = LockedBox<[String]>([])
         let fanout = RemoteMonitorFanout(machines: ["M1Ultra"], project: "P", profile: nil,
@@ -137,7 +137,7 @@ final class RemoteMonitorFanoutIDTests: XCTestCase {
         XCTAssertTrue(line.contains(#""machine":"M1Ultra""#), line)
     }
 
-    /// フリート横断の run 進捗(monitorRuns)も**マシン名は親が埋める**(docs/design.md §18.2)。
+    /// フリート横断の run 進捗(monitorRuns)も**マシン名は親が埋める**(DS-18.2)。
     /// 埋め忘れると、子は "local" を名乗ったまま届くので拡張が手元のタイルへ誤って重ねる
     func testRunsLineGetsTheMachineStamped() {
         let relayed = LockedBox<[String]>([])

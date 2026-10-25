@@ -239,7 +239,7 @@ export const panelsStrings = {
   },
   "panels.appProfile.packageNamePlaceholder": { ja: "パッケージ名", en: "Package name" },
 
-  // 実行プロファイル節のデバイス一覧に添える「デバイスを追加」ボタン(§13 段2 と同じ位置付け)。
+  // 実行プロファイル節のデバイス一覧に添える「デバイスを追加」ボタン(RR-13 段2 と同じ位置付け)。
   "panels.runProfile.addDevicesLabel": { ja: "デバイスを追加", en: "Add devices" },
   "panels.runProfile.addExistingTitle": {
     ja: "インストール済みのシミュレータ/AVD・接続中の実機からこの実行プロファイルに追加",
@@ -291,7 +291,7 @@ export const panelsStrings = {
   "panels.settings.languageJa": { ja: "日本語", en: "日本語" },
   "panels.settings.languageEn": { ja: "English", en: "English" },
 
-  // docs/remote-runner.md §12。実体は CLI のホスト登録簿(`fleetest api remote-machines`)、
+  // RR-12。実体は CLI のホスト登録簿(`fleetest api remote-machines`)、
   // このタブはもう1つの操作口。行内容(削除ボタン)は settingsTab.js が動的生成するため
   // webview 側辞書(i18n/strings/webviewMonitorB.ts の wvMonitor2.remote.*)を使う。
   // ここは静的ラベルのみ。
@@ -311,7 +311,7 @@ export const panelsStrings = {
   "panels.settings.remoteHostsAdd": { ja: "リモートホストを追加", en: "Add remote host" },
 
   // 順番待ち(fleetest.remoteWaitLock → api run --wait-lock)。ランナーは機械ごとに直列化される。
-  // **「奪う」(--force-lock)の語は出さない** —— GUI に導線を作らない(docs/remote-runner.md §18.7)
+  // **「奪う」(--force-lock)の語は出さない** —— GUI に導線を作らない(RR-18.7)
   "panels.settings.remoteWaitLockLabel": {
     ja: "ランナー競合時の最大待機時間",
     en: "Max wait on runner contention",
@@ -343,12 +343,12 @@ export const panelsStrings = {
   "panels.settings.cleanupReportsLabel": { ja: "レポートの上限(reports)", en: "Limit for reports (reports)" },
   "panels.settings.cleanupLogsLabel": { ja: "ログの上限(*.log)", en: "Limit for logs (*.log)" },
   // 生きているブリッジぶんの束は消せない(guarded)ので、この上限は「保持量を抑える線」ではなく
-  // 「立てっぱなしに気付かせる線」。docs/results-json.md §保持容量
+  // 「立てっぱなしに気付かせる線」。docs/results-json.md 「保持容量」
   "panels.settings.cleanupXcresultLabel": {
     ja: "ブリッジ診断ログの上限(*.xcresult)",
     en: "Limit for bridge diagnostics (*.xcresult)",
   },
-  // 上限の各行のツールチップ(label の title)。中身の定義は docs/results-json.md §保持容量
+  // 上限の各行のツールチップ(label の title)。中身の定義は docs/results-json.md 「保持容量」
   "panels.settings.cleanupDeviceCapturesTooltip": {
     ja: "Simulator の中に XCUITest が自動で残す録画・スクリーンショットです。",
     en: "Recordings and screenshots XCUITest leaves inside the Simulator.",

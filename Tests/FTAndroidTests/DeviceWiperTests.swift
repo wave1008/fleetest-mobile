@@ -98,8 +98,8 @@ final class DeviceWiperTests: XCTestCase {
                         "AppleLocale", "-string", "ja_JP"])
     }
 
-    // MARK: - Android の run-lease 判定(消す前に他人の run を殺さない。docs/remote-runner.md
-    // §18.7 規律④)。simctl/adb/実エミュレータには触れず、一時ディレクトリの RunLease.write で
+    // MARK: - Android の run-lease 判定(消す前に他人の run を殺さない。docs/remote-runner/
+    // RR-18.7 規律④)。simctl/adb/実エミュレータには触れず、一時ディレクトリの RunLease.write で
     // 偽の保持者を作って確かめる(DeviceBooterStopRefusalTests と同じ作法)。
 
     private func makeStateDir() -> URL {

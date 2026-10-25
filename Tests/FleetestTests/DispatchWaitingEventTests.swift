@@ -114,7 +114,7 @@ final class DispatchWaitingEventTests: XCTestCase {
     }
 
     /// **手元のロックを取る経路を全数で仕分ける**(入口だけ見ると fan-out の経路が漏れる —— 実際に
-    /// 複数機械の api run だけが無言で待っていた。maintainer-notes §62.4)。`LocalDispatchLock(` を作る
+    /// 複数機械の api run だけが無言で待っていた。MN-62.4)。`LocalDispatchLock(` を作る
     /// ファイルの集合を等号で固定し、api run 側は出し口を渡す・run 側は渡さない・両方から呼ばれる
     /// `DispatchPrelock` は mode で出し分ける
     func testEveryLocalLockConstructionIsClassified() throws {

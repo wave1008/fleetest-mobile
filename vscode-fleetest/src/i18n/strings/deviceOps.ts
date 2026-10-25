@@ -271,7 +271,7 @@ export const deviceOpsStrings = {
     en: "Failed to parse {cmd} output: {error}",
   },
   "deviceOps.cmdOutputInvalid": { ja: "{cmd} の出力形式が不正です。", en: "{cmd} output format is invalid." },
-  // §13 段2「マシン」セレクタ: リモート実行時のエラーへマシン名を付記する(withSourceContext)。
+  // RR-13 段2「マシン」セレクタ: リモート実行時のエラーへマシン名を付記する(withSourceContext)。
   "deviceOps.remoteMachineSuffix": { ja: "{message}(マシン: {machine})", en: "{message} (machine: {machine})" },
   "deviceOps.createRemoteConfirmMessage": {
     ja: "「{name}」を {machine} 上に作成します。よろしいですか?",

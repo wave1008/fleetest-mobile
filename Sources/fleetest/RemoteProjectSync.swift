@@ -76,7 +76,7 @@ enum RemoteProjectSync {
 
     /// 実行中の fleetest バイナリ自身(FleetRunner.selfBinaryPath と同じ理由・同じ実装)。
     /// 子は必ず `remote exec` 経由で起こすので、ssh の張り方・PATH 補正・ホスト解決を
-    /// そこへ委ねられる(専用の ssh 経路を新設しない = docs/remote-runner.md §14)
+    /// そこへ委ねられる(専用の ssh 経路を新設しない = RR-14)
     static func selfBinaryPath() -> String {
         if let url = ExecutablePath.current {
             return url.path

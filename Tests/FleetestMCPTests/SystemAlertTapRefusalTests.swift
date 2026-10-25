@@ -3,7 +3,7 @@
 //   アラートだけは毎回聞く(使い回すと、権限を要求するボタンを叩いた後の操作で黙る)
 // ②断る。どちらのブリッジでも操作は届き(in-app は背面のアプリが反応・XCUITest は XCTest がアラートの
 //   ボタンを押す)、起きることをブリッジごとに言う ③SpringBoard に attach している間は断らない
-// ④ref を座標へ畳む double_tap / drag / pinch(`verifiedElement`)も同じ門(§19 A4)
+// ④ref を座標へ畳む double_tap / drag / pinch(`verifiedElement`)も同じ門
 // ⑤照会そのものが失敗したら断らずに撃つが、確かめていないことを注記に残す(P2 の MCP 側)
 
 import XCTest
@@ -134,7 +134,7 @@ final class SystemAlertTapRefusalTests: XCTestCase {
         XCTAssertEqual(taps.count, 1, "\(driver.calls)")
     }
 
-    // MARK: - ref なし ft_type が「焦点が無い」で失敗したとき(§19.3 M10)
+    // MARK: - ref なし ft_type が「焦点が無い」で失敗したとき
 
     /// **本命**: ref を渡さない ft_type がドライバの失敗(=「焦点が無い」相当)で落ちたとき、
     /// 前面にシステムアラートが出ていれば、それを可能性の高い原因として名指しする

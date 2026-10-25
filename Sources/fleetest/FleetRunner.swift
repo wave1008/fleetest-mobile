@@ -1,5 +1,5 @@
 // FleetRunner.swift
-// `fleetest run --fleet <name>`(docs/remote-runner.md §13「フリート実行」)。
+// `fleetest run --fleet <name>`(RR-13「フリート実行」)。
 // 各エントリを、この fleetest バイナリ自身の子プロセスとして並行に起動する
 // ("local" → `fleetest run --profile <p> …` / それ以外 → `fleetest run --runner <h> --profile <p> …`)。
 // **子プロセス方式にする理由**: ローカル実行の出力は ProfileRunner 等の深い階層から直接
@@ -51,7 +51,7 @@ enum FleetRunner {
         try preflightFolders(folders, project: project, fleetName: fleetName)
 
         // --junit: 各エントリの子プロセスへ一時パスの --junit を渡し、全エントリ終了後に
-        // FTCore.JUnitMerge で1本へ結合する(docs/remote-runner.md §8)。--split でも同じ
+        // FTCore.JUnitMerge で1本へ結合する(RR-8)。--split でも同じ
         // 仕組みを使うため一時ディレクトリの生成・削除はここで一度だけ行う
         let junitTempDir = try makeJUnitTempDir(requested: junit)
         defer { if let junitTempDir { try? FileManager.default.removeItem(at: junitTempDir) } }
@@ -131,7 +131,7 @@ enum FleetRunner {
         return FleetProfile.aggregateExitCode(outcomes.map(\.exitCode))
     }
 
-    // MARK: - split(docs/remote-runner.md §8「シナリオバッチを複数 Mac に割り当てる」)
+    // MARK: - split(RR-8「シナリオバッチを複数 Mac に割り当てる」)
 
     /// **実績が無いシナリオの見積り**: このプロジェクトの既知シナリオの中央値を使う。
     /// プロジェクトごとに実行速度が大きく違うため、固定の秒数は使わない
@@ -173,7 +173,7 @@ enum FleetRunner {
         }
         guard !selected.isEmpty else {
             throw ValidationError("--split has 0 scenarios to distribute after filtering"
-                + " (docs/remote-runner.md §8)")
+                + " (RR-8)")
         }
 
         let entryPlatforms = try fleet.runs.map { try resolveEntryPlatforms($0, project: project) }
@@ -287,7 +287,7 @@ enum FleetRunner {
     /// エントリが走らせられる platform 集合を、実際の run と同じ規則(ProfileResolver.resolve)で
     /// 求める。**実行プロファイルはプロジェクト資産(git 管理)で、実行のたびにリモートへ
     /// 転送される**ので、リモートエントリでも SSH せずローカルの clone から解決できる
-    /// (docs/remote-runner.md §8)
+    /// (RR-8)
     private static func resolveEntryPlatforms(
         _ entry: FleetRunEntry, project: TestProject
     ) throws -> Set<String> {
@@ -298,7 +298,7 @@ enum FleetRunner {
     /// エントリごとの machine 識別子と固定オフセット(ディスパッチ経路の平均秒 × 1000)。
     /// facts はディスパッチのたびに RemoteRunDispatcher が書く。初回(キャッシュ無し)は
     /// machine=nil・offset=0 で FleetSplit.MachineContext が単純な混合見積りへ退化する。
-    /// **entryFallbackFactors**(§8): 実績が無い機械の事前係数(コア数の逆比、単位なし)。
+    /// **entryFallbackFactors**(RR-8): 実績が無い機械の事前係数(コア数の逆比、単位なし)。
     /// FleetSplit の優先順は 同一機実績 → 実測係数(speedFactors=共通観測)→ この事前係数 なので、
     /// 観測が貯まり次第そちらへ自然に置き換わる。基準はローカル機(混合中央値の実績は主に
     /// ローカルに貯まるため、ローカルを 1.0 として相対化するのが最も実績と整合する)
@@ -449,7 +449,7 @@ enum FleetRunner {
             "none of the --folder names exist in \(project.name) "
             + "(\(folders.joined(separator: ", "))); available: \(availableText)."
             + " Every entry of fleet \"\(fleetName)\" would have 0 scenarios; aborting before dispatch"
-            + " (docs/remote-runner.md §13)")
+            + " (RR-13)")
     }
 
     // MARK: - subprocess
@@ -509,7 +509,7 @@ enum FleetRunner {
         return args
     }
 
-    // MARK: - --junit の集約(docs/remote-runner.md §8)
+    // MARK: - --junit の集約(RR-8)
 
     /// エントリごとの一時 --junit 出力を集める作業ディレクトリ。junit が指定されていなければ nil
     /// (通常の --fleet の挙動を変えない)

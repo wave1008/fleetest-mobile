@@ -55,7 +55,7 @@ public struct Sel: Sendable, Equatable {
     var fallbacks: [FlowLocator]
     /// 組み立て時に見つかった誤り(1オリジンでない序数など)。**最初の1件だけ**保持し、
     /// 実行前に失敗ステップとして落とす(`FTRuntime.perform`)。**crash させない**のは
-    /// 1プロセス=1シナリオでプロセスを落とすとレポートごと消えるため(design.md §10)。
+    /// 1プロセス=1シナリオでプロセスを落とすとレポートごと消えるため(DS-10)。
     /// 文字列版が `[0]` を validationError で落とすのと同じ扱いに揃える
     var invalidReason: String?
 

@@ -41,7 +41,7 @@ public enum StartingRunnerVerdict: Equatable {
     ///   測れなければ elapsed だけで決める
     /// - simulatorBooted: 対象がシミュレータで Shutdown なら、ランナーが起動中であるはずがない(xcodebuild は
     ///   ブートを待つ側で、落とされたデバイスに張り付いたランナーは二度と announce しない)。**待たずに起動し直す**
-    ///   (実測: 落としたデバイスの引き取りが 180 秒待ってから起動し直していた。台帳 §19.25)
+    ///   (実測: 落としたデバイスの引き取りが 180 秒待ってから起動し直していた)
     public static func decide(elapsed: TimeInterval?, quietFor: TimeInterval? = nil,
                               simulatorBooted: Bool = true,
                               budget: TimeInterval) -> StartingRunnerVerdict {

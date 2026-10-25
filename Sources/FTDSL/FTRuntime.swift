@@ -594,7 +594,7 @@ public final class FTDriveCore {
         // DSL の経路では実質発火しない(executor 既定の occlusionGuard は常に false)ため、
         // ここで実行プロファイルのマスタースイッチだけを見て頼む。off のときは compileModelIfNeeded
         // 自身が no-op(occlusionOCRResolvedMode の doc)。**dry-run では頼まない**(ガードを撃たない。
-        // 短命なので途中で捨てた上にキャッシュの 1 モデルを上書きし、次の run に払い直させる = performance-tuning §3.33)
+        // 短命なので途中で捨てた上にキャッシュの 1 モデルを上書きし、次の run に払い直させる = PT-3.33)
         if !dryRun, ScenarioHost.ocrCompileNeeded(fmTextVisibilityCheck: fmTextVisibilityCheckEnabled,
                                                   ocrTextVisibilityCheck: occlusionOCREnabled) {
             RegionText.compileModelIfNeeded(mode: occlusionOCRResolvedMode)
@@ -996,7 +996,7 @@ public final class FTDriveCore {
                    readyUpdateForPreviousStep: outcome?.readyUpdateForPreviousStep,
                    opensReadyObservation: outcome?.opensReadyObservation ?? false,
                    // 画像の判定(分類器・existImage)・リンク文字の OCR で落ちたときだけ入る(StepOutcome.evidenceImage)。
-                   // ラベルはファイル名に入って 24 文字で切られる(docs/design.md の該当節)
+                   // ラベルはファイル名に入って 24 文字で切られる(docs/design/ の該当節)
                    screenshotData: outcome?.evidenceImage,
                    screenshotLabel: outcome?.evidenceImage == nil ? nil
                        : step.action == "existImage" ? "judged-by-findImage"

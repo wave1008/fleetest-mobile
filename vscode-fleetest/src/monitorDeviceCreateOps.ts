@@ -84,7 +84,7 @@ export class MonitorDeviceCreateOps {
   /**
    * `fleetest api create-device` を短命プロセスとして実行する(デバイス追加モーダルの OK)。
    * creatingDevice による多重実行防止(モーダル側のボタン無効化に加えた保険)。source が remote
-   * なら、実行環境を変え得る破壊的操作として先にホスト側 modal 確認を挟む(§13。照会系の
+   * なら、実行環境を変え得る破壊的操作として先にホスト側 modal 確認を挟む(RR-13。照会系の
    * device-catalog/installed-devices は確認不要)。確認を待つ間も多重実行防止は効かせる
    * (creatingDevice を確認前に true にする)。
    */
@@ -101,7 +101,7 @@ export class MonitorDeviceCreateOps {
     }
     this.creatingDevice = true;
     // ダウンロードが要る OS バージョンを選んだ場合は、上書き/リモートの確認とは統合した
-    // 1枚のモーダル(ライセンス同意)だけを出す(2枚続けて出さない。§13の規律と同じ)。
+    // 1枚のモーダル(ライセンス同意)だけを出す(2枚続けて出さない。RR-13の規律と同じ)。
     if (msg.installSystemImage) {
       void this.confirmAndInstallThenCreate(msg, msg.installSystemImage);
       return;
@@ -296,7 +296,7 @@ export class MonitorDeviceCreateOps {
     return { created, failed };
   }
 
-  /** リモート作成の modal 確認(§11・§13 と同じ showWarningMessage({modal:true}) 方式。
+  /** リモート作成の modal 確認(RR-11・RR-13 と同じ showWarningMessage({modal:true}) 方式。
    * webview の window.confirm は効かないため必ずホスト側で行う)。 */
   private async confirmAndSpawnCreateDevice(msg: CreateDeviceMessage, machine: string | null): Promise<void> {
     const overwrite = msg.overwrite === true;
@@ -329,7 +329,7 @@ export class MonitorDeviceCreateOps {
   /**
    * ダウンロードが要る Android OS バージョンを選んだときの「デバイスを追加」OK(runCreateDevice から)。
    * **確認は1枚だけ**(上書き・リモートの確認とは統合する。confirmAndSpawnCreateDevice を分岐で
-   * 使い分けない — 2枚続けて聞かない §13の規律)。同意を得てから
+   * 使い分けない — 2枚続けて聞かない RR-13の規律)。同意を得てから
    * `install-system-image` を実行し、成功したときだけ通常の spawnCreateDevice へ進む。
    */
   private async confirmAndInstallThenCreate(
@@ -452,7 +452,7 @@ export class MonitorDeviceCreateOps {
    * msg.register が false、または source が remote のときは `--no-register` を付与し物理作成のみ
    * 行う(実行プロファイルには追記しない)。remote は register の値によらず強制する ——
    * リモート側に登録してもプロファイルの正はローカルで、次回ディスパッチの rsync --delete で
-   * 消えるため(§13)。作成した1台は #device-pick-overlay の再取得→チェック→OK
+   * 消えるため(RR-13)。作成した1台は #device-pick-overlay の再取得→チェック→OK
    * (runProfileDevicesSync。常にローカルへ書く既存経路)にそのまま乗せてローカル登録する。
    */
   private spawnCreateDevice(msg: CreateDeviceMessage, onResult?: CreateDeviceOutcomeHandler): void {
@@ -729,7 +729,7 @@ export class MonitorDeviceCreateOps {
    * #device-pick-overlay の行右クリック「削除」: `fleetest api delete-device` を実行し、ホスト上の
    * 実体(シミュレータ/AVD)を消す(runProfileDeviceRemove のプロファイル除去とは別物。本体は残さない)。
    * 破壊的・不可逆な操作なので、ローカル/リモートどちらでも必ずホスト側 modal 確認を挟む
-   * (§13・runCreateDevice のリモート確認と同じ showWarningMessage({modal:true}) 方式だが、
+   * (RR-13・runCreateDevice のリモート確認と同じ showWarningMessage({modal:true}) 方式だが、
    * こちらは常に確認する — create と違い「作るだけ」ではなく実体を消すため)。
    */
   async runDeleteDevice(msg: DevicePickDeviceDeleteMessage): Promise<void> {

@@ -57,7 +57,7 @@ final class WorkspaceAppStagingTests: XCTestCase {
     /// **repoRoot(workspaceRoot の絶対パスの前置き)が違っても、同じ declared 文字列なら
     /// 同じ相対ステージ先になる** —— ワークスペースは rsync でホスト間を丸ごと運ばれる複製で、
     /// リモートの子はローカルとは違う repoRoot から自分自身の workspaceRoot を組み立てる
-    /// (docs/remote-runner.md §17)。名前空間が絶対パス由来だとここで食い違う
+    /// (RR-17)。名前空間が絶対パス由来だとここで食い違う
     func testInstallPathRelativeSuffixIsStableAcrossDifferentWorkspaceRoots() {
         let localWorkspace = URL(fileURLWithPath: "/Users/local/github/foundation-tester/TestProjects/E2E-iOS/workspace")
         let remoteWorkspace = URL(fileURLWithPath: "/Users/runner/fleetest-runner/work/TestProjects/E2E-iOS/workspace")
@@ -180,7 +180,7 @@ final class WorkspaceAppStagingTests: XCTestCase {
     }
 
     /// 原本が無くても複製が既にあれば何もしない(リモートの子は rsync で複製だけを受け取り
-    /// 原本を持たない。docs/remote-runner.md §17。ここで常にエラーにすると、この機構が解決した
+    /// 原本を持たない。RR-17。ここで常にエラーにすると、この機構が解決した
     /// 「リモートで appPath が見つからない」問題へ逆戻りする)
     func testStageAppIsNoOpWhenSourceMissingButDestAlreadyStaged() throws {
         let source = tempDir.appendingPathComponent("missing/SampleApp.app").path

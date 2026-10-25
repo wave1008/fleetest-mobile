@@ -370,7 +370,7 @@ public enum FlickKind: String, Codable, Sendable, CaseIterable {
 ///
 /// **これらは `scrollFrame` を明示したときの値**。未指定のとき(ブリッジ側の軸別既定)には
 /// 影響しない —— 全画面固定のままスパンを広げると始点がスクロール領域の外に出て
-/// 1ミリも動かない(docs/performance-tuning.md §3.16 の実害)。
+/// 1ミリも動かない(PT-3.16 の実害)。
 public enum FTScrollDefaults {
     public static func startMarginRatio(intent: FTSwipeIntent, vertical: Bool) -> Double {
         margin(intent: intent, vertical: vertical)

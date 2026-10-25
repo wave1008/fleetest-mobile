@@ -45,7 +45,7 @@ final class AndroidDriverAdbFailureTests: XCTestCase {
     }
 
     /// `ft_list_apps` に存在しない serial を渡すと、`pm list packages` の失敗出力(空・エラー文)が
-    /// 「0 app(s) installed」という成功扱いに畳まれていた(負荷テスト実測。§56.10 と同じ型)
+    /// 「0 app(s) installed」という成功扱いに畳まれていた(負荷テスト実測。MN-56.10 と同じ型)
     func testListInstalledPackagesThrowsWhenAdbFails() throws {
         let driver = AndroidDriver(serial: serial, adbPath: try fakeADB(
             "echo \"adb: device '$2' not found\" >&2; exit 1"))

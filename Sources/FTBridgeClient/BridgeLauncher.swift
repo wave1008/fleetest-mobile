@@ -45,7 +45,7 @@ public struct BridgeLauncher: Sendable {
     }
     /// **起動ごとに別名**(`bridge-<port>-<起動時刻ms>.xcresult`)。同名を使い回すと、前回の束が
     /// 残っていた/消した直後に書き戻された回に xcodebuild が `Existing file at -resultBundlePath` で
-    /// 1 秒で死ぬ(2 台で実測。台帳 §19.25)。古い束は startDetached が同じポートの
+    /// 1 秒で死ぬ(2 台で実測)。古い束は startDetached が同じポートの
     /// ぶんを掃く(`staleResultBundles`)ので溜まらない
     func resultBundlePath(stamp: String) -> URL {
         resultBundleDirectory.appendingPathComponent("bridge-\(port)-\(stamp).xcresult")
@@ -561,7 +561,7 @@ public struct BridgeLauncher: Sendable {
                 // **トンネルだけが残っている**(ブリッジは死に、実機の iproxy がポートを握ったまま)。
                 // 台帳(`iproxy-<port>.pid`)が既に消えているとここまで来るが、「起動していません」は
                 // 事実と食い違う —— このポートを名指しで止めに来た呼び手にとっては、その残骸こそが
-                // 止めたいもの(doctor の案内先もここ → maintainer-notes §46)
+                // 止めたいもの(doctor の案内先もここ → MN-46)
                 if PortHolder.stopTunnelHolder(port: port) {
                     ConsoleOut.err("stopped the leftover USB tunnel holding port \(port)"
                         + " (its bridge was already gone)")
@@ -588,7 +588,7 @@ public struct BridgeLauncher: Sendable {
     /// pid が今も「このポート専用の」FleetestRunner ランナーかを ps で確認する
     /// (stopAll/stopMatching/killOrphanRunners と同じ照合: このポート専用の xctestrun
     /// ファイル名をコマンドラインに含むか)。stop()/stopAndWait() の PID 再利用ガードに使う。
-    /// **TTL 自主終了(design.md §4.1)は pid ファイルを消せない** —— 放置された pid ファイルが
+    /// **TTL 自主終了(DS-4.1)は pid ファイルを消せない** —— 放置された pid ファイルが
     /// 指す番号は、数日後には無関係な新しいプロセスに再利用され得る。生存確認だけでは
     /// (`ProcessLiveness.isAlive`)区別できないので、コマンドラインまで見る。
     /// 判定本体は pure な isOurRunner(command:port:) に切り出し、ps 抜きでテストする
@@ -942,7 +942,7 @@ public struct BridgeLauncher: Sendable {
         return stopped
     }
 
-    /// 死んだランナーの pid ファイルを掃除する(停止はしない)。TTL 自主終了(design.md §4.1)は
+    /// 死んだランナーの pid ファイルを掃除する(停止はしない)。TTL 自主終了(DS-4.1)は
     /// ホスト側の pid ファイルを消せないため、放置すると assignPort がそのポートを使用中と
     /// みなし採番がドリフトする。provision のプランニング前(ProvisionLock 内)から呼ぶ
     public static func sweepStalePidFiles(repoRoot: URL) {

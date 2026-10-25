@@ -1,6 +1,6 @@
 // `fleetest api host-metrics-summary` の引数解釈と集計。
 // 「あの実行は CPU 律速だったか」を実行後に判定する唯一の口なので、集計が静かに間違うと
-// 性能判断そのものを誤らせる(docs/performance-tuning.md §4)。
+// 性能判断そのものを誤らせる(PT-4)。
 
 import XCTest
 @testable import fleetest

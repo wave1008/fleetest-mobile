@@ -1,5 +1,5 @@
 // VSCode拡張向け: マシン登録簿(LocalConfig.remoteHosts)の読み書き(fleetest api remote-machines)。
-// docs/remote-runner.md §13。stdout には結果 1 行の JSON だけを出す(診断は stderr のみ。
+// RR-13。stdout には結果 1 行の JSON だけを出す(診断は stderr のみ。
 // ApiCommands.swift と同じ流儀)。
 //
 // **拡張側と1:1の契約**: dir/machine は未設定でも常にキー自体は出し、値は空文字にする
@@ -15,7 +15,7 @@ struct ApiRemoteHostsCommand: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "remote-machines",
         abstract: "Read or update the machine registry (~/.config/fleetest/config.json) and print it as JSON"
-            + " on stdout (diagnostics on stderr only; docs/remote-runner.md §13)")
+            + " on stdout (diagnostics on stderr only; RR-13)")
 
     @Option(name: .customLong("import"),
             // ArgumentHelp は文字列リテラルからしか作れない(連結した String は渡せない)
@@ -134,7 +134,7 @@ struct ApiRemoteHostsCommand: AsyncParsableCommand {
     }
 
     /// **登録簿の JSON はこの1形だけ**(`remote machines list --json` も同じ口を通す。
-    /// 別形(`{"machines":[…]}` 等)を持つと拡張が読む契約と食い違う = §18 の残件)
+    /// 別形(`{"machines":[…]}` 等)を持つと拡張が読む契約と食い違う )
     static func emit(_ entries: [RemoteHostEntry]) {
         let config = LocalConfig.load()
         let output = ApiRemoteHostsOutput(

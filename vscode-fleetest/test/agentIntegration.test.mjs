@@ -86,11 +86,11 @@ test("ランナーの install 引数が docs と一致する(片方だけ変え�
     .map((m) => m[1])
     .filter((f) => f.startsWith("--skip") || f === "--no-next-steps");
   assert.ok(flags.length >= 3, `installArgs から抑止フラグを抽出できません: ${flags}`);
-  for (const doc of ["docs/remote-runner.md", "docs/remote-runner-setup.md"]) {
+  for (const doc of ["docs/remote-runner/14-16.md", "docs/remote-runner-setup.md"]) {
     const source = readFileSync(path.join(ROOT, doc), "utf8");
     const missing = flags.filter((f) => !source.includes(f));
     // --no-next-steps は setup 手順書には出ないので、そちらだけ緩める
-    const required = doc.endsWith("remote-runner.md") ? missing : missing.filter((f) => f !== "--no-next-steps");
+    const required = doc.endsWith("14-16.md") ? missing : missing.filter((f) => f !== "--no-next-steps");
     assert.deepEqual(required, [],
       `${doc} が installArgs の抑止フラグを載せていません: ${required.join(", ")}`);
   }

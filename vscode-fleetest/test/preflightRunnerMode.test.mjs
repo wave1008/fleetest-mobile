@@ -1,4 +1,4 @@
-// Scripts/preflight.sh --runner(ランナー機の前提判定。docs/remote-runner.md §5・§14)の契約検証。
+// Scripts/preflight.sh --runner(ランナー機の前提判定。RR-5・RR-14)の契約検証。
 //
 // 検証する契約:
 //   1. --runner の判定は読み取り専用(書き込み系コマンドを実行しない)。人間向けの助言文
@@ -74,7 +74,7 @@ test("--runner: 実行文に書き込み系コマンドが無い(読み取り専
       hit,
       undefined,
       `--runner の実行文に書き込み系コマンド(${pattern})が見つかりました: "${hit}"\n` +
-        "runner モードは読み取り専用の契約(docs/remote-runner.md §14「sudo/GUI が要る項目を実行しない」)。" +
+        "runner モードは読み取り専用の契約(RR-14「sudo/GUI が要る項目を実行しない」)。" +
         "助言文(runner_manual+=/kv/say の引数)なら operationalLines() のフィルタに追加すること。",
     );
   }

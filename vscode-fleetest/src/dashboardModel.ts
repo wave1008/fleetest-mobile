@@ -330,7 +330,7 @@ export interface ApiResultsPayload {
   readonly summary: readonly ScenarioSummaryRow[];
   /** 不安定度降順 */
   readonly flaky: readonly FlakyRow[];
-  /** デバイスの健全性(§4)。期間内に事象が1つも無いデバイスは含まれない(0件は空配列)。 */
+  /** デバイスの健全性。期間内に事象が1つも無いデバイスは含まれない(0件は空配列)。 */
   readonly deviceHealth: readonly DeviceHealthRow[];
   /** マシンの健全性。host 昇順。 */
   readonly machineHealth: readonly MachineHealthRow[];

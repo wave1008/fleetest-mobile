@@ -922,7 +922,7 @@ test("順番待ちの空欄・不正値は null(既定へ戻す)を送り、入�
   }
 });
 
-// 走っている他人の run を殺せる導線は GUI に出さない(ユーザー決定。docs/remote-runner.md §18.7)
+// 走っている他人の run を殺せる導線は GUI に出さない(ユーザー決定。RR-18.7)
 test("順番待ちの隣に「奪う」導線を出さない", (t) => {
   const { window, document } = createWebview();
   t.after(() => window.close());

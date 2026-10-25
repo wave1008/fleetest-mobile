@@ -1,4 +1,4 @@
-// `--runner` 登録簿(docs/remote-runner.md §13)の純粋ロジック。
+// `--runner` 登録簿(RR-13)の純粋ロジック。
 // ssh/ファイル I/O は Sources/fleetest/RemoteCommands.swift の RemoteHostResolver 側(e2e に残す)。
 
 import Foundation

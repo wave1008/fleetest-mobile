@@ -73,7 +73,7 @@ final class MCPActionWaitForTests: XCTestCase {
         let text = bodyText(content)
         XCTAssertTrue(text.contains("tap (1.0, 2.0) done"), text)
         XCTAssertTrue(text.contains("waitFor requires snapshotAfter: true"), text)
-        // 待っていない(tap の後に snapshot が積まれない。tap の前の1枚は座標の範囲判定 = §19 M4)
+        // 待っていない(tap の後に snapshot が積まれない。tap の前の1枚は座標の範囲判定 )
         let tapIndex = try XCTUnwrap(driver.calls.firstIndex { $0.hasPrefix("tap(") })
         XCTAssertFalse(driver.calls[(tapIndex + 1)...].contains("snapshot"), "\(driver.calls)")
     }

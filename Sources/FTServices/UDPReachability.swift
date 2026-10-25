@@ -1,4 +1,4 @@
-// UDP の経路の確認の純粋な部分(docs/remote-runner.md §17「UDP の経路の確認」)。
+// UDP の経路の確認の純粋な部分(RR-17「UDP の経路の確認」)。
 // ソケットの送受信・エコーの起動は呼び手(ServicesSession)。ここはファイル・時刻・乱数・ソケットに触れない。
 
 import Foundation

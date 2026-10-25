@@ -54,7 +54,7 @@ final class ClippingContainerScrollableTests: XCTestCase {
         XCTAssertTrue(StepExecutor.isClippedByViewport(target, screen: viewport))
     }
 
-    /// **縦リストの退行**(2026-08-28・iOS xcuitest 限定。maintainer-notes §4.5.1)。
+    /// **縦リストの退行**(2026-08-28・iOS xcuitest 限定。MN-4.5.1)。
     /// 行の容器 `#list_rows` は scrollable を申告せず、**外側の全画面 scrollView だけ**が申告する。
     /// 申告を無条件で優先すると容器が画面全体になり、慣性で動いている最中の見切れ・整定判定が
     /// 効かなくなって、行を移動前の座標で撃つ(`selected=-`)。

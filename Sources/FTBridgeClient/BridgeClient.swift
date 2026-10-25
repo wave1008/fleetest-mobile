@@ -63,7 +63,7 @@ public final class BridgeClient: AppDriver, Sendable {
     }
     /// **401 を受けたときに台帳の token を読み直す口**(既定 = `.fleetest/bridge-<port>.endpoint`)。
     /// ブリッジを起動し直すと token が変わり、init で固定した値のままでは以後すべて 401 で
-    /// 「接続断」とも扱われず戻れなかった(実機 iPhone 13・§19.3)。読み直して**1 回だけ**撃ち直す。
+    /// 「接続断」とも扱われず戻れなかった(実機 iPhone 13)。読み直して**1 回だけ**撃ち直す。
     /// テストは差し替えて注入する
     var tokenReloader: @Sendable () -> String? {
         get { mutable.withLock { $0.tokenReloader } }
@@ -1072,7 +1072,7 @@ public final class BridgeClient: AppDriver, Sendable {
     /// 1回の移動量がビューポート高を超えて要素を飛び越す)。iOS 側は未使用フィールドとして無視する。
     ///
     /// **`SwipeRequest.distance` は送らない**(= ブリッジの軸別既定 縦 0.4・横 0.6 のまま)。
-    /// 距離を広げてはいけない: スワイプは画面中央基準の全画面固定(design.md 承認済み差分)なので、
+    /// 距離を広げてはいけない: スワイプは画面中央基準の全画面固定(design/ 承認済み差分)なので、
     /// 0.8 にすると始点が y=画面の10% になり**スクロール領域の外から始まって1ミリも動かない**。
     /// 実際に踏んだ(scrollToBottom は始点がリスト内なので成功し、scrollToTop だけが
     /// 3 SUT とも row_29 で止まって直後の `exist "#row_01"` が落ちた)。速くするのはストロークだけ。
@@ -1083,7 +1083,7 @@ public final class BridgeClient: AppDriver, Sendable {
     /// 200ms を試したが、Android の Compose で慣性が出て
     /// **探索直後のタップが 9 行ずれた**(row_30 を狙って row_39)。
     /// 逆に 300ms のままだと Flutter/Android は負荷時に到達し損ねることがある ——
-    /// **どちらかに倒せるだけの較正が無い**ので現状維持(docs/performance-tuning.md §3.16 の
+    /// **どちらかに倒せるだけの較正が無い**ので現状維持(PT-3.16 の
     /// 「較正できるまで触らない」に従う)
     static func strokeMs(for intent: FTSwipeIntent, path: FTSwipePath?) -> Int? {
         intent == .edge ? edgeSwipeDurationMs : nil
@@ -1102,13 +1102,13 @@ public final class BridgeClient: AppDriver, Sendable {
     /// **2500 ではなく 1500**: 3設定×3周(交互)の実測で、scrollToTop の中央値はほぼ同じ
     /// (8,251 対 8,287ms)なのに**最悪ケースが 12.9s 対 18.5s**と差が付き、周ごとのばらつきも
     /// 小さかった。sum では 2500 が 8.8s 勝つ(壁時計 約1.1s/プロファイル)が、尾を引く挙動は
-    /// フレーク耐性の観点で割に合わない。詳細は docs/performance-tuning.md §3.17
+    /// フレーク耐性の観点で割に合わない。詳細は PT-3.17
     static let edgeSwipeVelocity = 1500.0
 
     /// 用途から velocity を決める。**探索では送らない**(既定速度のまま)。
     /// 慣性を消す狙いで v350 を試したが、**ブリッジを跨ぐと収束しなかった** ——
     /// iOS では刻み = 実移動量にできる一方、Android は速度ノブが無く(距離とストローク時間で
-    /// 決まる)同じ設計にできない。実測は docs/performance-tuning.md §3.18
+    /// 決まる)同じ設計にできない。実測は PT-3.18
     static func velocity(for intent: FTSwipeIntent, path: FTSwipePath?) -> Double? {
         intent == .edge ? edgeSwipeVelocity : nil
     }

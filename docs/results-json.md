@@ -99,7 +99,7 @@ guarded だけで線を超えていても**消せるものは全部消す**(線�
 guarded だけで上限を超えたときは他のカテゴリと同じく**事実を言う**(何が容量を占めているか・
 立てっぱなしのブリッジを落とせば消せること)。実機ブリッジや MCP セッションのように立てっぱなしに
 する使い方では 1 台あたり約 6 GB/日で伸び続ける。**VSCode 拡張が開いていれば、同じ条件で使われていない
-ブリッジを起動し直して束を孤児にし、この掃除に消させる**(docs/design.md §12.2「ブリッジ診断ログ(xcresult)の
+ブリッジを起動し直して束を孤児にし、この掃除に消させる**(DS-12.2「ブリッジ診断ログ(xcresult)の
 起動し直し」)。拡張を開いていない(CLI・MCP だけ)ときは今までどおり事実を言うだけ。
 
 **掃除が見る場所は2つ**(`RetentionSweeper.Roots`)。録画・レポート・`install.sh` のログは
@@ -173,7 +173,7 @@ jq -r 'select(.workerAnomalies == null) | .runID' results/runs/2026-08/*/run.jso
 
 **描画崩壊の検査**(iOS Simulator のみ)の失敗は、`description` が `screen rendering check (before launchApp | at the end of the scenario …)` の
 失敗ステップで、**`failureKind` も `command` も無い**(経路も DSL コマンドも言えない)。`detail` に事実(アプリの領域が一色 / N 個の文字要素のどれも描かれていない・
-1 秒あけた2枚のスクリーンショット・最後に描画を確認してから画面を見ずに通った検証 N 件の名前)だけが入る。設計は docs/design.md「描画崩壊の検査」。
+1 秒あけた2枚のスクリーンショット・最後に描画を確認してから画面を見ずに通った検証 N 件の名前)だけが入る。設計は docs/design/「描画崩壊の検査」。
 
 `not-found` は「画面が違う」と「セレクタが古い」を区別しない(どちらもこの経路)。
 そこの判断は読み手が持つ情報(直前のステップ・注記・host-metrics)と合わせて行う。
@@ -190,7 +190,7 @@ jq -r 'select(.workerAnomalies == null) | .runID' results/runs/2026-08/*/run.jso
 | 揃えるもの | なぜ | どうする |
 |---|---|---|
 | **run の本数** | デバッグ用の小さな run は**コードが半分直った状態**で回すので失敗率が桁違い(実測: 1〜2本の run は 18〜27%、30本+ の run は 0.5〜1.1%)。期間ごとに小さな run の比率が変わると、それだけで推移が動く | 30本+ の run だけを見る(下のレシピ) |
-| **シナリオの集合** | 追加・削除が多い(2026-07〜08 の E2E は `(project, platform, scenarioID)` 601 通りのうち、3期間すべてに登場するのは 80)。**新しい witness は開発中なので落ちて当たり前** | 比べる全期間に登場するものだけに絞る(名前で外す判断は docs/verification.md §フレークの集計は「調査由来の失敗」を除いてから読む) |
+| **シナリオの集合** | 追加・削除が多い(2026-07〜08 の E2E は `(project, platform, scenarioID)` 601 通りのうち、3期間すべてに登場するのは 80)。**新しい witness は開発中なので落ちて当たり前** | 比べる全期間に登場するものだけに絞る(名前で外す判断は docs/verification/ §フレークの集計は「調査由来の失敗」を除いてから読む) |
 | **標本数** | 1% のフレークは 40 回の実行では半分の確率で1度も現れない。**「フレークを示したシナリオ数」は実行回数が減るだけで下がる** | 期間ごとの最小回数へ間引いて再標本化する |
 | **デバイス構成** | `worker` の顔ぶれは黙って変わる。**小画面・旧 API のデバイスが1台入っただけで「Android が悪化した」に見える**(実例: `tap` が画面外のデバイスでだけ落ちた) | `worker` 別に割り、片方の期間にしか居ないデバイスは落とす |
 
@@ -256,8 +256,8 @@ tr '\n' '\0' < /tmp/suite.txt | xargs -0 \
 | runID | String | この run の ID |
 | project | String | プロジェクト名 |
 | profile | String? | 実行プロファイル名 |
-| host | String | **実行マシンのホスト名**(`FT_MACHINE` > hostname を sanitize したもの)。**LPT の同一マシン判定はこれ**。**マシン名(設定タブで付けたローカルエイリアス)は記録しない** —— エイリアスは頻繁に変わりうるので記録の鍵にしない(2026-08-26 ユーザー決定。用語は docs/remote-runner.md §0) |
-| toolchain | String? | **この run を実行した機械のツールチェーン指紋**(`xcodebuild -version` + iOS Simulator SDK のビルド。`FTCore.ToolchainFingerprint.current()`)。Xcode の無い機械(Android 専用のランナー等)では欠落。リモート実行でツールチェーンの混在(ベータ seed 違いは advisory で止めない。docs/remote-runner.md §7)を許すぶん、**その赤がどの機械の Xcode で出たかを run 横断で追うための事実** |
+| host | String | **実行マシンのホスト名**(`FT_MACHINE` > hostname を sanitize したもの)。**LPT の同一マシン判定はこれ**。**マシン名(設定タブで付けたローカルエイリアス)は記録しない** —— エイリアスは頻繁に変わりうるので記録の鍵にしない(2026-08-26 ユーザー決定。用語は RR-0) |
+| toolchain | String? | **この run を実行した機械のツールチェーン指紋**(`xcodebuild -version` + iOS Simulator SDK のビルド。`FTCore.ToolchainFingerprint.current()`)。Xcode の無い機械(Android 専用のランナー等)では欠落。リモート実行でツールチェーンの混在(ベータ seed 違いは advisory で止めない。RR-7)を許すぶん、**その赤がどの機械の Xcode で出たかを run 横断で追うための事実** |
 | trigger | String | `"api"`(拡張)/ `"cli"` |
 | pid | Int? | run を書いたプロセスの pid(`fleetest run` / `api run` 自身)。**同じ `host` でだけ意味を持つ**。insights の `unfinishedRuns` は、finishedAt の無い run のうち **同じ機械で pid がまだ生きているものを「実行中」として数えない**(2026-09-14 より前の記録には無く、その run は従来どおり未完了として数える) |
 | startedAt / finishedAt | String / String? | ISO8601。**finishedAt が無い = 未完了**(クラッシュ検出。`interrupted`/`abortReason` が付いた run は finishedAt を持つので、この判定には掛からない) |
@@ -466,7 +466,7 @@ kernelの`IODARTFamily` / `VM exhausted`を時刻で照合する。2008だけで
 | description | String | 人間可読なステップ説明(group の前置・注記の括弧書きを含む) |
 | command | String? | DSL のコマンド名。**`description` を割って作らないこと** |
 | failureKind | String? | 上表 |
-| notes | [String]? | `StepNote` の rawValue(`interruption-dismissed` / `settle-capped` / `visibility-guard-skipped` / `system-alert-present` 等。全部の定義は `Sources/FTCore/StepNote.swift`。occlusion-guard・OCR の近道に関わる `guard-retaken` / `ocr-budget-exhausted` / `ocr-compile-waited` / `ocr-compile-capped` / `ocr-shortcut-not-ready` / `ocr-shortcut-busy` の読み方は下の §TimelineStepRecord(`guardMs` / `ocrMs` の段)。`blank-screenshot`(テキストの可視性検証のスクショが下端の帯を除いて真っ黒 = 絵が撮れていない・表示の凍結。判定せずに素通りした)。`webview-capture-blank`(テキストの可視性検証の対象が WebView の内側にあり、木の上では覆われていないのに、その文字の領域が絵では一色だった = iOS のスクショが WebView の層を取り逃した。判定せずに素通りした。木に載らない覆いは見逃すので**率を見る注記**)。`ocr-read-what-fm-missed` / `fm-read-what-ocr-missed`(テキストの可視性検証で OCR と FM の判定が割れ、見えていると読めた側を採って緑にした。前者は FM が見えないと言い OCR が読めた回・後者はその逆。**率を見る注記**)。`fm-empty-transcript-on-ink`(テキストの可視性検証で FM が見えないと答え、転写が空なのに要素の領域に構造があった。判定は変えない。空の転写は FM の失敗に数えられないので、**率が上がったら FM が読める文字を取りこぼしている**(OCR の近道が撃てない機械ではそのまま誤った赤になる)。文字の無い装飾だけが描かれた回でも立つ)。`check-state-classified`(checkIsON / checkIsOFF の状態を CheckStateClassifier が要素の画像から判定した。a11y の報告ではない)。`check-state-classifier-failed`(見本画像はあるのに学習か読み込みに失敗し、a11y だけで判定した)。`vision-anomaly-retried`(findImage / findImages / existImage で Vision の異常を検知し、待って走査をやり直した。判定は変えない。**率が上がったら機械の GPU が混んでいる**)。`vision-helper-rescued`(同じ異常を検知した走査を、run が起こした長寿命の補助プロセスに特徴量を計算させてやり直し、補助の値が門を通って待たずに済んだ。**率が上がったら、シナリオのプロセスの Vision が負荷下の初期化で壊れる回が多い**)。`vision-helper-unavailable`(補助に頼もうとしたが無い・答えない・unhealthy で、既存の待ち直しへ落ちた。**立ち続けるなら補助が起動していない**)。`blank-screenshot-retaken`(findImage / findImages / existImage のスクショのアプリの領域が一色だったので、照合せずに待って撮り直した。戻らなければ失敗)。`settled-before-gesture`(flick・swipe・scroll の前に木の静止を待ち、待っている間に実際に木が動いた = 動いている最中か古い枠へ指を置いていた回)。`stale-ref-at-tap`(**`FT_STALE_TAP_PROBE=1` の測定のときだけ**: XCUITest の ref タップで、撃つ直前に撮り直した木に要素がもう控えた枠に居なかった。断らずに撃った = **判定は変えない**)。`stale-ref-retried`(ブリッジが ref の指す要素はもう同じ場所に居ないと撃たずに断り(422 `stale-ref`)、木を撮り直して引き直した。**判定は変えない**。緑の run でこの経路が働いた回を数える印)。`settled-after-launch`(起動直後の最初のロケータ操作の前に配置の静止を待ち、待っている間に実際に木が動いた = 待たなければずれる前の座標を撃っていた回)。`settled-after-keyboard`(直前の `type` がキーボードを出して画面が動いたので、次の操作の解決前に整定を待ち、**待っている間に実際に木が変わった**回だけ立つ。立たない = 待った時点で既に静止していた)。`settle-not-reached`(`waitForSettle(throwsException: false)` で、画面の画素か木が `waitSeconds` の上限まで止まらなかった。失敗にせず先へ進み、`false` を返した。注記の本文に、どちらの段で何秒変わり続けたかが載る。**`throwsException: true`(既定)の時間切れは注記でなくステップの失敗**で、`sel` の要素が見つからない失敗は `throwsException` によらず失敗。**率が上がったら、止まらない物(スピナー・シマー)が範囲に入っているか `quietSeconds` / `waitSeconds` が足りない**)。`keyboard-not-shown-after-type`(Android の `type` の後、ソフトキーボードが木に出るのを最大 1.5 秒待ったが出なかった。待ちをやめて従来どおり解決した。**率が上がったら上限不足かキーボードを出さない欄**)。`keyboard-appeared-late`(上の待ちを待ち切った後のロケータ操作の木でキーボードが出ていた = 上限不足の事例)。`acted-outside-container`(容器の外にあると判定した対象を、掴み直しと追加の送りを上限まで行っても外のまま操作した。**ステップは緑のまま**(設計どおり止めない)なので、後段の検証が無いシナリオではこれが「別の物に当たったかもしれない」唯一の痕跡)。`unchanged-tap-before-failure`(検証が失敗したとき、それより前のタップのうち画面を 1 ピクセルも変えなかったものを失敗文言で名指しした。**判定は変えない**。直前のタップだけでなく、tap が続いた場合は次のタップの時点で画面が変わっていなかった前のタップも名指しする。**iOS の木はアプリのプロセスだけ**なので、権限の要求など OS のアラートを出したタップも無変化に見える —— iOS の文言は「飲まれた」と言い切らずその可能性を併記する)。`inapp-tap-outside-hit-area`(iOS の in-app が ref タップで要素を直接撃ったが、撃った点 = 枠の中心で本物のタッチを受けるのは別の view だった。**判定は変えない**。XCUITest では同じタップが赤になり得る印)。`inapp-activation-point-off-centre`(iOS の in-app が SwiftUI / UIKit のアプリで UIView でない要素を activate で撃ったが、活性化の点が枠の外側 4 分の 1 にあり、枠の中心は押せる範囲の外だった。典型は文字の部分しか押せない SwiftUI の `.plain` の Button。**判定は変えない**)。`waited-for-presented-overlay`(React Native のアプリを XCUITest で押す前に、出てきたばかりのダイアログ・シートの表示の切り替え(0.55 秒)を待った。**判定は変えない**。払った回数を見る印)。`launch-activated-before-foreground`(xcuitest の高速起動で、起動させた後にランナーがアプリを前面と見ないまま activate を頼んだ。activate が通れば緑のまま。**ランナーごと落ちる手前**の印)。自己修復の注記は `heal-fingerprint-match`(指紋照合で解決)/ `heal-unwritable`(一致したが一意に書けるセレクタが無い)の2つ(2026-09-15 に FM ヒール関連の `heal-proposal-rejected` / `heal-answer-unresolved` / `heal-no-replacement` / `heal-confidence-injected` を撤去 → maintainer-notes §22)) |
+| notes | [String]? | `StepNote` の rawValue(`interruption-dismissed` / `settle-capped` / `visibility-guard-skipped` / `system-alert-present` 等。全部の定義は `Sources/FTCore/StepNote.swift`。occlusion-guard・OCR の近道に関わる `guard-retaken` / `ocr-budget-exhausted` / `ocr-compile-waited` / `ocr-compile-capped` / `ocr-shortcut-not-ready` / `ocr-shortcut-busy` の読み方は下の §TimelineStepRecord(`guardMs` / `ocrMs` の段)。`blank-screenshot`(テキストの可視性検証のスクショが下端の帯を除いて真っ黒 = 絵が撮れていない・表示の凍結。判定せずに素通りした)。`webview-capture-blank`(テキストの可視性検証の対象が WebView の内側にあり、木の上では覆われていないのに、その文字の領域が絵では一色だった = iOS のスクショが WebView の層を取り逃した。判定せずに素通りした。木に載らない覆いは見逃すので**率を見る注記**)。`ocr-read-what-fm-missed` / `fm-read-what-ocr-missed`(テキストの可視性検証で OCR と FM の判定が割れ、見えていると読めた側を採って緑にした。前者は FM が見えないと言い OCR が読めた回・後者はその逆。**率を見る注記**)。`fm-empty-transcript-on-ink`(テキストの可視性検証で FM が見えないと答え、転写が空なのに要素の領域に構造があった。判定は変えない。空の転写は FM の失敗に数えられないので、**率が上がったら FM が読める文字を取りこぼしている**(OCR の近道が撃てない機械ではそのまま誤った赤になる)。文字の無い装飾だけが描かれた回でも立つ)。`check-state-classified`(checkIsON / checkIsOFF の状態を CheckStateClassifier が要素の画像から判定した。a11y の報告ではない)。`check-state-classifier-failed`(見本画像はあるのに学習か読み込みに失敗し、a11y だけで判定した)。`vision-anomaly-retried`(findImage / findImages / existImage で Vision の異常を検知し、待って走査をやり直した。判定は変えない。**率が上がったら機械の GPU が混んでいる**)。`vision-helper-rescued`(同じ異常を検知した走査を、run が起こした長寿命の補助プロセスに特徴量を計算させてやり直し、補助の値が門を通って待たずに済んだ。**率が上がったら、シナリオのプロセスの Vision が負荷下の初期化で壊れる回が多い**)。`vision-helper-unavailable`(補助に頼もうとしたが無い・答えない・unhealthy で、既存の待ち直しへ落ちた。**立ち続けるなら補助が起動していない**)。`blank-screenshot-retaken`(findImage / findImages / existImage のスクショのアプリの領域が一色だったので、照合せずに待って撮り直した。戻らなければ失敗)。`settled-before-gesture`(flick・swipe・scroll の前に木の静止を待ち、待っている間に実際に木が動いた = 動いている最中か古い枠へ指を置いていた回)。`stale-ref-at-tap`(**`FT_STALE_TAP_PROBE=1` の測定のときだけ**: XCUITest の ref タップで、撃つ直前に撮り直した木に要素がもう控えた枠に居なかった。断らずに撃った = **判定は変えない**)。`stale-ref-retried`(ブリッジが ref の指す要素はもう同じ場所に居ないと撃たずに断り(422 `stale-ref`)、木を撮り直して引き直した。**判定は変えない**。緑の run でこの経路が働いた回を数える印)。`settled-after-launch`(起動直後の最初のロケータ操作の前に配置の静止を待ち、待っている間に実際に木が動いた = 待たなければずれる前の座標を撃っていた回)。`settled-after-keyboard`(直前の `type` がキーボードを出して画面が動いたので、次の操作の解決前に整定を待ち、**待っている間に実際に木が変わった**回だけ立つ。立たない = 待った時点で既に静止していた)。`settle-not-reached`(`waitForSettle(throwsException: false)` で、画面の画素か木が `waitSeconds` の上限まで止まらなかった。失敗にせず先へ進み、`false` を返した。注記の本文に、どちらの段で何秒変わり続けたかが載る。**`throwsException: true`(既定)の時間切れは注記でなくステップの失敗**で、`sel` の要素が見つからない失敗は `throwsException` によらず失敗。**率が上がったら、止まらない物(スピナー・シマー)が範囲に入っているか `quietSeconds` / `waitSeconds` が足りない**)。`keyboard-not-shown-after-type`(Android の `type` の後、ソフトキーボードが木に出るのを最大 1.5 秒待ったが出なかった。待ちをやめて従来どおり解決した。**率が上がったら上限不足かキーボードを出さない欄**)。`keyboard-appeared-late`(上の待ちを待ち切った後のロケータ操作の木でキーボードが出ていた = 上限不足の事例)。`acted-outside-container`(容器の外にあると判定した対象を、掴み直しと追加の送りを上限まで行っても外のまま操作した。**ステップは緑のまま**(設計どおり止めない)なので、後段の検証が無いシナリオではこれが「別の物に当たったかもしれない」唯一の痕跡)。`unchanged-tap-before-failure`(検証が失敗したとき、それより前のタップのうち画面を 1 ピクセルも変えなかったものを失敗文言で名指しした。**判定は変えない**。直前のタップだけでなく、tap が続いた場合は次のタップの時点で画面が変わっていなかった前のタップも名指しする。**iOS の木はアプリのプロセスだけ**なので、権限の要求など OS のアラートを出したタップも無変化に見える —— iOS の文言は「飲まれた」と言い切らずその可能性を併記する)。`inapp-tap-outside-hit-area`(iOS の in-app が ref タップで要素を直接撃ったが、撃った点 = 枠の中心で本物のタッチを受けるのは別の view だった。**判定は変えない**。XCUITest では同じタップが赤になり得る印)。`inapp-activation-point-off-centre`(iOS の in-app が SwiftUI / UIKit のアプリで UIView でない要素を activate で撃ったが、活性化の点が枠の外側 4 分の 1 にあり、枠の中心は押せる範囲の外だった。典型は文字の部分しか押せない SwiftUI の `.plain` の Button。**判定は変えない**)。`waited-for-presented-overlay`(React Native のアプリを XCUITest で押す前に、出てきたばかりのダイアログ・シートの表示の切り替え(0.55 秒)を待った。**判定は変えない**。払った回数を見る印)。`launch-activated-before-foreground`(xcuitest の高速起動で、起動させた後にランナーがアプリを前面と見ないまま activate を頼んだ。activate が通れば緑のまま。**ランナーごと落ちる手前**の印)。自己修復の注記は `heal-fingerprint-match`(指紋照合で解決)/ `heal-unwritable`(一致したが一意に書けるセレクタが無い)の2つ(2026-09-15 に FM ヒール関連の `heal-proposal-rejected` / `heal-answer-unresolved` / `heal-no-replacement` / `heal-confidence-injected` を撤去 → MN-22)) |
 | detail | String? | 失敗理由(英語・人間可読) |
 | file / line | String? / Int? | ソース位置 |
 | durationMs | Int? | 所要 |
@@ -517,7 +517,7 @@ snapshot/action/wait のどれにも計上されない時間だった実測。
 近道(OCR)は撃たない**(撃つとステップごとに予算を捨てるだけで、判定は結局 FM が下す)③**諦めた読みが
 走っている間は積み増さない** ④載った後の劣化に備え OCR 段に予算
 (`RegionText.occlusionBudget` = 1.3 秒 = 置き換える相手である FM 照合の実測下限)を持たせ、
-超えたら FM へ落として注記 `ocr-budget-exhausted` を残す(設計は docs/design.md §Tier-2 の続き)。
+超えたら FM へ落として注記 `ocr-budget-exhausted` を残す(設計は docs/design/ §Tier-2 の続き)。
 **`ocr-budget-exhausted` の率が上がったら Vision が劣化している**(モデルが載っていない・OS 側の不調)。
 **コンパイルが終わっていなければ、近道の直前で終わるまで待つ**(2026-09-15)。**2026-10-06 からは最初のシナリオを起こす前に
 `compile-ocr` の完了を待つ**(run のログに `waited Ns for the OCR model` が出る。その秒数はシナリオの所要に入らない)ので、
@@ -542,7 +542,7 @@ timeout を跨いだまま「見えていない」と出たときだけ、締切
 
 **36〜108 秒の正体(同日に確定)**: Vision の認識器の実体(Espresso)のコンパイルキャッシュは
 **プロセス名と署名 ID ごと**(`~/Library/Caches/<プロセス名>/com.apple.e5rt.e5bundlecache`。SwiftPM の Debug ビルドは ID に
-LC_UUID が入るので再ビルドでコールドに戻る。docs/performance-tuning.md §3.33)で、コンパイル
+LC_UUID が入るので再ビルドでコールドに戻る。PT-3.33)で、コンパイル
 (コールド 20〜45 秒 × 言語集合 2)が**そのプロセスの生存中に終わったときだけ**コミットされる。
 シナリオ実行プロセス(1シナリオ=1プロセス)はほぼ終わる前に死んで `.tmp` を残すだけ
 (E2E-CMP で完了 1 / 放置 53)なので、**全プロセスが毎回ゼロから払っていた**。対策は
@@ -572,7 +572,7 @@ LC_UUID が入るので再ビルドでコールドに戻る。docs/performance-t
 - **`firstFrameMs`**(Int?): **ステップの最初に注入した入力**(スクロール探索のスワイプがあればタップより先のそのスワイプ)から、最初に提示されたフレームまでの遅れ。t1(反応)の確認済みの値ではない。**iOS は run の後に Instruments の記録(端末全体の「画面に出たフレーム」)から入る**(ランナーは注入の時刻だけ返す)。注入の時刻はランナーが XCTest の合成を呼ぶ直前なので、XCTest が入力を端末へ届けるまでの時間を含む
 - **`firstFrameMissing`**(String?): `firstFrameMs` が無い理由。`busyBeforeAction`(操作の前から描画が続いていた)/ `noInjectedInput`(ブリッジが入力の注入を記録していない)/ `noFrame`(注入の後にフレームが出なかった)/ `frameHistoryIncomplete`(フレームの履歴が足りず判定できない)/ `noSessionApp`(対象アプリが無い)/ `bridgeError`(prepare / collect が失敗した。未対応のドライバの 501 を含む)。値があるときは省略。ブリッジが知らない理由を返したときも省略する(別の理由に丸めない)。`busyBeforeAction` は「描画が止まらなかった」ときだけで、ブリッジが判定できなかった(`noSessionApp` 等)ときはその理由になる
 - `reactionMs` / `readyAfterObservationStartMs` / `observationStartMs`: 常に省略(t1 は画面の差での確認が要る。後者2つは「観測の遅れ」の方式を採らなかったので使わない)
-- **t2(操作可能)の欄は、このステップの次の計測ステップが対象を解決した時点で後から入る**(ブリッジが記録した木の履歴を、次のステップが実際に操作した要素で判定する = docs/response-measurement.md §5「2b の方式」)。**次の計測ステップが無い(シナリオの最後の計測ステップ・失敗や中断で終わったシナリオ)ときと、次のステップが対象に着くまでに自分で画面を動かした(スクロール探索・寄せ)ときは判定されず、これらの欄は省略のまま**。結果 JSON への書き込みは `kind: "responseReady"` のイベント(`index` = 宛先のステップの添字・`readyUpdate`)を `ScenarioRecordBuilder` が `timeline[]` の該当ステップへ当てる(ライブの NDJSON(`fleetest api run`)には流さない)
+- **t2(操作可能)の欄は、このステップの次の計測ステップが対象を解決した時点で後から入る**(ブリッジが記録した木の履歴を、次のステップが実際に操作した要素で判定する = RM-5「2b の方式」)。**次の計測ステップが無い(シナリオの最後の計測ステップ・失敗や中断で終わったシナリオ)ときと、次のステップが対象に着くまでに自分で画面を動かした(スクロール探索・寄せ)ときは判定されず、これらの欄は省略のまま**。結果 JSON への書き込みは `kind: "responseReady"` のイベント(`index` = 宛先のステップの添字・`readyUpdate`)を `ScenarioRecordBuilder` が `timeline[]` の該当ステップへ当てる(ライブの NDJSON(`fleetest api run`)には流さない)
   - **`readyMs`**(Int?): t2。**最初の注入**から、対象が操作可能(解決できる・有効・覆われていない・枠が次のステップの使った枠と等しい)になり、続く次の読みでも保たれた最初の読みの終わりまで
   - **`readyAfterLastInjectionMs`**(Int?): 最後の注入から t2 まで。**`injectionSpanMs`**(Int?): 最初から最後の注入まで。**`injections`**(Int?): 注入の回数(`readyMs` が無いときも、判定されたなら入る)
   - **`readyDecidedBy`**(String?): `tree`(木の条件で決めた。画素の静止は見ていない)

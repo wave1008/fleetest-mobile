@@ -118,7 +118,7 @@ log_dir = os.path.join(repo, ".fleetest", "mutation", datetime.now().strftime("%
 os.makedirs(log_dir, exist_ok=True)
 
 # 本線の無視物は運ばない(先頭 `/` = 転送の根に固定。rsync のワイルドカード文字は逃がす)。
-# -F(dir-merge)は使わない: openrsync では --delete から受け側を守らない(maintainer-notes §3.4)。
+# -F(dir-merge)は使わない: openrsync では --delete から受け側を守らない(MN-3.4)。
 # 除外した物は受け側でも --delete の対象外なので、残骸は purge_ignored が消す
 exclude_file = os.path.join(log_dir, "rsync-exclude.txt")
 with open(exclude_file, "w") as f:

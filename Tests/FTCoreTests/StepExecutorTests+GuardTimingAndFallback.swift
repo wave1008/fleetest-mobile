@@ -26,7 +26,7 @@ extension StepExecutorTests {
     }
 
     /// select は解決するだけでデバイス操作(tap/press 等)を一切呼ばないこと
-    /// (exist と違い検証でもない = occlusionGuard も立たない。docs/design.md の select 契約)
+    /// (exist と違い検証でもない = occlusionGuard も立たない。docs/design/ の select 契約)
     func testSelectResolvesWithoutDeviceOperation() async throws {
         let log = CallLog()
         let primary = FakeAppDriver(name: "primary", log: log,

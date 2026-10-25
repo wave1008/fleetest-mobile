@@ -30,7 +30,7 @@ final class AndroidBridgeRunningProbeTests: XCTestCase {
 
     /// adb 自体が失敗した(オフライン等)ときの非数字のエラー文言を pid と誤認して
     /// 「動いている」と断定しない —— pidof は「見つからない」でも非ゼロで終わるため、
-    /// status だけでは adb の失敗と区別できない(§56.10 と同じ型)
+    /// status だけでは adb の失敗と区別できない(MN-56.10 と同じ型)
     func testNonNumericOutputIsUnknownNotRunning() {
         XCTAssertNil(AndroidDriver.bridgeRunningVerdict(
             Shell.Result(status: 1, output: "error: no devices/emulators found")))

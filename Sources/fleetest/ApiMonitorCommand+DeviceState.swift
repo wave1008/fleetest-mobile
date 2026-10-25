@@ -419,7 +419,7 @@ extension ApiMonitorCommand {
             ? FrozenVerdict([.injected]) : .healthy
         // **run 中は自前の受動観測を確定に使わない**: run はアプリを terminate→relaunch し続けるので
         // 合間の一様(真っ黒)フレームは正常に出るし、黒画面の2種(描画要求なし/本物の wedge)は
-        // 受動観測では分けられない(docs/verification.md)。run 中に本物が起きれば
+        // 受動観測では分けられない(docs/verification/)。run 中に本物が起きれば
         // run 側の能動プローブが published(DeviceFrozenStore)経由でここへ届く。
         // 注入(陽性対照)と published は run 中も残す
         let own = inRun ? .healthy : debounce.verdict(id: id, physical: physical)

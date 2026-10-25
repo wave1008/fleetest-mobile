@@ -81,7 +81,7 @@ extension MCPServer {
             // 「profile を使う利用者にだけ穴が残る」形になる
             if let cached = drivers[key] {
                 if let moved = await deviceIdentityChanged(key, args: args) { throw MCPError(moved) }
-                // **maintainer-notes §51.10**: モード(xcuitest/inapp)が同じ機のまま入れ替わっていないかも
+                // **MN-51.10**: モード(xcuitest/inapp)が同じ機のまま入れ替わっていないかも
                 // 確かめる(udid だけでは捕まらない・ref を使わない呼び出しでも効かせる)。
                 // 食い違っていれば `.refuse`(記憶に依る呼び出し)か `.rebuildSilently`
                 // (依らない呼び出し。下の生成へそのまま落ちる)のどちらか
@@ -91,7 +91,7 @@ extension MCPServer {
                 case .rebuildSilently:
                     break
                 case .unchanged:
-                    // **inapp モードの fallback(XCUITest)ポートも本人確認する**(maintainer-notes §51.2): 主(in-app)の udid が
+                    // **inapp モードの fallback(XCUITest)ポートも本人確認する**(MN-51.2): 主(in-app)の udid が
                     // 変わっていなくても、`HybridFallbackDriver` の fallback は別ポートを握ったままで
                     // 起動し直しにより別の機へ移り得る。fallback には ref が乗らないので(primary と違い)
                     // 捨てるべきセッション記憶が無い —— キャッシュだけ落として下の生成へ通す
@@ -250,7 +250,7 @@ extension MCPServer {
             if let moved = await deviceIdentityChanged(key, args: args) {
                 throw MCPError(moved)
             }
-            // **maintainer-notes §51.10**(profile 経路の同じ確認と理由は同じ): ブリッジが同じ機のまま入れ替わって
+            // **MN-51.10**(profile 経路の同じ確認と理由は同じ): ブリッジが同じ機のまま入れ替わって
             // いないかも確かめる(Android のキーは connectedPorts が無いので即 .unchanged)
             switch await primaryBridgeCheck(key, args: args) {
             case .refuse(let message):
@@ -258,7 +258,7 @@ extension MCPServer {
             case .rebuildSilently:
                 break
             case .unchanged:
-                // **inapp モードの fallback(XCUITest)ポートも本人確認する**(maintainer-notes §51.2。profile 経路の
+                // **inapp モードの fallback(XCUITest)ポートも本人確認する**(MN-51.2。profile 経路の
                 // 同じ確認と理由は同じ)。fallback には ref が乗らないのでキャッシュだけ落とし、
                 // 下の生成へ通す(セッション記憶は主の udid が変わっていないので保つ)
                 if await hybridFallbackDrifted(key) {
@@ -434,7 +434,7 @@ extension MCPServer {
         guard udidPorts.isEmpty else {
             return try reconcilePort(port, udid: udid, udidPorts: udidPorts)
         }
-        // **明示 port は scan より先に、その1本だけ狙い撃ちで本人確認する**(maintainer-notes §51.6):
+        // **明示 port は scan より先に、その1本だけ狙い撃ちで本人確認する**(MN-51.6):
         // `bridgePorts(forUDID:)` は全ポートへ一律2秒の窓で scan するだけなので、高負荷で busy な
         // XCUITest(quiescence 待ちで数十秒ブロックしうる)は生きていても scan の結果に載らない。
         // 呼び手が port を明示しているなら、その1本だけをもっと長い窓で確かめたほうが scan の
@@ -475,7 +475,7 @@ extension MCPServer {
         }
         diagnosis.answeredPorts = answered.unconfirmed
         // **実機のランナーが生きていてトンネル(iproxy)だけが消えた**なら張り直してから本人確認する(供給の引き取り・
-        // ライブ操作の自動起動と同じ門 = maintainer-notes §78.1・§82.5)。ランナーは止めない。答えなければ下の文言へ
+        // ライブ操作の自動起動と同じ門 = MN-78.1・MN-82.5)。ランナーは止めない。答えなければ下の文言へ
         if Self.nothingListensFor(diagnosis), diagnosis.lookup == .physical,
            let restored = await Self.restoreMissingPhysicalTunnel(udid: udid),
            case .confirmedMatch = await Self.explicitPortIdentityProbe(port: restored, udid: udid,
@@ -540,7 +540,7 @@ extension MCPServer {
          identities.filter { $0.1 == .unknown }.map(\.0))
     }
 
-    /// 明示 port だけを狙い撃ちして udid を本人確認した結果(maintainer-notes §51.6)。**「確かめられない」を
+    /// 明示 port だけを狙い撃ちして udid を本人確認した結果(MN-51.6)。**「確かめられない」を
     /// 「一致した/しなかった」に畳まない** —— 3値のまま呼び出し元(`portForIOS`)へ渡す
     enum ExplicitPortIdentity: Equatable, Sendable {
         /// `/status` が答え、udid(実機は `statusForIdentityCheck` が記録で補う)が一致した
@@ -552,7 +552,7 @@ extension MCPServer {
     }
 
     /// `explicitPortIdentityProbe` が payload を確かめる窓。**scan の2秒より長く取る** ——
-    /// scan の窓の短さが maintainer-notes §51.6 の取りこぼしの原因なので、そこに揃えると同じ取りこぼしを再現する。
+    /// scan の窓の短さが MN-51.6 の取りこぼしの原因なので、そこに揃えると同じ取りこぼしを再現する。
     /// `udidBridgeDiagnosisBudget`(3秒)に揃え、追加コストの上限を「診断1回ぶん」に留める
     static let explicitPortIdentityProbeTimeoutSeconds: Double = 3
 
@@ -588,7 +588,7 @@ extension MCPServer {
         return .scan(knownExplicit: candidate == explicit ? identity : nil)
     }
 
-    /// 明示 port の直接確認で「別の udid」と確定したときの文面(maintainer-notes §51.6)。scan 経由の同種の食い違い
+    /// 明示 port の直接確認で「別の udid」と確定したときの文面(MN-51.6)。scan 経由の同種の食い違い
     /// (`reconcilePort` 第2 guard)とトーンは揃えるが、ここでは udidPorts が空(scan が何も
     /// 見つけていない)ので「その udid の他の応答ポート一覧」は出さず、確かめた1件だけを示す
     static func explicitPortMismatchMessage(port: UInt16, udid: String, actualUDID: String) -> String {
@@ -619,7 +619,7 @@ extension MCPServer {
         /// 合成 memberwise init で省略可能なパラメータになるのは **`var` のときだけ** ——
         /// 既定値つきの `let` は memberwise init から丸ごと外れて渡せなくなる)
         var wedgedPorts: [UInt16] = []
-        /// **診断そのものが確定したか**(maintainer-notes §51.6)。`false`(既定)= この値の他の欄
+        /// **診断そのものが確定したか**(MN-51.6)。`false`(既定)= この値の他の欄
         /// (空の `listeningButUnresponsive`/`wedgedPorts`)は「確かめて本当に空だった」ことを表す。
         /// `true` = 予算超過で診断を最後まで走らせられず、他の欄は「集まらなかった」だけで
         /// 空になっている ——  この区別が無いと、時間切れの結果が①〜④のどの分岐にも当たらず
@@ -665,7 +665,7 @@ extension MCPServer {
     /// 引く。probe(`BridgeDiscovery.probeStatus`。isBound 300ms 上限 + `udidProbeTimeoutSeconds`)は
     /// 候補上限本まで**並列**に撃つので、直列合算ではなく1回ぶんだけ足で乗る。
     /// **この 30 秒をそのまま `ft_status`(対話的な口)へ持ち込まない** —— 尽きたら
-    /// `UDIDBridgeDiagnosis.diagnosisTimedOut`(= 完走できなかった。`.unknown` とは別の値 —— maintainer-notes §51.6)
+    /// `UDIDBridgeDiagnosis.diagnosisTimedOut`(= 完走できなかった。`.unknown` とは別の値 —— MN-51.6)
     /// へ落とす。診断自体は打ち切らず走り続ける(`TaskBudget.run` と同じ立場: 諦めるのは
     /// 待つことだけ)
     static let udidBridgeDiagnosisBudget: Duration = .seconds(3)
@@ -866,7 +866,7 @@ extension MCPServer {
     /// だけ残っている。③と事実が違うので文面も分ける)。**④を③より先に見る** ——
     /// 両方が非空になる実測は無いが、wedged は「待っても戻らない」という強い事実なので
     /// busy 側の「Retry in a moment」より優先する。
-    /// ⑤診断そのものが予算内に終わらなかった(`timedOut`。maintainer-notes §51.6)。①〜④は
+    /// ⑤診断そのものが予算内に終わらなかった(`timedOut`。MN-51.6)。①〜④は
     /// すべて「診断が完走した」上での分岐なので、**timedOut を全部より先に見る** —— 完走して
     /// いない回は busy/wedged の判定材料(probe の結果)自体が集まっていないので、空の
     /// `listeningButUnresponsive`/`wedgedPorts` を「本当に空だった」と読むと、確かめていない
@@ -900,7 +900,7 @@ extension MCPServer {
             + " retry the call in a moment."
     }
 
-    /// 診断(`udidBridgeDiagnosis`)自体が予算内に終わらなかったときの文面(maintainer-notes §51.6)。**「居ない」と
+    /// 診断(`udidBridgeDiagnosis`)自体が予算内に終わらなかったときの文面(MN-51.6)。**「居ない」と
     /// 断定せず `bridge up` も勧めない** —— ①〜④のどの事実も集められていないので、確かめられた
     /// のは「確かめられなかった」ことだけ。生きているブリッジへ2本目を起動させる案内を誤って出さない
     static func bridgeDiagnosisUnconfirmedMessage(udid: String) -> String {
@@ -1145,7 +1145,7 @@ extension MCPServer {
         return Self.movedDeviceRefusal(port: port, previousUDID: moved, nowUDID: now)
     }
 
-    /// **主ポートのブリッジが変わっていないか(maintainer-notes §51.10)**: `deviceIdentityChanged` は
+    /// **主ポートのブリッジが変わっていないか(MN-51.10)**: `deviceIdentityChanged` は
     /// udid しか見ず、しかも `usesRememberedDeviceState` で ref を使う呼び出しにしか効かない —— 同じ
     /// udid のまま run のたびのブリッジの起動し直しでモードが xcuitest ⇄ inapp に入れ替わった形を
     /// 見逃す。**実測**: xcuitest でキャッシュ済みのドライバの port が in-app ブリッジへ化け、ref を
@@ -1246,7 +1246,7 @@ extension MCPServer {
     }
 
     /// **inapp モードのキャッシュ命中の fallback(XCUITest)ポートが別の機/別ブリッジへ移っていないか**
-    /// (maintainer-notes §51.2): `deviceIdentityChanged` は主(in-app・`connectedPorts`/`udids`)しか
+    /// (MN-51.2): `deviceIdentityChanged` は主(in-app・`connectedPorts`/`udids`)しか
     /// 見ないので、`HybridFallbackDriver` の fallback が握る `hybridFallbackPorts[key]` は
     /// ノーチェックのまま残っていた。ブリッジは run のたびに起動し直され**同じポート番号が
     /// 別デバイス(あるいは同じデバイスの in-app ブリッジ)に化ける**ため、home/appSwitcher/drag/
@@ -1522,7 +1522,7 @@ extension MCPServer {
                 verdict = .unknown("adb")
             }
         } else {
-            // **実機は simctl ではなく devicectl**(§19.3 M8。ft_list_apps の同型判定と揃える —
+            // **実機は simctl ではなく devicectl**(ft_list_apps の同型判定と揃える —
             // MCPServer+SessionTools.swift の ftListApps 参照): 実機の udid を simulatorInstallVerdict
             // へ渡すと、udid の形が同じシミュレータ名(既定は機種名なので実機と同名になりやすい)を
             // 誤って照会し、別デバイスの在否を答える。候補は3段(ft_list_apps と同じ優先順)
@@ -1583,7 +1583,7 @@ extension MCPServer {
     }
 
     /// **確かめられなかったので撃たない**ときの文言。①確かめられなかった理由 ②撃った場合に
-    /// 起きること(XCUITest ランナーの main queue ハング → ブリッジ自壊。§T1 実測)③次の手、の3点を持つ
+    /// 起きること(XCUITest ランナーの main queue ハング → ブリッジ自壊。実測)③次の手、の3点を持つ
     static func uncheckedLaunchRefusal(bundleID: String, reason: String) -> String {
         "could not verify whether \(bundleID) is installed (\(reason))."
             + " Launching an app that turns out to be missing hangs XCUIApplication.launch(),"
@@ -1852,7 +1852,7 @@ extension MCPServer {
     /// **`treeIsAppsOwn`**: 木の sessionBundleID がそのアプリのまま(XCUITest のセッションは背面化
     /// してもアプリに付いたままで、**アプリ自身の木**を返し続ける)なら「今の画面」とは言わない ——
     /// 実機 iPhone 13 では appSwitcher の直後に「the tree below is whatever is actually on screen」と
-    /// 言いながらアプリの木を返していた(§19.3 担当報告の再現)。inapp モードの背面化読み(SpringBoard を
+    /// 言いながらアプリの木を返していた。inapp モードの背面化読み(SpringBoard を
     /// 参照 = sessionBundleID が springboard)のときだけ「今そこにあるもの」
     static func sentToBackgroundNote(_ sessionBundleID: String?, treeIsAppsOwn: Bool) -> String {
         let app = sessionBundleID.flatMap { $0 == "com.apple.springboard" ? nil : $0 } ?? "the app"
@@ -1909,7 +1909,7 @@ extension MCPServer {
     /// 通常文言は launcher へ迷い込んだとしか言わず、実際に落ちたことを伝えられない。
     /// **`stoppedByTool` はさらに確度が高い事実**(推測ではなく、ツール自身が撃った操作)なので
     /// processEvidence より先に見る —— 明示 ft_clear_app_data / ft_install の直後は
-    /// 「クラッシュしたかも」ではなく「この操作で止めた」と言う(§19.3 M2)
+    /// 「クラッシュしたかも」ではなく「この操作で止めた」と言う
     static func switchedAppNote(launched: String?, snapshot: SnapshotResponse,
                                 processEvidence: AndroidAppProcessEvidence? = nil,
                                 stoppedByTool: String? = nil) -> String {

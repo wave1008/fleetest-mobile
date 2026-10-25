@@ -105,7 +105,7 @@ languageSelect.addEventListener('change', () => {
   vscode.postMessage({ type: 'setLanguage', value: languageSelect.value });
 });
 
-// ---- リモート実行(CLI のホスト登録簿・config.ts。docs/remote-runner.md §12) --------
+// ---- リモート実行(CLI のホスト登録簿・config.ts。RR-12) --------
 // ホスト一覧は行数が可変のため DOM を直接組み立てる。行の識別は name(変更され得る)ではなく
 // 使い捨ての rowId で行う。
 //
@@ -191,7 +191,7 @@ function makeEnabledCell(tr, checked) {
  *  `.settings-number`)。**行の種類を問わずこの関数を通す** —— 固定行(この機械)と可変行で
  *  別々に組むと片方だけ制限や見た目が漏れる。
  *
- *  値は **1〜9 の1桁**に限る。範囲の根拠は docs/performance-tuning.md §3.5(実測でスループットは
+ *  値は **1〜9 の1桁**に限る。範囲の根拠は PT-3.5(実測でスループットは
  *  並列度5で飽和し、8 まで測っても伸びない)。0 と空欄はどちらも「未設定」= 既定へ倒す扱いなので
  *  0 は打てなくてよい。**`maxLength` は `type=number` では効かない**ので、桁の制限は
  *  input イベントの絞り込みだけが担っている(消すと2桁が入る)。 */
@@ -544,7 +544,7 @@ function addHostRow(host, confirmed) {
   row.enabledInput = makeEnabledCell(tr, host ? host.enabled !== false : true);
   row.enabledInput.addEventListener('change', () => { if (row.confirmed) { onHostsChanged(); } });
   // FM 並列枠。**空欄 = 未設定**(ランナー側の既定に任せる)。0 を送ると CLI 側が解除として扱う。
-  // 機械によっては FM を2並列以上で呼ぶと壊れるため機械ごとに絞れる(docs/remote-runner.md §19)
+  // 機械によっては FM を2並列以上で呼ぶと壊れるため機械ごとに絞れる(RR-19)
   const fmTd = document.createElement('td');
   fmTd.className = 'settings-remote-hosts-fm';
   row.fmInput = makeFMConcurrencyInput(host ? host.fmConcurrency : 0);

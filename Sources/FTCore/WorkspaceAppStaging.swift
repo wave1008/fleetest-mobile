@@ -6,7 +6,7 @@
 //   - ProfileRunner.run / ApiRunCommand / MCP の resolveProfileTarget: 自分自身の apps[platform] を
 //     揃える(stageWorkspaceApps)。**resolve した appPath をデバイスへ渡す経路を足したらここも通す**
 //   - RemoteRunDispatcher: ミラー rsync 直前にローカルのワークスペースへ揃える(installPath 単体)
-// docs/remote-runner.md §17。
+// RR-17。
 
 import CryptoKit
 import Foundation
@@ -37,7 +37,7 @@ public enum WorkspaceAppStaging {
     /// ローカルとリモートの子で異なるため ―― 同じ宣言でもホストごとに違うステージ先になり、
     /// リモートの子が自分で resolve() し直したときに手元がステージしたファイルを見失う
     /// (ワークスペースは rsync で丸ごと運ばれる複製で、リモートは中身を読むだけ。
-    /// docs/remote-runner.md §17)。`declared` はプロジェクトの JSON ファイル自体を通じて
+    /// RR-17)。`declared` はプロジェクトの JSON ファイル自体を通じて
     /// 両ホストへ届くので、文字列としては常に一致する。
     ///
     /// **名前空間を挟むのは、declared のファイル名(basename)だけでは衝突するから** ——
@@ -97,7 +97,7 @@ public enum WorkspaceAppStaging {
     ///
     /// **source が存在せず dest も無い場合だけエラー**(原本のパスを名指しする)。source が無く
     /// dest だけあるのは想定内で無視する ―— リモートの子は rsync で複製だけを受け取り原本を
-    /// 持たない(docs/remote-runner.md §17)。ここで常にエラーにすると、この機構が解決した
+    /// 持たない(RR-17)。ここで常にエラーにすると、この機構が解決した
     /// 「リモートで appPath が見つからない」問題へ逆戻りする。
     ///
     /// 戻り値: 実際にコピーしたら true(スキップ/複製のみ確認は false)

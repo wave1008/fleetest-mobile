@@ -1,7 +1,7 @@
 import XCTest
 
 /// `api live serve` の座標コマンド(tap/doubleTap/press/drag の x/y 形)が、ドライバへ撃つ前に
-/// 画面内かを断ることの配線(maintainer-notes §51.1: 断らずに撃った結果 AndroidDriver の Int32 変換が
+/// 画面内かを断ることの配線(MN-51.1: 断らずに撃った結果 AndroidDriver の Int32 変換が
 /// trap してプロセスごと落ちた)。`perform` はデバイスが要る private func なのでソース走査で
 /// 固定する(ApiLiveGestureCommandTests と同じ方針)。
 /// 判定そのもの(`FTCore.TapTargetGeometry.isPointOnScreen`)の単体テストは

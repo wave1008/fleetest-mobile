@@ -1,4 +1,4 @@
-// ランナー機に複数の Xcode が入っているときの自動選択(docs/remote-runner.md §7)。
+// ランナー機に複数の Xcode が入っているときの自動選択(RR-7)。
 // ssh/プロセス起動は Sources/fleetest/RemoteRunDispatcher.swift・RemoteCommands.swift 側
 // (ここは列挙の解析・選択規則だけの純粋ロジック)。
 

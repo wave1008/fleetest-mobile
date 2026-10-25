@@ -5,7 +5,7 @@
 // ① **載せたままにする暖機(keep-warm)は実際の生成**: 最後の FM の利用から `keepWarmIntervalSeconds` 経つごとに、小さな画像の
 //    転写を1回撃つ(`keepAlive`。前の1回が終わるまで次は撃たない)。**`prewarm` だけでは足りない** —— prewarm が載せたままにするのは
 //    3B の本体と画像エンコーダだけで、**安全判定のモデル(instruct_300m.safety)は生成のたびに読まれ、約 5 秒で降ろされる**。
-//    FM の死はその載せ直しで起きた(実測6回すべて。docs/maintainer-notes.md §81)。生成を休まず撃ち続けた形はデバイス実行の横でも
+//    FM の死はその載せ直しで起きた(実測6回すべて。MN-81)。生成を休まず撃ち続けた形はデバイス実行の横でも
 //    死ななかった。予備のセッション(`spare`)の `prewarm` は本番の転写の prefill のために残す
 // ② **転写は予備のセッションを取り出して使い、実要求が終わった合間に予備を置き直す**(使ったセッションは捨てる)
 // ③ **FMHealth・FMUsageLedger・FMBreaker に記録しない** —— 記録は要求した側(シナリオ・プローブ)が自分の所要で行う。
@@ -47,7 +47,7 @@ public enum FMServeServer {
     /// 搭載メモリがこれ以上[バイト]の機械では暖機をやめない(ユーザー決定)。**理由**: やめる判断が要ったのは 8GB の M1mini だけで、
     /// 192GB の M2Ultra では Simulator の一斉起動の間の一時的な遅さで成立し、プロセスの終わりまで暖機が止まった。その 6 分後、
     /// 空きメモリ 1GB を切った最中に safety の載せ直しが Code=53 で失敗し FM が死んだ(暖機の停止が死の原因とは確定していない。
-    /// 死は載せ直しの瞬間に起きる = maintainer-notes §81・§97)。
+    /// 死は載せ直しの瞬間に起きる = MN-81・MN-97)。
     /// 16GiB = macOS が「16GB」の Mac で `physicalMemory` に返す値ちょうど
     static let keepWarmGiveUpBelowPhysicalMemoryBytes: UInt64 = 16 << 30
 

@@ -1,6 +1,6 @@
 // ServiceGateway.swift
 // サンドボックスの中の run-setup.sh / run-teardown.sh が、宣言したサービスでの exec・状態・ログ・公開ポートの照会を
-// 親へ頼む口(docs/remote-runner.md §17 スクリプト ④)。`SandboxBroker` の1往復と違い**ストリーム**:
+// 親へ頼む口(RR-17 スクリプト ④)。`SandboxBroker` の1往復と違い**ストリーム**:
 // 標準入力・標準出力・標準エラーを行区切りの JSON フレームで流す(巨大なダンプが 1 MiB の要求に載らないため)。
 // 判定は `ServiceGatewayPolicy`(FTServices の `ServicePolicy` が実装)。ここは配管だけで、何を実行するかは決めない。
 //

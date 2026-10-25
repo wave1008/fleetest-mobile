@@ -1,4 +1,4 @@
-// run ボード(フリート横断の実行状況。docs/design.md §18)。ツールバー直下・ラインビューの上に
+// run ボード(フリート横断の実行状況。DS-18)。ツールバー直下・ラインビューの上に
 // 常設(main.js の 'monitorRuns'/'runBoardReset'/'runBoardCollapsed'/'hostMetricsMachines' ケースが
 // このモジュールへ渡す。契約: monitorWebviewMessages.ts の同名メッセージ)。
 //
@@ -593,7 +593,7 @@ function appendDeviceLane(row, machine, name, lane, receivedAtMs, platform) {
   const scenarioEl = document.createElement('span');
   scenarioEl.className = 'run-board-lane-scenario';
   // scenario 省略 = そのレーンに今の割り当てが無い(直前の1本を終えて次を待つ。
-  // FTCore.RunProgressLane の契約)。**レーンごとの残り本数は持たない**(design.md §18.1)。
+  // FTCore.RunProgressLane の契約)。**レーンごとの残り本数は持たない**(DS-18.1)。
   const idle = lane !== undefined && lane.scenario === undefined;
   scenarioEl.textContent = lane === undefined ? '' : (idle ? t('runBoard.laneIdle') : `▶ ${lane.scenario}`);
 
@@ -652,7 +652,7 @@ function updateRow(row, run) {
   row.scopeEl.textContent = run.profile ? `${run.project} / ${run.profile}` : run.project;
 
   // **走り出す前(ビルド中・供給中・Vision のコンパイル待ち)は進捗を出さない** —— 本数も割合もまだ意味を持たない
-  // (docs/design.md §18.5)。経過だけは出す(どれくらい待っているかが分かる)
+  // (DS-18.5)。経過だけは出す(どれくらい待っているかが分かる)
   const beforeRunning = run.phase !== 'running';
   row.progressEl.style.display = beforeRunning ? 'none' : '';
   // 供給の段階があれば準備中の文言を詳しくする(無ければ従来のまま。推測で埋めない)
@@ -682,7 +682,7 @@ function updateRow(row, run) {
   }
 
   // **詰まりは事実だけ**(0 のときは出さない)。「遅い」「異常」とは書かない ——
-  // アプリが重いのか機械が混んでいるのかツールには分けられない(docs/design.md §18.5)
+  // アプリが重いのか機械が混んでいるのかツールには分けられない(DS-18.5)
   const notes = [];
   if (run.requeued > 0) {
     notes.push(t('runBoard.requeued', { count: String(run.requeued) }));

@@ -95,7 +95,7 @@ enum ProfileRunOrchestrator {
             },
             probeBridge: { worker in
                 // inapp モードの主ポート(in-app)は別アプリのシナリオ中サスペンドされ TCP 受理・HTTP
-                // 無応答になる(design §8.8)ため、死活確認は suspend されない xcuitest 側で行う
+                // 無応答になる(DS-8.8)ため、死活確認は suspend されない xcuitest 側で行う
                 guard let port = worker.connection.xcuiPort ?? worker.connection.port else {
                     return .silent
                 }

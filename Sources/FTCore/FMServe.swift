@@ -1,7 +1,7 @@
 // FM の常駐プロセス(`fleetest api fm-serve`)との通信と起動。**画像を伴う FM の呼び出し(テキストの可視性検証・
 // screenLooksLike・死活の確かめ)は全部この1プロセスが撃つ**。シナリオのプロセスは LanguageModelSession を持たない。
 //
-// なぜ常駐の1プロセスか(実測・docs/maintainer-notes.md §81): FM の死(ANE の `Program load failed — no memory`)は
+// なぜ常駐の1プロセスか(実測・MN-81): FM の死(ANE の `Program load failed — no memory`)は
 // 「使っていない間に降ろされたモデルを ANE に載せ直す瞬間」に起きる。OS は最後の利用から約 4 秒で FM の部品を降ろす。
 // 入れ替わる多数のシナリオのプロセスが各自セッションを作る形では、載せ直しが絶えず起きる。1 プロセスが撃ち続けた
 // 計測(デバイス実行の横で 528 回・デバイス無しで 1,000 回超)では一度も死ななかった。

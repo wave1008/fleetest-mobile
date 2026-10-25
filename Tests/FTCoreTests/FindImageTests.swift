@@ -315,7 +315,7 @@ final class FindImageTests: XCTestCase {
         XCTAssertEqual(shared.computed, screenElements.count, "見本2枚でも候補3つぶんしか計算しない")
     }
 
-    /// 1回の走査の Vision の控えは1回だけ書く(特徴量1回ごとに書くと照合より重い。performance-tuning §3.30)
+    /// 1回の走査の Vision の控えは1回だけ書く(特徴量1回ごとに書くと照合より重い。PT-3.30)
     func testEachScanWritesTheVisionLedgerOnce() throws {
         let url = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
             .deletingLastPathComponent().appendingPathComponent("Sources/FTCore/StepExecutor+FindImage.swift")

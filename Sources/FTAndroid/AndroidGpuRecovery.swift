@@ -5,7 +5,7 @@
 // **プロセス再起動が必須**: GPU モードは emulator の起動引数 -gpu で固定されるため、ゲスト再起動や
 // gRPC RESET では戻せない(DeviceBooter.startEmulator 参照)。そのため該当機1台につき run 開始が
 // 約1分延びる。戻した先で再び凍結すればモニターの watchdog がまた CPU に落とす
-// (design.md §12.4 の既知トレードオフ)。
+// (DS-12.4 の既知トレードオフ)。
 //
 // 拡張(MonitorDeviceOps.cpuRenderNames)の「GPUで再起動」と目的は同じだが別経路: あちらは
 // モニターの手動操作、こちらは run 開始時の自動処理で、互いの状態は共有しない

@@ -179,7 +179,7 @@ public enum DeviceBooter {
         return outcomes
     }
 
-    /// **他人の run を殺さない**(docs/remote-runner.md §18.7 規律④「他人の run を殺す操作は
+    /// **他人の run を殺さない**(RR-18.7 規律④「他人の run を殺す操作は
     /// ロックを読む」)。`key` は run 側の lease 鍵と同じ値(`leaseKey(spec:platform:)`)。
     /// force / 鍵が引けない(素通り=安全側)/ 保持者が居ない / 保持者が自分自身、のいずれかなら
     /// nil(止めてよい)。それ以外はデバイス名と保持者 pid を名指しした拒否文言を返す
@@ -943,7 +943,7 @@ public enum DeviceBooter {
         // 指定する(CPU 描画は凍結を回避できるが上記の約3コア/デバイスを払う)
         // -no-snapshot 必須: ロード+セーブ両方の無効化=コールドブート保証。Quickboot スナップショットの
         // ロードはブート時黒画面の代表原因(-no-snapshot-save だけではセーブのみ無効で、Android Studio 等が
-        // 残したスナップショットがあるとロードしてしまう。docs/performance-tuning.md §6 の Wipe Data 行参照)
+        // 残したスナップショットがあるとロードしてしまう。PT-6 の Wipe Data 行参照)
         let arguments = ["-avd", avd,
                          "-no-snapshot", "-no-window", "-no-boot-anim", "-no-audio",
                          "-gpu", gpuMode]

@@ -129,7 +129,7 @@ enum WebViewShotComposite {
         case .captureFailed:
             // **ソケットは画面上の WebView の証拠ではない** —— アプリが一度でも WebView を作れば
             // プロセスが続く限り残る(実地: WebView の無い RN 画面の真っ白なキャプチャに
-            // 「WebView の層」と案内した → maintainer-notes §62.2)。木にノードが無いときは断定しない
+            // 「WebView の層」と案内した → MN-62.2)。木にノードが無いときは断定しない
             return head + "The app's devtools socket is reachable, but Page.captureScreenshot"
                 + " returned no image or one that does not fit the WebView area."
                 + (hasWebViewNode ? "" : " No WebView is in the accessibility tree of this screen, and the"

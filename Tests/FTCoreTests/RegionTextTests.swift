@@ -191,7 +191,7 @@ final class RegionTextTests: XCTestCase {
     }
 
     /// 拡大の段はリテラルで固定する(実測: ×1 で 71% → ×2 まで 88% → ×3 まで 97%・×4 は 74% に落ちる。
-    /// docs/poc-fm-occlusion-guard.md §5.17)
+    /// OG-5.17)
     func testUpscaleLadderIsPinned() {
         XCTAssertEqual(RegionText.upscaleLadder, [1, 2, 3])
     }
@@ -435,7 +435,7 @@ final class RegionTextProbeWithRetryTests: XCTestCase {
     }
 
     /// 配線: 「コンパイルは終わったのに読めない」で即座に返す分岐が、探り直しを頼んでから返すこと
-    /// (頼まないと、開始時に読めなかったプロセスでは最後まで近道を撃てない = maintainer-notes §84.4)
+    /// (頼まないと、開始時に読めなかったプロセスでは最後まで近道を撃てない = MN-84.4)
     func testFinishedUnreadyBranchRequestsAReprobe() throws {
         let root = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()

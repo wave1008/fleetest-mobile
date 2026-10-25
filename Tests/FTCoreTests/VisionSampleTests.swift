@@ -24,7 +24,7 @@ final class VisionSampleTests: XCTestCase {
         XCTAssertNotNil(VisionSample.labelIssue(classifier: "ScreenClassifier", label: "[Top]"))
     }
 
-    // MARK: - path escape (maintainer-notes §51.8)
+    // MARK: - path escape (MN-51.8)
 
     func testLabelIssueRejectsDotDotComponents() {
         XCTAssertNotNil(VisionSample.labelIssue(

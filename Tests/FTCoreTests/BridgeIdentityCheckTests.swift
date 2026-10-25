@@ -122,7 +122,7 @@ final class BridgeIdentityCheckTests: XCTestCase {
         }
     }
 
-    // MARK: - hybridFallbackDrift(maintainer-notes §51.2。inapp モードが主とは別に握るポートの本人確認。
+    // MARK: - hybridFallbackDrift(MN-51.2。inapp モードが主とは別に握るポートの本人確認。
     // 呼び手は MCP とライブ操作(api live serve)の2つ、どちらも FTBridgeClient.HybridFallbackIdentity 経由)
 
     /// **本命**: fallback ポートが今は別デバイスの XCUITest ブリッジ。以前は無検査で
@@ -134,7 +134,7 @@ final class BridgeIdentityCheckTests: XCTestCase {
             .differentDevice, "fallback ポートが別デバイスの udid を名乗っているのに一致と判定した")
     }
 
-    /// **maintainer-notes §51.2 の実測**: 起動し直しで fallback ポートが in-app ブリッジに化けた(XCUITest ではない)。
+    /// **MN-51.2 の実測**: 起動し直しで fallback ポートが in-app ブリッジに化けた(XCUITest ではない)。
     /// in-app には `/gesture` が無いので 404 になるが、相手が同じデバイスの別ポートとは限らない。
     /// udid が申告されない(実機の xcuitest しか取り得ない形)ので、ブリッジの食い違いは
     /// differentDevice に分類する(実機 ⇄ シミュレータの入れ替わりでしか起こらない)

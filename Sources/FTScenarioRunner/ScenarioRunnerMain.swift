@@ -743,7 +743,7 @@ struct RunScenario: AsyncParsableCommand {
         }
 
         // 「否定側でしか使われず一度も解決できなかった #id」「最後まで不成立の ifCanSelect」
-        // 「アサーションが1本も無い」を修正提案として残す(いずれも緑のまま腐る経路。docs/design.md §10)
+        // 「アサーションが1本も無い」を修正提案として残す(いずれも緑のまま腐る経路。DS-10)
         // tearDownDevice の子は片付けなので「アサーションが無い」等の提案を出さない(@Test ではない)
         if !deviceTeardownOnly {
             core.warnAboutNeverResolvedIDs()

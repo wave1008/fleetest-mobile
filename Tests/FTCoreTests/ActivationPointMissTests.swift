@@ -1,6 +1,6 @@
 // `TapHitAreaMiss.activationPointMiss`(枠の中心が押せる範囲の外だと活性化の点から言い切れるか)と、
 // それを使ってよいフレームワーク(`AppUIFramework.activationPointMarksHitArea`)を固定する。
-// 値は E2EY-iOS の実測(maintainer-notes §77): 直す前の `.plain` の行は活性化の点が文字の上、直した後は中心。
+// 値は E2EY-iOS の実測(MN-77): 直す前の `.plain` の行は活性化の点が文字の上、直した後は中心。
 
 import XCTest
 @testable import FTCore

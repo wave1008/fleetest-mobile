@@ -2,7 +2,7 @@ import Foundation
 import XCTest
 
 /// `checkCompatibility` が選んだ `DEVELOPER_DIR` を toolchain probe と実際の run(remoteRunCommand)の
-/// **両方**が使うこと(docs/remote-runner.md §7)。別々に解決すると、照合した Xcode と実際に走る
+/// **両方**が使うこと(RR-7)。別々に解決すると、照合した Xcode と実際に走る
 /// Xcode が食い違う(緑のまま別の Xcode で走る沈黙の退行)。型では守れない境界(文字列合成)なので
 /// ソース走査で固定する。
 ///

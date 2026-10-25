@@ -1,5 +1,5 @@
 // iOS 実機の最初のフレーム(`firstFrameMs`)を、ホストが録った xctrace の記録から結果へ後から入れる純粋な部分。
-// 契約: docs/response-measurement.md §5・§8.5。XCUITest ランナーは `downTimeMs`(端末の mach 時刻を ms にした値)だけを返し、
+// 契約: RM-5・RM-8.5。XCUITest ランナーは `downTimeMs`(端末の mach 時刻を ms にした値)だけを返し、
 // `firstFrameMs` は nil のまま。ここで `displayed-surfaces-interval` の時刻(同じ端末の時計)と突き合わせて埋める。
 // 事実だけを書く: 記録が覆っていない注入には何も入れない(推測で `noFrame` にしない)。
 

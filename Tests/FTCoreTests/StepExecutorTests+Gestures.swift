@@ -469,7 +469,7 @@ extension StepExecutorTests {
 
         XCTAssertEqual(outcome.driverFallback?.contains("still reported outside"), true,
                        "救えなかったことを注記に残すこと: \(outcome.driverFallback ?? "nil") 呼び出し=\(log.entries)")
-        // **止めないのは設計どおり**(docs/design.md「ghost は拒否せず、警告して撃つ」)。
+        // **止めないのは設計どおり**(docs/design/「ghost は拒否せず、警告して撃つ」)。
         // その代わり run 横断で数えられる注記を必ず残す
         guard case .passed = outcome.status else {
             XCTFail("外のままでも撃って緑のまま(設計どおり)の想定だが \(outcome.status) だった"); return
@@ -692,7 +692,7 @@ extension StepExecutorTests {
     }
 
     /// 対象の中心が**後ろに並ぶ(=手前寄りの)要素**に入るなら空打ちしない。
-    /// 実害: タブバーの帯に出た要素へ空打ちしてホームタブが反応した(docs/verification.md)
+    /// 実害: タブバーの帯に出た要素へ空打ちしてホームタブが反応した(docs/verification/)
     func testPointTakenByFrontElement() {
         let target = framed(ref: 1, id: "txt", x: 16, y: 815, width: 111, height: 20)
         let tabBar = framed(ref: 2, id: "tab_home", x: 0, y: 778, width: 134, height: 62)

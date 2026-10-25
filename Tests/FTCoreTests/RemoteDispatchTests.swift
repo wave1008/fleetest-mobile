@@ -1,4 +1,4 @@
-// `fleetest run --runner` (docs/remote-runner.md §3・§7・Phase 1) の純粋ロジック。
+// `fleetest run --runner` (RR-3・RR-7・Phase 1) の純粋ロジック。
 // SSH/rsync 越しの結合は e2e に残す(ここは文字列合成・判定のみ)。
 
 import Foundation
@@ -409,7 +409,7 @@ final class RemoteDispatchTests: XCTestCase {
         XCTAssertTrue(paths[1].hasSuffix("/"), paths[1])
     }
 
-    /// 回収は「信頼するランナー」ではなく共有ディレクトリからの入力(§15.3 は同一 UNIX ユーザー)。
+    /// 回収は「信頼するランナー」ではなく共有ディレクトリからの入力(RR-15.3 は同一 UNIX ユーザー)。
     /// 宛先の外を指すシンボリックリンクを受けないことを固定する
     func testCollectionRsyncArgsRefuseUnsafeSymlinks() {
         let layout = RemoteLayout(base: "/Users/ci/fleetest-runner", issuer: "alice", home: "/Users/ci")
@@ -701,7 +701,7 @@ final class RemoteDispatchTests: XCTestCase {
         XCTAssertEqual(command,
             "cd '\(workDir)' 2>/dev/null && test -f Package.swift || "
             + "{ echo \"no runner workspace at \(workDir) — run: fleetest remote setup"
-            + " <this host> once for this issuer (docs/remote-runner.md §18)\" >&2; exit 91; } && "
+            + " <this host> once for this issuer (RR-18)\" >&2; exit 91; } && "
             + "export PATH=\"/opt/homebrew/bin:/usr/local/bin:$PATH\" && "
             + "export FT_DISPATCH_LOCK_HELD='local' && export FT_DISPATCHED_RUN=1 && test -x '\(binary)' || "
             + "{ echo \"fleetest binary not found on remote — run: swift build --product fleetest\" >&2; exit 90; } && "
@@ -750,7 +750,7 @@ final class RemoteDispatchTests: XCTestCase {
         XCTAssertFalse(without.contains("FT_FM_CONCURRENCY"), without)
     }
 
-    /// Xcode の選択(docs/remote-runner.md §7)。**非 nil のときだけ** export する ——
+    /// Xcode の選択(RR-7)。**非 nil のときだけ** export する ——
     /// nil(ambient)のときに1バイトも足さないことと、非 nil のときは launch(binary 実行)の
     /// 前に export が来ることの両方を固定する
     func testRemoteRunCommandExportsDeveloperDirOnlyWhenGiven() {
@@ -770,7 +770,7 @@ final class RemoteDispatchTests: XCTestCase {
         XCTAssertFalse(ambient.contains("DEVELOPER_DIR"), ambient)
     }
 
-    /// 未 setup の発行者(work が無い)は exit 91 の専用ガードで fail fast する(§18.2)。
+    /// 未 setup の発行者(work が無い)は exit 91 の専用ガードで fail fast する(RR-18.6)。
     /// バイナリ不在(exit 90)より手前に置く —— workspace 自体が無ければバイナリの有無を
     /// 問うても意味が無い
     func testRemoteRunCommandGuardsMissingIssuerWorkspaceBeforeBinaryGuard() {
@@ -901,7 +901,7 @@ final class RemoteDispatchTests: XCTestCase {
         XCTAssertEqual(rows.map(\.issuer), ["carol"])
     }
 
-    /// 回収した録画はランナーに残さない(docs/remote-runner.md §15.4)。**消すのは録画だけ**
+    /// 回収した録画はランナーに残さない(RR-15.4)。**消すのは録画だけ**
     func testDeleteRecordingsCommandTargetsOnlyRecordings() {
         let layout = RemoteLayout(base: "/Users/ci/fleetest-runner", issuer: "alice", home: "/Users/ci")
         let command = RemoteArtifactCollection.deleteRecordingsCommand(project: "E2E", layout: layout)
@@ -1250,7 +1250,7 @@ final class RemoteDispatchTests: XCTestCase {
         }
     }
 
-    /// 全発行者(`users/<issuer>/work`)を横断する(§18.2)。ディスクはホスト共有
+    /// 全発行者(`users/<issuer>/work`)を横断する(RR-18.6)。ディスクはホスト共有
     /// 資源なので保持ポリシーは全員分に掛ける。**一覧はグロブでなく find で作る**(相手は zsh。
     /// マッチしないグロブはそのコマンドごと落ちる)
     func testCleanPlanCoversAllIssuersWithoutGlobs() {
@@ -1503,7 +1503,7 @@ final class RemoteDispatchTests: XCTestCase {
         XCTAssertEqual(command,
             "cd '\(workDir)' 2>/dev/null && test -f Package.swift || "
             + "{ echo \"no runner workspace at \(workDir) — run: fleetest remote setup"
-            + " <this host> once for this issuer (docs/remote-runner.md §18)\" >&2; exit 91; } && "
+            + " <this host> once for this issuer (RR-18)\" >&2; exit 91; } && "
             + "export PATH=\"/opt/homebrew/bin:/usr/local/bin:$PATH\" && "
             + "export FT_ISSUER='alice' && export FT_DISPATCHED_RUN=1 && test -x '\(binary)' || "
             + "{ echo \"fleetest binary not found on remote — run: swift build --product fleetest\" >&2; exit 90; } && "
@@ -1537,7 +1537,7 @@ final class RemoteDispatchTests: XCTestCase {
 
 extension RemoteDispatchTests {
     /// **base ではなく workDir を写す**。base を渡すと `users/<issuer>/work` が残り、
-    /// 手元に存在しないパスが画面と記録に出る(2026-08-26 の実害。§18.2 の発行者
+    /// 手元に存在しないパスが画面と記録に出る(2026-08-26 の実害。RR-18.6 の発行者
     /// ネームスペースを足したときに追随し損ねていた)
     func testRelayRewriteMapsTheRunnerWorkDirOntoTheLocalRepoRoot() {
         let layout = RemoteLayout(base: "/Users/u/fleetest-runner", issuer: "u", home: "/Users/u")

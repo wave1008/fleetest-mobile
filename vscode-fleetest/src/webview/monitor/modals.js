@@ -664,7 +664,7 @@ dlgOk.addEventListener('click', () => {
     model: dlgModel.value,
     os: dlgOs.value,
     // ピッカー経由なら register:false(登録はピッカー側 OK の runProfileDevicesSync で行う)。
-    // source が remote のときはホスト側が register によらず --no-register を強制する(§13)。
+    // source が remote のときはホスト側が register によらず --no-register を強制する(RR-13)。
     register: !deviceAddFromPicker,
     overwrite: overwrite,
     ...installFields,

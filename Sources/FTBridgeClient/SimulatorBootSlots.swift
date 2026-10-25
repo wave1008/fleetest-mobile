@@ -9,7 +9,7 @@ import Synchronization
 
 public enum SimulatorBootSlots {
     /// 同時に起動してよい台数。ユーザー決定(`DeviceBooter.bootAll` の同時2台と同じ値)。
-    /// 5台の一斉起動で空きメモリが 59.5GB → 0.7GB に尽き FM が死んだ → maintainer-notes §97。設定・環境変数の口は置かない
+    /// 5台の一斉起動で空きメモリが 59.5GB → 0.7GB に尽き FM が死んだ → MN-97。設定・環境変数の口は置かない
     public static let concurrency = 2
 
     /// 待ちの上限は置かない(`bootstatus -b` 自体に上限が無い。持ち主が死ねば flock が外れる)。

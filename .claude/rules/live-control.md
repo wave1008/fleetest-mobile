@@ -73,7 +73,7 @@ CLAUDE.md から移した規則(本文は移設前と同一)。この領域の�
   自動起動を撃たない)。**前面追従の候補はシミュレータ = `launchctl list` / 実機 = devicectl の
   processes × apps(`IOSPhysicalRunningApps`)** —— 片方だけ変えない。**本人確認へ渡す `/status` は
   `BridgeDiscovery.statusForIdentityCheck` で udid を補う**(実機のランナーは名乗らない = 補わないと
-  既定ポートの別の実機を「自分」と読む)→ maintainer-notes §47。
+  既定ポートの別の実機を「自分」と読む)→ MN-47。
   **1コマンドの中で撃つ外部呼び出しの timeout は command watchdog(30 秒)より十分短く**し、失敗は控えて
   毎コマンド撃ち直さない(`DevicectlBackoff`)—— watchdog が serve を殺すたびに自動起動が走る。
   **内側の上限が command watchdog の基準値を超えるコマンド(`Timeout.session` 45秒で撃つ launch/activate/
@@ -81,18 +81,18 @@ CLAUDE.md から移した規則(本文は移設前と同一)。この領域の�
   `ApiLiveServeCommand.watchdogAllowanceSeconds` でその分を watchdog に足す**(拡張側は `serveCommandAllowanceMs` が
   gesture/press/drag/pinch/fold を ms で持つ。拡張は launch/install を撃たないが、片方だけ変えない)。**窓は本人確認・操作・観測をまとめて数えるので、観測を撃つ命令は
   `observationAllowanceSeconds`(session)も足す**(窓に渡すのは和の `watchdogWindowAllowanceSeconds`)——
-  猶予が無いと、内側の期限より先に watchdog が serve ごと殺す → maintainer-notes §66。
+  猶予が無いと、内側の期限より先に watchdog が serve ごと殺す → MN-66。
   **観測の段(前面追従・screenshot・snapshot・springboard 退避・失敗の注記)は段の数を猶予へ足さず、手前で
   `ResidentProcessGuard.noteCommandProgress()` を撃って窓を張り直す**(窓は「進まない時間」を測る。前面追従は
-  `followFrontmost` だけを通す。`LiveWatchdogProgressScanTests`)→ maintainer-notes §68.1
+  `followFrontmost` だけを通す。`LiveWatchdogProgressScanTests`)→ MN-68.1
   **実機に2本目のランナーを立てない**(ライブ操作の自動起動 `LiveBridgeAutoStarter.launchBridge` が、同じ実機を
   宛先に持つ別ポートの xcodebuild を見たら断る。起動途中のランナーは走査に載らない。bridge up / 供給は起動途中のデバイスを
-  待って引き取るので門は置かない)→ maintainer-notes §49.4。
+  待って引き取るので門は置かない)→ MN-49.4。
   **Simulator も、同じ台に残骸と言えないランナー(忙しくて /status に答えない・起動途中でまだ待ち受けていない)が居れば、
   起動先と同じポートでも起動しない**(`BridgeLauncher.partitionRunnersElsewhere(_:repoRoot:)` → `isLeftoverRunner` = 接続拒否・このワークスペース・
-  起動途中でない、の3つが揃ったものだけが残骸 → maintainer-notes §101。`XCUIBridgeResolver.start` と `ApiLiveServe.busyRunnerPort` も同じ判定で
+  起動途中でない、の3つが揃ったものだけが残骸 → MN-101。`XCUIBridgeResolver.start` と `ApiLiveServe.busyRunnerPort` も同じ判定で
   そのポートへ振り替える)。**判断に使う走査は `BridgeDiscovery.scanDetailed`**(答えないが待ち受けている = silent を別に返す。
-  `scan` は答えたものだけ)→ maintainer-notes §99
+  `scan` は答えたものだけ)→ MN-99
   **`--udid` がこの Mac のシミュレータ一覧にも実機一覧にも無いなら、自動起動を一度も撃たずに起動時点で
   即エラー終了する**(`ApiLiveServe.udidStartupOutcome`。判定は MCP と同じ `SimulatorCatalog.lookupUDID`
   の1箇所——2つ目の判定を作らない)。**一覧そのものが読めない(unreadable)は「居ない」に畳まず進む**

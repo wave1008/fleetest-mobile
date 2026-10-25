@@ -1,6 +1,6 @@
 // ApiRunMachineFanout.swift
 // `fleetest api run --profile <p>` で p のデバイスが複数の機械にまたがるときの実行
-// (docs/remote-runner.md §13)。DeviceMachineRunner(`fleetest run` の同じ状況)と同じ割り当て
+// (RR-13)。DeviceMachineRunner(`fleetest run` の同じ状況)と同じ割り当て
 // (build→list→resolve→assign)を再利用し、ホストごとに `fleetest api run --runner <label> …` を
 // 子プロセスとして並行に起動、NDJSON を1本の stdout ストリームへ多重化する。
 //
@@ -35,7 +35,7 @@ enum ApiRunMachineFanout {
         var remoteDir: String?
         var remoteTimeout: Int?
         /// `--wait-lock <秒>`。**親の待ち(先読み・DispatchPrelock)にだけ使い、子へは渡さない**
-        /// (下の args 組み立てと §18.10)。ここに無いと、拡張の設定 `fleetest.remoteWaitLock` が
+        /// (下の args 組み立てと RR-18.10)。ここに無いと、拡張の設定 `fleetest.remoteWaitLock` が
         /// **複数機械にまたがるプロファイルでだけ黙って落ちる** —— 共有フリートで一番待ちたい形がまさにそれ
         var waitLock: Int?
     }
@@ -68,9 +68,9 @@ enum ApiRunMachineFanout {
         // 理由・同じ位置。ユーザー決定「1つのマシンで同時に複数の run は走らせない」)。
         // **build を直列化するための一時的な先取り** —— 配分が確定したら local に配られるかどうかに
         // 関わらず必ず手放す(下)。全順序どおりの本取得は `DispatchPrelock` が local を含めて
-        // 改めて行う(§18.10「循環待ちを構造的に作れない」= local だけ順序の外に出さない)。
+        // 改めて行う(RR-18.10「循環待ちを構造的に作れない」= local だけ順序の外に出さない)。
         // api run に --force-lock は無い。**待っていることは NDJSON にも出す**(単機の api run と同じ出し口。
-        // 渡し忘れると、複数機械のプロファイルだけ実行ログビューが無言のまま止まって見える → maintainer-notes §62.4)
+        // 渡し忘れると、複数機械のプロファイルだけ実行ログビューが無言のまま止まって見える → MN-62.4)
         var localLock = try LocalDispatchLock(
             runGroup: runGroup, waitLock: options.waitLock, log: { logStderr($0) },
             emitWaiting: LocalDispatchLock.apiRunWaitingEmitter()).acquire()

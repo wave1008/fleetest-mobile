@@ -1,7 +1,7 @@
 // スキル配布の整合検証。
-// 契約(docs/design.md §15): **runbook 本体は複製しない**。正典は .claude/skills/ の1箇所で、
+// 契約(DS-15): **runbook 本体は複製しない**。正典は .claude/skills/ の1箇所で、
 // 受け手の作業フォルダへは install.sh(ステップ7.8)がコピーを置く。配布は「クローンを読ませる」1本
-// (プラグイン・curl 取得は廃止済み。docs/maintainer-notes.md §2.3)。
+// (プラグイン・curl 取得は廃止済み。MN-2.3)。
 // スキルの呼び出し名は SKILL.md frontmatter の name から決まるため、ディレクトリ名との一致も見る。
 //
 // process.cwd() は npm test 実行時に vscode-fleetest ルート(protocolVersion.test.mjs と同じ前提)。
@@ -36,7 +36,7 @@ test("各スキルの frontmatter name がディレクトリ名と一致する",
 
 test("廃止したプラグイン配布・curl 取得が復活していない", () => {
   for (const rel of [".claude-plugin", "Scripts/install-skill.sh", "skills"]) {
-    assert.ok(!existsSync(path.join(ROOT, rel)), `${rel} が復活しています(docs/maintainer-notes.md §2.3)`);
+    assert.ok(!existsSync(path.join(ROOT, rel)), `${rel} が復活しています(MN-2.3)`);
   }
 });
 

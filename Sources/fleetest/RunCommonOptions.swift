@@ -60,7 +60,7 @@ struct RunCommonOptions: ParsableArguments {
     var devices: [String] = []
 
     /// **どの機械のデバイスを使うか**。`--device` は名前でしか絞れないが、一意なのは (host, name)
-    /// なので、名前だけだと別の機械の同名デバイスまで掴む(docs/remote-runner.md §13)。
+    /// なので、名前だけだと別の機械の同名デバイスまで掴む(RR-13)。
     /// マシン別サブ実行が自分で付ける値で、手で打つものではない
     @Option(name: .customLong("device-machine"),
             help: ArgumentHelp(

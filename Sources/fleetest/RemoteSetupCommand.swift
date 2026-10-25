@@ -1,5 +1,5 @@
 // RemoteSetupCommand.swift
-// `fleetest remote setup` / `teardown` / `align` / `exec` (docs/remote-runner.md §14)。
+// `fleetest remote setup` / `teardown` / `align` / `exec` (RR-14)。
 // 純粋ロジックは Sources/FTRemote/RemoteSetup.swift 側(RemoteSetupPlan、単体テスト対象)。
 
 import ArgumentParser
@@ -117,7 +117,7 @@ private func remoteReach(hostSpec: RemoteHostSpec)
     return (nil, firstLine, nil)
 }
 
-// MARK: - dispatch.lock (docs/remote-runner.md §18.3 規則2)
+// MARK: - dispatch.lock (RR-18.3 規則2)
 //
 // align/install はリモートの `<base>/tool/.build` バイナリを再ビルドで差し替えるため、
 // 稼働中の dispatch へ重ねるとその dispatch を SIGKILL する(「E2E 中に swift build を
@@ -162,7 +162,7 @@ extension RemoteCommand {
             commandName: "setup",
             abstract: "Provision a remote Mac to receive --runner dispatches (idempotent)",
             discussion: "Steps: local → reach → preflight → install → align → verify "
-                + "(docs/remote-runner.md §14). Exit codes match install.sh: "
+                + "(RR-14). Exit codes match install.sh: "
                 + "0 = done / 2 = stopped with steps left for a human / 1 = failed.")
 
         @Argument(help: "Remote runner to set up: a registered machine (fleetest remote machines) or a raw user@host/host")
@@ -179,7 +179,7 @@ extension RemoteCommand {
         var project: String?
 
         @Option(help: ArgumentHelp("Run profile for the verification dispatch. Setup is not confirmed working "
-            + "until one real dispatch passes (docs/remote-runner.md §14, decision 3)"))
+            + "until one real dispatch passes (RR-14, decision 3)"))
         var profile: String?
 
         @Option(help: "Scenario ID to run for verification (defaults to the whole --profile)")
@@ -242,7 +242,7 @@ extension RemoteCommand {
                     emit("reach", .fail,
                          "\(hostSpec.sshTarget) is sitting at the login window (console user: "
                          + "\(session.consoleUser), expected: \(session.sshUser)) — unlock and log in on the "
-                         + "runner, then retry (docs/remote-runner.md §5)")
+                         + "runner, then retry (RR-5)")
                     try summarizeAndExit()
                 }
                 emit("reach", .ok, "reachable, logged in as \(session.sshUser)")
@@ -298,7 +298,7 @@ extension RemoteCommand {
                 + " (first run can take several minutes)...")
 
             // install/align は稼働中バイナリを差し替えるので、走っている dispatch と衝突しない
-            // ことを先に確かめる(docs/remote-runner.md §18.3 規則2)。verify の dispatcher が
+            // ことを先に確かめる(RR-18.3 規則2)。verify の dispatcher が
             // 同じロックを自分で取るので、verify より前に必ず解放する
             var dispatchLockHeld = false
             defer {
@@ -441,7 +441,7 @@ extension RemoteCommand {
             if let session, !session.isLoggedIn {
                 say("\(hostSpec.sshTarget) is sitting at the login window (console user: "
                     + "\(session.consoleUser), expected: \(session.sshUser)) — unlock and log in on the "
-                    + "runner, then retry (docs/remote-runner.md §5)")
+                    + "runner, then retry (RR-5)")
                 throw ExitCode(1)
             }
 
@@ -491,7 +491,7 @@ extension RemoteCommand {
         static let configuration = CommandConfiguration(
             commandName: "align",
             abstract: "Fetch, checkout and build the local HEAD revision on a runner"
-                + " (the align step of `remote setup` alone; docs/remote-runner.md §14)")
+                + " (the align step of `remote setup` alone; RR-14)")
 
         @Argument(help: "Remote runner to align: a registered machine (fleetest remote machines) or a raw user@host/host")
         var runner: String
@@ -536,7 +536,7 @@ extension RemoteCommand {
             if let session, !session.isLoggedIn {
                 say("\(hostSpec.sshTarget) is sitting at the login window (console user: "
                     + "\(session.consoleUser), expected: \(session.sshUser)) — unlock and log in on the "
-                    + "runner, then retry (docs/remote-runner.md §5)")
+                    + "runner, then retry (RR-5)")
                 throw ExitCode(1)
             }
             let layout: RemoteLayout
@@ -549,7 +549,7 @@ extension RemoteCommand {
             }
 
             // align は稼働中バイナリを差し替えるので、走っている dispatch と衝突しないことを
-            // 先に確かめる(docs/remote-runner.md §18.3 規則2)
+            // 先に確かめる(RR-18.3 規則2)
             if let failure = acquireRemoteDispatchLock(hostSpec: hostSpec, layout: layout) {
                 say(failure)
                 throw ExitCode(1)
@@ -571,7 +571,7 @@ extension RemoteCommand {
             commandName: "exec",
             abstract: "Run `fleetest <args>` on a remote runner and relay its output and exit code",
             discussion: "The generic transport for one-shot queries and operations "
-                + "(docs/remote-runner.md §14): do not add a dedicated ssh path for a new use case, use this. "
+                + "(RR-14): do not add a dedicated ssh path for a new use case, use this. "
                 + "Everything after <runner> is passed through verbatim, so --remote-dir must come before it.\n"
                 + "  fleetest remote exec mac2 -- doctor --fm-only\n"
                 + "  fleetest remote exec --remote-dir ~/runner mac2 -- api device-catalog")
@@ -583,7 +583,7 @@ extension RemoteCommand {
                 help: "Runner-only base directory on the remote host (default: the machine registry's entry, or ~/fleetest-runner)")
         var remoteDir: String?
 
-        // 設計文書(docs/remote-runner.md §14)は `fleetest --host <name> <サブコマンド>` の形で
+        // 設計文書(RR-14)は `fleetest --host <name> <サブコマンド>` の形で
         // 書いているが、ArgumentParser のサブコマンド解決と `run --host` の意味が衝突するため
         // `remote exec <runner> -- <args>` に変えた(トップレベルに --host オプションは無い)
         @Argument(parsing: .captureForPassthrough,
@@ -627,7 +627,7 @@ extension RemoteCommand {
             } else if status == 91 {
                 ConsoleOut.err(
                     "this issuer has no runner workspace on \(hostSpec.sshTarget) yet — run `fleetest remote setup "
-                        + "\(hostSpec.sshTarget)` once for this issuer (docs/remote-runner.md §18)")
+                        + "\(hostSpec.sshTarget)` once for this issuer (RR-18)")
             }
             if status != 0 {
                 throw ExitCode(status)

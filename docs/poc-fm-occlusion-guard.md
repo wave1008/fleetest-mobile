@@ -2,11 +2,11 @@
 
 | 種別 | 範囲 | 読む場面 | 扱わないこと |
 |---|---|---|---|
-| 記録 | テキストの可視性検証(FM・OCR の段)の PoC と実測 | 判定の根拠と実測を確かめるとき | 現在の仕様(→ [design.md](design.md)・.claude/rules/fm-occlusion.md) |
+| 記録 | テキストの可視性検証(FM・OCR の段)の PoC と実測 | 判定の根拠と実測を確かめるとき | 現在の仕様(→ [design/](design/README.md)・.claude/rules/fm-occlusion.md) |
 
 ブランチ: `poc/fm-occlusion-verify` / 実施日: 2026-07-21 / 実行: メインセッション(Claude Code)
 
-## 1. 背景と課題
+## OG-1 背景と課題
 
 `exists` / `textEquals` / `valueEquals` の判定は、スナップショット(アクセシビリティツリー)上に
 要素が存在するかだけを見る([LocatorResolver.matchDetailed](../Sources/FTCore/LocatorResolver.swift))。
@@ -19,14 +19,14 @@ hittable は無く、②Compose iOS では `isHittable` 自体が壊れている
 そこで、**描画(スクリーンショット)を根拠に FM(オンデバイス Foundation Models)で可視性を照合し、
 覆われ/切れ/減光/不在なら assert を失敗へ反転する**方式の実現可能性・正確性・速度を検証した。
 
-## 2. 実装(PoC)
+## OG-2 実装(PoC)
 
 | 追加物 | 位置 | 役割 |
 |---|---|---|
 | `OcclusionVerifier` | [Sources/FTFoundationModels/OcclusionVerifier.swift](../Sources/FTFoundationModels/OcclusionVerifier.swift) | FM 視覚照合器。`@Generable VisibilityVerdict{ visible, state, observedText, reason }` を greedy で生成 |
 | `ReplayDelegate.verifyElementVisible` | [Sources/FTCore/StepExecutor.swift](../Sources/FTCore/StepExecutor.swift) | FM 非依存の delegate フック(既定実装 nil)。FTCore を FM から切り離したまま結線 |
 | `StepExecutor.occlusionGuard` + `occlusionFlip()` | ノブは同上。`occlusionFlip` の現在の実体は [Sources/FTCore/StepExecutor+Assert.swift](../Sources/FTCore/StepExecutor+Assert.swift) | ノブ。exists/textEquals がツリー一致した**一点で1回だけ** FM 照合し、`visible==false` なら `.failed("text visibility check failed (on screen)…")` へ反転(誤った緑を赤へ) |
-| 計測ハーネス | `ftester-poc-occlusion`(PoC ブランチ履歴・§8) | 正解ラベル付き合成フィクスチャで正確性・速度を計測 |
+| 計測ハーネス | `ftester-poc-occlusion`(PoC ブランチ履歴・OG-8) | 正解ラベル付き合成フィクスチャで正確性・速度を計測 |
 
 検証器は 2 アームを実装して比較した:
 
@@ -35,7 +35,7 @@ hittable は無く、②Compose iOS では `isHittable` 自体が壊れている
   frame は pt、スクショは px なので `screen` サイズからスケールを求めて px クロップする(Retina 対応)。
 - **full(比較用)**: スクショ全体＋frame 座標を**言葉で**渡し、座標→ピクセル対応を FM に委ねる。
 
-## 3. 計測方法
+## OG-3 計測方法
 
 実機・シミュレータ不要。iPhone 相当の logical 画面(402×874pt)を **renderScale=2 のピクセル
 (804×1748px)** で CoreGraphics 合成し、pt→px 換算経路も実地で通す。ナビバー・ディストラクタ文言を
@@ -54,7 +54,7 @@ hittable は無く、②Compose iOS では `isHittable` 自体が壊れている
 指標: **誤った緑の排除の再現率**(隠れ 15 件を reject できた割合=機能の価値)、**有害な誤反転率**
 (正しく見えている 3 件を誤って reject=導入の害)、全体正解率、1 回あたりレイテンシ。
 
-## 4. 結果
+## OG-4 結果
 
 2 回とも**ほぼ同一**(greedy のため決定的。full アームの誤りも同じ 4 件が再現)。
 
@@ -82,7 +82,7 @@ hittable は無く、②Compose iOS では `isHittable` 自体が壊れている
 - cropped は **median ≈ 1.6s / p90 ≈ 1.75s**。max(2.6〜2.9s)は各実行の**初回のみ**でモデルの
   コールドスタート。以降は定常。クロップで画像が小さい分 full より速い。
 
-## 5. 分析
+## OG-5 分析
 
 - **クロップが決定打**。座標を自然言語で渡す弱い手がかりを排し、視覚モデルに「この小領域を読めるか」
   という単純問題へ還元したことで精度が 78%→100% に跳ねた。設計判断(cropped を本命)は妥当。
@@ -93,7 +93,7 @@ hittable は無く、②Compose iOS では `isHittable` 自体が壊れている
   通常の in-app snapshot(~0.05ms)/操作に対し大きいので**常時 ON は非現実的**、ノブで**画面/シナリオ
   限定**が前提。
 
-## 5.5 FM を「疑いがある時だけ」呼ぶ自動ゲート(追加検証)
+## OG-5.5 FM を「疑いがある時だけ」呼ぶ自動ゲート(追加検証)
 
 全 assert で FM(+1.6s)を払うのは非現実的なので、**安価な事前シグナルで FM をゲート**する2段前段を
 追加実装・計測した。FM に回すのは疑わしい時だけにする。
@@ -135,10 +135,10 @@ hittable は無く、②Compose iOS では `isHittable` 自体が壊れている
 - **Tier-0 で拾えない残余**(覆う要素がツリーに載らない部分覆い)は原理的に FM 前段では検知不能。
   ここだけは「全件 FM」でないと 100% にはならない。実運用では稀と見て、ゲート既定 ON を推奨する。
 
-## 5.7 実 UI(Simulator)再計測 — 合成では見えなかった重大な誤反転(2026-07-21)
+## OG-5.7 実 UI(Simulator)再計測 — 合成では見えなかった重大な誤反転(2026-07-21)
 
 空きデバイス **A012ADD8**(iPhone 17 Pro/iOS 27、モニター占有外)に in-app ブリッジを注入起動し、
-**sut-ec-mobile** の実画面で計測(ハーネス `ftester-poc-occlusion` の Live.swift・§8、
+**sut-ec-mobile** の実画面で計測(ハーネス `ftester-poc-occlusion` の Live.swift・OG-8、
 `ftester-poc-occlusion live <udid> <bundle> <port> <dir>`)。ground truth はスクショ目視で確定。
 
 ### 結果: unconditional FM は実 UI で**約50%の有害誤反転**
@@ -172,9 +172,9 @@ FM が最も信頼できるケース。逆に言うと:
 - ただしゲートは低インク領域しか FM に回さないので、**高インク下に隠れる部分覆い**は依然
   取りこぼす(Tier-0 幾何で一部補うのみ)。
 
-## 5.8 足切り+省略許容を実装して再計測 — 誤反転 50%→0%(2026-07-22)
+## OG-5.8 足切り+省略許容を実装して再計測 — 誤反転 50%→0%(2026-07-22)
 
-§5.7 の誤反転(アイコン/画像/絵文字/結合/省略)への対策を実装し、同じ A012ADD8 で再計測した。
+OG-5.7 の誤反転(アイコン/画像/絵文字/結合/省略)への対策を実装し、同じ A012ADD8 で再計測した。
 
 **対策1: FM 前の要素足切り**([OcclusionEligibility.swift](../Sources/FTCore/OcclusionEligibility.swift)・ツリーのみ)。
 `StaticText`/`Text` 等のテキスト型のみを対象にし、**非テキスト型(Button/Image/Cell)・結合 label
@@ -192,18 +192,18 @@ FM が最も信頼できるケース。逆に言うと:
 3 画面・**適格テキスト 36 要素すべてで `visible=true`(ground truth 全可視 → 誤反転 0/36)**。
 各画面 26 要素は足切りで FM を呼ばず除外。レイテンシ median≈1.6s。
 
-- **決定的**: §5.7 で誤反転していた ref9「家電・電化製品」(実描画「家電・電化**…**」)が、省略許容で
+- **決定的**: OG-5.7 で誤反転していた ref9「家電・電化製品」(実描画「家電・電化**…**」)が、省略許容で
   `fullyVisible` に是正。価格「¥18,000」評価「(610)」商品名など省略/記号交じりの実テキストも全て正。
 - **誤反転率 ≈50% → 0%**(実 UI・同一デバイス)。足切り+省略許容で素の FM の実用不能問題は解消した。
 
 **未取得**: デバイス上での true-positive(実際に覆われた要素を false と当てる)。iOS シミュレータは
 ハードウェアキーボード接続時にソフトキーボードが出ず(02≈03 が同一)、狙った occlusion を作れなかった。
-occlusion 検知能力の裏付けは現状 §4(合成: 覆い/空/減光を 100% 検知)+低インクゲートに依存。
+occlusion 検知能力の裏付けは現状 OG-4(合成: 覆い/空/減光を 100% 検知)+低インクゲートに依存。
 実オーバーレイ(モーダル/シート/スナックバー)での true-positive 確認が残タスク。
 
-## 5.9 デバイス上で true-positive を取得(2026-07-22)
+## OG-5.9 デバイス上で true-positive を取得(2026-07-22)
 
-`occtest` モード(ハーネス Live.swift・§8)で実 occlusion を作って検証:
+`occtest` モード(ハーネス Live.swift・OG-8)で実 occlusion を作って検証:
 商品詳細で「カートに追加」→ スナックバー(`カートに追加しました 見る`)が下部を覆う瞬間に snapshot+screenshot し、
 覆われた適格テキストを verifier が捕捉できるか確認した。ground truth はスクショ目視。
 
@@ -228,7 +228,7 @@ frame は或る瞬間、pixel は別の瞬間のもので、crop がズレて空
 StepExecutor.occlusionFlip は既に「操作の settle 後・pass 確定の一点」で1回だけ実行する設計なので、
 通常の assert(整定後)では問題になりにくいが、アニメ中の assert では留意が必要(diagnosis に state を残す理由)。
 
-## 5.10 DSL: 全アサーションを既定で可視性確認・`requireVisible: false` でオプトアウト(2026-07-22)
+## OG-5.10 DSL: 全アサーションを既定で可視性確認・`requireVisible: false` でオプトアウト(2026-07-22)
 
 occlusion-guard を利用側の既定挙動にし、**`requireVisible` 引数で統一**した(ユーザー決定)。
 `visible()` / `present()` は削除(検討の経緯は本節末尾)。
@@ -263,7 +263,7 @@ select("#sw").valueIs("1")                   // 同上(既定ガード)
 > 可視性が不要な箇所を `requireVisible: false` にするのを推奨。
 > 未了: (a)`textIs` 等への guard 付与は未実施。(b)explore 自動生成は guard を明示しない(既定に従う)。
 
-## 5.11 実行時配線の修正 + エンドツーエンドデバイス確認(2026-07-22)
+## OG-5.11 実行時配線の修正 + エンドツーエンドデバイス確認(2026-07-22)
 
 **配線バグ修正(重要)**: 実ランナーの `LazyFMDelegate`([ScenarioRunnerMain.swift](../Sources/FTScenarioRunner/ScenarioRunnerMain.swift))が
 新メソッド `verifyElementVisible` を転送しておらず、実シナリオ実行では `exist` のガードが `ReplayDelegate`
@@ -282,7 +282,7 @@ select("#sw").valueIs("1")                   // 同上(既定ガード)
 OcclusionVerifier)がデバイス上で機能することを確認**。これで PoC は 合成 → 実 UI 誤反転修正 → 実 UI TP → DSL →
 配線 → E2E まで一通り実証済み。
 
-## 5.12 poll-until-visible: 過渡的オーバーレイでの誤失敗を回避(2026-07-22)
+## OG-5.12 poll-until-visible: 過渡的オーバーレイでの誤失敗を回避(2026-07-22)
 
 当初は「pass 確定の一点で1回」ガードを実行し、その瞬間に覆われていると即失敗していた。これは
 **ローディング表示・スナックバー・遷移アニメ等の過渡的オーバーレイ**で誤失敗を招く(消えるはずの覆いで落ちる)。
@@ -296,10 +296,10 @@ OcclusionVerifier)がデバイス上で機能することを確認**。これで
 - デバイス E2E 再確認: sticky バー裏「レビュー」の `exist` は依然 failed(可視化されないため timeout で反転)、
   `requireVisible: false`/可視テキストは pass(無回帰)。
 
-## 5.13 textIs / valueIs も既定 occlusion-guard 化(2026-07-22)
+## OG-5.13 textIs / valueIs も既定 occlusion-guard 化(2026-07-22)
 
 `exist` と揃え、`textIs` / `valueIs` も**既定で可視性確認あり**(一致かつ実際に見えていること)に。
-オプトアウトは共通の `requireVisible: false`(§5.10 参照。当初は `exist`=present / テキスト系=引数 と
+オプトアウトは共通の `requireVisible: false`(OG-5.10 参照。当初は `exist`=present / テキスト系=引数 と
 非対称だったが、最終的に全コマンド共通の `requireVisible` 引数へ統一)。内部の `FlowStep.occlusionGuard`
 フィールドは実装名として据え置き。
 
@@ -310,9 +310,9 @@ OcclusionVerifier)がデバイス上で機能することを確認**。これで
   (StepCommandParamsTests)を検証(全 green)。
 
 これで存在系(`exist`)・一致系(`textIs`/`valueIs`)とも既定で「見えていること」を確認する。
-オプトアウトは全コマンド共通の `requireVisible: false`(`present` は削除済み。§5.10 の命名の経緯を参照)。
+オプトアウトは全コマンド共通の `requireVisible: false`(`present` は削除済み。OG-5.10 の命名の経緯を参照)。
 
-## 5.14 スクショ再利用: 操作を挟まない連続ガードで往復(~125ms)を回避(2026-07-22)
+## OG-5.14 スクショ再利用: 操作を挟まない連続ガードで往復(~125ms)を回避(2026-07-22)
 
 実測(§crop 検討)で、ガード発火のたびに全画面スクショ往復 **~125ms** を払っていた。**操作を挟まない
 連続ガード**(`exist` を並べる等、同一静止画面)では 1 枚を使い回して往復を省く。
@@ -327,7 +327,7 @@ OcclusionVerifier)がデバイス上で機能することを確認**。これで
 - テスト: 連続ガードでスクショ 1 回に集約 / 操作を挟むと取り直す、を StepExecutorTests で検証(count で確認)。
   デバイス E2E 無回帰(覆い→failed / 可視→passed)。poll-until-visible とも両立(待機ごとに取り直すため覆いは再判定)。
 
-## 5.15 レビュー反映(別セッションのレビュー・2026-07-22)
+## OG-5.15 レビュー反映(別セッションのレビュー・2026-07-22)
 
 - **#1 座標系の食い違い(要修正・中)**: textEquals/valueEquals がフォールバックドライバ(SystemUI/springboard)
   由来の要素に一致した場合、その frame/screen は primary と別座標系なのに occlusionFlip へ primary の
@@ -346,9 +346,9 @@ OcclusionVerifier)がデバイス上で機能することを確認**。これで
 テスト追加: #1 fsnap 一致でガード不呼出 / #2 eligibility の isUserText / #5 不一致時に occlusion を返さない
 (StepExecutorTests・全 green)。
 
-## 5.16 本番実行でのコスト実測(2026-07-22・M2 Ultra)
+## OG-5.16 本番実行でのコスト実測(2026-07-22・M2 Ultra)
 
-PoC の懸念は「常時 ON は非現実的」(§4 の速度計測)だったが、**ゲートが効いて実運用の発火は少ない**。
+PoC の懸念は「常時 ON は非現実的」(OG-4 の速度計測)だったが、**ゲートが効いて実運用の発火は少ない**。
 SampleApp 76シナリオを `ios-5-android-5`(10台並列)で実行した実測:
 
 - FM 発火は **8シナリオ / 14回・計53.9秒**(うち occlusion 10回33.5秒、heal 4回20.4秒)
@@ -360,13 +360,13 @@ SampleApp 76シナリオを `ios-5-android-5`(10台並列)で実行した実測:
 枠1本で運用しておりスループットは並列度によらず約1回/秒に見えたが、2026-09-01 の実測で
 これは FM 自体の天井ではなく枠数の帰結だったと判明した)。実行時間には「FM 呼び出し総数と枠」
 から来る下限ができ、**デバイスを増やしても縮まない**(枠はホスト単位のため)。詳細な実測値と、
-発火が増えたときの絞り方は [performance-tuning.md §3.5 / §4.2](performance-tuning.md)。
+発火が増えたときの絞り方は PT-3.5 / PT-4.2](performance-tuning/README.md)。
 
 計測は `FMHealth`(Sources/FTCore/FMHealth.swift)が用途別に計上し、結果 JSON の `fm` と
 モニターの FM グラフに出る。**ANE 負荷率では測れない**(電源状態の1ビットしか返さないため廃止済み。
-performance-tuning.md §6)。
+PT-6)。
 
-## 5.17 Tier-2: Vision OCR を FM の手前に置く(2026-09-07)
+## OG-5.17 Tier-2: Vision OCR を FM の手前に置く(2026-09-07)
 
 FM(画像添付)は crop 1 枚に p50 1.3〜1.9s(並列時 2.8s)を払い、ホスト単位で直列化される
 (FMCallSlots)。**同じ crop を Vision の `VNRecognizeTextRequest` で読むだけなら p50 33ms**なので、
@@ -414,7 +414,7 @@ E2E-iOS で 77 枚(34 本・34/34 緑)、日本語ラベルを持つ E2E-CMP `io
 この誤読は次節の言語規則で消える(97% が等倍で読める)。
 
 - **OCR 単独(FM の置き換え)は不可**: 誤読した回を「見えていない」と読むと誤った赤になる。
-  §5.7 の「素の FM は約50%誤反転」と同型の失敗で、向きだけが違う。**読めなかったことは
+  OG-5.7 の「素の FM は約50%誤反転」と同型の失敗で、向きだけが違う。**読めなかったことは
   反転の根拠にしない**(判定は必ず FM)。
 - 到達した crop は 162/163 が Tier-0 幾何の疑い由来で、インク由来(sd < 12)は 1 枚。
   インク由来の母集団は実測1(167 枚)がそのまま代表する。
@@ -450,7 +450,7 @@ E2E-iOS で 77 枚(34 本・34/34 緑)、日本語ラベルを持つ E2E-CMP `io
 - **合成画像では拡大の効きが再現しない**(6pt の合成文字は ×2 で悪化した)。回帰は実 crop の
   固定コーパス(`Tests/Fixtures/OcclusionCrops/` の 3 枚 + manifest)で、**言語規則の効き目・
   段ごとの読み取り・撃つ回数**を等号で固定する。この 3 枚は認識レベルを fast に落とす・
-  日本語の集合で言語補正を切る(§5.18)・拡大を止める・言語規則を壊す、のいずれの変異も落とす。
+  日本語の集合で言語補正を切る(OG-5.18)・拡大を止める・言語規則を壊す、のいずれの変異も落とす。
 
 ### 使う API と版
 
@@ -483,7 +483,7 @@ E2E-iOS で 77 枚(34 本・34/34 緑)、日本語ラベルを持つ E2E-CMP `io
 「モデルがメモリに載っていない」ではなかった。プロセスで最初の 1 回だけ 20〜45 秒かかるのは
 **Espresso(認識器の実体)の AOT コンパイル**で、キャッシュは
 `~/Library/Caches/<プロセス名>/com.apple.e5rt.e5bundlecache` に**プロセス名と署名 ID で**鍵付けされ
-(SwiftPM の Debug ビルドは ID に LC_UUID が入る。docs/performance-tuning.md §3.33)、
+(SwiftPM の Debug ビルドは ID に LC_UUID が入る。PT-3.33)、
 **コンパイルがそのプロセスの生存中に終わったときだけ**コミットされる(途中で死ぬと `.tmp.<pid>` が残るだけ)。
 1 シナリオ = 1 プロセスの実行バイナリは 20〜60 秒で終わるのでほぼコミットできず
 (E2E-CMP で完了 1 / 放置 53)、**全プロセスが毎回ゼロから払っていた**。xctest ホストや素の CLI では
@@ -497,7 +497,7 @@ E2E-iOS で 77 枚(34 本・34/34 緑)、日本語ラベルを持つ E2E-CMP `io
 読む(`RegionText.compileModelIfNeeded`。ガードが既定で効く executor の生成時に始める)/ **③ 探りが 1 行以上
 読めるまで近道は撃たない**(`isModelReady`。判定は FM が担うので損は無い)。読ませる言語集合は
 `languages(for:)` が返しうる 2 つ(2 つ目の日本語の認識器は旧形式で実行ファイルごとのコンパイルが無く、検出・向きは
-1 つ目と共有 = 1 つ目の後なら約 0.1 秒。docs/performance-tuning.md §3.33)。
+1 つ目と共有 = 1 つ目の後なら約 0.1 秒。PT-3.33)。
 
 実測: シナリオ側のコンパイル 22,980ms → 218ms、実 crop の初回読み 21,830ms → 98〜122ms、
 E2E(local)でガード 54 件中 43 件が近道・予算切れ 0・guardMs 最大 456ms(修正前 107,720ms)。
@@ -525,7 +525,7 @@ E2E(local)でガード 54 件中 43 件が近道・予算切れ 0・guardMs 最�
 **利用者の口は実行プロファイルの `ocrTextVisibilityCheck`**(既定 true。拡張のプロファイルタブ
 「Advanced Features(Experimental)」セクションの「OCRを使用したテキストの可視性検証を有効にする」)。
 他のキーを経由せずこの値がそのまま効く。`false` にすると `--no-ocr-text-visibility-check` がランナーへ渡り、
-**環境変数より優先**して OCR を止める(従来どおり FM だけで判定)。`fmTextVisibilityCheck` との関係は §5.22。
+**環境変数より優先**して OCR を止める(従来どおり FM だけで判定)。`fmTextVisibilityCheck` との関係は OG-5.22。
 
 環境変数は保守者用の口:
 `FT_OCCLUSION_OCR`: 未設定/その他 = **on(既定)** / `0`・`off` = 殺しスイッチ(従来どおり FM だけ)/
@@ -537,7 +537,7 @@ E2E(local)でガード 54 件中 43 件が近道・予算切れ 0・guardMs 最�
 誤った赤は構造上増えない(読めなかった回の判定は必ず FM)。
 
 
-## 5.18 FM には期待文字列を渡さない —— 転写 + ホスト照合(2026-09-15)
+## OG-5.18 FM には期待文字列を渡さない —— 転写 + ホスト照合(2026-09-15)
 
 日本語 UI での精度確認(iOS 標準アプリ 20 画面を ja/en で撮り、実要素に覆い・空白・別の文字を合成。
 正解付き ja 70 / en 80 要素 × 5 変種 + 実 run の crop 158 枚)で、FM 段の**おうむ返し**が見つかった:
@@ -586,7 +586,7 @@ FM に見せない**ことが本質だった。
 - **探索側の穴**: E2E-iOS の `#txt_offscreen` はタブバーの裏に 2pt しか描かれておらず、旧 FM は
   おうむ返しで通していた(真陽性)。`clippingContainer` の深さ規則が「可視域に兄弟 1 つ」で nil →
   viewport が画面全体 → 容器の下端を 18pt はみ出した要素を found と判定していた。nil のときは
-  申告 scrollable の祖先へ倒す形に直した(docs/maintainer-notes.md §19)
+  申告 scrollable の祖先へ倒す形に直した(MN-19)
 - **字形**: en ロケールのシミュレータは「単」(U+5358)を中国語フォントの字形で描き、補正なしの Vision も
   FM も「单」(U+5355)と読む。言語の選択(`languages(for:)` = ja+en)は既にあったが
   `usesLanguageCorrection` を切っていたのが効いていた。**日本語モデルを載せる集合でだけ補正を有効**にする
@@ -599,7 +599,7 @@ FM に見せない**ことが本質だった。
 要素の frame に変種を合成し、`OcclusionCrop.rect` で切った crop を `OcclusionVerifier.verifyCropped`
 (frame = 画像全体)に当てる。
 
-## 5.19 FM が判定を返さないときの OCR だけの判定と、先頭だけ描かれた形(2026-09-26)
+## OG-5.19 FM が判定を返さないときの OCR だけの判定と、先頭だけ描かれた形(2026-09-26)
 
 それまで FM が判定を返さないとき(macOS 26・実呼び出しの失敗・ブレーカ開)はガードが素通りし、
 OCR の有無で合否は変わらなかった(OCR は「見える」側にしか倒さないため)。ユーザー要望で、
@@ -622,7 +622,7 @@ OCR の有無で合否は変わらなかった(OCR は「見える」側にし�
 
 | 種類 | 件数 | 正解の付け方 |
 |---|---|---|
-| 実 crop(E2E-iOS / E2E-CMP の measure 採取・§5.17 と同じ) | 163 | 目視(5 件は撮った瞬間に期待の文字が出ていなかった: WebView の空白・DOM が絵より先に進んだ `wv_result=link`・画面外テキスト) |
+| 実 crop(E2E-iOS / E2E-CMP の measure 採取・OG-5.17 と同じ) | 163 | 目視(5 件は撮った瞬間に期待の文字が出ていなかった: WebView の空白・DOM が絵より先に進んだ `wv_result=link`・画面外テキスト) |
 | **実画面の日本語**(ja ロケールの Simulator・iOS 27 の設定とリマインダー 34 画面) | 134(うち日本語 119) | 型の足切りを通り・画面内に収まり・全画面の容器を除いて他と重ならない要素。赤の候補は1件ずつ目視(2 件は本当に見えていなかった: 浮いた検索バーの下・木と絵のずれ) |
 | FM が反転した実 crop(`~/Library/Logs/fleetest/occlusion/`) | 39 | 目視で全件が見えていない(空白・図形・別の行) |
 | 合成(見えている実 crop から) | 空白・全面の覆い・左 65% / 右 35% の覆い・半透明 50% / 80%・別の文字 × 各 295 | 変種の定義どおり |
@@ -689,7 +689,7 @@ FM を答えなかったことにする注入(`FT_FAKE_FM_NO_VERDICT=1`)を付�
 切って `RegionText.read`(言語は `languages(for:)`・拡大の段ごと)で読み、`TranscriptMatch.judge` と
 `OCROnlyVisibility.judge` に当てる。
 
-## 5.20 文字以外の要素に FM を当てる案(不採用・2026-09-26)
+## OG-5.20 文字以外の要素に FM を当てる案(不採用・2026-09-26)
 
 「FM を使用した UI の視覚検証」として、文字以外の要素(アイコン・画像・ボタン・スイッチ)にも
 可視判定を広げる案を PoC で測り、**新設しないと決めた**(ユーザー決定)。
@@ -711,15 +711,15 @@ FM が拾えるのは空白と全面の覆いだけで、どちらもインク�
 転写を木のラベルと突き合わせられるからで、アイコンには突き合わせる相手が無い。再検討するなら、
 見た目の正解(見本・前回の見た目)を持つ形に限る。
 
-## 5.21 OCR で不可視と言い切れた回は FM を呼ばない(2026-09-26。§5.22 で改めた)
+## OG-5.21 OCR で不可視と言い切れた回は FM を呼ばない(2026-09-26。OG-5.22 で改めた)
 
 ユーザー決定: **FM の有無に関わらず**、OCR の読み(読めなければインク量)だけで `OCROnlyVisibility` が
 「見えていない」と言い切れた回は FM に回さず赤にする。役割は「a11y の木が在ることを保証し、見えているかを
-安い OCR で決め、OCR が言い切れない形だけ FM で精度を足す」。§5.17 の「読めなかった回の判定は必ず FM」は
+安い OCR で決め、OCR が言い切れない形だけ FM で精度を足す」。OG-5.17 の「読めなかった回の判定は必ず FM」は
 「**丸ごとは読めなかった**だけを反転の根拠にしない」に改める(1文字誤読の問題は言語規則で解消済み・
-判定は §5.19 の `TranscriptMatch.judge` を通る)。
+判定は OG-5.19 の `TranscriptMatch.judge` を通る)。
 
-- 根拠は §5.19 のコーパス: 見えている実 crop 290 件(日本語 119)で OCR だけの判定の誤った赤 0。
+- 根拠は OG-5.19 のコーパス: 見えている実 crop 290 件(日本語 119)で OCR だけの判定の誤った赤 0。
   FM が生きている構成でこの判定が赤にするのは、FM が使えないときに赤にしていたのと同じ形だけ
 - FM へ上げるのは **判定不能**(読めない × インクが多い = 図形・WebView・一部だけ残った文字。
   OCR が判定不能にした見えない標本 72 件を FM は 72/72 赤・見えている 31 件は全部緑)と、
@@ -731,21 +731,21 @@ FM が拾えるのは空白と全面の覆いだけで、どちらもインク�
 - 配線は `OCROnlyVisibilityWiringTests.testOCRNotVisibleShortCircuitsBeforeFM` が FM より前にあることを固定
   (変異 2 件 = measure に限定・skipped を立てる、を検出)
 
-## 5.22 FM の段と OCR の段を独立させ、両方の判定を突き合わせる(2026-09-26)
+## OG-5.22 FM の段と OCR の段を独立させ、両方の判定を突き合わせる(2026-09-26)
 
-ユーザー決定で §5.21 を改める: 実行プロファイルの `fmTextVisibilityCheck`(「FM を使用したテキストの可視性検証」)は
+ユーザー決定で OG-5.21 を改める: 実行プロファイルの `fmTextVisibilityCheck`(「FM を使用したテキストの可視性検証」)は
 **FM の段**、`ocrTextVisibilityCheck` は **OCR の段**を指し、独立に切り替える(guard はどちらかが true なら走る)。
 **FM の段が使えるときは OCR の赤でも FM に回し**、最終判定は2つを突き合わせて決める。
 
 **突き合わせの規則: 見えていると読めた側を採る**(`OCROnlyVisibility.merge`。赤は両方が見えないと言った回か、
 OCR が判定不能で FM が見えないと言った回だけ)。根拠:
 
-- どちらも期待文字列を知らずに読んだ文字を同じ `TranscriptMatch` で照合する(FM には期待文字列を渡さない = §5.18。
+- どちらも期待文字列を知らずに読んだ文字を同じ `TranscriptMatch` で照合する(FM には期待文字列を渡さない = OG-5.18。
   おうむ返しで「読めた」ことにはならない)。**「読めた」は描かれている直接の証拠**で、「読めなかった」は読み手の
-  失敗でも起きる(OCR: 短い文字列の誤読・5 文字未満は誤読の許容が無い。FM: 字形の取り違え「擴張」、§5.18 の ja 1/70)
-- 割れる2向きの誤りの率(同じ母集団ではないので目安): OCR の赤が見えている要素に出る率 0/290(§5.19)・
-  FM の赤が見えている要素に出る率 ja 1/70・en 0/80・実 run 0/153(§5.18)/ 見えない要素を FM が緑にする率
-  3/608(合成・余白への写り込み。§5.18)・OCR の判定が緑にする率は左 65% の覆いで 4/295(§5.19。値だけ違う別の文字と
+  失敗でも起きる(OCR: 短い文字列の誤読・5 文字未満は誤読の許容が無い。FM: 字形の取り違え「擴張」、OG-5.18 の ja 1/70)
+- 割れる2向きの誤りの率(同じ母集団ではないので目安): OCR の赤が見えている要素に出る率 0/290(OG-5.19)・
+  FM の赤が見えている要素に出る率 ja 1/70・en 0/80・実 run 0/153(OG-5.18)/ 見えない要素を FM が緑にする率
+  3/608(合成・余白への写り込み。OG-5.18)・OCR の判定が緑にする率は左 65% の覆いで 4/295(OG-5.19。値だけ違う別の文字と
   右 35% の覆い・半透明は設計どおりの緑)。**ガードに届く要素の大半は見えている**(E2E で 142/142 等)ので、
   割れた回は見えている側である見込みが高い
 - 規則が割れた回を**黙って**畳まないよう、注記 `ocr-read-what-fm-missed`(FM は見えないと言い OCR は読めた)/
@@ -768,10 +768,10 @@ OCR が判定不能で FM が見えないと言った回だけ)。根拠:
   返らない・merge が FM の後)・`FTDriveCoreOCRModelCompileWiringTests`(OCR だけでも guard が走る)・
   `testFMStageOffNeverCallsFM`。変異 5 件をすべて検出
 
-## 6. 既知の限界
+## OG-6 既知の限界
 
 1. **合成フィクスチャでの計測**。実アプリのスクショ(半透明シート、影、アンチエイリアス、動的コンテンツ)は
-   未検証。次段で sut-ec-mobile の実オーバーレイ画面で再計測すべき。→ §5.7〜5.9 の実 UI 計測で解消済み。
+   未検証。次段で sut-ec-mobile の実オーバーレイ画面で再計測すべき。→ OG-5.7〜5.9 の実 UI 計測で解消済み。
 2. **Compose iOS の frame クランプ画面では無力**。クロップ先の frame 自体が嘘([compose-ios-ax-frame-clamp])
    なので、退化 frame は `occlusionFlip` がスキップする実装にした(素通り=従来動作)。この画面群は
    本ガードの対象外と割り切る。
@@ -779,9 +779,9 @@ OCR が判定不能で FM が見えないと言った回だけ)。根拠:
 4. **coveredPartial の閾値は主観**。65% 覆いを「見えない」と定義。どこまでを許容するかは要件次第。
 5. **poll 挙動**。現状は「ツリー一致の一点で1回照合し、不可視なら即失敗」。過渡的オーバーレイ
    (スピナー等)を待ちたいなら「可視になるまで poll、timeout で失敗」に変える余地(FM コール増)。
-   → §5.12 の poll-until-visible で解消済み。
+   → OG-5.12 の poll-until-visible で解消済み。
 
-## 7. 推奨(実 UI 計測を踏まえ改訂)
+## OG-7 推奨(実 UI 計測を踏まえ改訂)
 
 実 UI で **unconditional FM は約50%誤反転**する事実が判明したため、当初の楽観的推奨(cropped を広く採用)
 を**取り下げる**。改訂版:
@@ -790,7 +790,7 @@ OCR が判定不能で FM が見えないと言った回だけ)。根拠:
 2. **FM は必ずゲート越し**。`occlusionInkThreshold`(既定 12)未満の低インク領域だけ FM に回す。
    これで実運用の誤反転をほぼ 0 にできる(デバイス上で確認)。当初はここで既定 OFF・限定 ON を
    推奨したが、三段ゲート+スクショ再利用でコストが抑えられたため**既定 ON が確定**
-   (2026-07-22 ユーザー決定・§5.15 #3。オプトアウトは `requireVisible: false`)。
+   (2026-07-22 ユーザー決定・OG-5.15 #3。オプトアウトは `requireVisible: false`)。
 3. **FM に回す前に要素種別・省略で足切りする**(次段の必須タスク):
    - 対象は「label が verbatim 描画されるテキスト要素」に限定。**アイコン/画像/結合セマンティクス
      (label に区切りの `, ` を含む合成ノード)/絵文字単体は除外**。
@@ -806,20 +806,20 @@ OCR が判定不能で FM が見えないと言った回だけ)。根拠:
 [RegionInk](../Sources/FTCore/RegionInk.swift)・[OcclusionSuspicion](../Sources/FTCore/OcclusionSuspicion.swift)・
 [OcclusionVerifier](../Sources/FTFoundationModels/OcclusionVerifier.swift)・StepExecutor.occlusionFlip)。
 
-**デバイス上での true-positive も取得済み(§5.9)**: スナックバー occlusion で「¥24,000」が visible→covered に
+**デバイス上での true-positive も取得済み(OG-5.9)**: スナックバー occlusion で「¥24,000」が visible→covered に
 正しく反転、sticky バー裏の「レビュー」も安定検知。実 UI で **誤反転 0 かつ 実 occlusion 捕捉**を両立できた。
 
 残タスクは **①高インク下の部分覆いの取りこぼし**(Tier-0 幾何で一部補完・原理的限界あり)、
-**②snapshot/screenshot の非原子性**(アニメ中は整定後に実行・§5.9 の罠)。
-**③DSL 露出は実装済み**(§5.10 の `requireVisible` 引数。`visible()` は削除済み)。これらを踏まえれば実採用の目処は立った。
+**②snapshot/screenshot の非原子性**(アニメ中は整定後に実行・OG-5.9 の罠)。
+**③DSL 露出は実装済み**(OG-5.10 の `requireVisible` 引数。`visible()` は削除済み)。これらを踏まえれば実採用の目処は立った。
 単体の FM を無差別に当てる案は引き続き非推奨。
 
 **採用形のまとめ(確定)**: DSL の `requireVisible` 引数で露出し**既定 ON**(2026-07-22 ユーザー決定・
-§5.15 #3。オプトアウトは `requireVisible: false`)、判定は
+OG-5.15 #3。オプトアウトは `requireVisible: false`)、判定は
 `eligible(足切り) → 低インク or Tier-0幾何(疑い) → FM(cropped・省略許容) → visible判定`の順。
 整定後の assert 一点で1回だけ実行。state は診断ログのみ。
 
-## 8. 再現手順(計測ハーネス)
+## OG-8 再現手順(計測ハーネス)
 
 計測に使った単体ハーネス `ftester-poc-occlusion`(合成フィクスチャ計測+デバイス駆動の
 live/dump/explore/occtest/e2e モード)は **main の履歴に保存**され(追加コミットで導入 → cleanup
@@ -834,4 +834,4 @@ swift build --product ftester-poc-occlusion
 .build/debug/ftester-poc-occlusion e2e <udid> <bundleID> <port>   # デバイス E2E
 ```
 
-[compose-ios-ax-frame-clamp]: ./design.md
+[compose-ios-ax-frame-clamp]: ./design/README.md

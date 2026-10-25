@@ -1,6 +1,6 @@
 // HostOccupancy.swift
 // 「今この機械で誰かの run が走っているか」を、**その機械の上のローカルなファイル読みだけで**
-// 判定する(docs/remote-runner.md §18.7 の M2「占有表示・配信の自動退避」)。
+// 判定する(RR-18.7 の M2「占有表示・配信の自動退避」)。
 //
 // dispatch.lock は機械に1本(RemoteDispatchLock。`~/.fleetest/`)で、**リモートへのディスパッチも
 // ローカル run も同じ1本を取る**(CLAUDE.md「1マシンで同時に走る run は1本」)。
@@ -8,11 +8,11 @@
 // 条件にしない —— 手元の run も占有である。
 // その機械で動いているプロセス(手元の `api monitor` / fan-out の子)は **ssh を1本も足さずに**
 // 読めるので、手元から監視間隔ごとに覗きに行く形にはしない(ssh の churn を作らない =
-// docs/remote-runner.md §13 の規律)。
+// RR-13 の規律)。
 //
 // **保持者が誰かは表示専用**(RemoteDispatchLockInfo と同じ規律 —— pid も issuer も自己申告)。
 // 配信の退避は**保持者が誰かによらず**効かせる: 配信とテストの干渉は他人の run でも自分の run
-// でも同じように起きる(docs/verification.md「8台に配信を張った状態のフル E2E は Android が
+// でも同じように起きる(docs/verification/environment.md「8台に配信を張った状態のフル E2E は Android が
 // 実際に赤になった」)。`mine` は文言と破壊的操作の確認にだけ使う。
 //
 // **この判定は「出れば占有」であって「出なければ空き」ではない**: dispatch.lock を取らない
@@ -75,8 +75,8 @@ public struct HostOccupancy: Equatable, Sendable, Codable {
     }
 }
 
-/// **他人(あるいは自分)の run を巻き添えにする操作の前に、占有を見る**(docs/remote-runner.md
-/// §18.1 #6)。`remote clean` の `devices down` はブリッジ停止 + シャットダウンなので、
+/// **他人(あるいは自分)の run を巻き添えにする操作の前に、占有を見る**(docs/remote-runner/
+/// RR-18.1 #6)。`remote clean` の `devices down` はブリッジ停止 + シャットダウンなので、
 /// 走っているディスパッチがあれば必ずその run を殺す。
 ///
 /// **判定は保持者が誰かによらない** —— 自分の run でも殺されることに変わりはない。
@@ -108,7 +108,7 @@ public enum RemoteDestructiveGuard {
             return .refuse(
                 "a dispatch is running on this host (\(holder)) — stopping its bridges and simulators"
                     + " would kill that run. Wait for it to finish, or pass --ignore-lock if you know"
-                    + " it is stale (docs/remote-runner.md §18.1)")
+                    + " it is stale (RR-18.1)")
         }
     }
 }

@@ -1,5 +1,5 @@
 // HostRecordingProbe(run 前の「端末側の録画セッション」検査)の判定と、壊さないための規律。
-// 検査そのものは simctl を撃つので単体では通せない(実物での確認は docs/verification.md の手順)。
+// 検査そのものは simctl を撃つので単体では通せない(実物での確認は docs/verification/ の手順)。
 
 import XCTest
 @testable import FTCore

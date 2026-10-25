@@ -1,4 +1,4 @@
-// フリート定義(docs/remote-runner.md §13)の純粋ロジック。
+// フリート定義(RR-13)の純粋ロジック。
 // ssh・プロセス起動は Sources/fleetest/FleetRunner.swift 側(e2e に残す)。
 
 import Foundation

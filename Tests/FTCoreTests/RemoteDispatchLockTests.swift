@@ -1,4 +1,4 @@
-// 同一リモートホストへの二重ディスパッチ防止ロック(docs/remote-runner.md §5)の純粋ロジック。
+// 同一リモートホストへの二重ディスパッチ防止ロック(RR-5)の純粋ロジック。
 // ssh 実行は Sources/fleetest/RemoteRunDispatcher.swift 側(e2e に残す)。
 
 import Foundation
@@ -130,7 +130,7 @@ final class RemoteDispatchLockTests: XCTestCase {
             + " (started by ci (from wave1008-mbp, pid 4242) at 2025-08-12T13:20:00Z)"
             + " — wait for it to finish, run `fleetest remote unlock --runner <machine>` if it is your own"
             + " dispatch that died, or pass --force-lock if it is stuck"
-            + " (docs/remote-runner.md §5)")
+            + " (RR-5)")
     }
 
     /// **手元のロックは別の文言**(逃げ道が違う)。`remote unlock --runner` は案内しない ——

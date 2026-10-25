@@ -67,9 +67,9 @@ CLAUDE.md から移した規則(本文は移設前と同一)。この領域の�
     全出力は `<WORK_DIR>/.fleetest/install-<日時>.log` へ
   - **pull 後は自分自身を再 exec する**(条件は「実行中のファイル = pull したクローンの
     `Scripts/install.sh` 自身」かつ HEAD が動いたときだけ)。**`update.sh` にも同じ再 exec がある**
-    (2周目は `FT_UPDATE_REEXEC` で up-to-date の早期終了を通さない)→ maintainer-notes §1.1
+    (2周目は `FT_UPDATE_REEXEC` で up-to-date の早期終了を通さない)→ MN-1.1
   - **画面は各ステップ1行(逐次)+ 集計だけ・生ログはファイルへ**(`--verbose` で従来)。
-    最後の再掲は warn/fail だけ → maintainer-notes §1.4
+    最後の再掲は warn/fail だけ → MN-1.4
   - **外部構成ではクローンのローカル変更を自動破棄**(reset --hard + `clean -fd`。`-x` は付けない
     = .build/ を消さない。`--keep-local` で従来)
   - **WORK_DIR の `AGENTS.md` にマーカー付きで入口を置き、`CLAUDE.md` には `@AGENTS.md` の読み込みだけを置く**
@@ -81,22 +81,22 @@ CLAUDE.md から移した規則(本文は移設前と同一)。この領域の�
     **使い方の解説は書かない**(ツール説明と二重管理になり必ずズレる)。受け手の資産なので
     マーカーの内側だけ差し替え、嫌う受け手には `--skip-entry-point`。
     **ここは受け手のファイルを書き換える唯一の箇所**なので、**マーカーが begin/end ちょうど1組で
-    なければ1バイトも書かない**(`installClaudeMdBlock.test.mjs` が3形を守る)→ maintainer-notes §1.2
+    なければ1バイトも書かない**(`installClaudeMdBlock.test.mjs` が3形を守る)→ MN-1.2
   - **クローンが git 管理しているファイルには書かない**。判定はレイアウトではなく
     **入口ファイルがクローンの作業ツリーの内側にあるか**(`os.path.commonpath` による包含判定)。
     **受け手のフローに「クローンの中を書く」工程を足すときは必ずこの判定を見る**
-    → maintainer-notes §1.3
+    → MN-1.3
   - **スキルのコピーはステップ7.8 が置く・更新する唯一の場所**(正典 `.claude/skills/` から
     `fleetest-setup` 以外を `<WORK_DIR>/.claude/skills/` へ**コピー**。リンクにしない = 作業フォルダは
     git にコミットされうる)。**一覧は正典から導出**(手書きの一覧を持たない)。**印
     `.fleetest-copied` にある名前だけ**を更新・削除し、印に無い同名は受け手のものとして触らない・
     リンクも触らない。**`fleetest-setup` は絶対に写さない**(作業フォルダのそれは `fleetest init` が
     書く受け手専用の別内容)。`--skip-skills` / クローン構成 / 置き先がクローンの内側は skip。
-    変わった回は再起動を案内する(`installCopiedSkills.test.mjs`)→ maintainer-notes §2.3
+    変わった回は再起動を案内する(`installCopiedSkills.test.mjs`)→ MN-2.3
   - **毎回 `fleetest api ensure-settings` で Bash 許可リストを補修する**(init 経由だけだと
     `--skip-project` の更新で既存の受け手に永久に届かない)。**クローンへの `Read` の allow と `Edit` の
     deny も同じ箇所で書く**(クローン構成では書かない・deny は初回だけ)。**シナリオを実行する ft_* / CLI を
-    allow から外す案は実測で守りにならなかったので戻さない** → maintainer-notes §2.5
+    allow から外す案は実測で守りにならなかったので戻さない** → MN-2.5
 - 受け手の更新: `Scripts/update.sh`(install.sh を再実行 + **版が変わったら間のリリースノートを「What's new」として表示** + project sync + **Claude Code の
   スキルのコピーの更新(install.sh のステップ7.8 が行う)。
   `.claude/skills/fleetest-update/SKILL.md` と 1:1)。**先に update-check.sh を呼び up-to-date なら
@@ -124,29 +124,29 @@ CLAUDE.md から移した規則(本文は移設前と同一)。この領域の�
   片方だけ変えない。`toolRootContract.test.mjs` が規則の3語(クローン判別マーカー・既定の隣・
   Package.swift の宣言)の欠落を検出)
 - **インストーラが面倒を見るエージェントは Claude Code だけ**(規約位置の唯一の定義元は
-  `Sources/FTCore/AgentIntegration.swift`。経緯と表は docs/design.md §15)。
+  `Sources/FTCore/AgentIntegration.swift`。経緯と表は DS-15)。
   - **runbook 本体(`.claude/skills/<name>/SKILL.md`)の正典はクローンの1箇所**。作業フォルダへの
-    コピーはステップ7.8 だけが作る(上記)。プラグイン配布と、スキルだけを curl で取る導入器は**廃止済み** —— 戻さない → maintainer-notes §2.3
+    コピーはステップ7.8 だけが作る(上記)。プラグイン配布と、スキルだけを curl で取る導入器は**廃止済み** —— 戻さない → MN-2.3
   - **他のエージェント(Codex・Cline 等)向けの分岐をコードに戻さない**。案内は
-    **docs/user-docs/reference/tools/other_agents(.md/_ja.md) の1箇所**に集約する → maintainer-notes §2.1
+    **docs/user-docs/reference/tools/other_agents(.md/_ja.md) の1箇所**に集約する → MN-2.1
   - **インストーラ(スクリプト)は受け手のグローバル設定(`~/.codex/config.toml` 等)に1バイトも書かない**
     (`agentIntegration.test.mjs` / `agentAdapters.test.mjs` が落とす)。**エージェントは 🧑 の同意(依頼かダイアログの「はい」)があるときだけ、
     そのクライアントの CLI で MCP を登録してよい**(Codex は `codex mcp add`。同名は上書き・他は残る)。
     **設定ファイルを手で編集させない**(TOML は同じテーブルの重複でファイル全体が無効になる)。
     セットアップでは選択ダイアログで登録の同意を取り、「はい」のときだけ登録する。断られたら完了報告で
     「『MCP を登録して』と頼めば登録する」と案内する(SKILL.md ステップ7.7・9)
-  - **正典をシンボリックリンクの側へ移さない** → maintainer-notes §2.4。
+  - **正典をシンボリックリンクの側へ移さない** → MN-2.4。
     **install.sh は clone 前・ビルド前に走るので Swift を呼べず、規約位置を手で持つ** ——
     片方だけ変えない(`agentIntegration.test.mjs`)
   - **SKILL.md に特定エージェント専用機能を前提として書かない**(`AskUserQuestion` は
     「選択ダイアログ(Claude Code なら AskUserQuestion)」の形で、実装ではなく意図を書く)
   - **Codex のサンドボックスはシェルだけを縛る**(`ft_*` は既定設定で全部動く。通らないのは
     シェル経由の導入・更新だけ)。**`network_access` / `writable_roots` を根拠に OK と言ってはいけない**
-    → maintainer-notes §2.2
+    → MN-2.2
 - MCP サーバの起動口: `Scripts/mcp-server.sh`(`.mcp.json` はこれを exec するだけ)。
   - **`.mcp.json` をリポジトリに置かない**(追跡外・`.gitignore` 済み)。登録は構成を問わず
     install.sh が**絶対パス**で WORK_DIR へ書く。**リポジトリ直下の `.mcp.json`
-    は `$PWD` 依存でクローンの外では起動しない** → maintainer-notes §2.3
+    は `$PWD` 依存でクローンの外では起動しない** → MN-2.3
   - **シェル式を `.mcp.json` へ直書きしない**(起動のたび約8秒の `swift build` を払い、失敗すると
     `>/dev/null` で理由が分からないまま起動しない)
   - ランチャが守るのは3つ: **鮮度でだけビルドする**(`find Sources Package.swift -newer <bin>`。

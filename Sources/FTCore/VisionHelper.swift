@@ -1,5 +1,5 @@
 // Vision の特徴量を長寿命の補助プロセス(`fleetest api vision-serve`)に計算させる救済の、通信とクライアント側。
-// 設計と実測の根拠は docs/maintainer-notes.md §67。
+// 設計と実測の根拠は MN-67。
 //
 // 使うのは**異常を検知した走査のやり直しの1回だけ**(`FindImage.retryingTransientAnomalies` の rescueSource)。
 // 平常時の走査はこのファイルに一切触れない。**門(isDegenerate / isConsistent)は補助プロセスの値にもそのまま掛かる**

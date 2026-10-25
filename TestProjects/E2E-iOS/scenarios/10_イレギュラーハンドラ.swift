@@ -32,7 +32,7 @@ class イレギュラーハンドラでダイアログが自動的に閉じら�
                     // ダイアログは開いたままここへ来るが、textIs はポーリングの各周回で
                     // dismissInterruption を評価するため、待機中に「確認」を検出して
                     // #btn_dialog_cancel を自動タップする(検証コマンドでも発火する仕様。
-                    // アクション限定だと exist/textIs の待機中に出た分を閉じられない。design.md)
+                    // アクション限定だと exist/textIs の待機中に出た分を閉じられない。docs/design/dsl-execution.md「割り込みハンドラ」)
                     select("#txt_dialog_result").textIs("dialog=cancel")
                     notExist("確認")
                 }

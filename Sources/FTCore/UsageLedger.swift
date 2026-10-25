@@ -98,7 +98,7 @@ public final class UsageLedger: Sendable {
     }
 
     /// 複数件をまとめて記録し、書き込みは1回だけにする(書き込みは1件あたり 1.5〜1.9ms =
-    /// docs/performance-tuning.md §3.30)。累計への足し方は1件ずつと同じ
+    /// PT-3.30)。累計への足し方は1件ずつと同じ
     func record(_ batch: [(ok: Bool, ms: Double)]) {
         guard !batch.isEmpty else { return }
         reapOnce()

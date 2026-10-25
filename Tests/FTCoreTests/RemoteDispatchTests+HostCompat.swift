@@ -458,7 +458,7 @@ extension RemoteDispatchTests {
         XCTAssertNil(RemoteStatusProbe.parse(base + "\(Self.statusSeparator)\n27.0\n\(Self.statusSeparator)\n").simulatorRuntime)
     }
 
-    /// 占有(誰が使っているか)を **remote status の1往復に相乗りさせる**(§18.1 #1)。
+    /// 占有(誰が使っているか)を **remote status の1往復に相乗りさせる**(RR-18.1 #1)。
     /// 別の ssh を足すとホスト数ぶん往復が増える
     func testStatusProbeParsesTheDispatchLockBlock() {
         let info = RemoteDispatchLock.encode(RemoteDispatchLockInfo(

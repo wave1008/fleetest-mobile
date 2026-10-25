@@ -1,6 +1,6 @@
 // レスポンス計測の run の間だけモニターの観測・配信を止める(.fleetest/monitor-hold.json = MonitorHold)。
 // 呼び手は `fleetest run --profile`(ProfileRunner.run)と `fleetest api run` の2箇所。
-// 配信や観測の負荷が反応時間に混ざる(docs/response-measurement.md §8.1)。
+// 配信や観測の負荷が反応時間に混ざる(RM-8.1)。
 // 既に期限付きの pause があれば控えて上書きし、終わりに(期限が残っていれば)戻す。期限の無い pause は触らない。
 // hold は `until` なしで書く: run の長さは事前に分からず、期限を置くと長い run の途中で解けて計測が汚れる。
 // 外すのは run の終わり(defer。中断・エラーでも通る)で、プロセスが SIGKILL で消えたときだけ残る

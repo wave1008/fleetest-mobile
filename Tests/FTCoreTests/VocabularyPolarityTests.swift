@@ -1,5 +1,5 @@
 // 「陽性/陰性」は**検知**の語彙(発火したかどうか)で、**判定の結果(緑/赤)には使わない**。
-// 規則は CLAUDE.md §用語(陽性/陰性)、由来は docs/maintainer-notes.md §11。
+// 規則は CLAUDE.md §用語(陽性/陰性)、由来は MN-11。
 // occlusion-guard だけが「発火すると赤になる検知」なので、同じ事象を検知として語るか判定として
 // 語るかで極性が反転し、禁止した一語がリポジトリの両側に跨っていた。コンパイルでは落ちない誤りで、
 // 読み手(次に触る Claude Code)が現象を取り違えるので走査で落とす。
@@ -8,7 +8,7 @@
 // (拡張のチェックボックスと同じ)。
 //
 // **走査の対象外**(3つとも理由が別):
-//   - CLAUDE.md / docs/maintainer-notes.md: 禁止語を書けないと規則そのものが書けない(人間の規律で守る)
+//   - CLAUDE.md / docs/maintainer-notes/: 禁止語を書けないと規則そのものが書けない(人間の規律で守る)
 //   - TestProjects/: ユーザー資産(CLAUDE.md「並列一括作業」)
 //   - reports/: .gitignore 済み(run の生成レポートと Apple へ提出済みの資料)。**提出物を遡って書き換えない**
 
@@ -30,7 +30,7 @@ final class VocabularyPolarityTests: XCTestCase {
 
     /// 対象外(前方一致)。この走査テスト自身は禁止語を持つので `#filePath` で除く
     private static let exemptPrefixes = [
-        "CLAUDE.md", "docs/maintainer-notes.md", "TestProjects/", "reports/",
+        "CLAUDE.md", "docs/maintainer-notes/", "TestProjects/", "reports/",
     ]
 
     private static var repoRoot: URL {
@@ -81,7 +81,7 @@ final class VocabularyPolarityTests: XCTestCase {
     func testBannedPolarityWordsAreGone() {
         let violations = Self.hits
         XCTAssertTrue(violations.isEmpty, """
-            「陽性/陰性」は検知の語彙で、判定(緑/赤)には使わない(CLAUDE.md §用語・maintainer-notes §11)。
+            「陽性/陰性」は検知の語彙で、判定(緑/赤)には使わない(CLAUDE.md §用語・MN-11)。
             検知が誤って発火 = 誤検知 / 発火しなかった = 見逃し(原理的限界は取りこぼし) /
             判定が誤って通った = 誤った緑 / 誤って落ちた = 誤った赤 / ガードの誤反転 = 誤反転。
             \(violations.map { "\($0.file):\($0.line) \($0.text)" }.joined(separator: "\n"))

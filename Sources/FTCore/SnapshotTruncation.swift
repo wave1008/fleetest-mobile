@@ -10,7 +10,7 @@
 // 中身が増えるわけではない。有効な手は2つだけ —— **上限を上げる**か、**画面を狭くする**
 // (シートを閉じる・大きなリストを畳む・スコープを絞る)。
 //
-// **文言は呼び手ごとに持つ**(docs/design.md の規律): MCP は `ft_snapshot maxElements:` と
+// **文言は呼び手ごとに持つ**(docs/design/ の規律): MCP は `ft_snapshot maxElements:` と
 // 書き、DSL は `.webView >> ...` / `scrollFrame:` と書く。ここが決めるのは
 // 「どちらの手が残っているか」だけ。
 

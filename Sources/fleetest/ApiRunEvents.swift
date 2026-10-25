@@ -202,7 +202,7 @@ struct RunOutcome {
 /// シナリオ毎に直接呼ぶ(同時に1件しか走らないため URL キー付けは不要)。ProfileRunner.swift
 /// からも同一ターゲット内で参照
 /// プラットフォーム 1 つ分のレーン稼働。分母は run 全体の壁時計(= そのプラットフォームが
-/// 「run が続いている間どれだけ遊休だったか」を表す)。docs/performance-tuning.md §3.6 の
+/// 「run が続いている間どれだけ遊休だったか」を表す)。PT-3.6 の
 /// 「台数を増やす前に、プラットフォーム別の稼働率と最終終了時刻を見る」を実行後に読める形にしたもの。
 struct LaneUtilization {
     let platform: String

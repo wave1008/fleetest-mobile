@@ -132,7 +132,7 @@ public enum BridgeDiscovery {
     /// 「誰も居ない」と確定できない(= `.refused` 以外)。**生死・持ち主を決める判定の入口はこちら** ——
     /// 溢れた待受への connect(ECONNRESET)や 300ms の時間切れは `.unknown` = 居るかもしれない。
     /// `isBound` で門を掛けると生きて塞がったランナー(XCTest の再試行で main が数十秒止まる)を
-    /// 「居ない」と読み、ライブ操作の自動起動がそれを片付けうる → maintainer-notes §62.1
+    /// 「居ない」と読み、ライブ操作の自動起動がそれを片付けうる → MN-62.1
     public static func mayBeListening(port: UInt16, repoRoot: URL?) -> Bool {
         connectProbe(port: port, repoRoot: repoRoot) != .refused
     }

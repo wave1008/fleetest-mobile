@@ -48,7 +48,7 @@ test("normalizeRemoteHosts: 型不正フィールドは空文字扱い(dir/host 
   );
 });
 
-test("normalizeRemoteHosts: machine は CLI 契約どおり保持する(§13 のキャッシュ)", () => {
+test("normalizeRemoteHosts: machine は CLI 契約どおり保持する(RR-13 のキャッシュ)", () => {
   assert.deepEqual(
     normalizeRemoteHosts([{ machine: "mac-02", host: "mac-02", dir: "" }]),
     [{ machine: "mac-02", host: "mac-02", dir: "", fmConcurrency: 0, color: "", enabled: true, developerDir: "" }],

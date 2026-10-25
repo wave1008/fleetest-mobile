@@ -3,7 +3,7 @@
 // 直接 simctl boot / bootstatus を撃たない(`SimulatorBootSingleEntryTests`)。
 // XCUITest 経路は xcodebuild が自動ブートもするが、**ブートの時間がランナーの起動予算に混ざる**:
 // 再起動直後の 8 台同時ブートは 3 分を超え、ランナーは何も書かないまま `startupTimeoutSeconds` を
-// 跨いで全滅した(陽性対照。台帳 §19.25)。ブートは観測できる事象なので先に待ち切る
+// 跨いで全滅した(陽性対照)。ブートは観測できる事象なので先に待ち切る
 
 import Foundation
 import FTCore
@@ -20,7 +20,7 @@ public enum SimulatorBoot {
 
     /// ブート済みなら約 200ms で返る。Shutdown なら枠を待って boot し、完了まで待つ(上限は simctl 任せ = 完了は観測で決まる)
     public static func ensureBooted(udid: String, log: (String) -> Void) throws {
-        // Booted なら SimulatorPosterCache が自ら気付いて何もしない(docs/design.md §Simulator の供給・健全性)
+        // Booted なら SimulatorPosterCache が自ら気付いて何もしない(DS-12.4.2)
         SimulatorBootCleanup.beforeBoot(udid: udid)
         try run(
             udid: udid,

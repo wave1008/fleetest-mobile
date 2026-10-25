@@ -1,6 +1,6 @@
 // 座標で撃つ操作の「前面が起動したアプリではない」警告(MCPServer.frontAppWarning)。
 // ref の操作は verifiedRef が断るが、座標の操作は木を読まないので、アプリを抜けた後の操作が
-// ランチャーや他のアプリへ黙って届いた(実機で実測 → maintainer-notes §60)。
+// ランチャーや他のアプリへ黙って届いた(実機で実測 → MN-60)。
 
 import XCTest
 @testable import fleetest_mcp

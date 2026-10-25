@@ -173,7 +173,7 @@ extension MCPServer {
         // インストール直後の初回起動で権限アラートが出ることがある(systemAlertProbePending 参照)
         systemAlertProbePending.insert(installKey)
         // **既に起動していたアプリの上書きインストールは、たいてい実行中のプロセスを止める**
-        // (§19.3 M2)。次の snapshot が switchedAppNote 経由で「クラッシュしたかも」と
+        //。次の snapshot が switchedAppNote 経由で「クラッシュしたかも」と
         // 誤診しないよう、原因をこの操作へ帰属させておく(ft_launch で消える)
         if launchedBundleIDs[installKey] != nil {
             toolStoppedBundleIDs[installKey] = "ft_install"
@@ -351,7 +351,7 @@ extension MCPServer {
         }
         // 次の ft_launch が初回起動と同じ扱いになる(systemAlertProbePending 参照)
         systemAlertProbePending.insert(clearAppDataKey)
-        // この呼び出しでアプリを止めた事実を記録する(§19.3 M2)。launchedBundleIDs は
+        // この呼び出しでアプリを止めた事実を記録する。launchedBundleIDs は
         // ここでは消さない(再インストール分岐と違い bundleID はまだ同じアプリのまま —
         // 次の ft_launch は「初回起動」ではなく「再起動」)。switchedAppNote がこれを見て
         // 「クラッシュしたかも」ではなく「この操作で止めた」と言う
@@ -360,7 +360,7 @@ extension MCPServer {
     }
 
     func ftTerminate(_ args: [String: Any]) async throws -> [[String: Any]] {
-        // **対象が分からなければ黙って何もしないのではなく、名指しで断る**(§19.3 M3):
+        // **対象が分からなければ黙って何もしないのではなく、名指しで断る**:
         // ドライバの terminate() は Android では currentPackage が無いと何も撃たずに
         // 戻る(AndroidDriver.terminate)。target を知らずに「Terminated the app」と
         // 答えると、何も終了させていないのに成功したと誤解させる

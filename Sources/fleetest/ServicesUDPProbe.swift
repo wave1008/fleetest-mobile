@@ -1,4 +1,4 @@
-// UDP の経路の確認の I/O(docs/remote-runner.md §17「UDP の経路の確認」)。判定・回数・文言は FTServices.UDPReachability。
+// UDP の経路の確認の I/O(RR-17「UDP の経路の確認」)。判定・回数・文言は FTServices.UDPReachability。
 // 親が 127.0.0.1 の公開ポートへ毎回変わるトークンを送り、エコーが同じ値を返すかを見る。
 
 import Darwin

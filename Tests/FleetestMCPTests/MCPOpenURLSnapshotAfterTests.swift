@@ -95,7 +95,7 @@ final class MCPOpenURLSummaryTests: XCTestCase {
                       "要約が実際にやったことを言っていない: \(text)")
     }
 
-    /// **§19.3 M4**: `waitFor` を渡したら要約はそれを名指しする ——
+    /// `waitFor` を渡したら要約はそれを名指しする ——
     /// 渡していない `waitForChange: false` を名乗ってはいけない(waitFor は下の
     /// snapshotAfterBody 側で別途効いているので、要約だけが実態と食い違っていた)
     func testWaitForIsNamedInsteadOfClaimingWaitForChangeFalse() {

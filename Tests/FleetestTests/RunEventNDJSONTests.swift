@@ -169,7 +169,7 @@ final class RunEventNDJSONTests: XCTestCase {
         XCTAssertEqual(event["sceneTitle"] as? String, "ログイン")
         XCTAssertEqual(event["section"] as? String, "action")
         XCTAssertEqual(event["description"] as? String, "tap \"#login\"")
-        // 時間内訳はレポート・性能計測の入力(docs/performance-tuning.md §4)
+        // 時間内訳はレポート・性能計測の入力(PT-4)
         XCTAssertEqual(event["durationMs"] as? Int, 444)
         XCTAssertEqual(event["snapshotMs"] as? Int, 9)
         XCTAssertEqual(event["actionMs"] as? Int, 380)

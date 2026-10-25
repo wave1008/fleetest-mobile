@@ -1,7 +1,7 @@
 // AppAttachDriver が「ref 無し操作の前にセッションを自分の bundleID へ揃える」ことの固定。
 // これを外すと、使い回された XCUITest ブリッジのセッションが**前のプロジェクトのアプリ**を
 // 指したままジェスチャを撃ち、無言で別アプリを操作する(実測: E2E-iOS の次に回った
-// E2E-Flutter の scrollTo が 12 回空振り。ランナーが落ちる経路もある。design.md 参照)。
+// E2E-Flutter の scrollTo が 12 回空振り。ランナーが落ちる経路もある。design/ 参照)。
 
 import XCTest
 @testable import FTBridgeClient

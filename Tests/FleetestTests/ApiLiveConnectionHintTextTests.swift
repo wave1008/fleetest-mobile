@@ -17,7 +17,7 @@ final class ApiLiveConnectionHintTextTests: XCTestCase {
         XCTAssertTrue(hint.contains("gone"), hint)
         XCTAssertTrue(hint.contains("fleetest bridge up"), hint)
         XCTAssertFalse(hint.lowercased().contains("busy"),
-                       "固まりを busy と呼ぶと『待てば直る』に読める — 過去の取り違え(§44.1)と同じ形")
+                       "固まりを busy と呼ぶと『待てば直る』に読める — 過去の取り違え(MN-44.1)と同じ形")
     }
 
     /// busy(timedOut): 待てば直る。起動し直しを勧めない

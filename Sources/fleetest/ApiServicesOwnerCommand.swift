@@ -1,4 +1,4 @@
-// `fleetest api services-owner`: `fleetest services up` が起こす常駐の所有者(docs/remote-runner.md §17「調停」)。
+// `fleetest api services-owner`: `fleetest services up` が起こす常駐の所有者(RR-17「調停」)。
 // サービスを上げ、控え(kind = owner)・プロキシ・adb reverse を持ったまま SIGTERM/SIGINT/SIGHUP を待ち、受けたら片付けて終わる。
 // 起こすのは `ServicesOwnerLaunch.spawn`(stdin は /dev/null・出力は試みごとのログ `--log-file`・FT_PARENT_PID は消す = 親より長く生きる)。
 // 控えを書けたら(= 同時の `up` に勝ったら)排他の中でそのログを .fleetest/services/<prefix>.log へ改名する。

@@ -363,7 +363,7 @@ public enum RunResultsQuery {
     /// iOS/Android の両方で回すプロジェクトでは、scenarioID だけで束ねると別プラットフォームの
     /// 実行時間・合否を1本の傾向へ混ぜてしまう(実測: XCUITest で1回回しただけで
     /// E2E-CMP 10 本・E2E-Flutter 11 本が「duration regressed」と誤って出た)。
-    /// LPT の見積りは platform で分けている(docs/remote-runner.md §8)のに合わせる
+    /// LPT の見積りは platform で分けている(RR-8)のに合わせる
     private struct ScenarioPlatformKey: Hashable {
         let scenarioID: String
         let platform: String
@@ -589,7 +589,7 @@ public enum RunResultsQuery {
                 count: retiredIDs.count, deltaPct: nil))
         }
 
-        // **実行中の run を「クラッシュの可能性」と数えない**(§18 の残件): 同じ機械で pid がまだ
+        // **実行中の run を「クラッシュの可能性」と数えない**: 同じ機械で pid がまだ
         // 生きていれば実行中。pid の無い古い記録・別の機械の記録は未完了として数える
         // (別の機械の生死はここからは分からない = 断定しない側)
         let unfinished = runs.filter { $0.finishedAt == nil }

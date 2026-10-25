@@ -1,6 +1,6 @@
 // ServicesCommand.swift
 // `fleetest services`: ワークスペースのサービス(scripts/compose.yaml)を人が起こす・止める・見る・一掃する
-// (docs/remote-runner.md §17「人の入口」「調停」)。run の間の起動と終了は run が行う(ServicesSession)。
+// (RR-17「人の入口」「調停」)。run の間の起動と終了は run が行う(ServicesSession)。
 // `up` は常駐の所有者(`fleetest api services-owner`)を起こして上がるまで待つ。`down` は所有者へ SIGTERM を送り終了を待つ。
 // run が握っているサービスは `down` も `reset`(--force 無し)も触らない。
 

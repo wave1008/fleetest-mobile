@@ -1,4 +1,4 @@
-// フリート横断の run 進捗の機械グローバルな控え(docs/design.md §18)。
+// フリート横断の run 進捗の機械グローバルな控え(DS-18)。
 //
 // モニターが run について持っている情報は run-lease の鮮度(inRun の1ビット)と、拡張が起こした
 // run にしか届かない runEvent だけだった。「何本中何本終わったか」を CLI 実行・他人の run・
@@ -9,7 +9,7 @@
 // 置き場は ~/.fleetest/runs/<pid>.json(機械グローバル。FMUsageLedger の隣・同じ規律)。
 // **プロジェクトに依存させない** —— ランナー機では発行者ごとに work が分かれる
 // (<base>/users/<issuer>/work/)ので、プロジェクトの .fleetest/ に置くと他人の run が
-// 原理的に見えない。共有アカウント前提(remote-runner.md §15.3)なので ~ は全員で1つ。
+// 原理的に見えない。共有アカウント前提(RR-15.3)なので ~ は全員で1つ。
 //
 // FMUsageLedger と違い、ここは「呼び出し回数の累積カウンタ」ではなく「run 1つのスナップショット」
 // なので UsageLedger(pid ごとの単調増加カウンタの共通実装)には乗せない —— 1 pid = 1 run が
@@ -35,7 +35,7 @@ public struct RunProgressLane: Codable, Equatable, Sendable {
     public let scenario: String?
     /// ISO8601 UTC。`scenario` が nil なら nil
     public let scenarioStartedAt: String?
-    // **レーンごとの残り本数は持たない**(docs/design.md §18.1)—— shared dispatch は同一 platform の
+    // **レーンごとの残り本数は持たない**(DS-18.1)—— shared dispatch は同一 platform の
     // レーンが1つのキューを共有するので、レーン別の残数は同じ数字が並ぶだけで誤読を招く
     // (3レーンに「残 2」= 6本残っていると読める)。run の残りは total - done で足りる
     /// **記録用**(画面には出さない。ユーザー決定): 実行中シナリオの実績中央値(秒)。
@@ -55,7 +55,7 @@ public struct RunProgressLane: Codable, Equatable, Sendable {
 }
 
 /// 1 run のスナップショット。`~/.fleetest/runs/<pid>.json` に丸ごと上書きされる
-/// (増分ではない。書き手は RunOrchestrator の1箇所 —— docs/design.md §18.1)
+/// (増分ではない。書き手は RunOrchestrator の1箇所 —— DS-18.1)
 public struct RunProgressRecord: Codable, Equatable, Sendable {
     public let pid: Int32
     /// `RunRecorder.runID`。recorder が無い経路(--dry-run/--debug 等)では nil
@@ -72,7 +72,7 @@ public struct RunProgressRecord: Codable, Equatable, Sendable {
     public let total: Int
     public let done: Int
     public let failed: Int
-    /// **詰まりの事実**(段6・docs/design.md §18.5): 結果を捨てて振り直した累計
+    /// **詰まりの事実**(段6・DS-18.5): 結果を捨てて振り直した累計
     /// (`RunProgressState.laneIdled` が成立した回数)。判定・文言は作らない —— 事実の並置だけ
     public let requeued: Int
     /// **詰まりの事実**: レーンが離脱した累計(`RunProgressState.laneLeft` の回数)

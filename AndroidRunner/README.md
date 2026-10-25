@@ -22,7 +22,7 @@ iOS 側 `Runner/FleetestRunnerUITests/BridgeRouter.swift`)なので、ホスト�
   - **-w は必須**(UiAutomationConnection は am プロセス側に生成される)。
     デバイス内でバックグラウンド化するので adb 切断後も常駐する
 - 停止: `adb shell am force-stop com.example.ftbridge`(`fleetest bridge down --platform android`)。
-  加えて `-e ttl <秒>` の無通信 TTL(design.md §4.1)で自主終了する。判定は accept の
+  加えて `-e ttl <秒>` の無通信 TTL(DS-4.1)で自主終了する。判定は accept の
   60s 周期起床なので検出は最大 +60s 遅れる(2h の既定に対して許容)
 - 注意: ブリッジ稼働中は `uiautomator dump` が使えない(a11y 接続は実質1本。dump 側が
   Killed される)

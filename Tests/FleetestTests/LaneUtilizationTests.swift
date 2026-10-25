@@ -1,5 +1,5 @@
 // プラットフォーム別レーン稼働の集計と、振り替え助言の判定。
-// docs/performance-tuning.md §3.6 の実測値をそのまま再現ケースにしている
+// PT-3.6 の実測値をそのまま再現ケースにしている
 // (iOS 5レーン 88〜96% で 185秒 / Android 5レーン 25〜48% で 88秒終了 → 振り替えが効く)。
 
 import XCTest
@@ -38,7 +38,7 @@ final class LaneUtilizationTests: XCTestCase {
     }
 
     func testIdlePlatformShowsLowUtilizationAndEarlyFinish() {
-        // §3.6 の形: iOS は最後まで詰まっている / Android は半分の時点で終わる
+        // PT-3.6 の形: iOS は最後まで詰まっている / Android は半分の時点で終わる
         var tracker = ScenarioTimingTracker()
         run(&tracker, "iosA", worker: "ios:8123", from: 0, to: 100)
         run(&tracker, "andA", worker: "android:emulator-5554", from: 0, to: 50)
@@ -127,7 +127,7 @@ final class LaneUtilizationTests: XCTestCase {
     }
 
     func testAdvisesRebalanceOnTheMeasuredImbalance() {
-        // §3.6 の実測そのもの
+        // PT-3.6 の実測そのもの
         let message = LaneBalanceAdvice.message(for: [
             stat("ios", lanes: 5, utilization: 0.92, lastFinish: 185),
             stat("android", lanes: 5, utilization: 0.36, lastFinish: 88),

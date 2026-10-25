@@ -227,7 +227,7 @@ final class BridgeRouterStatusContractTests: XCTestCase {
     /// 501 は isBridgeIncapable が真になり、ホストは XCUITest へフォールバックする ——
     /// つまり**フォールバック先が自分自身**になるので、増やすと無限の遠回りを作る。
     ///
-    /// 唯一の例外が hideKeyboard で、これは iOS に実装手段が無い(§10)ため in-app も
+    /// 唯一の例外が hideKeyboard で、これは iOS に実装手段が無い(DS-10)ため in-app も
     /// XCUITest も 501 を返す。ホスト(`StepExecutor`)は in-app の 501 を typeDriver へ
     /// **1回だけ**回し、そこでも 501 なら失敗させるので、遠回りは1往復で止まる。
     /// **これ以外の 501 を足さないこと**(「今は無理」は 422)

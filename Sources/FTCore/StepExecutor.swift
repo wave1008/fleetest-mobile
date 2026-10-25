@@ -256,7 +256,7 @@ public struct StepOutcome: Sendable {
 /// なので、テストでは捕まらない。素取得でよい経路は `driver.snapshot()` を呼ぶ。
 enum SnapshotFreshness {
     /// 直前に**自分で画面を動かした**(スワイプ・ドラッグ・整定のポーリング)。
-    /// 実測と機構は runScrollSearch のコメントおよび docs/verification.md
+    /// 実測と機構は runScrollSearch のコメントおよび docs/verification/
     case afterOwnMove
     /// 内蔵スクロール探索の後の解決。**探索がスワイプを撃っていなければ**素取得でよい
     /// (撃っていないなら木は古くならない)
@@ -1178,7 +1178,7 @@ public final class StepExecutor {
     /// 変わっていない」を証跡として出せる。
     ///
     /// **追加のスナップショットは撮らない**のが要件(実行中に I/O を足すとタイミングが変わって
-    /// 事象そのものが消える。docs/verification.md「Compose の探索直後タップ」の heisenbug)。
+    /// 事象そのものが消える。docs/verification/judgment.md「Compose の探索直後タップ」の heisenbug)。
     /// 署名の生成も**失敗したときだけ**行う(正常系はフィールドを持ち回るだけ)。
     struct LastInteraction {
         /// 失敗文言に出す操作の呼び名(例: `tap "#row_30"`)
@@ -1480,7 +1480,7 @@ public final class StepExecutor {
     }
 
     /// 「動いた」と言い切る下限(pt)。整定のわずかな揺れやサブピクセルで注記を出さないための床。
-    /// 実測の取りこぼしは 98pt 級(docs/verification.md の計装記録)なので、この値で十分拾える
+    /// 実測の取りこぼしは 98pt 級(docs/verification/ の計装記録)なので、この値で十分拾える
     static let movedTargetThreshold: Double = 8
 
     /// タップした要素を**別の木の中で**探し直す。id があれば id、無ければ型+ラベル。
@@ -1630,7 +1630,7 @@ public final class StepExecutor {
 
     /// 探索スワイプの刻み倍率(自己補正)。**1回の移動量が容器を超えると要素を飛び越す**ので、
     /// 実移動量を毎周測って詰める。較正表は持たない(端末・SUT を跨ぐと再現しないため。
-    /// docs/performance-tuning.md §3.16 / §3.18)。ステップごとに 1.0 へ戻す。
+    /// PT-3.16 / PT-3.18)。ステップごとに 1.0 へ戻す。
     /// **読むのは `scrollPath` の1箇所だけ** = `scrollFrame` を書いた経路でしか効かない
     var spanScale: Double = 1
 }

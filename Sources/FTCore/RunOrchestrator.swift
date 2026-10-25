@@ -584,7 +584,7 @@ public enum ScenarioOutcome: Sendable, Equatable {
 enum EnvironmentFault {
     /// XCUITest の a11y 基盤が一時的に応答しない。**ブリッジ供給直後・アプリ入れ替え直後**に
     /// 同時刻クラスタで出て、再実行で必ず消える(2回・8件と6件を手で判定した)。
-    /// docs/verification.md「kAXErrorAPIDisabled は環境と判定してよい」
+    /// docs/verification/traps.md「kAXErrorAPIDisabled は環境と判定してよい」
     static let markers = ["kAXErrorAPIDisabled"]
 
     static func matches(_ detail: String?) -> Bool {
@@ -862,7 +862,7 @@ public final class RunOrchestrator: Sendable {
     private let runnerProcessAlive: (@Sendable (RunWorker) -> Bool?)?
     /// 失敗後チェックの /status プローブ 1 回分。isDeviceFrozen と同じ理由で注入(BridgeClient は
     /// FTBridgeClient)。inapp モードは主ポート(in-app)が別アプリのシナリオ中サスペンドされ
-    /// 「TCP 受理・HTTP 無応答」になるため、注入側で xcuitest 側ポートを叩く(design §8.8)。
+    /// 「TCP 受理・HTTP 無応答」になるため、注入側で xcuitest 側ポートを叩く(DS-8.8)。
     /// 未注入時は worker.driver への素朴なプローブにフォールバック
     private let probeBridge: (@Sendable (RunWorker) async -> BridgeProbeOutcome)?
     /// run-lease(RunLease.write/remove、FTBridgeClient)。ワーカーが稼働中のデバイスキーを持ち、
@@ -874,7 +874,7 @@ public final class RunOrchestrator: Sendable {
     private let recordingLeases: RunLeaseLedger
     /// どちらかの lease の書き手が注入されているか(未注入ならハートビートを起こさない)
     private let hasLeaseWriters: Bool
-    /// 実行プロファイル名(run.json の profile と同じ由来。docs/design.md §18 の RunProgressRecord.profile)。
+    /// 実行プロファイル名(run.json の profile と同じ由来。DS-18 の RunProgressRecord.profile)。
     /// orchestrator は解決済みプロファイルの構造を知らないため、呼び出し側が文字列で渡す
     private let profile: String?
     /// run 進捗の書き手(`RunProgressLedger.write` を pid・ディレクトリで束ねたもの)。
@@ -883,7 +883,7 @@ public final class RunOrchestrator: Sendable {
     private let removeRunProgress: (@Sendable () -> Void)?
     /// 準備中の端末ごとの供給の段階(台帳の supply)。nil = 台帳を書かない経路
     private let supplyProgress: RunSupplyProgress?
-    /// 残り見積もり(docs/design.md §18.4)の実績を読む件数(シナリオ1本あたり)。
+    /// 残り見積もり(DS-18.4)の実績を読む件数(シナリオ1本あたり)。
     /// **FTCore は fleetest ターゲットの `LPTOrdering` を参照できない**ため、呼び出し側が
     /// 同じ run の `LPTOrdering.apply` に渡したのと同じ値(`lptHistoryRuns ?? LPTOrdering.defaultHistoryRuns`)
     /// をそのまま渡す —— ETA が LPT の並べ替えと違う窓の実績を読むと、同じ run 内で
@@ -1223,7 +1223,7 @@ public final class RunOrchestrator: Sendable {
         /// ドレイン(残ったまま終わった item)の記録に載せる (platform, worker, 理由)
         let drainInfo: (String, Bool) -> (platform: String, worker: String?, reason: String)
         /// 実際にキューへ乗る(= いつか scenarioStarted される)シナリオの鍵の多重集合。
-        /// 残り見積もり(docs/design.md §18.4)の未着手初期値。**即スキップ分(担当ワーカーなし)は
+        /// 残り見積もり(DS-18.4)の未着手初期値。**即スキップ分(担当ワーカーなし)は
         /// 含めない** —— どのレーンにも一生取られないので、含めると見積もりが下がりきらないまま残る
         var runnableScenarios: [RunProgressEstimate.ScenarioKey] = []
         switch dispatch {
@@ -1285,10 +1285,10 @@ public final class RunOrchestrator: Sendable {
         /// broadcast のドレイン文言用(参加したレーンの key)。shared では使わない
         let joinedKeys = JoinedLaneKeys()
 
-        // run 進捗の記帳(docs/design.md §18)。**total はここで確定した値のまま動かさない**
+        // run 進捗の記帳(DS-18)。**total はここで確定した値のまま動かさない**
         // (再キュー・失敗で変えない。RunProgressRecord.total の宣言参照)
         if writeRunProgress != nil || removeRunProgress != nil {
-            // 残り見積もり(§18.4)。読むのは run 開始時に1回だけ。LPTOrdering.apply と同じ実績源
+            // 残り見積もり(DS-18.4)。読むのは run 開始時に1回だけ。LPTOrdering.apply と同じ実績源
             // (RunResultsStore.scanRecords → LPTScheduler.durations)だが **machine 優先はしない**
             // (preferringMachine 無し。手元の run の見積もりに他機の実績を混ぜるかは別の設計判断)
             let resultsDir = RunResultsStore.resultsDir(projectRoot: project.rootURL)

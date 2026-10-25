@@ -6,7 +6,7 @@ import Foundation
 
 /// キャッシュを捨てた snapshot でもう1周だけ確かめる仕掛け。撃つ場面が**2つ**ある。
 /// Android の a11y ツリーは IME 等が前面のとき数秒古い値を返し続ける
-/// (docs/verification.md「ブリッジの『誤った赤』を疑う手順」)。
+/// (docs/verification/judgment.md「ブリッジの『誤った赤』を疑う手順」)。
 /// 対応しないドライバ(iOS 系。鮮度問題を持たない)ではどちらも行わず周回を増やさない。
 ///
 /// - `arm`: **失敗と決める前**(期限切れ)。アプリは正しいのに検証だけが落ちるのを防ぐ。
@@ -238,7 +238,7 @@ extension StepExecutor {
         // Tier-2(FM の手前): 期待テキストが Vision OCR で丸ごと読めれば見えている(FM を呼ばず素通り)。
         // 実 run で FM の段に届いた crop の 97% がここで片付く(p50 92ms。FM は 1.3〜2.8s)。
         // 丸ごと読めなかったこと自体は反転の根拠にしない(反転は下の FM との突き合わせか、FM の段が無いときの OCROnlyVisibility)。
-        // 詳細は RegionText のコメントと docs/poc-fm-occlusion-guard.md §5.17。off のときはこの if を通らない
+        // 詳細は RegionText のコメントと OG-5.17。off のときはこの if を通らない
         var ocrReading: RegionText.Reading?
         var ocrReadable = false
         // **近道を実際に撃つ時点でコンパイルが終わっていなければ、終わるまで待つ**(受け皿。ふつうは
@@ -350,10 +350,10 @@ extension StepExecutor {
         // **OCR と FM の突き合わせ: 見えていると読めた側を採る**(赤はどちらも見えないと言った回だけ)。
         // どちらも期待文字列を知らずに読んだ文字を同じ TranscriptMatch で照合するので、「読めた」は描かれている
         // 直接の証拠で、「読めなかった」は読み手の失敗でも起きる(OCR の短い文字列の誤読・FM の字形の取り違え)。
-        // 根拠と実測は docs/poc-fm-occlusion-guard.md §5.22。measure は FM の判定を採取するので突き合わせない
+        // 根拠と実測は OG-5.22。measure は FM の判定を採取するので突き合わせない
         // **FM の転写が空なのに要素の領域に構造がある**事実(判定は変えない。率を見る)。空の転写は呼び出しとしては
         // 成功なので FMHealth / FMLiveness に出ず、OCR の近道が撃てない機械では FM の1回の空振りがそのまま赤になる
-        // (実測: 赤 157 件のうち 17 件が読める文字への空の転写 → maintainer-notes §84.4)。構造の有無は
+        // (実測: 赤 157 件のうち 17 件が読める文字への空の転写 → MN-84.4)。構造の有無は
         // firstFrameBlankStdDevCeiling(「画素に構造が無い」の定義)で分ける = 白紙・一色の画面では立たない
         var emptyTranscriptOnInk = ""
         if !v.visible, v.observedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
@@ -361,7 +361,7 @@ extension StepExecutor {
            ink > Self.firstFrameBlankStdDevCeiling {
             // **OCR の段がオンで、近道が撃てなかった(読みが無い)ときだけ**、同じ領域を OCR に読ませて確かめる。
             // 近道は「起動時の探りが読めた」ことを条件にするので、負荷の下ではそのプロセスの最初のガードで撃てず、
-            // FM の1回の空振りがそのまま赤になった(maintainer-notes §92.1)。OCR は素通りの根拠にだけ使う
+            // FM の1回の空振りがそのまま赤になった(MN-92.1)。OCR は素通りの根拠にだけ使う
             // (丸ごと読めたら緑・読めなければ判定は FM のまま)。**オフの構成では読まない**(利用者が切った段を使わない)
             var ocrConfirmationFact = ""
             if occlusionOCRMode == .on, ocrReading == nil {

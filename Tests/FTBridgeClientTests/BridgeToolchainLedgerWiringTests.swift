@@ -4,7 +4,7 @@ import XCTest
 /// `BridgeProvisioner` の `.reuse`/`.adopt` は返す前に必ず `BridgeToolchainLedger.matchesCurrent` を
 /// 通ること・`.launch` の ready 合流点(両モード共通)は必ず `record` すること。比較を素通りしても
 /// コンパイルは通る(型で守れない境界)ので、ソース走査で固定する
-/// (docs/verification.md 「型の効かない境界の改名は往復テストで縛る」と同じ規律)。
+/// (docs/verification/ 「型の効かない境界の改名は往復テストで縛る」と同じ規律)。
 final class BridgeToolchainLedgerWiringTests: XCTestCase {
 
     private static var source: String {

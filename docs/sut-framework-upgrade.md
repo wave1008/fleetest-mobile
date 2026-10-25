@@ -20,7 +20,7 @@ fleetest 自身の SUT(E2E・E2EX・E2EY)の Flutter・React Native・Compose Mu
   SUT をビルドする。`dist/` は gitignore なのでアラインでは届かない)。**フレームワークの SDK・ツールは両方の機械に要る**
 - **Flutter / RN の SUT の iOS プロジェクトは `project.pbxproj` のまま**(他の iOS プロジェクトは `project.xcproj`)。CocoaPods 1.17 の
   `pod install` と flutter ツール(`flutter build ios`・`--config-only`)が pbxproj を直接開くため、xcproj に移すと落ちる。上流が対応するまで移さない
-  (maintainer-notes §102)
+  (MN-102)
 - 追うのは**最新の安定版だけ**(旧版を並べて検証しない。ユーザー決定 2026-10-08)
 - **1フレームワークずつ**上げてコミットを分ける(赤の帰属を1つに絞る)
 

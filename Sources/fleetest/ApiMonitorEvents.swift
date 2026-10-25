@@ -39,7 +39,7 @@ struct ApiMonitorStorageEvent: Codable {
     let storageRefreshId: Int?
 }
 
-/// 機械の dispatch.lock の状態変化(docs/remote-runner.md §18.7 M2)。**手元でも出す** ——
+/// 機械の dispatch.lock の状態変化(RR-18.7 M2)。**手元でも出す** ——
 /// ロックは機械に1本で、リモートへのディスパッチもローカル run も同じ1本を取る。
 /// `machine` は **var** —— 子は自分の機械名を知らない(畳んだプロファイルでは "local")ので、
 /// 中継する RemoteMonitorFanout が埋める(monitorDevices・monitorFrame と同じ規律)。
@@ -85,7 +85,7 @@ struct ApiMonitorLockEvent: Codable {
     }
 }
 
-/// フリート横断の run 進捗(docs/design.md §18)。1レーン分。台帳(RunProgressLane)の
+/// フリート横断の run 進捗(DS-18)。1レーン分。台帳(RunProgressLane)の
 /// ISO8601 は運ばない —— 経過は monitor が自分の時計で秒に直す(18.3)
 struct ApiMonitorRunProgressLane: Codable, Equatable {
     let key: String
@@ -98,7 +98,7 @@ struct ApiMonitorRunProgressLane: Codable, Equatable {
     let expectedSeconds: Int?
 }
 
-/// フリート横断の run 進捗。1 run 分(docs/design.md §18.2 の monitorRuns.runs[])
+/// フリート横断の run 進捗。1 run 分(DS-18.2 の monitorRuns.runs[])
 struct ApiMonitorRunProgress: Codable, Equatable {
     let pid: Int32
     let runID: String?
@@ -112,11 +112,11 @@ struct ApiMonitorRunProgress: Codable, Equatable {
     let total: Int
     let done: Int
     let failed: Int
-    /// **詰まりの事実**(docs/design.md §18.5 段6): 結果を捨てて振り直した累計。台帳の値をそのまま運ぶ
+    /// **詰まりの事実**(DS-18.5 段6): 結果を捨てて振り直した累計。台帳の値をそのまま運ぶ
     let requeued: Int
     /// **詰まりの事実**: レーンが離脱した累計。台帳の値をそのまま運ぶ
     let laneDropouts: Int
-    /// 残り見積もり(docs/design.md §18.4)。makespan の下界・実績ゼロの run は nil
+    /// 残り見積もり(DS-18.4)。makespan の下界・実績ゼロの run は nil
     let etaSeconds: Int?
     let lanes: [ApiMonitorRunProgressLane]
     /// 台帳の値をそのまま運ぶ("building" / "preparing" / "compiling" / "running")。作り替えない。
@@ -129,7 +129,7 @@ struct ApiMonitorRunProgress: Codable, Equatable {
     let videoClips: RunProgressVideoClips?
 }
 
-/// monitorRuns イベント: フリート横断の run 進捗(docs/design.md §18.2)。**手元でも出す**
+/// monitorRuns イベント: フリート横断の run 進捗(DS-18.2)。**手元でも出す**
 /// (読む台帳が機械グローバルなので、CLI 実行の run も他人の run も載る)。`machine` は **var**
 /// (子は畳んだプロファイルを見て自分を "local" と名乗るので、中継する RemoteMonitorFanout が
 /// monitorLock/monitorDevices と同じ規律で埋める)
@@ -181,7 +181,7 @@ struct ApiMonitorDeviceInfo: Codable {
     let inRun: Bool
     /// 対話セッション(MCP・ライブ操作)の使用中の印(`MCPDeviceLease`)が生きているなら true。
     /// 拡張のブリッジ監視が数えない・撃たないための入力(使用中の端末は start-device が止めずに断るので、
-    /// 数えると修復を積んで失敗する誤警告になる = maintainer-notes §84.8)。leaseStateDir 未解決時は常に false
+    /// 数えると修復を積んで失敗する誤警告になる = MN-84.8)。leaseStateDir 未解決時は常に false
     let inSession: Bool
     /// デバイスの実体種別("virtual" / "physical")。iOS 実機は fleetest-simstream が
     /// CoreSimulator 私有 API のため画面配信できない等、扱いが変わるので拡張側が分岐する
@@ -219,7 +219,7 @@ struct ApiMonitorDeviceInfo: Codable {
     /// **他の発行者・他のウィンドウがこのデバイスの画面配信を張っている**(共有ランナーは
     /// FTCore.StreamLease、同じ Mac の別ウィンドウは FTCore.LocalStreamHolder)。
     /// 拡張はこのデバイスの配信を起こさずポーリングのままにする —— 同じデバイスを人数ぶん捕捉すると
-    /// ランナーが痛む(docs/remote-runner.md §18.2)。誰も張っていなければ false
+    /// ランナーが痛む(RR-18.2)。誰も張っていなければ false
     /// (どちらの判定もこの機械の中で完結するので「不明」は無い。nil は観測そのものを
     /// していない経路 = 合成デバイスの行だけ)。
     /// (契約は vscode-fleetest/src/monitorDeviceModel.ts の MonitorDevice.streamedByOther)

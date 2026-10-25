@@ -259,7 +259,7 @@ public enum ScenarioHost {
     /// Vision の OCR のコンパイルキャッシュ(`~/Library/Caches/<名前>/com.apple.e5rt.e5bundlecache`)は
     /// **実行ファイル名と Identifier の組**が鍵で、SwiftPM の Debug ビルドは Identifier が
     /// `<名前>-55554944<LC_UUID>` = 中身が変わるたびに変わるので、揃えないと再ビルドのたびに 20〜45 秒の
-    /// コンパイルをやり直す(実測は docs/performance-tuning.md §3.33)。**LC_UUID は変えない**(dSYM・
+    /// コンパイルをやり直す(実測は PT-3.33)。**LC_UUID は変えない**(dSYM・
     /// クラッシュレポートの対応づけを壊さない)。`codesign -f` は新しい inode に置き換えるので、
     /// 同じバイナリを実行中のプロセスを巻き込まない。失敗しても run は止めない(性能だけの問題)
     static func pinSigningIdentifier(binary: URL, productName: String, log: ((String) -> Void)?) {

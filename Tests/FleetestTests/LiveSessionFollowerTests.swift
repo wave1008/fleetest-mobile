@@ -541,7 +541,7 @@ extension LiveSessionFollowerTests {
     }
 }
 
-/// ライブ操作の自動起動は、同じ実機を宛先に持つ別ポートのランナーを見たら起動しない(maintainer-notes §49.4)
+/// ライブ操作の自動起動は、同じ実機を宛先に持つ別ポートのランナーを見たら起動しない(MN-49.4)
 final class LiveAutoStarterDuplicateRunnerWiringTests: XCTestCase {
     func testLaunchBridgeChecksForAnotherRunnerBeforeStarting() throws {
         let url = URL(fileURLWithPath: #filePath)

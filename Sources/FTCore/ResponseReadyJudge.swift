@@ -1,5 +1,5 @@
 // t2(操作可能)の判定。ブリッジが記録した木の履歴(ステップ j の最初の注入から次の計測ステップ i の最初の注入まで)を、
-// i が実際に解決して操作した対象で判定する(docs/response-measurement.md §5「2b の方式」)。
+// i が実際に解決して操作した対象で判定する(RM-5「2b の方式」)。
 // ドライバに触らない純粋な関数だけを持つ。解決・遮蔽の判定は呼び手が StepExecutor と同じ共有の判定で組んで渡す
 // (ここで二重に持たない)。
 
@@ -104,7 +104,7 @@ public enum ResponseReadyJudge {
     /// - isOccluded: 解決した要素の中心が別の要素に覆われているか(タップ前と同じ共有の判定)
     /// - usedFrame: i が実際に解決して操作した要素の枠
     ///
-    /// 条件(§5 の ①②③): 解決でき・有効・覆われておらず・枠が i の使った枠と等しい。
+    /// 条件(RM-5 の ①②③): 解決でき・有効・覆われておらず・枠が i の使った枠と等しい。
     /// 1回の読みだけで揃っても確定しない(次の成功した読みでも揃うことを要る)。
     /// ④(画素の静止)は判定しない・要素の同一性は比べない(`readyIdentity` = locator)
     public static func judge(observation: ResponseObservation, facts: ResponseInjectionFacts,

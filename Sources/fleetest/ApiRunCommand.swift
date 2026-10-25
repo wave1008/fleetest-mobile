@@ -102,13 +102,13 @@ struct ApiRunCommand: AsyncParsableCommand {
         RunCommonOptions.noProfileSettings(setOverrides: setOverrides)
     }
 
-    /// **拡張から待てるようにするための口**(docs/remote-runner.md §18.2 M2)。共有ランナーでは
+    /// **拡張から待てるようにするための口**(RR-18.2 M2)。共有ランナーでは
     /// 「ロックが取れないので失敗しました」を人間が手で押し直す運用になり、そこが摩擦の実体だった。
     /// **奪う口(--force-lock)は足さない** —— 走っているかもしれない他人の run を GUI から
-    /// 殺せる導線を作らない(§5 の決定を維持)
+    /// 殺せる導線を作らない
     @Option(name: .customLong("wait-lock"),
             help: ArgumentHelp("Instead of failing fast, poll until the dispatch.lock (this Mac's or a remote host's) is released, "
-              + "up to this many seconds (docs/remote-runner.md §5)"))
+              + "up to this many seconds (RR-5)"))
     var waitLock: Int?
 
     @Flag(name: .customLong("performance"),
@@ -246,7 +246,7 @@ struct ApiRunCommand: AsyncParsableCommand {
         }
         // デバイスが複数の機械にまたがる実行プロファイルは、ホストごとの子プロセス(`fleetest api
         // run --runner <label>`)へ分け、NDJSON を ApiRunMachineFanout が1本へ多重化する
-        // (docs/remote-runner.md §13)。--runner 明示や全台が同じ機械なら nil が返り通常経路のまま。
+        // (RR-13)。--runner 明示や全台が同じ機械なら nil が返り通常経路のまま。
         // --debug は子プロセスの stdin へ橋渡しする経路が無いため、ここでだけ明示的に拒否する
         // (単一ホストの --runner + --debug は dispatchToRemoteHost が同様に拒否している)
         if !dryRun, let profile = common.profile,
@@ -347,7 +347,7 @@ struct ApiRunCommand: AsyncParsableCommand {
         // 本数ぶんに削られた外のデバイスが照合されず、同じ打鍵で `fleetest run --dry-run` だけが警告した
         var commandCheckDevices: [CommandTargetCheck.Device] = []
         if let (resolvedAll, full) = preResolvedProfile {
-            // ワークスペースは常に有効(既定 `<project.rootURL>/workspace`。docs/remote-runner.md §17)
+            // ワークスペースは常に有効(既定 `<project.rootURL>/workspace`。RR-17)
             // なので毎回雛形作成(ProfileRunner.run と同じ規律。既に揃っていれば
             // 何もしない。リモートディスパッチは別途ミラー前のローカル側で同じ呼び出しを行う
             // = RemoteRunDispatcher.prepareWorkspace)。続けて appPath の原本を apps/ へ
@@ -388,7 +388,7 @@ struct ApiRunCommand: AsyncParsableCommand {
             commandCheckDevices = full.devices.map(CommandTargetCheck.Device.init)
         }
 
-        // 開始/終了スクリプト(docs/remote-runner.md §17。ProfileRunner.run と同じ規律 ——
+        // 開始/終了スクリプト(RR-17。ProfileRunner.run と同じ規律 ——
         // デバイスに触る前に撃ち、終了スクリプトは defer で必ず撃つ)。**resolvedAll ではなく
         // 絞り込み後の resolved を渡す**(スクリプトが受け取るデバイス一覧は、この run が実際に
         // 使うデバイスと一致していないと `adb reverse` の宛先がずれる)。
@@ -504,7 +504,7 @@ struct ApiRunCommand: AsyncParsableCommand {
             androidWorkersTask = nil
         }
 
-        // run 進捗の記帳(docs/design.md §18.1)。**ビルドより前に1本書く** —— 実測でシナリオの
+        // run 進捗の記帳(DS-18.1)。**ビルドより前に1本書く** —— 実測でシナリオの
         // swift build から供給の記帳が出るまで ~15秒あり、書かないとその間ボードに1本も出ない。
         // 総本数・レーンはまだ未確定(total: 0・lanes: [])。
         // `runWithProfileParallel` が同じ pid ファイルを上書きする。
@@ -795,7 +795,7 @@ struct ApiRunCommand: AsyncParsableCommand {
         }
     }
 
-    // MARK: - --runner(拡張連携用 NDJSON 中継。docs/remote-runner.md §3・§12)
+    // MARK: - --runner(拡張連携用 NDJSON 中継。RR-3・RR-12)
 
     /// リモート `fleetest api run` の NDJSON を stdout へそのまま中継する。stdin 制御系
     /// (--debug)・ローカル専用系(--dry-run 等)はリモートでは意味を持たない/中継されないため
@@ -1253,7 +1253,7 @@ struct ApiRunCommand: AsyncParsableCommand {
         // 届かず取りこぼす)
 
         // **sweep はここでは呼ばない** —— この run の掃除は "building" を書く入口で済んでいる
-        // (1 run で2回走らせない。docs/design.md §18.1「run 開始時に1回」)
+        // (1 run で2回走らせない。DS-18.1「run 開始時に1回」)
 
         // 段階「準備中」の控え。handoff が立たないまま抜けるときは defer で消す(writePreparingProgress の doc)
         let progressWriter = ProfileRunOrchestrator.writePreparingProgress(

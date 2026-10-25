@@ -1,5 +1,5 @@
 // DeviceMachineRunner.swift
-// **1つの実行プロファイルのデバイスが複数の機械にまたがるとき**の実行(docs/remote-runner.md §13)。
+// **1つの実行プロファイルのデバイスが複数の機械にまたがるとき**の実行(RR-13)。
 // 実行プロファイルのデバイスは1台ずつ machine を持てるので、「ローカル10台 + M1Ultra 10台」のような
 // 混在が書ける。run はマシンごとのサブ実行(この fleetest 自身の子プロセス)へ分け、シナリオを
 // 台数で重み付けして配り、出力・JUnit・終了コードを1つに束ねる。
@@ -122,7 +122,7 @@ enum DeviceMachineRunner {
         // 「1つのマシンで同時に複数の run は走らせない」・規律③「取るのは run の入口」)。
         // **build を直列化するための一時的な先取り** —— 配分が確定したら local に配られるかどうかに
         // 関わらず必ず手放す(下)。全順序どおりの本取得は `DispatchPrelock` が local を含めて
-        // 改めて行う(§18.10「循環待ちを構造的に作れない」= local だけ順序の外に出さない)
+        // 改めて行う(RR-18.10「循環待ちを構造的に作れない」= local だけ順序の外に出さない)
         var localLock = try LocalDispatchLock(
             runGroup: runGroup, waitLock: waitLock, forceLock: forceLock,
             log: { FleetRunner.log($0) }).acquire()

@@ -79,7 +79,7 @@ public enum BridgeAPI {
     /// 無いため定数はここに置く。
     /// 0.25(0.2 でなく)である理由: 横向きの高さは実測 ~390pt で下部バー+セーフエリアが
     /// ~y=341 から始まる。0.2 の始点(y≈312)はそこを ~30pt しかクリアしない
-    /// (docs/performance-tuning.md:798-801 に、全画面 swipe がタブバー上で始まり 0pt しか
+    /// (docs/performance-tuning/:798-801 に、全画面 swipe がタブバー上で始まり 0pt しか
     /// 動かなかった実測が残る)。それでもバーに乗れば動かない——そのときは
     /// host 側の「何も動いていない」判定がそのまま報告する
     public static let defaultSwipeMarginRatio = 0.25
@@ -298,7 +298,7 @@ public enum BridgeAPI {
     /// 根拠: これを超えて素通しすると、シミュレータ内の testmanagerd が合成タッチ列
     /// (RCPSyntheticEventStream)を作り続けて約15MB/秒で肥大化する(実測: press
     /// duration=1e9 でランナーは3秒で ok を返すが testmanagerd は残り続け、数時間で170〜280GB。
-    /// 止めるには testmanagerd 自体を kill するしかない。→ maintainer-notes §49.1)
+    /// 止めるには testmanagerd 自体を kill するしかない。→ MN-49.1)
     public static let gestureSecondsCeiling: Double = 60
 
     /// waitForSettle で比べる範囲を各辺この割合だけ内側へ削る(100×200 → 内側 80×160)。縁で止まった後も変わり続ける
@@ -718,7 +718,7 @@ public struct StatusResponse: Codable, Sendable {
     /// **最後に画面が進んでからの秒数**(iOS=CADisplayLink / Android=Choreographer の tick)。
     /// **ホストは凍結判定に使わない。採り直さないこと** —— 本物の wedge でも拍動は回り続ける
     /// (測っているのは「vsync を要求しているか」で「表示が進んだか」ではない。反証の実測は
-    /// docs/verification.md)。計器の撤去は版上げを伴うため次のブリッジ変更に便乗する。
+    /// docs/verification/)。計器の撤去は版上げを伴うため次のブリッジ変更に便乗する。
     /// 計器を持たないブリッジ・旧ブリッジは返さない → nil 許容。
     /// 通信の `idleSeconds`(下)とは別物 —— あちらは「無通信秒数」で画面とは無関係
     public var displayIdleSeconds: Double?
@@ -1116,7 +1116,7 @@ public struct DragRequest: Codable {
     /// **終端ドウェル(`thenHoldForDuration`)のフィールドは持たない** —— 実測して
     /// **iOS では慣性を止められない**ことが分かったため(v1500 + hold 0.2s で 2.85→2.82 倍。
     /// 所要だけ +200ms)。XCUITest の hold は指を保持するだけでイベントを出さず、
-    /// `UIPanGestureRecognizer` の速度計算が更新されない。詳細は docs/performance-tuning.md §6
+    /// `UIPanGestureRecognizer` の速度計算が更新されない。詳細は PT-6
     public var duration: Double?
     public init(fromX: Double, fromY: Double, toX: Double, toY: Double,
                 press: Double? = nil, duration: Double? = nil) {
@@ -1607,7 +1607,7 @@ public struct OKResponse: Codable {
 /// **もう1つの事実(v160〜)**: UIView でない AX 要素を activate で撃ったとき、**枠の中心が押せる範囲の外だと
 /// 活性化の点から言い切れた**(`.activationPoint`。判定は `activationPointMiss` = 純粋関数)。SwiftUI の
 /// `.contentShape` 抜け(文字の部分しか押せない)は hitTest にも AX の当たり判定にも出ず、割れたのはこの点だけ
-/// だった(docs/maintainer-notes.md §77)。使ってよいフレームワークは `AppUIFramework.activationPointMarksHitArea`。
+/// だった(MN-77)。使ってよいフレームワークは `AppUIFramework.activationPointMarksHitArea`。
 /// UIView の要素は hitTest が答えるので対象外(UIStepper・UITextView 等は活性化の点が中心に無いのが正常)
 public struct TapHitAreaMiss: Codable, Equatable, Sendable {
     public enum Kind: Codable, Equatable, Sendable {

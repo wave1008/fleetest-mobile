@@ -542,7 +542,7 @@ final class BridgeRouter {
 
     /// 横向きの SpringBoard は枠を縦の座標系のまま返し(画面は縦と横の和)、座標で撃つと done のまま空振りする。
     /// 要素で叩く(`XCUIElement.tap()`)も効かない: XCTest がその要素を「アラートに遮られている」と判定し、
-    /// InterruptionGuard の下では操作を諦める(2026-10-04 実測。maintainer-notes §66.6)。
+    /// InterruptionGuard の下では操作を諦める(2026-10-04 実測。MN-66.6)。
     /// 当たらないと分かっている操作で done を返さず 422 で断る(422 = セッションはあるが今は無理)
     private func refuseLandscapeSpringBoardTap() -> BridgeError {
         BridgeError(422, "the device is in landscape: SpringBoard reports its elements in portrait coordinates,"
@@ -869,7 +869,7 @@ final class BridgeRouter {
         return frame.width > frame.height ? .landscape : .portrait
     }
 
-    /// **iOS ではキーボードを閉じられない**(docs/design.md に不採用の記録)。Esc は不発で、
+    /// **iOS ではキーボードを閉じられない**(docs/design/ に不採用の記録)。Esc は不発で、
     /// app.keyboards は別プロセス扱いでタイムアウトする(handleType のコメント参照)。
     /// **嘘の成功を返さない**ため 501 を返す
     private func handleHideKeyboard() throws -> BridgeHTTPServer.Response {
@@ -965,7 +965,7 @@ final class BridgeRouter {
     /// 横向き(landscape)専用の既定 swipe の始点・終点。**frame ローカル座標**を返す
     /// (`coordinate(_:_:)` が app frame 原点からのオフセットとして加算するため minX/minY は足さない)。
     /// 縦向きは対象外で nil を返し `swipeUp()` 系のまま —— 全画面を暗黙に座標化する案は
-    /// 2度撤回済み(docs/performance-tuning.md §3.19)。
+    /// 2度撤回済み(PT-3.19)。
     /// マージンは `BridgeAPI.defaultSwipeMarginRatio`(0.25)だが、**下端からは
     /// `BridgeAPI.bottomChromeClearance` を必ず空ける** —— 比だけだと窓の低い横向きで
     /// 始点がタブバーの内側に落ち、1pt も動かない(定数の doc に実測)。
@@ -1731,7 +1731,7 @@ final class BridgeRouter {
         return app
     }
 
-    /// **ジェスチャ系(/tap /swipe /drag /doubleTap /pinch /press)専用**の前面確認(§3.1 の残件。
+    /// **ジェスチャ系(/tap /swipe /drag /doubleTap /pinch /press)専用**の前面確認(
     /// 2026-09-14 物理 SE3: `ft_navigate home` → 座標 `ft_tap` でランナーが落ちた)。座標ジェスチャは
     /// `app.coordinate(...)` が **Find the Application** を撃ち、ref 形は要素のライブクエリを撃つ ——
     /// どちらもセッションのアプリが背面だと刺さって XCTest が Tear Down し**ランナーごと落ちる**。

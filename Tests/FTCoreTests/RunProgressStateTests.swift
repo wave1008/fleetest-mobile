@@ -1,7 +1,7 @@
-// RunProgressState(RunOrchestrator の run 進捗の記帳。docs/design.md §18)の検証。
+// RunProgressState(RunOrchestrator の run 進捗の記帳。DS-18)の検証。
 // 守るもの: ①前回と同じ内容なら書かない(壁時計だけが進む周期で emit させない、の actor 側の砦)
 // ②再キュー(laneIdled)は done/failed を増やさない ③scenarioFinished は done を必ず、
-// 失敗なら failed も増やす ④finish() は remove を呼ぶ ⑤残り見積もり(§18.4)は進捗とともに減る
+// 失敗なら failed も増やす ④finish() は remove を呼ぶ ⑤残り見積もり(DS-18.4)は進捗とともに減る
 // (RunProgressEstimate の式そのものは RunProgressEstimateTests が固定するので、ここでは
 // scenarioStarted/scenarioFinished/laneIdled が pendingCounts を正しく出し入れしているかだけを見る)。
 
@@ -248,7 +248,7 @@ final class RunProgressStateTests: XCTestCase {
                        "振り直しでまだ未着手ぶんに戻っている(消えていない)")
     }
 
-    // MARK: - 詰まりの事実(§18.1 段6。判定・閾値は作らない。回数を数えるだけ)
+    // MARK: - 詰まりの事実(DS-18.1 段6。判定・閾値は作らない。回数を数えるだけ)
 
     /// 再キュー(laneIdled)は requeued を1増やす。laneDropouts は増えない
     func testLaneIdledIncrementsRequeuedOnly() async {
@@ -298,7 +298,7 @@ final class RunProgressStateTests: XCTestCase {
         XCTAssertEqual(journal.writes.last?.laneDropouts, 1)
     }
 
-    // MARK: - expectedSeconds(§18.5 段6。実績表からレーン単位で引く。新しい I/O は足さない)
+    // MARK: - expectedSeconds(DS-18.5 段6。実績表からレーン単位で引く。新しい I/O は足さない)
 
     /// シナリオ開始時、実績表にあれば expectedSeconds を秒(切り上げ)で持つ
     func testScenarioStartedSetsExpectedSecondsFromTheEstimateTable() async {

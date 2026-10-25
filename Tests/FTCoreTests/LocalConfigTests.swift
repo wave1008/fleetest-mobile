@@ -80,7 +80,7 @@ final class LocalConfigIssuerIdTests: XCTestCase {
         XCTAssertEqual(LocalConfig.resolveIssuerId(environment: [:], configURL: url), fallback)
     }
 
-    // MARK: - resolveIssuer (explicit フラグ付き。§18.2: resolveLayoutIssuer が USER@hostname
+    // MARK: - resolveIssuer (explicit フラグ付き。RR-18.6: resolveLayoutIssuer が USER@hostname
     // フォールバックのときだけ1回警告するための出所判定)
 
     func testResolveIssuerExplicitTrueForEnvironment() throws {

@@ -78,7 +78,7 @@ final class BridgeLauncherCaptureSettingsTests: XCTestCase {
             args.firstIndex(of: flag).flatMap { args.indices.contains($0 + 1) ? args[$0 + 1] : nil }
         }
         // 置き場はポートごとの固定フォルダ、名前は起動ごと(bridge-<port>-<stamp>.xcresult。
-        // 同名の使い回しは `Existing file at -resultBundlePath` で落ちる。台帳 §19.25)
+        // 同名の使い回しは `Existing file at -resultBundlePath` で落ちる)
         let bundle = try XCTUnwrap(value(after: "-resultBundlePath"), "結果の束が既定の場所へ積まれる")
         XCTAssertTrue(bundle.hasPrefix(root.appendingPathComponent(".fleetest/xcresult/bridge-8914-").path), bundle)
         XCTAssertTrue(bundle.hasSuffix(".xcresult"), bundle)

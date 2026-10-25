@@ -39,7 +39,7 @@ final class AndroidDeviceAnswerTimeoutScanTests: XCTestCase {
         // 免除 = 端末の応答を確かめずに撃つと決めたもの(等号で固定する。足すなら理由を書く)
         let exempted: [String: String] = [
             #"adb(["shell", "input", "swipe""#:
-                "ドラッグ・長押しのフォールバック(実機の主経路)。正当に長く、門の往復を毎ジェスチャに払わない(§65.6)",
+                "ドラッグ・長押しのフォールバック(実機の主経路)。正当に長く、門の往復を毎ジェスチャに払わない(MN-65.6)",
         ]
         let regex = try NSRegularExpression(pattern: #"(?<![A-Za-z])adb\(\[[^\]\n]*"#)
         let ns = text as NSString

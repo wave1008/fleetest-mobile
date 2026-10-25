@@ -1,6 +1,6 @@
 // 補助プロセス `fleetest api vision-serve`: 長寿命のプロセスで Vision の特徴量を計算し、Unix ドメインソケットで答える。
 // run の開始時に RunOrchestrator(FTCore の `VisionHelperHost`)が起こし、シナリオのプロセスは Vision の異常を検知したときだけ頼る。
-// 本体・通信は Sources/FTCore/VisionHelper*.swift(設計は docs/maintainer-notes.md §67)。
+// 本体・通信は Sources/FTCore/VisionHelper*.swift(設計は MN-67)。
 // 終了条件: stdin EOF(親が閉じた)または SIGTERM/SIGINT。ソケットのファイルは終了時に消す。
 
 import ArgumentParser

@@ -49,7 +49,7 @@ actor LiveBridgeAutoStarter {
     /// 接続拒否を観測したとき呼ぶ。idle なら起動タスクを開始する(starting/failed 中は何もしない
     /// = xcodebuild の二重起動を防ぐ)。戻り値は更新後の状態サフィックス。
     /// `trigger` は**何を見て起動したか**(ログの事実)。応答なしから probe の判定で起動した回を
-    /// 「Connection refused」と書くと、生きたランナーを片付けた回の切り分けができない → maintainer-notes §62.1
+    /// 「Connection refused」と書くと、生きたランナーを片付けた回の切り分けができない → MN-62.1
     func noteConnectionRefused(trigger: String = "Connection refused") -> String {
         if case .idle = state {
             state = .starting
@@ -250,7 +250,7 @@ actor LiveBridgeAutoStarter {
             }
             // **実機に2本目のランナーを立てない**(2本目の起動が1本目を殺し、残った側も道連れになる)。
             // 自動起動は起動途中のランナーを引き取らないので、serve が再起動するたびに別ポートで
-            // 立て直していた(実地: 8124→8136→8137 が同時に生存。maintainer-notes §49.4)。
+            // 立て直していた(実地: 8124→8136→8137 が同時に生存。MN-49.4)。
             // bridge up / 供給は起動途中のデバイスを待って引き取るので、この門はここにだけ置く
             if physical, let ps = try? Shell.run(["ps", "-axo", "pid=,command="]), ps.status == 0,
                let other = BridgeLauncher.runnersOnDevice(
@@ -260,10 +260,10 @@ actor LiveBridgeAutoStarter {
                     device: udid, port: other.port, pid: other.pid, physical: true))
             }
             // **シミュレータでも、同じ台に残骸と言えないランナーが居れば起動しない**(2本目が1本目を殺し、両方が落ちて端末から
-            // ブリッジが消えた = maintainer-notes §99)。忙しいランナーは /status に答えず、起動途中のランナーはまだ待ち受けていないので、
+            // ブリッジが消えた = MN-99)。忙しいランナーは /status に答えず、起動途中のランナーはまだ待ち受けていないので、
             // 接続拒否だけでは残骸と言わない —— 判定は `partitionRunnersElsewhere`(`isLeftoverRunner` = 拒否・このワークスペース・
             // 起動途中でない)。止めるのは残骸だけ。**起動先と同じポートも見る**(外すのは古いビルドの止め直し = stopFirst のときだけ):
-            // 見ないと startDetached の killOrphanRunners が同じポートの起動途中のランナーを止める(maintainer-notes §101)
+            // 見ないと startDetached の killOrphanRunners が同じポートの起動途中のランナーを止める(MN-101)
             if !physical, let ps = try? Shell.run(["ps", "-axo", "pid=,command="]), ps.status == 0 {
                 let split = BridgeLauncher.partitionRunnersElsewhere(
                     BridgeLauncher.runnersOnDevice(psOutput: ps.output, device: udid, excludingPort: stopFirst ? port : 0),

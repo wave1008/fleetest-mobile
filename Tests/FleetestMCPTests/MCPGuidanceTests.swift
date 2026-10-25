@@ -373,7 +373,7 @@ final class MCPGuidanceTests: XCTestCase {
         XCTAssertTrue(noteWithoutEvidence.contains("Leaving the app"), noteWithoutEvidence)
     }
 
-    /// **§19.3 M2**: ツール自身が ft_clear_app_data/ft_install でアプリを止めたと分かっている
+    /// ツール自身が ft_clear_app_data/ft_install でアプリを止めたと分かっている
     /// ときは、たとえ Android の processEvidence が running: false を言っていても
     /// 「クラッシュしたかも」ではなく「この操作で止めた」と言う(事実のほうが確度が高い)
     func testSwitchedAppNoteAttributesToTheToolWhenItStoppedTheAppItself() {
@@ -466,7 +466,7 @@ final class MCPGuidanceTests: XCTestCase {
         XCTAssertFalse(hint.contains("run profile"), "profile で in-app が立つと言っている: \(hint)")
     }
 
-    /// **フレームワークが判明していて食い違うなら黙る**(§19.3 M9): この助言は `framework`
+    /// **フレームワークが判明していて食い違うなら黙る**: この助言は `framework`
     /// 1つに固有の欠陥で、判明した uikit アプリへ Compose 専用の助言を出すのは誤誘導になる
     func testModeHintDropsWhenTheKnownFrameworkDoesNotMatch() {
         let server = MCPServer(write: { _ in }, makeDriver: { _ in FakeDriver() },

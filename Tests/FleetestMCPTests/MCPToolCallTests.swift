@@ -69,7 +69,7 @@ final class MCPToolCallTests: XCTestCase {
 
     func testDoubleTapAcceptsCoordinates() async throws {
         _ = try await server.call(tool: "ft_double_tap", args: ["x": 10.0, "y": 20.0])
-        // 先頭の "snapshot" = 直近の木が無いので画面の範囲を1枚読んでから判定する(§19 M4)
+        // 先頭の "snapshot" = 直近の木が無いので画面の範囲を1枚読んでから判定する
         XCTAssertEqual(driver.calls, ["snapshot", "doubleTap(x:10.0,y:20.0)"])
     }
 
@@ -252,7 +252,7 @@ final class MCPToolCallTests: XCTestCase {
         XCTAssertEqual(driver.calls, [])
     }
 
-    /// **§19.3 M2**: ft_clear_app_data の直後、木がまだ別画面(ホーム/ランチャ)を指している
+    /// ft_clear_app_data の直後、木がまだ別画面(ホーム/ランチャ)を指している
     /// snapshot は「アプリが落ちたかも」ではなく「この呼び出しで止めた」と言うこと
     /// (ツール自身が撃った操作なので、クラッシュを疑う理由が無い)
     func testSnapshotAfterClearAppDataDoesNotSuspectACrash() async throws {
@@ -717,7 +717,7 @@ final class MCPToolCallTests: XCTestCase {
         XCTAssertEqual(driver.calls, ["terminate"])
     }
 
-    /// **§19.3 M3**: 対象が分からない(bundleId も無く、このセッションで ft_launch もしていない)
+    /// 対象が分からない(bundleId も無く、このセッションで ft_launch もしていない)
     /// ときは黙って何もしないのではなく throw する。答えを「Terminated the app」で嘘つかない
     func testTerminateWithNoKnownTargetRefuses() async {
         await assertThrows("ft_terminate", [:])

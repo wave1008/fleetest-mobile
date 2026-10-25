@@ -1,5 +1,5 @@
 // RemoteDeviceFanout.swift
-// **デバイスの起動・停止を機械ごとに分散する**(docs/remote-runner.md §13)。
+// **デバイスの起動・停止を機械ごとに分散する**(RR-13)。
 // 1つの実行プロファイルのデバイスが複数の機械にまたがるとき、`api start-all-devices` / `stop-all-devices` は
 // 手元のぶんを自分で処理しつつ、**リモートのぶんをその機械へ投げる**。
 //

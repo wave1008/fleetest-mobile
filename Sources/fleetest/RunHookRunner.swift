@@ -1,5 +1,5 @@
 // RunHookRunner.swift
-// 実行プロファイルの開始/終了スクリプト(docs/remote-runner.md §17「スクリプト(Seatbelt の中)」)の実行。
+// 実行プロファイルの開始/終了スクリプト(RR-17「スクリプト(Seatbelt の中)」)の実行。
 // 判定(パス解決・実行可否・孤児か)は FTCore.RunHookPlan / RunHookLease、枠の規則は FTCore.ScriptSandbox、
 // 中継の判定は FTServices.ServicePolicy。ここは入力集め・起動・出力の中継・子孫の掃除・控えの更新だけ。
 //
@@ -306,7 +306,7 @@ enum RunHookRunner {
     /// 子プロセスを起動し、出力を1行ずつ中継する(まとめて出すと、数十秒かかる setup が
     /// 終わるまで画面が無音になり「止まった」と読まれる)。**タイムアウトは置かない** ——
     /// 妥当な上限を決める根拠がこちらに無い(起こすものは利用者が決める)。リモート実行は
-    /// ディスパッチ全体の上限(§16.2 `--remote-timeout`)が外側から縛る。
+    /// ディスパッチ全体の上限(RR-16.2 `--remote-timeout`)が外側から縛る。
     /// **出力せずに戻らない**形は `RunHookStall` の閾値ごとに警告を 1 行出して待ち続ける。
     /// **終了はパイプの EOF と独立に待つ**(`sleep 999 &` の孫が書込端を握っても掃除に進める)。
     /// 終わったら期限つきで出力を回収し、プロセスグループに残った子孫を止める。
@@ -390,7 +390,7 @@ enum RunHookRunner {
 
     /// スクリプトのプロセスグループに残っているもの(`sleep 999 &` 等)へ SIGTERM → 猶予 → SIGKILL。
     /// `Foundation.Process` の子はグループリーダーで、`sandbox-exec` は同じ pid で exec するので pgid = 子の pid。
-    /// `setsid` で離脱した子孫には届かない(検出もできない = §17 ⑤ は目標)
+    /// `setsid` で離脱した子孫には届かない(検出もできない = RR-17 ⑤ は目標)
     static func sweepProcessGroup(_ pgid: pid_t, what: String, log: (String) -> Void) {
         guard killpg(pgid, 0) == 0 else { return }  // 誰も居ない
         killpg(pgid, SIGTERM)

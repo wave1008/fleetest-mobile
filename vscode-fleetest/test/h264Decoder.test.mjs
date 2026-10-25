@@ -2,7 +2,7 @@
 // createH264Renderer の「デコード実寸の通知」契約テスト。
 // VideoFrame は close() で detach され displayWidth/Height が 0 を返す(WebCodecs 仕様)。
 // close 後に読んでいたため H.264 タイルはアスペクト比を一度も採れず、枠が既定値のまま
-// 残っていた(実害 2026-07-29。docs/design.md §12.1)。
+// 残っていた(実害 2026-07-29。DS-12.1)。
 //
 // 検証対象:
 // - onFirstFrame/onDimensions が close 前の実寸を受け取る(0 が渡らない)

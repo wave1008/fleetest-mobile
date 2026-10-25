@@ -1,6 +1,6 @@
 // run の開始時に補助プロセス(`fleetest api vision-serve`)を1つ起こし、終了時に止める(起動する側)。
 // 呼び口は `RunOrchestrator.run` の1箇所(`fleetest run` / `fleetest api run` / リモートのランナー機の run はどれもここを通る)。
-// 設計は docs/maintainer-notes.md §67。
+// 設計は MN-67。
 //
 // **プロセスに1つ**(1 つの親の中で RunOrchestrator が複数回走る = 複数機械に跨るプロファイル。参照を数えて最初の acquire で起こし、
 // 最後の release で止める)。起こすのは**画像の見本を持つプロジェクトのときだけ**(`FindImage.prewarmIfNeeded` と同じ条件)・

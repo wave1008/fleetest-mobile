@@ -1,5 +1,5 @@
 // RemoteHostRegistry.swift
-// `--runner` の論理名登録簿(LocalConfig.remoteHosts。docs/remote-runner.md §13)。
+// `--runner` の論理名登録簿(LocalConfig.remoteHosts。RR-13)。
 // ssh/ファイル I/O はここに置かない(呼び出し側 = Sources/fleetest/RemoteCommands.swift の
 // RemoteHostResolver)。ここは名前の妥当性・解決規則・並び順だけを扱う純粋関数。
 
@@ -16,7 +16,7 @@ public enum RemoteHostRegistryError: Error, LocalizedError, Equatable {
             return "invalid machine name: \(detail)"
         case .hostAlreadyRegistered(let host, let machine):
             return "\(host) is already registered as machine \"\(machine)\""
-                + " (dispatching to both fights over the same devices; docs/remote-runner.md §13)"
+                + " (dispatching to both fights over the same devices; RR-13)"
         }
     }
 }
@@ -27,7 +27,7 @@ public enum RemoteHostResolution: Equatable {
     case registered(RemoteHostEntry)
     /// 登録簿に無いので生の ssh 宛先として扱う
     case rawTarget(String)
-    /// "local"・空文字(予約名。docs/remote-runner.md §13「フリート定義」)
+    /// "local"・空文字(予約名。RR-13「フリート定義」)
     case reserved
 }
 
@@ -47,7 +47,7 @@ public enum RemoteHostRegistry {
         }
         guard trimmed != "local" else {
             throw RemoteHostRegistryError.invalidName(
-                "\"local\" is reserved for local execution (docs/remote-runner.md §13)")
+                "\"local\" is reserved for local execution (RR-13)")
         }
         guard trimmed.unicodeScalars.allSatisfy(allowedNameCharacters.contains) else {
             throw RemoteHostRegistryError.invalidName(
@@ -57,7 +57,7 @@ public enum RemoteHostRegistry {
 
     /// **machine を省略したときの既定名**: ssh 宛先からホスト部を採る(`user@` を落とす)。
     /// マシン名はこの Mac だけのエイリアスなので、名前を付けたくない利用者に付けさせない
-    /// (登録簿の鍵は host。docs/remote-runner.md §0)。
+    /// (登録簿の鍵は host。RR-0)。
     /// **同期相手: vscode-fleetest/src/remoteRunArgs.ts の defaultMachineForHost**
     /// (拡張は入力欄のウォーターマークと送信値に使う。規則が割れると、画面が予告した名前と
     /// 実際に登録される名前が食い違う。remoteHostDefaultMachineSync.test.mjs が検出)
@@ -126,7 +126,7 @@ public enum RemoteHostRegistry {
         }
     }
 
-    /// 同じ ssh 宛先を指す登録が複数あるとき、その宛先を返す(名前順。§13 のガードの土台
+    /// 同じ ssh 宛先を指す登録が複数あるとき、その宛先を返す(名前順。RR-13 のガードの土台
     /// — 同一リモートへの二重ディスパッチはデバイスの取り合いになる)
     public static func duplicateTargets(_ entries: [RemoteHostEntry]) -> [String] {
         var counts: [String: Int] = [:]

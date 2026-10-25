@@ -1,4 +1,4 @@
-// RunProgressLedger(フリート横断の run 進捗。docs/design.md §18)の検証。
+// RunProgressLedger(フリート横断の run 進捗。DS-18)の検証。
 // 守るもの: ①往復(write→readAll で同じ内容が返る) ②生存判定は pid + startedAt
 // (死んだ pid・記録より後に始まった pid = 再利用は除外) ③壊れた JSON 1件が全体を巻き添えにしない
 // ④既定ディレクトリはリテラルで固定する ⑤sweep は死んだ pid のぶんだけ消す

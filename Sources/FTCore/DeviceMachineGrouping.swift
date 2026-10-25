@@ -2,7 +2,7 @@
 // **一意なのは name 単体ではなく (machine, name)** —— フリートの各機は同じ命名規則で
 // シミュレータを作るため、別マシンの同名は例外ではなく通常。
 //
-// 用語(docs/remote-runner.md §0): machine = 登録簿のマシン名(この Mac だけのエイリアス)。
+// 用語(RR-0): machine = 登録簿のマシン名(この Mac だけのエイリアス)。
 // ホスト名 / IP は host で、この型は一切扱わない。
 // マシン名の正規化(nil・""・"local" → nil)は MachineDispatch.normalize が唯一の定義元。
 

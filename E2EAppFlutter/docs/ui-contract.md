@@ -51,7 +51,7 @@ Flutter の semantics ツリーは**支援技術が要求したときだけ**構
 | `TextField`(`obscureText` 含む) | `textField` | `textField` |
 
 Flutter は canvas 描画で Android 側の className が `android.view.View` のままになるため、
-ブリッジが **葉 + contentDesc → `staticText`** の規則で写像している(docs/design.md §10)。
+ブリッジが **葉 + contentDesc → `staticText`** の規則で写像している(DS-10)。
 → 型セレクタは `button` / `switch` / `staticText` / `textField` が使える。
 → **id の無いテキストもスナップショットに出る**(2026-07-26 以降)。ラベルをアンカーにした
   方向セレクタが Android でも使える(`TestProjects/E2E-Flutter/scenarios/09_ID無し画面.swift`)。
@@ -67,7 +67,7 @@ Flutter は canvas 描画で Android 側の className が `android.view.View` �
 ### D. `ListView` の `cacheExtent` は 0 にする
 
 既定(250px)だと画面外の先読み行まで semantics に出るうえ、iOS ではその frame が
-ビューポート内にクランプされて報告される(design.md §4.6)。すると `scrollTo` が
+ビューポート内にクランプされて報告される(DS-4.6)。すると `scrollTo` が
 「まだ画面外の `#row_40` を見つけた」と判断して停止し、続くタップがクランプ座標
 (実際には何も無い場所)を叩いて空振りする。
 

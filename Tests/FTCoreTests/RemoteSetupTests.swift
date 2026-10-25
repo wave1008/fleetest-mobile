@@ -1,4 +1,4 @@
-// `fleetest remote setup` (docs/remote-runner.md §14) の純粋ロジック。
+// `fleetest remote setup` (RR-14) の純粋ロジック。
 // scp/ssh 越しの結合は e2e に残す(ここは文字列合成・判定のみ)。
 
 import Foundation
@@ -29,7 +29,7 @@ final class RemoteSetupTests: XCTestCase {
 
     /// `--tool-root` を明示する — work が `<base>/users/<issuer>/work` へ2階層深くなり、
     /// install.sh の既定 `<work-dir>/../foundation-tester` が RemoteLayout.toolRoot と
-    /// もう一致しないため(§18.2)
+    /// もう一致しないため(RR-18.6)
     func testInstallArgsIncludesToolRoot() {
         let args = RemoteSetupPlan.installArgs(workDir: "/x/users/alice/work", projectName: "E2E",
                                                 toolRoot: "/x/foundation-tester")

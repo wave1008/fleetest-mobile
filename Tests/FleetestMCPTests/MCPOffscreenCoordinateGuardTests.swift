@@ -1,7 +1,7 @@
 // 画面外の座標(負・画面サイズ超え)への ft_tap / ft_double_tap / ft_long_press / ft_drag は、
 // 直近の ft_snapshot の screen に対して判定し**撃たずに拒否**する。in-app ブリッジは「その点を
 // 含む最小の frame」を撃つだけで点が画面の中かを見ない(InAppBridge.swift)ので、撃つと画面外の
-// 要素が押される。まだ ft_snapshot を撮っていないときは1枚読んでから判定する(§19 M4)。
+// 要素が押される。まだ ft_snapshot を撮っていないときは1枚読んでから判定する。
 // screen が 0(旧ブリッジ)のときだけ「分からない」を「外れている」と読まず撃つ。縁は外(`<`)。
 
 import XCTest
@@ -56,7 +56,7 @@ final class MCPOffscreenCoordinateGuardTests: XCTestCase {
                        "拒否したはずなのに実際に撃ってしまった: \(driver.calls)")
     }
 
-    /// **ft_snapshot をまだ撮っていなければ1枚読んでから判定する**(§19 M4: snapshot 前の
+    /// **ft_snapshot をまだ撮っていなければ1枚読んでから判定する**(snapshot 前の
     /// `tap (5000, -20)` が done になっていた)。読むのは直近の木が無いときだけ
     func testReadsOneSnapshotWhenNoneWasTakenAndThenRejects() async throws {
         do {
@@ -84,7 +84,7 @@ final class MCPOffscreenCoordinateGuardTests: XCTestCase {
         XCTAssertTrue(driver.calls.contains { $0.hasPrefix("tap(x:") }, "\(driver.calls)")
     }
 
-    /// **縁は外**(§19 M4): 390x844 の画面で (390, 844) は画素の外。原点 (0,0) と最後の画素は中
+    /// **縁は外**: 390x844 の画面で (390, 844) は画素の外。原点 (0,0) と最後の画素は中
     func testTheFarEdgeIsOutsideAndTheOriginIsInside() async throws {
         try await takeSnapshot()
         do {
@@ -161,7 +161,7 @@ final class MCPOffscreenCoordinateGuardTests: XCTestCase {
         XCTAssertFalse(driver.calls.contains { $0.hasPrefix("drag(") }, "\(driver.calls)")
     }
 
-    // MARK: - 座標の引数は1つ残らず門を通る(§56.6 の型: ツールは門を通すのに一部の引数が漏れる)
+    // MARK: - 座標の引数は1つ残らず門を通る(MN-56.6 の型: ツールは門を通すのに一部の引数が漏れる)
 
     /// スキーマの座標引数(点を表す数値)。**集合はスキーマから導出する**ので、座標を取る引数を
     /// 足すと下の表に行が無くて落ちる = 門を通し忘れた引数が黙って通らない
@@ -215,7 +215,7 @@ final class MCPOffscreenCoordinateGuardTests: XCTestCase {
         }
     }
 
-    // MARK: - Android は iOS 専用の概念を名指ししない(§19.3 M5)
+    // MARK: - Android は iOS 専用の概念を名指ししない
 
     /// in-app ブリッジの hit-test の仕組みは iOS(inapp モード)だけの実態。Android の拒否に
     /// 混ざると、存在しない仕組みの説明になる

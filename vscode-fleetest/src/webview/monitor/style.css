@@ -441,7 +441,7 @@ button.bulk-cancel:hover:not(:disabled) {
   display: none;
 }
 
-/* run ボード(フリート横断の実行状況。docs/design.md §18)。ツールバー直下・ラインビューの上に
+/* run ボード(フリート横断の実行状況。DS-18)。ツールバー直下・ラインビューの上に
    常設(run 0本でもヘッダは残す。runBoard.js)。 */
 /* 見出し行どうしの区切りは地色(見出し行と同じ)だけで付け、線を見せない。
    **例外は「実行中」と「デバイス」の間の1本だけ**(ユーザー決定)——
@@ -836,7 +836,7 @@ html[lang="en"] .header-count {
   color: var(--vscode-descriptionForeground);
 }
 /* 詰まりの事実(再キュー・レーン離脱)。**警告色にしない** —— 事実を並べるだけで、
-   遅い/異常という判定はしていない(docs/design.md §18.5) */
+   遅い/異常という判定はしていない(DS-18.5) */
 .run-board-notes {
   flex: 0 0 auto;
   font-variant-numeric: tabular-nums;

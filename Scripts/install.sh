@@ -652,7 +652,7 @@ FT="$TOOL_ROOT/.build/debug/fleetest"
 echo "==> swift build (${TOOL_ROOT}; the first build takes minutes)"
 step_started=$SECONDS
 # 動いている FM の常駐プロセス(`$FT api fm-serve`)の実行ファイルを、推論の途中でビルドが差し替えない
-# (maintainer-notes §4.1)。既にビルドがあれば、その**複製**の `api fm-align` にビルドを包ませる
+# (MN-4.1)。既にビルドがあれば、その**複製**の `api fm-align` にビルドを包ませる
 # (FM が居れば推論の終わりを待って退かせ → ビルド → 新しい実行ファイルで起こし直す。居なければ枠を押さえてビルドするだけ)。
 # 複製するのはビルドが $FT を差し替えるため(`remote align` の helper と同じ理由)。包むのはビルドだけ ——
 # この後の doctor は FM を呼ぶので、保護の中に入れると枠を待ち合う。**`--no-restart` で起こし直させない** —— 保守の親は
@@ -963,7 +963,7 @@ fi
 # 「このアプリのテスト書いて」と言われたエージェントの手掛かりはスキルの description だけになる。
 # 実害は3つに絞られる(素の XCTest を書き始める / 新しい ft_* に気づかない /
 # DSL コマンドを推測で書く)ので、**使い方の解説は書かず入口だけ**置く
-# —— 解説を置くとツール説明と二重管理になり必ずズレる(docs/design.md「契約は1箇所」)。
+# —— 解説を置くとツール説明と二重管理になり必ずズレる(docs/design/「契約は1箇所」)。
 # 受け手の資産なので**マーカーの内側だけ**差し替える。嫌うなら --skip-entry-point。
 #
 # **本文は AGENTS.md、CLAUDE.md には読み込み(`@AGENTS.md`)だけ**(AgentIntegration.entryPointFile /

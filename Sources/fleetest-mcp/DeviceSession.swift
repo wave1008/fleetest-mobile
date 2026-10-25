@@ -83,7 +83,7 @@ struct DeviceSession {
     /// 値は `launchedBundleID` に対する申告 —— 別のアプリが起動されれば ft_launch が
     /// 消すので、古い記録が別アプリへ誤って付くことはない。
     /// `switchedAppNote` が「プロセスが無い = クラッシュの疑い」と誤診しないための材料
-    /// (§19.3 M2: 明示的に止めた直後の snapshot が「crashed かも」と言っていた)。
+    /// (明示的に止めた直後の snapshot が「crashed かも」と言っていた)。
     /// **ft_launch で消える**(再起動すれば以後の不在は別の原因になり得るため)
     var toolStoppedBundleID: String?
     /// **最後に ft_install した packagePath**。
@@ -149,7 +149,7 @@ struct DeviceSession {
     /// inapp モード(in-app + XCUITest)キャッシュ命中の XCUITest フォールバックポート。
     /// **`connectedPort` とは別枠**(あちらは主(in-app)のポート): `HybridFallbackDriver` の
     /// fallback は home/drag/座標 press/gesture 等をこちらへ回すので、起動し直しで別デバイスへ
-    /// 移っていないかは主の udid だけでは検知できない(maintainer-notes §51.2。hybridFallbackDrifted 参照)
+    /// 移っていないかは主の udid だけでは検知できない(MN-51.2。hybridFallbackDrifted 参照)
     var hybridFallbackPort: UInt16?
     /// 掴んでいる Android ブリッジの serial。iOS の `connectedPort` と同じ理由で
     /// `connection` の表示文字列からは読み解かない —— 直接指定は "serial <serial>"、profile

@@ -29,7 +29,7 @@ export function repairWifi(adbPath: string, serial: string): Promise<boolean> {
 }
 
 /** 画面凍結(blank-screen)の軽量修復を CLI に委譲する。手順・判定閾値・gRPC/adb の振り分けは
- * Swift 側 AndroidHealthProbe.repairBlankDisplay が唯一の正(docs/performance-tuning.md §7)。
+ * Swift 側 AndroidHealthProbe.repairBlankDisplay が唯一の正(PT-7)。
  * 戻り値: 再プローブで非 blank になったら true。spawn 失敗・タイムアウト・JSON 不正は false
  * (例外は投げない。呼び出し側 monitorHealthWatchdog は false を「修復できず」として扱う)。 */
 export function repairDisplay(

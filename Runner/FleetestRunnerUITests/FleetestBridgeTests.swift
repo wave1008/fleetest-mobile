@@ -39,7 +39,7 @@ final class FleetestBridgeTests: XCTestCase {
         // 実機は FT_BIND_ALL=1 で 0.0.0.0 に開く(BridgeHTTPServer.start 参照)。
         // 127.0.0.1 決め打ちで出すと実機の切り分け時に誤誘導する
         let bindHost = ProcessInfo.processInfo.environment["FT_BIND_ALL"] == "1" ? "0.0.0.0" : "127.0.0.1"
-        // 無通信 TTL(0 = 無期限)。忘れられたブリッジのデバイス占有を防ぐ(design.md §4.1)
+        // 無通信 TTL(0 = 無期限)。忘れられたブリッジのデバイス占有を防ぐ(DS-4.1)
         let ttl = BridgeAPI.resolvedBridgeTTLSeconds(ProcessInfo.processInfo.environment["FT_BRIDGE_TTL"])
         NSLog("[fleetest] bridge listening on %@:%d ttl=%@", bindHost, Int(port),
               ttl > 0 ? "\(ttl)s" : "off")

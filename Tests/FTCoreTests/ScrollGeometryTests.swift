@@ -119,7 +119,7 @@ final class ScrollGeometryTests: XCTestCase {
     // `implicitScrollTarget`(面積最大のスクロール容器を暗黙の対象にする規則)のテストは
     // 2026-08-05 に**関数ごと削除**した。暗黙の座標化は2度撤回されており production から
     // 呼ばれていなかった = 生きているように見えるだけの死んだ規則だった。
-    // 規則と再検討条件は docs/performance-tuning.md §3.19 に残っている(必要になったら書き直す)
+    // 規則と再検討条件は PT-3.19 に残っている(必要になったら書き直す)
 
     /// 横は現行の 0.2↔0.8(スパン 0.6)と同じ = 用途で分けない
     func testHorizontalMarginIsUniform() {

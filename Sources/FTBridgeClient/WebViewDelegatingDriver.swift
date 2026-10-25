@@ -220,7 +220,7 @@ public final class WebViewDelegatingDriver: AppDriver {
     /// ランナーに問い合わせないまま数秒置いた直後の座標イベントを **200 を返しつつ届け損なう**
     /// (実測: アイドル ~3.5s で ~14%・~1s でも数%。SUT の JS プローブで「ページは pointerdown
     /// すら見ていない」を確認)。直前にランナーへ木を1回読ませると 0/25(A/B は
-    /// docs/verification.md §interop WebView)。**時間閾値にしない** —— 短いギャップでも
+    /// docs/verification/ §interop WebView)。**時間閾値にしない** —— 短いギャップでも
     /// 確率的に落ちる実測があり、安全な境界を引けない。機構(testmanagerd の何が冷えるのか)は
     /// 非公開で特定できておらず、この接続確認は観測に立脚した防御
     /// 実行プロファイル iosPreActionPing(既定 true)。OFF は FT_PRE_ACTION_PING=0 で届く
@@ -246,7 +246,7 @@ public final class WebViewDelegatingDriver: AppDriver {
     /// DOM は `value` を返せるので**読み返して1回だけ張り直す**。
     /// **判定は「値が入力前から1文字も変わっていない」ときだけ**にする —— 「期待した文字列を
     /// 含まない」で判定すると、入力を加工するフィールド(大文字化・書式化)で二重入力になる
-    /// (Android の SET_TEXT で踏んだ二重追記と同じ型。docs/design.md §Android のテキスト注入の規律)
+    /// (Android の SET_TEXT で踏んだ二重追記と同じ型。docs/design/ §Android のテキスト注入の規律)
     public func type(ref: Int?, text: String) async throws {
         guard mode == .domInterop else { try await screenDriver.type(ref: ref, text: text); return }
         guard let ref else {

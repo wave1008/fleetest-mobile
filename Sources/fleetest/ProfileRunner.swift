@@ -439,7 +439,7 @@ enum ProfileRunner {
         // 取りこぼす)
 
         // **sweep はここでは呼ばない** —— この run の掃除は "building" を書く入口で済んでいる
-        // (1 run で2回走らせない。docs/design.md §18.1「run 開始時に1回」)
+        // (1 run で2回走らせない。DS-18.1「run 開始時に1回」)
 
         // 段階「準備中」の控え。handoff が立たないまま抜けるときは defer で消す(writePreparingProgress の doc)
         let progressWriter = ProfileRunOrchestrator.writePreparingProgress(
@@ -524,7 +524,7 @@ enum ProfileRunner {
         for line in WorkerModeSummary.lines(recorder?.recordedWorkerModes ?? []) { ConsoleOut.out(line) }
 
         // プラットフォーム別のレーン稼働。台数を増やす前にここを見る(遊休レーンがあるなら
-        // 増やすのではなく配分を変える。docs/performance-tuning.md §3.6)
+        // 増やすのではなく配分を変える。PT-3.6)
         // 単一プラットフォームでも「レーンが遊休している」ことは読めるので出す(台数過多の検知)。
         // 逐次実行(1レーン)だけは自明なので黙る。
         let utilizations = timing.laneUtilizations

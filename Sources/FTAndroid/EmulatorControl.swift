@@ -2,7 +2,7 @@
 // - serial がディスカバリ(EmulatorEndpoints)に無い = 実機 or 旧 emulator → 呼び出し側の adb 経路
 // - gRPC が一度でも失敗した個体は同一ブート(pid)中は adb 固定(再試行で遅くしない。
 //   再ブートで pid が変われば自動的に gRPC へ復帰)
-// - 殺しスイッチ: 環境変数 FT_EMULATOR_CONTROL=adb で全面 adb(docs/verification.md)
+// - 殺しスイッチ: 環境変数 FT_EMULATOR_CONTROL=adb で全面 adb(docs/verification/)
 // 各メソッドは「gRPC で完了できなければ nil / false」を返し、呼び出し側が adb にフォールバックする。
 
 import FTEmulatorGrpc
@@ -47,7 +47,7 @@ public enum EmulatorControl {
     }
 
     // 名前付きキーの keypress は置かない — emulator は sendKey を成功で受けてキーを捨てる
-    // (無音 no-op。AndroidDriver.home() と docs/design.md §16.3)。キー系は adb keyevent。
+    // (無音 no-op。AndroidDriver.home() と DS-16.3)。キー系は adb keyevent。
     // gpio-keys に載る KEY_POWER/KEY_SLEEP だけは届くので sleepWake は gRPC のまま
 
     /// 2点間ドラッグ(座標は screencap と同じ物理ピクセル)。false = gRPC 不可

@@ -19,7 +19,7 @@ Flutter SDK が必要(`brew install --cask flutter`)。
 ## 実行
 
 **iOS と Android を別々に実行する。** シナリオは `platform:` 未指定(両OS共通で書いてある)ため、
-両OSのデバイスを1プロファイルに並べても片方のキューにしか入らない(docs/design.md §11.4)。
+両OSのデバイスを1プロファイルに並べても片方のキューにしか入らない(DS-11.4)。
 
 ```sh
 fleetest run --project E2E-Flutter --profile ios-xcuitest

@@ -1,7 +1,7 @@
 // 契約: 外部コマンドの出力から値を作るときは終了コードを見る。`Shell.run` / `Shell.runData` は
 // **非ゼロで投げない**ので、`output` を素で解析すると失敗の出力(空・エラー文)から確定値ができる ——
 // `adb devices` の失敗が「接続中は無い」になり、停止の確認・データ削除・MCP の接続断の判定が誤った
-// (負荷テスト 2026-09-27 §56.7 と同じ型の掃討)。`Shell.Result.outputIfSucceeded` か `status` を見ること。
+// (負荷テスト 2026-09-27 MN-56.7 と同じ型の掃討)。`Shell.Result.outputIfSucceeded` か `status` を見ること。
 //
 // **集合は Sources/ 全体から機械的に導出する**(SharedResourceOwnershipParityTests と同じ流儀)。
 // 関数単位なので、同じ関数に status を見る呼び出しが1つでもあれば他の素の読みは見逃す(粒度の限界)。
@@ -83,7 +83,7 @@ final class ToolOutputStatusScanTests: XCTestCase {
         return results
     }
 
-    // `adb(`/`rawAdb(` は `AndroidDriver` が Shell.Result を返す包み(§56.10 の掃討漏れ:
+    // `adb(`/`rawAdb(` は `AndroidDriver` が Shell.Result を返す包み(MN-56.10 の掃討漏れ:
     // `Shell.run` を直接呼ばない関数はこの包み越しに素の `.output` を読んでいても元の走査に映らなかった)
     private static let shellCall = #"Shell\.run(Data)?\s*\(|\b(?:adb|rawAdb)\("#
     /// 素の出力の読み(`outputIfSucceeded` は語が続くので当たらない・`.data(` はメソッド呼び出しなので外す)

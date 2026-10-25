@@ -1,4 +1,4 @@
-/// ステップ1つぶんの応答時間計測の記録(契約: docs/response-measurement.md §5・§8.3、結果 JSON は docs/results-json.md)。
+/// ステップ1つぶんの応答時間計測の記録(契約: RM-5・RM-8.3、結果 JSON は docs/results-json.md)。
 /// 操作の直後に入るのは `busyBeforeAction` / `quietWaitMs` / `firstFrameMs` / `firstFrameMissing` だけ。t2 の欄は
 /// このステップの次の計測ステップが対象を解決した時点で `ResponseReadyUpdate` として後から入る
 /// (次の計測ステップが無い = シナリオの最後の計測ステップ・途中で終わったシナリオは判定されず、t2 の欄は nil のまま)。

@@ -16,7 +16,7 @@ public struct VideoRecordingConfig: Sendable {
     /// 1000: 実測(M2 Ultra・iOS シミュレータ / Android エミュレータ・静的な画面とスクロールの2本・
     /// 500/1000/1500/3000 × 解像度 ON/OFF を各2回)で、1500 → 1000 は iOS のクリップが 15〜35% 小さくなり、
     /// OCR で読める文字の割合は差が見えなかった(条件内の揺れ ±10pt 以下)。500 は iOS の半分解像度(既定)で
-    /// 誤読が 2〜5 倍に増えたので下限。数値の全体は docs/performance-tuning.md §3.31。
+    /// 誤読が 2〜5 倍に増えたので下限。数値の全体は PT-3.31。
     /// Android は半分解像度の映像が 1000 に届く量を使わないので、ほぼ変わらない
     public static let defaultBitrateKbps = 1000
 

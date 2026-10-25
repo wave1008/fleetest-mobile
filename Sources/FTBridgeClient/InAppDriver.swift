@@ -106,7 +106,7 @@ public final class InAppDriver: AppDriver {
         }
         // **再起動するのは「接続を拒否された」= プロセスが居ないときだけ**。無応答(タイムアウト)は
         // **サスペンド中の生存プロセス**でも起きる —— 背面に回った in-app アプリは TCP を受理して
-        // 何も返さない(docs/verification.md)。そこを死と読むと、`home()` の後の openURL が
+        // 何も返さない(docs/verification/)。そこを死と読むと、`home()` の後の openURL が
         // warm 配送のはずが毎回プロセス再起動になり、in-process の状態を黙って捨てる
         // (同じシナリオが xcuitest モードとだけ挙動が食い違う)。サスペンドなら
         // simctl openurl 自体が前面化して配送するので、こちらから起こす必要はない

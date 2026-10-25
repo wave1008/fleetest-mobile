@@ -97,7 +97,7 @@ struct ApiRemoteCompatCommand: AsyncParsableCommand {
         ConsoleOut.out(String(data: data, encoding: .utf8)!)
     }
 
-    /// この実行プロファイルが使うリモートマシンのラベル一覧(登録名。docs/remote-runner.md §13 —
+    /// この実行プロファイルが使うリモートマシンのラベル一覧(登録名。RR-13 —
     /// devices[].machine は登録名でしか書けない契約)。機械が2つ以上にまたがっていれば
     /// DeviceMachineRunner の分割計画から、単一機械の自動ディスパッチならその機械を取る
     private static func remoteHostNames(project: TestProject, profile: String) throws -> [String] {
@@ -158,7 +158,7 @@ private struct RemoteCompatMachineJSON: Encodable {
     let revision: String?
     let revisionCompatible: Bool?
     /// `RevisionRelation.rawValue`。revisionCompatible == false かつ published(未 push でない)かつ
-    /// local/remote 両 rev が取れているときだけ non-nil(§18.3 規則1)
+    /// local/remote 両 rev が取れているときだけ non-nil(RR-18.3 規則1)
     let revisionRelation: String?
     let toolchain: String?
     /// blocking で止まるか(advisory = ベータ seed だけの差は true のまま)

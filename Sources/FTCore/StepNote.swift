@@ -15,7 +15,7 @@ import Foundation
 public enum StepNote: String, Sendable, Codable, CaseIterable {
     /// 整定の収束判定がポーリング上限で打ち切られ、**画面が動いたまま先へ進んだ**。
     /// 赤になる前の先行指標: ここが増えている状態で構造的な高速化を入れると、
-    /// フレーク率の上昇として遅れて現れる(docs/performance-tuning.md の採用ゲート)。
+    /// フレーク率の上昇として遅れて現れる(docs/performance-tuning/ の採用ゲート)。
     /// 探索の終端で出る場合だけ文言が変わる(`StepExecutor.scrollSearchNote`)が**コードは同じ**
     case settleCapped = "settle-capped"
 
@@ -196,7 +196,7 @@ public enum StepNote: String, Sendable, Codable, CaseIterable {
     case textEllipsized = "text-ellipsized"
 
     /// occlusion-guard の OCR と FM の判定が割れ、**FM は見えないと言ったが OCR は期待の文字を読めた**ので
-    /// 緑にした(見えていると読めた側を採る。docs/poc-fm-occlusion-guard.md §5.22)。
+    /// 緑にした(見えていると読めた側を採る。OG-5.22)。
     /// **率を見たい注記**: 多ければ FM の書き起こしの取りこぼし、あるいは OCR が見逃しを作っている疑い
     case ocrReadWhatFMMissed = "ocr-read-what-fm-missed"
 
@@ -332,7 +332,7 @@ public enum StepNote: String, Sendable, Codable, CaseIterable {
     case keyboardAppearedLate = "keyboard-appeared-late"
 
     /// 容器の外にあると判定した対象を、掴み直しと追加の送りを上限まで行っても外のまま**操作した**
-    /// (止めないのは設計どおり = docs/design.md「スクロール残像(ghost)は拒否せず、警告して撃つ」)。
+    /// (止めないのは設計どおり = docs/design/「スクロール残像(ghost)は拒否せず、警告して撃つ」)。
     /// ステップは緑のまま。**後段の検証が無いシナリオでは、これだけが「別の物に当たったかもしれない」
     /// 痕跡**になる(実測: iPhone 13 LAN で撃った後、後段の textIs が selected=- で赤。
     /// それまでは説明文の括弧書きにしか残らず run 横断で数えられなかった)。
@@ -371,13 +371,13 @@ public enum StepNote: String, Sendable, Codable, CaseIterable {
     /// (ブリッジの事実 `TapHitAreaMiss` を写すだけ)。
     /// **判定は変えない**(撃つのをやめない・撃ち直さない・赤にしない)。原因は推測しない
     /// (アプリの作り・重なった部品・遷移の途中、のどれかは言えない)。
-    /// **率が上がったら in-app では緑・XCUITest では赤になる操作が増えている**(docs/maintainer-notes.md §76.1)
+    /// **率が上がったら in-app では緑・XCUITest では赤になる操作が増えている**(MN-76.1)
     case inAppTapOutsideHitArea = "inapp-tap-outside-hit-area"
 
     /// in-app が UIView でない AX 要素(SwiftUI 等)を activate で撃ったが、その活性化の点が枠の中心
     /// (座標タップ・XCUITest が押す点)と違った(ブリッジの事実 `TapHitAreaMiss.Kind.activationPoint` を写すだけ)。
     /// 典型は文字の部分しか押せない SwiftUI の `.plain` の Button(`.contentShape` 抜け)だが、**原因は推測しない**。
-    /// 判定は変えない。**率が上がったら in-app では緑・XCUITest では赤になる操作が増えている**(maintainer-notes §77)
+    /// 判定は変えない。**率が上がったら in-app では緑・XCUITest では赤になる操作が増えている**(MN-77)
     case inAppActivationPointOffCentre = "inapp-activation-point-off-centre"
 
     /// 出てきたばかりのダイアログ・シートの中の要素を本物の指と同じ経路(XCUITest)で押す前に、表示の切り替えが終わる

@@ -1,4 +1,4 @@
-// RunSupplyProgress(run の準備中の端末ごとの供給の段階。docs/design.md §18.1)の検証。
+// RunSupplyProgress(run の準備中の端末ごとの供給の段階。DS-18.1)の検証。
 // 守るもの: ①snapshot は名前順(共有の段階が先頭)②同じ内容への書き込みは通知しない
 // ③クリアは行を消して通知する ④reporter は step nil を消去に写す ⑤通知はロックの外(通知の中で snapshot を読める)。
 

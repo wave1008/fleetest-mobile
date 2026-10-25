@@ -1,4 +1,4 @@
-// MCP の `ft_rotate portrait` の後に端末の回転設定を戻すかの判定(§19 R1)。
+// MCP の `ft_rotate portrait` の後に端末の回転設定を戻すかの判定。
 // 元から向きが固定されていた端末(前の MCP セッションが横のまま切れた後)で元の user_rotation を
 // 書き戻すと、明示された portrait を横へ取り消しながら「Rotated to portrait」と答えていた(Pixel 3a)。
 // 判定は `AndroidDriver.autoRotateRestorePlan` の1箇所(adb 無しで固める)

@@ -111,7 +111,7 @@ final class MCPRefGenerationTests: XCTestCase {
         XCTAssertFalse(text.contains("older snapshot"), text)
     }
 
-    /// 4.5(§19.3 M6): `ft_type(ref:)` は内部で verifiedRef → freshSnapshot を1回払うが、
+    /// 4.5: `ft_type(ref:)` は内部で verifiedRef → freshSnapshot を1回払うが、
     /// 木が変わっていなければ adoptSnapshot は世代を進めない(同一性が一致すれば base を
     /// 使い回す)ので、同じスナップショットから採った**別の** ref はこの後も stale にならない
     /// はず——という回帰ガード。読み返し等の内部検証は raw snapshot(adoptSnapshot を通さない)

@@ -257,7 +257,7 @@ struct ApiLiveServe: AsyncParsableCommand {
                 await runnerHealth.reset()
                 logStderr("switched the driver to \(endpoint.host):\(port) (announced by the runner)")
             }
-            // **port の本人確認(udid + ブリッジ)を毎コマンド撃つ**(maintainer-notes §51.2・§51.10 と同型の穴):
+            // **port の本人確認(udid + ブリッジ)を毎コマンド撃つ**(MN-51.2・MN-51.10 と同型の穴):
             // makeLiveDriver は起動時に1回組むきりで、フリートが run のたびにブリッジを
             // 起動し直すと port が別デバイス、あるいは**同じデバイスの別ブリッジ**へ移り得る ——
             // inapp モードなら home/appSwitcher/drag/座標 press/gesture/pinch(fallback 経由)が、
@@ -367,7 +367,7 @@ struct ApiLiveServe: AsyncParsableCommand {
     /// 空きポートを充てて「まだ居ない」の形(接続拒否)に落とし、自動起動
     /// (LiveBridgeAutoStarter)に委ねる。ここが無いと、自動起動が想定している
     /// まさにその場面(ブリッジ未着手のデバイスを既定ポートで開く)が塞がれる
-    /// **4つ目の戻り値**(maintainer-notes §51.10): `port` の期待ブリッジ(composeDriver 参照)。**Android と、
+    /// **4つ目の戻り値**(MN-51.10): `port` の期待ブリッジ(composeDriver 参照)。**Android と、
     /// デバイスがまだ無いプレースホルダ(自動起動待ち)は nil** —— どちらも「今 probe してよい
     /// ブリッジの期待」が無い(Android はブリッジ種別の概念が無く、プレースホルダは
     /// 何も応答しない = 自動起動の成功を「switched the driver」が拾ってから初めて分かる)。
@@ -403,7 +403,7 @@ struct ApiLiveServe: AsyncParsableCommand {
         case .mismatch(let detail):
             mismatch = detail
         case .silent:
-            // **応答が無いことを「このデバイスのブリッジ」と読まない**(§18.7「不明と空きを混ぜない」の同型)。
+            // **応答が無いことを「このデバイスのブリッジ」と読まない**(RR-18.7「不明と空きを混ぜない」の同型)。
             // ただし **busy は正常**(XCUITest は駆動中 /status に答えない)なので、
             // `/status` の代わりに**プロセスの実体**で占有者を見る —— **肯定的に別のデバイスと
             // 読めたときだけ**掴むのをやめる。決めつけて進むと、この後の自動起動がそのポートへ
@@ -412,7 +412,7 @@ struct ApiLiveServe: AsyncParsableCommand {
             // 利用者が --port で決めた宛先はそのまま進む(指定を勝手に変えない)。
             // **占有者を読めるのはループバックの宛先だけ** —— 実機の LAN bind は向こうの機械の
             // ポートなので、こちらの lsof が同じ番号で見つけるのは無関係なプロセス。
-            // 読めない相手を根拠に宛先を変えない(§18.7「不明と空きを混ぜない」の同型)
+            // 読めない相手を根拠に宛先を変えない(RR-18.7「不明と空きを混ぜない」の同型)
             // **待受が無い瞬間もある**(run のレーンの in-app ブリッジは、シナリオの合間のアプリの
             // 起こし直しの間だけ消える)。そのときポートの持ち主を言えるのは in-app の台帳だけ ——
             // 見ずに進むと自動起動がレーンのポートでランナーを起動し、レーンの操作がこのデバイスへ届く
@@ -521,7 +521,7 @@ struct ApiLiveServe: AsyncParsableCommand {
 
     /// resolve(または乗り換え後の resolve)の結果から実際に使うドライバを組み立てる。
     /// inapp モードの in-app 側(別ポート)はここで初めて本人確認する——xcuitest 側だけでは検分できない。
-    /// **4つ目の戻り値**は、以後の毎コマンドの本人確認(run() の drift チェック・maintainer-notes §51.10)が
+    /// **4つ目の戻り値**は、以後の毎コマンドの本人確認(run() の drift チェック・MN-51.10)が
     /// `port` へ probe を撃つときの期待ブリッジ —— inapp/xcuitest モードは `"xcuitest"`、
     /// XCUITest が見つからず in-app 単独に落ちたときだけ `"inapp"`(`port` がそのまま
     /// in-app ポートを指すため)。ここを固定にすると in-app 単独の構成を xcuitest 期待で
@@ -878,7 +878,7 @@ struct ApiLiveServe: AsyncParsableCommand {
 
     /// `BridgeDiscovery.probeStatus` の結果ごとの文言(純粋関数)。**固まり(transportFailed)と
     /// busy(timedOut)で対処が逆になる**のが要点 —— 固まりは起動し直しが要り、busy は待てば直る。
-    /// この2つを混ぜて「待て」と言い続けたのが過去のバグ(docs/maintainer-notes.md §44.1)
+    /// この2つを混ぜて「待て」と言い続けたのが過去のバグ(MN-44.1)
     static func bridgeUnreachableHint(probe: BridgeDiscovery.StatusProbe) -> String {
         switch probe {
         case .transportFailed:
@@ -889,7 +889,7 @@ struct ApiLiveServe: AsyncParsableCommand {
                 + " run `fleetest bridge up` for this device, then try again."
         case .timedOut:
             // **「切断ではない」と言い切らない**: プローブが時間切れでも、元の失敗が「接続が切れた」なら
-            // ランナーが落ちる途中のことがある(実測: 約 10 秒後に接続拒否へ変わった = maintainer-notes §84.8)。
+            // ランナーが落ちる途中のことがある(実測: 約 10 秒後に接続拒否へ変わった = MN-84.8)。
             // 言えるのは「答えなかった」事実と、最も多い理由(忙しい)まで
             return " The device is still connected, but its bridge did not answer a status check in time —"
                 + " most likely it is busy (for example, waiting for the screen to settle can take tens of"

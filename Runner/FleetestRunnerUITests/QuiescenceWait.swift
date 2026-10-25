@@ -169,7 +169,7 @@ enum QuiescenceWait {
     /// **タップ・ダブルタップ・長押しは true**(待ちを飛ばし、整定は木の観察 = captureSettled が担う)/
     /// **スワイプ(スクロールを含む)は false**(待ちを残す。慣性の終わりを木では見届けられず、RN の横スクロール E2E-RN S0090 が
     /// 6 回中 4 回落ちた —— 探索が対象を見つけて止まった後も慣性で流れて画面外へ出る。タップ系は 4 SUT で退行無し。
-    /// 実測と経緯は docs/performance-tuning.md §8)。`skip: true` はどちらも飛ばす
+    /// 実測と経緯は PT-8)。`skip: true` はどちらも飛ばす
     /// **待ちは飛ばさず、上限だけ `quiescenceCapSeconds` に縮める**(type / clear / pressEnter 用。ヘッダ `X-FT-Settle` を見ない =
     /// 打鍵の前の待ちはキーボードの出現を兼ねるので、利用者の `settle: false` でも飛ばさない)
     /// `skipPostEvent`: 操作の後の待ちを飛ばす(/type だけ true。既定値を置かない = 呼び手に決めさせる)

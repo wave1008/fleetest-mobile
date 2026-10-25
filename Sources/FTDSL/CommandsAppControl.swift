@@ -609,7 +609,7 @@ public func tapAppIcon(_ appIconName: String? = nil,
 
 /// 秒 → ナノ秒。**範囲外の Double で `UInt64(_:)` は trap する**(負値も無限大も
 /// UInt64 に入らない巨大値も)。1プロセス=1シナリオなので trap するとレポートごと消えるため、
-/// ここで丸める(design.md §10)。上限が壁時計上限なのは、**それより長くは待てない**から
+/// ここで丸める(DS-10)。上限が壁時計上限なのは、**それより長くは待てない**から
 /// (超えたステップは FTSync がキャンセルする。docs/commands.md にも書いてある契約)。
 /// 負値と NaN は `seconds > 0` が false になって 0 に落ちる
 func ftSleepNanoseconds(_ seconds: Double) -> UInt64 {

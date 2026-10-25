@@ -7,7 +7,7 @@
 // ここも直さないとテストが落ちる —— 索引が古いまま配られるのを防ぐのが唯一の目的。
 // 併せて docs/commands.md も直す(あちらは人間向けの散文、こちらは名前の正典)。
 //
-// summary は**英語**(CLI は英語のみ。docs/design.md の方針)。1行・命令形にしない。
+// summary は**英語**(CLI は英語のみ。docs/design/ の方針)。1行・命令形にしない。
 //
 // FTCore に居る理由: 表は静的データで Foundation にしか依存しない(コマンド定義自体は
 // Sources/FTDSL/Commands*.swift に残る。この索引はその名前の一覧を映すだけ)。

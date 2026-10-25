@@ -62,11 +62,11 @@ tag 定数は `composeApp/src/commonMain/kotlin/com/ftester/e2e/Tags.kt` に集�
   **`checkIsON` / `checkIsOFF`(と セレクタの `checked=`)は iOS の E2EAppIOS の `#cb_agree` / `#radio_*` でだけ
   使えない** —— SwiftUI の Button で自作しており、状態を a11y に一切出さない(2026-09-18 実測)。
   CMP・Flutter・RN の iOS と全 SUT の Android、E2EAppIOS の `#sw_notify`(Toggle)は読める
-  (読み方は docs/framework-differences.md §2.6)。**この契約では状態の正は echo Text**
+  (読み方は FD-2.6)。**この契約では状態の正は echo Text**
   (`agree=<true|false>` 等)で、`checkIsON` / `checkIsOFF` は echo と並べて書く。
 - **プロセス起動時は必ずホームタブのルートに戻る**(画面遷移状態を永続化しない)。
   `launchApp` はアプリのデータを消さないため、ナビ状態のリセットはアプリ側の責務
-  (docs/design.md §10 の知見)。永続化するのは下表の「永続」印の付いた値だけ。
+  (DS-23)。永続化するのは下表の「永続」印の付いた値だけ。
 - **Compose iOS の制約**: Scaffold 等コンテナの testTag は iOS AX ツリーに現れない
   → 着地判定は必ず leaf(Text/Button)で行う。高密度スクロール画面は frame がクランプされ
   tap が外れるため、リスト行の高さは 56dp 以上を確保する。
@@ -434,7 +434,7 @@ iOS では XCUITest の2タッチを間欠的に取りこぼす(2026-09-24 実�
 **バナーは「覆いの判定」を分ける witness**: 全画面モーダルは背面を隠すが、**バナーは隠さない**
 (下のボタンは触れる)。木も同じでなければならない —— 「手前の窓だけ見せる」実装だと
 バナー1枚でアプリ本体が丸ごと消えるので、**要素ごとに「手前の窓がタッチを受ける位置か」で
-判定する**(docs/design.md)。
+判定する**(docs/design/)。
 
 ## コントロールタブ(タイトル `コントロール`)
 

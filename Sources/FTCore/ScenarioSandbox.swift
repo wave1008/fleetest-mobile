@@ -7,7 +7,7 @@
 // **全拒否が土台**(`(deny default)`)。全許可を土台にすると、書き込みと通信を絞っても
 // LaunchServices(`open -a`)や CoreSimulator(`simctl spawn`)経由で枠の外にプロセスを起こせる
 // (どちらも実測)。Simulator の操作は親の `SandboxBroker` が代行する。
-// 規則の形・残る抜け道・書式の罠は docs/design.md §11.7。
+// 規則の形・残る抜け道・書式の罠は DS-11.7。
 import Foundation
 
 public enum ScenarioSandbox {
@@ -688,7 +688,7 @@ public enum ScenarioSandbox {
     }
 
     /// Docker API を TCP で公開している Mac での抜け道(2375 = 平文・2376 = TLS。Docker の既定)。枠の中から繋げると
-    /// `docker run -v $HOME:/h` でホストの秘密を読める(docs/sandbox-seatbelt.md §8.7 の実測)。別のポートでの公開は拾えない
+    /// `docker run -v $HOME:/h` でホストの秘密を読める(SB-8.7 の実測)。別のポートでの公開は拾えない
     static let dockerTCPPorts: [UInt16] = [2375, 2376]
 
     /// `(subpath "<実体パス>")`。Seatbelt は symlink を解決した後のパスで照合するので

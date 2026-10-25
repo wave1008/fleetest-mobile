@@ -104,7 +104,7 @@ enum ResidentProcessGuard {
     /// (猶予は noteCommandStart のまま)。**窓は「進まない時間」を測る** —— 命令全体を1本の窓で数えると、
     /// 段ごとに期限のある呼び出し(観測の screenshot・snapshot・springboard 退避・前面追従)が劣化した
     /// ランナーでそれぞれ期限近くまで掛かったとき、進んでいるのに強制終了する(猶予の足し算を3度継ぎ足した
-    /// → maintainer-notes §68.1)。アイドル中は何もしない
+    /// → MN-68.1)。アイドル中は何もしない
     static func noteCommandProgress() {
         state.withLock {
             guard $0.commandStartedAt != nil else { return }

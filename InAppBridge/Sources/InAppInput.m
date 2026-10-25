@@ -399,7 +399,7 @@ id _Nullable FTCurrentTextReceiver(void) {
 BOOL FTClearTextInFirstResponder(void) {
     id responder = ftClearTarget();
     if (!responder) return NO;
-    // **Flutter アプリでは in-app では消せない**(docs/design.md に不採用の記録)。
+    // **Flutter アプリでは in-app では消せない**(docs/design/ に不採用の記録)。
     // 判定はアプリ粒度: 受け口の実クラスでは判定しきれない(secure 欄は別クラスで、名前は
     // 版・構成で変わる。2026-07-30 実測で取りこぼした)。Flutter はテキスト状態を Dart 側が
     // 持つというアプリ単位の性質なのでこの粒度が正しい。NO = 409 → xcuitest フォールバック

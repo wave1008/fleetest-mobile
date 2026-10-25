@@ -1,5 +1,5 @@
 // RemoteDispatch.swift
-// `fleetest run --runner` (docs/remote-runner.md §3・§7・Phase 1) の純粋ロジック。
+// `fleetest run --runner` (RR-3・RR-7・Phase 1) の純粋ロジック。
 // プロセス起動・ネットワーク I/O はここに置かない(呼び出し側 = Sources/fleetest/RemoteRunDispatcher.swift)。
 
 import Foundation
@@ -66,7 +66,7 @@ public struct RemoteHostSpec: Equatable, Sendable {
     }
 }
 
-/// rev 不一致の解消の向き(docs/remote-runner.md §18.3 規則1)。配布モデル上、2人の rev は
+/// rev 不一致の解消の向き(RR-18.3 規則1)。配布モデル上、2人の rev は
 /// ほぼ常に祖先関係にある(全員が同じ upstream main を追従)ので、祖先判定だけで向きを決められる
 public enum RevisionRelation: String, Sendable {
     case localBehind    // ローカルがランナーの祖先 = この機械が古い
@@ -91,18 +91,18 @@ public enum RemoteCompat {
     }
 
     /// 向き付きの案内(英語1文)。**localBehind は align を実行手順として案内しない** ——
-    /// ランナーはピン運用(§18.3)なので、遅れている側の人間が自分を上げる
+    /// ランナーはピン運用(RR-18.3)なので、遅れている側の人間が自分を上げる
     public static func relationAdvice(_ relation: RevisionRelation) -> String {
         switch relation {
         case .localBehind:
             return "This machine is behind the runner: update yourself (Scripts/update.sh, or git pull + rebuild)"
-                + " — do NOT align the runner backward to match (pinned deployment; docs/remote-runner.md §18.3)."
+                + " — do NOT align the runner backward to match (pinned deployment; RR-18.3)."
         case .remoteBehind:
             return "The runner is behind: update it with `fleetest remote align <host>`"
-                + " (for a fleet, verify on one host first per the §16.6 canary procedure, then roll out to the rest)."
+                + " (for a fleet, verify on one host first per the canary procedure in docs/remote-runner/ (RR-16.6), then roll out to the rest)."
         case .diverged:
             return "Local and runner revisions have diverged (branch work) — a shared runner cannot track"
-                + " both branches; use a dedicated machine for branch verification (docs/remote-runner.md §18.3)."
+                + " both branches; use a dedicated machine for branch verification (RR-18.3)."
         case .unknown:
             return "Cannot tell which side is behind (the runner's revision is not in this clone)."
                 + " Run `git fetch` and retry — in most cases this machine is the one that is behind."
@@ -233,14 +233,14 @@ public enum RemoteCompat {
     }
 }
 
-/// リモートホストに用意する専用ベースディレクトリの配置(docs/remote-runner.md 改訂版)。
+/// リモートホストに用意する専用ベースディレクトリの配置(docs/remote-runner/ 改訂版)。
 /// `tool/` = TOOL_ROOT(foundation-tester のクローン。ランナー専用) / `work/` = WORK_DIR
 /// (受け手パッケージ。TestProjects・results・.build)。マシンが既に持つローカルインストール
 /// (受け手自身の `~/foundation-tester` 等)とは別物にすることで、rsync --delete による
 /// ユーザー資産の消失・SPM ビルドロック競合・results DB 混在を避ける
 public struct RemoteLayout: Equatable, Sendable {
     public let base: String
-    /// 発行者ネームスペースの鍵(§18.2)。resolveLayoutIssuer が検証済みの値を渡す契約
+    /// 発行者ネームスペースの鍵(RR-18.6)。resolveLayoutIssuer が検証済みの値を渡す契約
     /// (validateIssuerKey を通していない値をここへ入れない)
     public let issuer: String
     /// **そのランナー機の `$HOME`**。呼び出し側が `echo $HOME` の1往復で確定した絶対パスを
@@ -267,9 +267,9 @@ public struct RemoteLayout: Equatable, Sendable {
     /// `package: "foundation-tester"` と一致しないと "unknown package" でマニフェストが
     /// 壊れる(localhost E2E で実測)。install.sh の既定
     /// TOOL_ROOT(= WORK_DIR/../foundation-tester)とも揃う。**ツールクローンは
-    /// ホスト共有のまま**(発行者ごとに分けない。§18.2/§18.4)
+    /// ホスト共有のまま**(発行者ごとに分けない。RR-18.6/RR-18.4)
     public var toolRoot: String { base + "/foundation-tester" }
-    /// 発行者ごとの WORK_DIR(§18.2)。rsync --delete・results・録画の混線を
+    /// 発行者ごとの WORK_DIR(RR-18.6)。rsync --delete・results・録画の混線を
     /// ネームスペースで構造的に消す
     public var workDir: String { base + "/users/" + issuer + "/work" }
     public var binary: String { toolRoot + "/.build/debug/fleetest" }
@@ -285,7 +285,7 @@ public struct RemoteLayout: Equatable, Sendable {
         workDir + "/" + Self.projectsDirName + "/" + project
     }
 
-    /// `remoteControl.workspace` のミラー先(docs/remote-runner.md §17)。
+    /// `remoteControl.workspace` のミラー先(RR-17)。
     /// プロジェクトごとに分ける(複数プロジェクトを同じランナーで回しても衝突しない)。
     /// projectDir と違い `--delete` は付いていない側の呼び出し規約は無く、rsync 引数
     /// (RemoteTransferPlan.workspaceRsyncArgs)側で --delete を明示する
@@ -434,7 +434,7 @@ public enum RemoteArtifactCollection {
 
     /// **`--safe-links` は回収(リモート → 手元)にだけ付ける**。ランナーが作ったシンボリックリンクを
     /// そのまま受けると、宛先ディレクトリの外を指すリンクを置かれ、続く転送がそこへ書き抜ける。
-    /// §15.3 の既定(同一信頼グループ・全員が同じ UNIX ユーザー)では results/ は同僚全員が書けるので、
+    /// RR-15.3 の既定(同一信頼グループ・全員が同じ UNIX ユーザー)では results/ は同僚全員が書けるので、
     /// 入力は「信頼するランナー」ではなく「共有ディレクトリ」として扱う。
     /// 送信(手元 → リモート)側の rsyncArgs には付けない —— 送る中身は手元の資産で、
     /// 受け手のシンボリックリンク(TestProjects/ 内の正当な参照)を落とす副作用のほうが害になる。
@@ -459,7 +459,7 @@ public enum RemoteArtifactCollection {
 
 extension RemoteArtifactCollection {
 
-    /// 回収済みの録画をランナーから消す1本のコマンド(docs/remote-runner.md §15.4)。
+    /// 回収済みの録画をランナーから消す1本のコマンド(RR-15.4)。
     /// **消すのは録画だけ**(実績 JSON は残す = `remote clean` の保持ポリシーが面倒を見る)。
     ///
     /// **グロブを使わない**。①置き場は `results/runs/<YYYY-MM>/<runID>/recordings`
@@ -503,7 +503,7 @@ extension RemoteArtifactCollection {
 }
 
 /// `remoteControl.workspace` の実効ルートがプロジェクトルート配下かどうかで転送経路を分ける
-/// (docs/remote-runner.md §17)。配下(既定 `<project.rootURL>/workspace` を含む)
+/// (RR-17)。配下(既定 `<project.rootURL>/workspace` を含む)
 /// ならプロジェクト転送(`RemoteTransferPlan.rsyncArgs`。`TestProjects/<project>/` を丸ごと運ぶ)が
 /// そのまま運ぶので専用の rsync は要らない ―― 同じバイトを二度送らない。配下でない
 /// (明示指定でプロジェクト外を指した)ときだけ専用ミラー(`workspaceRsyncArgs`)が要る
@@ -777,7 +777,7 @@ public enum RemoteTimeout {
 
     /// 明示指定 > 自動算出 > **無期限**。自動算出は「1シナリオあたりの上限 × シナリオ数 +
     /// 固定オーバーヘッド」で minimum..maximum にクランプする(遅いデバイス起動・LPT 待ちを
-    /// 1シナリオ600秒/固定900秒で見込む。根拠は docs/remote-runner.md §16.2)。
+    /// 1シナリオ600秒/固定900秒で見込む。根拠は RR-16.2)。
     ///
     /// **戻り値 nil = タイムアウトを掛けない**(欠陥2)。`scenarioCount` は呼び出し側の
     /// 明示 `--scenario` の個数で、プロファイル全体や `--fleet` では実行本数を実行前に知らない
@@ -798,7 +798,7 @@ public enum RemoteTimeout {
 }
 
 /// リモートの Aqua セッション(コンソールにログイン中のユーザー)。resolveLayout の $HOME 取得と
-/// 同じ ssh 往復に相乗りして取得する(§16.3)。ログインウィンドウで停止中は誰も操作できず
+/// 同じ ssh 往復に相乗りして取得する(RR-16.3)。ログインウィンドウで停止中は誰も操作できず
 /// run が確実に固まるため、ディスパッチ前に fail fast する
 public struct RemoteSessionInfo: Equatable, Sendable {
     public let home: String
@@ -905,7 +905,7 @@ public enum RemoteProbe {
     }
 }
 
-/// `fleetest remote status`(docs/remote-runner.md §16.5)の1ホスト分の生取得結果。
+/// `fleetest remote status`(RR-16.5)の1ホスト分の生取得結果。
 /// 個々のフィールドは独立にパース失敗し得る(壊れた出力でも取れた分だけ埋める。全体を
 /// nil にすると「到達したが1項目読めなかった」場合に他の全項目まで失う)
 public struct RemoteHostStatus: Equatable, Sendable {
@@ -914,7 +914,7 @@ public struct RemoteHostStatus: Equatable, Sendable {
     public let toolchain: String?
     public let binaryPresent: Bool
     public let freeKB: Int?
-    /// dispatch.lock の状態(docs/remote-runner.md §18.2 M2)。nil = ブロックが読めず判定不能。
+    /// dispatch.lock の状態(RR-18.2 M2)。nil = ブロックが読めず判定不能。
     /// **「今このフリートを誰が使っているか」を手で ssh しに行かずに済ませる**ための欄で、
     /// 破壊的操作(remote clean)の前にも同じ probe を撃つ
     public let lock: RemoteDispatchLock.Probe?
@@ -958,7 +958,7 @@ public enum RemoteStatusProbe {
     /// (新しい呼び出し元にどちらかを選ばせる)。
     ///
     /// `developerDir` はディスパッチが選ぶ Xcode(呼び出し側が `XcodeSelection.resolve` で
-    /// 事前に解決する。docs/remote-runner.md §7)。**ブロックを増やさず既存の joined 文字列の
+    /// 事前に解決する。RR-7)。**ブロックを増やさず既存の joined 文字列の
     /// 先頭に export を1つ足すだけ** —— `parse` は固定インデックスでブロックを読むため、
     /// 新しいブロックを足すと後続の全ブロックがずれる。export はここから先の全ステップに
     /// 効く(`;` 区切りは同じシェルセッションなので環境変数は持ち越される)。nil ならこれまでどおり
@@ -1087,7 +1087,7 @@ public enum RemoteStatusProbe {
     }
 }
 
-/// `fleetest remote clean`(docs/remote-runner.md §16.4)の削除対象・削除コマンド。
+/// `fleetest remote clean`(RR-16.4)の削除対象・削除コマンド。
 /// dispatch(実行中に残った孤児)/ 各プロジェクトの reports・results の3系統を対象にする
 public enum RemoteCleanPlan {
 
@@ -1099,7 +1099,7 @@ public enum RemoteCleanPlan {
     public static func stopsDevices(dryRun: Bool) -> Bool { !dryRun }
 
     /// keepDays より古いエントリを消す(dryRun なら列挙するだけの)コマンド一覧。
-    /// **全発行者(`users/*/work`)を横断する**(§18.2) —— ディスクは
+    /// **全発行者(`users/*/work`)を横断する**(RR-18.6) —— ディスクは
     /// ホスト共有資源なので保持ポリシーは全員分に掛ける。
     ///
     /// **グロブを書かない**(RemoteHooksReap と同じ理由: 相手は zsh で、マッチしないグロブは
@@ -1134,7 +1134,7 @@ public enum RemoteCleanPlan {
 }
 
 /// `du -sk <base>/users/*/work` の出力 → 発行者ごとの使用量(純粋)。
-/// **ディスクはホスト共有資源**なので「誰のぶんか」が見えないと消す判断ができない(§18.1)。
+/// **ディスクはホスト共有資源**なので「誰のぶんか」が見えないと消す判断ができない(RR-18.1)。
 /// 行の形は `<KB>\t<path>`(BSD du)。想定外の行は捨てる = 壊れた1行で全体を失わない
 public enum RemoteDiskUsage {
     public struct Row: Equatable, Sendable {
@@ -1147,7 +1147,7 @@ public enum RemoteDiskUsage {
     }
 
     /// ssh で撃つ1本の sh コマンド(出力は `parse` へ)。**グロブを書かない**(相手は zsh で、
-    /// マッチしないグロブは du ごと落ちる。maintainer-notes §3.5)。一覧は find で作り
+    /// マッチしないグロブは du ごと落ちる。MN-3.5)。一覧は find で作り
     /// **`-exec du {} +` で渡す** —— `du $(find …)` にすると、1件も無いとき du が引数無し =
     /// カレントの全走査になる
     public static func command(layout: RemoteLayout) -> String {
@@ -1197,10 +1197,10 @@ public enum RemoteShell {
     /// 処理は挟まない)。コンソールにログインしている限りそのままで launchd ドメイン
     /// (CoreSimulator 等)へ到達できる(実測)
     /// `fmConcurrency` は登録簿の欄(`RemoteHostEntry`)。**機械によっては FM を 2 並列以上で
-    /// 呼ぶと壊れる**(実測と経緯は docs/remote-runner.md)ので、枠を機械ごとに絞れるようにする。
+    /// 呼ぶと壊れる**(実測と経緯は docs/remote-runner/)ので、枠を機械ごとに絞れるようにする。
     /// nil のときは**1バイトも足さない** —— ランナー側の既定(`FMCallSlots.defaultConcurrency`)に任せる
     /// `developerDir` はディスパッチが選んだ Xcode(`FTRemote.XcodeSelection`。
-    /// docs/remote-runner.md §7)。非 nil のときだけ `export DEVELOPER_DIR=` を足す
+    /// RR-7)。非 nil のときだけ `export DEVELOPER_DIR=` を足す
     /// (nil = ambient のまま、`xcode-select` の機械既定に従う)。**呼び出し側
     /// (RemoteRunDispatcher.checkCompatibility)がこの run とその直前の toolchain probe に
     /// 必ず同じ値を渡す** —— 別々に解決すると、照合した Xcode と実際に走る Xcode が食い違う
@@ -1228,7 +1228,7 @@ public enum RemoteShell {
         let devDirCmd = developerDir.map { "export DEVELOPER_DIR=\(quote($0)) && " } ?? ""
         return "cd \(quote(layout.workDir)) 2>/dev/null && test -f Package.swift || "
             + "{ echo \"no runner workspace at \(layout.workDir) — run: fleetest remote setup"
-            + " <this host> once for this issuer (docs/remote-runner.md §18)\" >&2; exit 91; } && "
+            + " <this host> once for this issuer (RR-18)\" >&2; exit 91; } && "
             + "\(pathCmd) && \(issuerCmd)\(streamOwnerCmd(streamOwner))"
             + "\(devDirCmd)\(fmCmd)\(lockHeldCmd)\(dispatchedRunCmd)\(guardCmd) && \(syncCmd) && \(launch)"
     }
@@ -1252,7 +1252,7 @@ public enum RemoteShell {
         "export \(HealWriteBack.dispatchedRunEnvironmentKey)=1 && "
     }
 
-    /// `fleetest remote exec`(docs/remote-runner.md §14「単発コマンドの転送は汎用化する」)。
+    /// `fleetest remote exec`(RR-14「単発コマンドの転送は汎用化する」)。
     /// remoteRunCommand と同じ PATH 補正・バイナリ不在 exit 90・workspace 不在 exit 91 の規律を
     /// 踏襲するが、**project sync は撃たない** — 照会・単発操作が目的で、同期は run 専用の前処理だから。
     /// **`developerDir` の既定は nil**(常に ambient)。呼び出し側(`RemoteSetupCommand.Exec`)は
@@ -1275,7 +1275,7 @@ public enum RemoteShell {
         let devDirCmd = developerDir.map { "export DEVELOPER_DIR=\(quote($0)) && " } ?? ""
         return "cd \(quote(layout.workDir)) 2>/dev/null && test -f Package.swift || "
             + "{ echo \"no runner workspace at \(layout.workDir) — run: fleetest remote setup"
-            + " <this host> once for this issuer (docs/remote-runner.md §18)\" >&2; exit 91; } && "
+            + " <this host> once for this issuer (RR-18)\" >&2; exit 91; } && "
             + "\(pathCmd) && \(issuerCmd)\(streamOwnerCmd(streamOwner))"
             + "\(devDirCmd)\(dispatchedRunCmd)\(guardCmd) && \(launch)"
     }
@@ -1383,7 +1383,7 @@ public final class StreamLineSplitter: Sendable {
         }
     }
 
-    /// 末尾 CR も落とす: `-tt` 経由のリモート実行(§16.1)は行末以外に CR を混ぜないが、
+    /// 末尾 CR も落とす: `-tt` 経由のリモート実行(RR-16.1)は行末以外に CR を混ぜないが、
     /// 子プロセスが改行前に kill されると「CR だけ来て \n が来ない」未完行が buffer に残り得るため
     public func flush() -> String? {
         buffer.withLock { buffer in

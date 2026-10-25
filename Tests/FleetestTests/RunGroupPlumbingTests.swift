@@ -74,7 +74,7 @@ final class RunGroupPlumbingTests: XCTestCase {
     }
 
     /// **`--wait-lock` は子へ渡さない** —— 待つのは親(`DispatchPrelock`)の役目になった
-    /// (docs/remote-runner.md §18.10)。親が取れた機械では子はロックを取りに行かず、
+    /// (RR-18.10)。親が取れた機械では子はロックを取りに行かず、
     /// 取れなかった機械では親が既に上限まで待ったあとなので、渡すと**同じ上限をもう一度払う**
     /// (最悪で待ちが2倍)。手元の子はそもそもディスパッチのロックを持たない
     func testApiRunMachineFanoutDoesNotRelayWaitLockBecauseTheParentWaits() {

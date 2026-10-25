@@ -1,10 +1,10 @@
-// maintainer-notes §51.2(2026-09-25): inapp モード(in-app ブリッジ + XCUITest ブリッジ)のキャッシュ命中は主(in-app)の udid だけを確かめており、
+// MN-51.2(2026-09-25): inapp モード(in-app ブリッジ + XCUITest ブリッジ)のキャッシュ命中は主(in-app)の udid だけを確かめており、
 // `HybridFallbackDriver` の fallback(AppAttachDriver)が握る XCUITest ポートは無検査のまま
 // キャッシュから返っていた。ブリッジは run のたびに起動し直されるので、そのポートは別デバイスへ
 // (あるいは同じデバイスの in-app ブリッジへ)移り得る —— home/drag/座標 press/gesture/pinch は
 // すべて fallback 経由なので、黙って別の機へ操作が届く。
 //
-// maintainer-notes §51.10(2026-09-25): 同じ穴が主(primary)ポートにもある。`deviceIdentityChanged` は udid しか見ず、
+// MN-51.10(2026-09-25): 同じ穴が主(primary)ポートにもある。`deviceIdentityChanged` は udid しか見ず、
 // ref を使う呼び出し(`usesRememberedDeviceState`)にしか効かないので、ref を使わない
 // `ft_terminate` のような呼び出しでは効かせようがない。同じ udid のまま run のたびの起動し直しで
 // ブリッジ(xcuitest ⇄ inapp)だけが入れ替わった形を見逃し、その bridge には無い操作
@@ -46,7 +46,7 @@ final class HybridFallbackDriftTests: XCTestCase {
         XCTAssertFalse(drifted, "udid が無いのに判定を撃った")
     }
 
-    /// maintainer-notes §51.10: primary の port/udid/bridge のどれかが無ければ撃たずに .none
+    /// MN-51.10: primary の port/udid/bridge のどれかが無ければ撃たずに .none
     /// (`connectedPorts`/`udids`/`bridges` は Android のキーには揃わないので、
     /// この no-op が Android の呼び出しを毎回 probe しないことも兼ねて守る)
     func testPrimaryBridgeDriftIsNoOpWithoutAllThreeOfPortUDIDBridge() async {
@@ -71,7 +71,7 @@ final class HybridFallbackDriftTests: XCTestCase {
         XCTAssertNil(server.hybridFallbackPorts[key], "機が変わっても前の fallback ポートが残った")
     }
 
-    // MARK: - primaryBridgeOutcome(maintainer-notes §51.10。純粋関数): drift していなければ現状維持、
+    // MARK: - primaryBridgeOutcome(MN-51.10。純粋関数): drift していなければ現状維持、
     // sameDeviceBridgeChanged は「記憶に依る呼び出しだけ拒否・依らなければ黙って作り直し」、
     // differentDevice は ref の有無を問わず常に拒否
 
@@ -162,10 +162,10 @@ final class HybridFallbackDriftTests: XCTestCase {
             let window = lines[index..<min(index + 30, lines.count)].joined(separator: "\n")
             XCTAssertTrue(window.contains("primaryBridgeCheck"),
                           "\(index + 1) 行目のキャッシュ命中がブリッジの入れ替わりを"
-                          + "確かめていない —— maintainer-notes §51.10 と同じ穴(udid だけ・ref を使う呼び出しだけ)が残る")
+                          + "確かめていない —— MN-51.10 と同じ穴(udid だけ・ref を使う呼び出しだけ)が残る")
             XCTAssertTrue(window.contains("hybridFallbackDrifted"),
                           "\(index + 1) 行目のキャッシュ命中が inapp モードの fallback ポートを"
-                          + "確かめていない —— maintainer-notes §51.2 と同じ穴(fallback だけ無検査)が残る")
+                          + "確かめていない —— MN-51.2 と同じ穴(fallback だけ無検査)が残る")
         }
         XCTAssertEqual(hits, 2, "キャッシュ命中の箇所数が変わった(実測 \(hits))。増えたなら確認も入れる")
     }

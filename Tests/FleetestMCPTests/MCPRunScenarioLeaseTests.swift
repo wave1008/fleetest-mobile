@@ -1,5 +1,5 @@
 // ft_run_scenario は ScenarioHost.run(実デバイス)を直接呼ぶだけで MCPDeviceLease を書いておらず、
-// 並行する `fleetest run` がこのデバイスを避けられず、他の MCP セッションへも警告が出なかった(台帳 §19.3)。
+// 並行する `fleetest run` がこのデバイスを避けられず、他の MCP セッションへも警告が出なかった。
 // デバイス/ビルドが要る実行なので単体テストでは撃てず、配線をソース走査で固定する
 // (MCPRotateSettleTests.testRestoreCallIsGatedToAndroidInSource と同じ手法)。
 

@@ -1,4 +1,4 @@
-// コンテナランタイム(Docker / Apple Container)の解決と、ランタイムの CLI を撃つ共通部品(docs/remote-runner.md §17)。
+// コンテナランタイム(Docker / Apple Container)の解決と、ランタイムの CLI を撃つ共通部品(RR-17)。
 // 選び方・接続先の制約・最低版の門はここだけが持つ。ランタイムの argv は FTServices の RuntimeCommands が作る。
 
 import FTCore
@@ -304,7 +304,7 @@ enum RuntimeListing {
 }
 
 enum ServicesRuntimeLocator {
-    /// 根拠: §17 の実測の版(container 1.1.0)。若い CLI で `inspect` の JSON の形が変わりうるので下を許さない。
+    /// 根拠: RR-17 の実測の版(container 1.1.0)。若い CLI で `inspect` の JSON の形が変わりうるので下を許さない。
     /// 落ちたらそこで上げる(`BridgeContractTests` と同じ運用)。
     static let minimumAppleContainerVersion = "1.1.0"
 

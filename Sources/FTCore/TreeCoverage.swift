@@ -11,7 +11,7 @@
 // 誤った成功)。打ち切り側だけ `retakenAtElementLimitCeiling` で塞いであり、こちらは
 // MCP の注記にしか無かった。
 //
-// **判定だけをここに置き、文言は呼び手ごとに持つ**(docs/design.md の規律)。
+// **判定だけをここに置き、文言は呼び手ごとに持つ**(docs/design/ の規律)。
 // MCP はツール名で逃げ道を書き(ft_screenshot / ft_snapshot)、DSL は StepNote で運ぶ。
 //
 // **断定はしない**(新しい検知は警告から始める)。DSL 側はこの判定で run を赤にせず注記に留める

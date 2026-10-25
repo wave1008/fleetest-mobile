@@ -353,7 +353,7 @@ extension StepExecutor {
     /// あるかの**肯定的な証拠**で、`remainingJump == nil` = 「もう先が無い」。これがあるなら
     /// 署名の不変化を2回重ねる必要はない。
     /// 効くのは iOS xcuitest の WebView で、**端に着いた後に捨てのスワイプを2回撃っていた**
-    /// (1スワイプ約2.5秒 = 実測 scrollToTop 中央値 12.1s の主成分。docs/performance-tuning.md §8)。
+    /// (1スワイプ約2.5秒 = 実測 scrollToTop 中央値 12.1s の主成分。PT-8)。
     /// 供給の無い画面(ネイティブ・旧ブリッジ・inapp モードの WebViewDelegatingDriver)は
     /// `offscreen` が nil なので 2 のまま
     static func unchangedRoundsForEdge(snapshot: SnapshotResponse,
@@ -573,14 +573,14 @@ extension StepExecutor {
             // 拾い直さない)。実測して超えていたら次の刻みを詰める。
             //
             // **基準は画面ではなく容器**: 画面の高さを基準にすると、容器は定義上それより小さいので
-            // **ほぼ発火しない** —— §3.18(f) の実測では SwiftUI は 1 スワイプ 681pt に対し
+            // **ほぼ発火しない** —— PT-3.18(f) の実測では SwiftUI は 1 スワイプ 681pt に対し
             // 画面基準の閾値 0.8×874=699pt で素通りする一方、リストの可視高は 492pt =
             // **1.38 倍の超過**(いちばん取りこぼす SUT で無効になる)。
             //
             // **効くのは `scrollFrame` を書いた経路だけ**。刻みを縮める唯一の口は `spanScale` →
             // `scrollPath` で、あちらは領域未指定なら nil を返してブリッジ既定に任せるため。
             // 既定経路の飛び越しをホスト側で塞ぐには座標スワイプを常用するしかなく、それは
-            // 2度撤回済み(docs/performance-tuning.md §3.19)。**ここを既定経路へ広げないこと**
+            // 2度撤回済み(PT-3.19)。**ここを既定経路へ広げないこと**
             let vertical = direction == .up || direction == .down
             if let previousSnapshot,
                let travel = Self.measuredTravel(before: previousSnapshot, after: snapshot,

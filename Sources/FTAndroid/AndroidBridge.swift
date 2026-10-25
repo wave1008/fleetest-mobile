@@ -617,7 +617,7 @@ extension AndroidDriver {
 
     /// installed が expected より新しいときだけ拒否理由を返す(等しい/古い/未インストールは
     /// nil = 通常の自動更新経路を塞がない)。Android は versionCode の引き下げインストールを
-    /// 拒否するため、adb install を試みる前に fail fast させる(docs/remote-runner.md §18.5)
+    /// 拒否するため、adb install を試みる前に fail fast させる(RR-18.5)
     static func downgradeRefusal(installed: Int?, expected: Int, serial: String? = nil) -> String? {
         guard let installed, installed > expected else { return nil }
         let uninstall = serial.map { "adb -s \($0) uninstall \(Self.bridgePackage)" }

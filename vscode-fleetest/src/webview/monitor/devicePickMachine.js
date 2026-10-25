@@ -3,7 +3,7 @@
 // マシン選択はこのダイアログのスコープだけに閉じる(実行プロファイル節に常設セレクタは置かない)。
 // 選択状態はここに保持する(VSCode 設定は増やさない)。
 //
-// 用語(docs/remote-runner.md §0): ここが扱うのは **machine = 登録簿のマシン名(この Mac だけの
+// 用語(RR-0): ここが扱うのは **machine = 登録簿のマシン名(この Mac だけの
 // エイリアス)** で、ホスト名/IP ではない。`remote exec <machine>` の第1引数に渡る値。
 //
 // 一覧は remoteConfig(拡張→webview。設定タブの同名メッセージと同一)を main.js から
@@ -61,7 +61,7 @@ machineSelect.addEventListener('change', () => {
 });
 
 /** #device-pick-overlay を開くたびに modals.js が呼ぶ。実行プロファイルは単独の既定ホストを
- * 持たないので、常にローカルへ戻す(§13 段2)。 */
+ * 持たないので、常にローカルへ戻す(RR-13 段2)。 */
 export function resetDevicePickMachine() {
   selectedMachine = null;
   renderSelect();
@@ -75,7 +75,7 @@ export function currentDeviceSource() {
 
 /** #device-add-overlay(入れ子の「デバイスを新規作成」ダイアログ)は常に #device-pick-overlay の
  * 中から開くため、読み取り専用のバッジとして現在の選択をそのまま映すだけでよい
- * (「リモート取得中はどのマシンから取っているかを画面に出す」§13 段2)。 */
+ * (「リモート取得中はどのマシンから取っているかを画面に出す」RR-13 段2)。 */
 export function refreshDeviceAddBadge() {
   const label = selectedMachine === null ? t('wvMonitor.devicePick.machineLocalShort') : selectedMachine;
   addBadge.textContent = t('wvMonitor.devicePick.machineBadge', { source: label });

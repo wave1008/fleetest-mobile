@@ -1,5 +1,5 @@
 // `ScenarioHost.pinSigningIdentifier`: シナリオ実行バイナリの署名 ID(Identifier)を製品名に揃える
-// (Vision の OCR のコンパイルキャッシュの鍵。docs/performance-tuning.md §3.33)。
+// (Vision の OCR のコンパイルキャッシュの鍵。PT-3.33)。
 // 本物の codesign で確かめる(写した /bin/echo に掛ける = SwiftPM のビルドは要らない)
 
 import XCTest

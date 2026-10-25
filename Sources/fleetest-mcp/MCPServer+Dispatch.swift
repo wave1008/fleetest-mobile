@@ -984,7 +984,7 @@ extension MCPServer {
     /// 何を根拠に選んだかを必ず添える
     /// `waitFor`/`waitForChangeExplicit`: **要約は実際に何を待つかを言う** —— 呼び手が
     /// `waitFor` を渡しているのに(snapshotAfterBody 側では効いている)要約だけが
-    /// 「waitForChange: false」を名乗ると、渡していない引数を渡したことにされる(§19.3 M4)。
+    /// 「waitForChange: false」を名乗ると、渡していない引数を渡したことにされる。
     /// `waitForChangeExplicit` は `args["waitForChange"] as? Bool`(渡していなければ nil)。
     /// 優先順: waitFor > 明示 false > それ以外(暗黙の着地待ち・明示 true)は汎用文言
     /// `routedByScheme`: **iOS は宛先を名乗らない** —— simctl openurl / devicectl openURL は

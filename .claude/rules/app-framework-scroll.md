@@ -28,7 +28,7 @@ CLAUDE.md から移した規則(本文は移設前と同一)。この領域の�
   `UIAccessibilityElement`、RN は `UIView`、SwiftUI は `NSObject`。`AccessibilityClassHint`)。
   どれも無ければ撃たない(打って外れると行が押される = 取り消せない側)。**木の形・型の名前から
   フレームワークを推定しない**(実アプリの 10/22 画面が Compose と同形・RN は Flutter と同形。
-  docs/verification.md)。③は非公開属性なので `Tests/Fixtures/AXClass/` の等号テストで Xcode の版の
+  docs/verification/)。③は非公開属性なので `Tests/Fixtures/AXClass/` の等号テストで Xcode の版の
   変化を検出し、取れなければ nil = 撃たない側へ縮退する
 - **アプリの UI フレームワークは `FTCore.AppUIFrameworkQuery` だけで決める**(語彙 `AppUIFramework` =
   iOS: compose / flutter / reactNative / swiftUI / uikit、Android: compose / flutter / reactNative / androidView)。
@@ -51,10 +51,10 @@ CLAUDE.md から移した規則(本文は移設前と同一)。この領域の�
   **+ `--ios-xcuitest`**。**フルスイートは iOS を in-app で回すので、これだけでは守れない** ——
   現にこの規則の導入(`8a416bc0`)が xcuitest 限定の退行を入れ、フル E2E 緑のまま通った
   (**5日後の `931897d6` で修正済み** —— 申告の祖先へ倒すのは「深さ由来の候補が要素を収められない」
-  ときだけ。経緯と壊れ方は maintainer-notes §4.5.1)
+  ときだけ。経緯と壊れ方は MN-4.5.1)
   **座標ドラッグは `StepExecutor.dragWithFallback` だけから撃つ**(in-app の drag は自前描画だけ受け、UIKit/SwiftUI は 501。
   `driver.drag` を直に呼ぶと inapp モードで黙って不発になる)
 - **端送りは「最後に動いてから `edgeClaimGraceAfterMove`(1.0 秒)」経つまで端と確定しない**(窓の外に描き足す
   RN の FlatList で途中止まりした)。**ドライバの `atEdge: false`(= 確かに動かした)は事実を知っている経路だけが返す**
   (in-app の contentOffset・Android の CDP)。**AX の scroll の受理は含めない** —— Compose は端でも受理し、含めた版は
-  端送りが毎回 maxSwipes まで回った(緑のまま)→ maintainer-notes §36
+  端送りが毎回 maxSwipes まで回った(緑のまま)→ MN-36

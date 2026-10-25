@@ -359,7 +359,7 @@ test("isMonitorEvent: monitorFrame は width/height が欠落/非数値なら fa
 
 // デバイスの一覧だけは toWebviewMessage を通さない —— 表示フィルタ(「起動中のデバイス」)を
 // **畳まずに** filter を添えて送り、落とすのは webview の入口(run ボードのツリーは通さない。
-// docs/design.md §18.5)。toWebviewMessage 側は Exclude してあるので通し忘れはコンパイルで止まる。
+// DS-18.5)。toWebviewMessage 側は Exclude してあるので通し忘れはコンパイルで止まる。
 test("devicesToWebviewMessage: 一覧は絞らず filter を添える", () => {
   const devices = [
     { ...REQ, id: "ios:シミュ1", name: "シミュ1", platform: "ios", state: "offline", detail: "未起動" },

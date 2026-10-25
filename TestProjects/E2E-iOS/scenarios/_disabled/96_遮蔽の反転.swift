@@ -8,7 +8,7 @@
 // **witness は `#txt_paint_target`**(無地の不透明な面で覆われるテキスト)。覆いに文字が無いことが
 // 要点で、文字があると guard は Tier-1(幾何で無罪 かつ インクあり → FM を省く)で素通りする
 // —— 既存の覆い(タブバー・別ウィンドウのモーダル)はどちらもインクがあり、実測で FM 呼び出しは
-// 0 だった(docs/verification.md)。**対象がテキストであることも必須** ——
+// 0 だった(docs/verification/)。**対象がテキストであることも必須** ——
 // `OcclusionEligibility` はテキスト型だけを FM に回すので、Button だと足切りで素通りする。
 //
 // 回し方: このファイルを scenarios/ 直下へ一時的に出し、`fmTextVisibilityCheck: true` の

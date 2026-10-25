@@ -5,7 +5,7 @@
 // のにインク量だけで不可視と言う —— E2E のコンパイル前のステップで実際に出た)。
 //
 // **不可視なら FM の反転と同じく赤**(警告の段階で E2E とコーパスの誤った赤 0 を確かめてから上げた。
-// 実測は docs/poc-fm-occlusion-guard.md §5.19)。**FM の反転と同じく、スクショが古い絵のままだと赤になる**
+// 実測は OG-5.19)。**FM の反転と同じく、スクショが古い絵のままだと赤になる**
 // (モニターの配信が張られた Android Emulator で実際に出た)—— OCR 固有の問題ではない。
 
 import Foundation
@@ -28,7 +28,7 @@ public enum OCROnlyVisibility {
     /// FM の判定と OCR の読みの判定の突き合わせ。**見えていると読めた側を採る**(赤は両方が見えないと
     /// 言った回か、OCR が判定不能で FM が見えないと言った回だけ)。どちらも期待文字列を知らずに読んだ文字を
     /// 同じ `TranscriptMatch` で照合するので「読めた」は描かれている直接の証拠で、「読めなかった」は読み手の
-    /// 失敗でも起きる。割れた回は `disagreement` の注記で残す(率で監査する)。根拠は poc §5.22
+    /// 失敗でも起きる。割れた回は `disagreement` の注記で残す(率で監査する)。根拠は OG-5.22
     public static func merge(fmVisible: Bool, fmState: TranscriptMatch.State?,
                              ocr: Outcome) -> (visible: Bool, state: TranscriptMatch.State?, disagreement: StepNote?) {
         switch ocr {
@@ -52,7 +52,7 @@ public enum OCROnlyVisibility {
         }
         // **occlusionInkThreshold をそのまま流用する**(専用の定数を置かない)。根拠: 実 crop
         // 290 件 + 合成で、この閾値を 6〜20 のどこに置いても結果は同一(空白は 0 付近・文字は
-        // 40 以上に分かれ、間に境界例が無い。docs/poc-fm-occlusion-guard.md §5.19)
+        // 40 以上に分かれ、間に境界例が無い。OG-5.19)
         guard let inkStdDev else { return .undetermined }
         return inkStdDev < inkThreshold ? .notVisible(.notRendered) : .undetermined
     }

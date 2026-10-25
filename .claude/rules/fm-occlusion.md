@@ -80,7 +80,7 @@ CLAUDE.md から移した規則(本文は移設前と同一)。この領域の�
   (`fleetest api fm-serve` = `FMServeServer`)だけが撃つ**。シナリオのプロセス・host-metrics・doctor は
   `LanguageModelSession` を持たず、`FMServeClient` で要求を送る(起こすのは `FMServeHost.ensureRunning` = run の2実装・
   死活の確かめ)。**理由**: FM の死(ANE の `no memory`)は「降ろされたモデルを載せ直す瞬間」に起き、入れ替わる多数のプロセスが
-  各自セッションを作る形はそれを絶えず起こした。1 プロセスが撃ち続けた形はデバイス実行の横でも死ななかった → maintainer-notes §81。
+  各自セッションを作る形はそれを絶えず起こした。1 プロセスが撃ち続けた形はデバイス実行の横でも死ななかった → MN-81。
   守る規律: ①**セッションを作ってよいファイルは3つ**(`FMServeServer` / `TestbaseDrafter` / `FMLoadGenerator`。
   `FMServeTests.testOnlyTheFMProcessAndAuthoringToolsCreateSessions`)②**常駐プロセスに届かなかった回は FM の失敗に数えない**
   (`FMHealth.recordSkip`。ブレーカ・死活の台帳を落とさない = FM の死ではない)③**記録は頼んだ側が自分の所要で行う**
@@ -94,7 +94,7 @@ CLAUDE.md から移した規則(本文は移設前と同一)。この領域の�
   `prewarm` は完了を待つ API が無いので、排他で保証できるのは先読みの開始まで(生成の実際の完了と混ぜない)。
   **直近 20 回の暖機のうち遅い回(4 秒超え)が 6 回以上ならその機械では暖機をやめる**
   = 全部品が ANE に収まらず呼び出しの中で載せ直している印で、続けても積み下ろしを撃つだけ。M1mini(8GB)がそうだった。
-  **ただし搭載メモリ 16GiB 以上の機械ではやめない**(ユーザー決定。M2Ultra でも Simulator の一斉起動の間に成立して暖機が止まり、その後の逼迫の最中に載せ直しで死んだ → maintainer-notes §97)⑥要求・応答の欄を変えたら
+  **ただし搭載メモリ 16GiB 以上の機械ではやめない**(ユーザー決定。M2Ultra でも Simulator の一斉起動の間に成立して暖機が止まり、その後の逼迫の最中に載せ直しで死んだ → MN-97)⑥要求・応答の欄を変えたら
   `FMServeWire.protocolVersion` を +1。**止めるのは相手が自分の実行ファイルより古いときだけ**(`FMServeHost.decide`。版の違いだけで
   止めると、作り直す前から生きている host-metrics が新しい常駐プロセスを毎分止めた)⑦**安全判定による拒否は失敗に数えない**
   (`refused` → skip。失敗に数えると同じ画面で毎回起きる拒否が「死」を記録して FM を止めた)
@@ -133,12 +133,12 @@ CLAUDE.md から移した規則(本文は移設前と同一)。この領域の�
   **5 つ目の読み手は FM を呼ぶ前の門**(`FMCallAdmission.enter(path:)` → `FMLiveness.isKnownDead`): その経路が
   **新しい死**なら呼ばずにスキップ(枠を取る前と取った後の2回見る)。古い・不明・生は呼んで確かめる =
   回復は次の実呼び出しかプローブで拾う。**連続失敗は機械全体で数える**(`FMLiveness.bumpFailureStreak`。
-  シナリオは1本ごとに別プロセスで、プロセス内で数えると閾値に届かず死を1度も記録しなかった)。**台帳の公表する判定(`text` / `vision`)は根拠 `Basis`(最新の生・自分で決めた死・実呼び出しの失敗の新しい側。どれも刻印 `FMLiveness.Stamp` つき)から毎回導く(`derive`)= 観測の着く順に依らない**。根拠と判定は同じファイル・同じ臨界区間で書き、畳むのは表示だけ(根拠は毎回更新)。刻印の比較は単調時刻だけ(壁時計を混ぜると比較が循環する)・前回の起動の根拠は捨てる・**起動が識別できない刻印の観測は共有しない**(プロセスの中だけ)。**連続失敗を別のファイルや数だけで持つ形・「訂正」の継ぎに戻さない**(順序の穴が5回続いた → maintainer-notes §83.6)。**台帳は最新1件の上書きなので、失敗・変わり目・死んだ瞬間の ANE のログ・死ぬ前のホストのメモリの推移(`FMHostMemory` のリング。書き手は fm-serve の周期だけ)・直近の JetsamEvent は `FMHistory`(`~/.fleetest/fm-history.ndjson`・30 日か 5 MB の早いほう)に追記で残す** —— 生の連投は書かない・同じ失敗は1行に畳む・実呼び出しの失敗は FMHealth、それ以外の書き手の死は FMLiveness.record が書く(二重に書かない)。読み口は `doctor --fm-only`
+  シナリオは1本ごとに別プロセスで、プロセス内で数えると閾値に届かず死を1度も記録しなかった)。**台帳の公表する判定(`text` / `vision`)は根拠 `Basis`(最新の生・自分で決めた死・実呼び出しの失敗の新しい側。どれも刻印 `FMLiveness.Stamp` つき)から毎回導く(`derive`)= 観測の着く順に依らない**。根拠と判定は同じファイル・同じ臨界区間で書き、畳むのは表示だけ(根拠は毎回更新)。刻印の比較は単調時刻だけ(壁時計を混ぜると比較が循環する)・前回の起動の根拠は捨てる・**起動が識別できない刻印の観測は共有しない**(プロセスの中だけ)。**連続失敗を別のファイルや数だけで持つ形・「訂正」の継ぎに戻さない**(順序の穴が5回続いた → MN-83.6)。**台帳は最新1件の上書きなので、失敗・変わり目・死んだ瞬間の ANE のログ・死ぬ前のホストのメモリの推移(`FMHostMemory` のリング。書き手は fm-serve の周期だけ)・直近の JetsamEvent は `FMHistory`(`~/.fleetest/fm-history.ndjson`・30 日か 5 MB の早いほう)に追記で残す** —— 生の連投は書かない・同じ失敗は1行に畳む・実呼び出しの失敗は FMHealth、それ以外の書き手の死は FMLiveness.record が書く(二重に書かない)。読み口は `doctor --fm-only`
 - **occlusion-guard の FM 段には期待文字列を渡さない**(2026-09-15)。FM に訊くのは「何が描かれているか」
   (転写 1 欄・prompt は定数)だけで、可否は `FTCore.TranscriptMatch` が期待文字列と突き合わせて決める。
   期待文字列を prompt に入れて「見えるか」を訊くと、空白・別の文字の crop でも期待文字列を写して
   visible=true と答える(おうむ返し。空白 20〜23% / 別の文字 33〜56% の見逃し)。欄順を変えても直らない。
-  `OcclusionTranscriptTests` がソース走査で守る → maintainer-notes §19
+  `OcclusionTranscriptTests` がソース走査で守る → MN-19
 - **occlusion-guard の OCR 段(`FTCore.RegionText`)の「丸ごと読めた」は素通りの根拠** —— 期待テキストが
   **丸ごと**読めた回は FM を省く(既定 on。**利用者の口は実行プロファイルの
   `ocrTextVisibilityCheck`**(拡張のプロファイルタブ
@@ -152,7 +152,7 @@ CLAUDE.md から移した規則(本文は移設前と同一)。この領域の�
   (ユーザー決定: 精度優先。off でも字形の取り違えを誤った赤にしない。off はコンパイルしないのでその回だけ初回コンパイルを
   払いうる。利用者向けは run_profile に明記)。**FM の空の転写(領域に濃淡あり)の OCR 確認は `ocrTextVisibilityCheck` がオンのときだけ**
   (`StepExecutor.emptyTranscriptOCRBudget`。近道の読みが無いときだけ読む)。**「オフでも OCR を使う」は惜しい転写に限ったユーザー決定で、
-  別の確認へ広げない**(広げてレビューで止められた = maintainer-notes §92.1)。**言語補正は日本語の集合でだけ掛ける**(`usesLanguageCorrection(for:)`。
+  別の確認へ広げない**(広げてレビューで止められた = MN-92.1)。**言語補正は日本語の集合でだけ掛ける**(`usesLanguageCorrection(for:)`。
   en ロケールの端末は「単」を中国語フォントの字形で描き、補正なしだと Vision も FM も「单」と読む。
   ASCII は切ったまま = 欠けを推測で埋めさせない)。読めなければ crop を
   拡大して読み直す(`upscaleLadder = [1,2,3]`。×4 で悪化するので上げ続けない。**1行も読めない
@@ -171,7 +171,7 @@ CLAUDE.md から移した規則(本文は移設前と同一)。この領域の�
   「描かれていない / 判定不能」を分ける(`FTCore.OCROnlyVisibility`。**追加の OCR は撃たない**)。
   **不可視なら FM の反転と同じく赤**(警告から始め、コーパスの誤った赤 0 と配信を止めた E2E の赤 0 を確かめて
   上げた。**近道が撃たれていない = 読みが nil なら判定しない** —— [] と混ぜるとインク量だけで赤にする)。
-  実測は docs/poc-fm-occlusion-guard.md §5.19・§5.22
+  実測は OG-5.19・OG-5.22
 - **先頭だけ読めた形の判定は `TranscriptMatch` の1か所**(FM と OCR で共有): 省略記号 → 緑(`text-ellipsized`)/
   割合 > `mostlyHiddenRatio`(0.5・ユーザー決定)→ 緑(`text-partially-hidden`)/ 以下 → 赤。**省略記号は点の列でも
   受ける**(ヒラギノの `…` を OCR は `•••`・`・・・` と読む。`TranscriptMatch.ellipsisTailLength`)。**誤読を許す先頭一致は
@@ -191,9 +191,9 @@ CLAUDE.md から移した規則(本文は移設前と同一)。この領域の�
 - **occlusion-guard の OCR 近道は、コンパイルが終わっていなければ終わるまで待ってから撃つ**(2026-09-15)。
   **2026-10-06 のユーザー決定で、最初のシナリオを起こす前に `compile-ocr` の完了を待つ**(`ScenarioHost.awaitOCRModelCompile`。
   9/15 の「run の開始時には待たない」は取り消し。シナリオの中で待つとアプリの時間が進み、一時的な状態を確かめる手順が
-  壊れた = E2EY-Android の骨組み。ステップ内の待ちは受け皿として残す。経緯は maintainer-notes §18・§20・§69.5): 認識器(Espresso)の
+  壊れた = E2EY-Android の骨組み。ステップ内の待ちは受け皿として残す。経緯は MN-18・MN-20・MN-69.5): 認識器(Espresso)の
   コンパイルキャッシュは**プロセス名と署名 ID ごと(SwiftPM の Debug ビルドは ID に LC_UUID が入り中身が変わる
-  再ビルドでコールドに戻るので、`ScenarioHost.build` が ID を製品名に揃える。LC_UUID は変えない)・コンパイルがプロセスの生存中に終わったときだけコミット**(docs/performance-tuning.md §3.33)。**シナリオを実際に走らせる経路は `ScenarioHost.listForRun`**(run / api run / 機械分担の
+  再ビルドでコールドに戻るので、`ScenarioHost.build` が ID を製品名に揃える。LC_UUID は変えない)・コンパイルがプロセスの生存中に終わったときだけコミット**(PT-3.33)。**シナリオを実際に走らせる経路は `ScenarioHost.listForRun`**(run / api run / 機械分担の
   3 箇所。`OCRModelCompileWiringTests` が等号で固定)で同じプロセス名の待てる子 `compile-ocr` を背景で起こす。
   一覧だけの経路(dry-run / MCP / codegen)は `list`。**プロセス内のコンパイル(探り)は DSL ではシナリオ開始時に
   FTRuntime が始める・dry-run では始めない**(短命で途中で捨て、キャッシュの 1 モデルを上書きする。executor の既定ガードは off でステップごとに効かせるので、`StepExecutor.init` の
@@ -207,9 +207,9 @@ CLAUDE.md から移した規則(本文は移設前と同一)。この領域の�
   近道を撃つのは **ready(探りが 1 行以上読めた)かつ 詰まった読みが無い**ときだけ(`shouldTakeShortcut`。
   純粋関数・配線は走査で固定)、予算 1.3 秒 = 置き換える相手の実測下限、**諦めても読みは止めない**。
   認識器は ANE を避ける(装置で読みが変わる分はコーパスに固定。**指定しても `_e5` の検出・向き・ラテンは ANE に読み込まれ、
-  指定が効くのは日本語の認識器だけ** = docs/performance-tuning.md §3.33)。
+  指定が効くのは日本語の認識器だけ** = PT-3.33)。
   **締め切り・予算のテストは戻り値でなく所要を直接測る**(`TaskBudgetTests`)
 
 - **描画崩壊の検査(iOS Simulator のみ)の検査点を、通る検証ごとに動かさない**。今は「画素で文字を確認した検証が無い区間の終わり」に1回(スクリーンショット約 100〜115ms)で、
-  検証ごとに動かすなら費用を測り直す。**崩壊の判定は `FTCore.RenderCollapse` の1箇所だけ**(呼び手は答えを写す。閾値 3 と向きの門の根拠は maintainer-notes §90)。
+  検証ごとに動かすなら費用を測り直す。**崩壊の判定は `FTCore.RenderCollapse` の1箇所だけ**(呼び手は答えを写す。閾値 3 と向きの門の根拠は MN-90)。
   アプリのログの Metal エラーを信号にしない

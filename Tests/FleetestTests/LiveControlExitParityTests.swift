@@ -4,7 +4,7 @@ import XCTest
 /// 「失敗したが、どうすればよいか」を返す役で、判定(FTCore / FTBridgeClient)は共有し文言だけ
 /// 呼び手ごとに持つ、という規律がある。**片方にだけ配線すると、同じ状況で一方は出口を案内し
 /// 他方は一次情報しか返さない** —— 実際にこの形で同じ型の不具合が3回続けて出た
-/// (docs/maintainer-notes.md §45)。ここは**配線の有無だけ**を縛る(文言の中身は
+/// (MN-45)。ここは**配線の有無だけ**を縛る(文言の中身は
 /// ApiLiveConnectionHintTextTests・MCP 側の各テストが見る)。
 ///
 /// **run(DSL)は対象外**: あちらは失敗をレポートへ残して自動回復する経路で、人が次の一手を
@@ -22,7 +22,7 @@ final class LiveControlExitParityTests: XCTestCase {
         "StaleFrameDetector",
         // XCTest の a11y サーバが一時的に落ちている(環境要因。数秒で戻る)
         "isAccessibilityTemporarilyDown",
-        // 座標が今の画面の外か(maintainer-notes §51.1: ライブ操作の drag が桁外れの座標でドライバごと落ちた)
+        // 座標が今の画面の外か(MN-51.1: ライブ操作の drag が桁外れの座標でドライバごと落ちた)
         "isPointOnScreen",
         // ポートの中身が別のデバイスに替わった(hybridFallbackDrift の3値のうち differentDevice)。
         // 黙って起動し直すと片方だけ別のデバイスへ操作を撃ち続ける

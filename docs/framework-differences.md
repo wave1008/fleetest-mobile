@@ -14,12 +14,12 @@ Flutter・React Native)によって、**木の見え方と操作の効き方が�
 | **C. 経路だけ違う** | 結果は同じだが、ツールの内部でフレームワークごとに別の手段を使う | 何もしない(性能・注記・フォールバックの理由として読む) |
 
 正典は別にある: **型と `#id` の実測は各 SUT の `docs/ui-contract.md`**(母体は `E2EAppCMP/docs/ui-contract.md`)、
-設計の根拠は `docs/design.md`、性能の経緯は `docs/performance-tuning.md`。ここは**横に並べて比べるための索引**で、
+設計の根拠は `docs/design/`、性能の経緯は `docs/performance-tuning/`。ここは**横に並べて比べるための索引**で、
 細部は各節から正典へたどる。
 
 ---
 
-## 0. ツールはフレームワークをどう知るか
+## FD-0 ツールはフレームワークをどう知るか
 
 - **判定は `FTCore.AppUIFrameworkQuery` の1箇所**。順は「.app / .ipa / .apk の目印 → iOS シミュレータに入っている
   バンドル → bundle ID ごとの台帳 → in-app ブリッジの自己申告 → 不明」。目印の規則は `UIFrameworkMarkers`
@@ -36,9 +36,9 @@ Flutter・React Native)によって、**木の見え方と操作の効き方が�
 
 ---
 
-## 1. 木の見え方(型・`#id`・ラベル)
+## FD-1 木の見え方(型・`#id`・ラベル)
 
-### 1.1 型の対照表(同じ `#id` を指したときの型。実測)
+### FD-1.1 型の対照表(同じ `#id` を指したときの型。実測)
 
 | 要素 | CMP(iOS) | CMP(Android) | SwiftUI/UIKit | View/XML | Flutter(iOS) | Flutter(Android) | RN(iOS) | RN(Android) |
 |---|---|---|---|---|---|---|---|---|
@@ -56,7 +56,7 @@ Flutter・React Native)によって、**木の見え方と操作の効き方が�
     **マスクの有無は iOS の Compose / Flutter では型に出ない**
   - 複数行の入力欄: SwiftUI/UIKit と RN(iOS)は `textView`、Android は `textField`
 
-### 1.2 `#id` の出し方(アプリ側の作法。守らないと `#id` が全滅する)
+### FD-1.2 `#id` の出し方(アプリ側の作法。守らないと `#id` が全滅する)
 
 | フレームワーク | 作法 | 罠 |
 |---|---|---|
@@ -67,7 +67,7 @@ Flutter・React Native)によって、**木の見え方と操作の効き方が�
 | Flutter | `Semantics(identifier:)` + `MergeSemantics` | **`ensureSemantics()` を呼ばないと木が空**。Slider を `MergeSemantics` で包むと **iOS の木が丸ごと空** |
 | React Native | `testID` | RN 0.65 以降(それ以前は Android に出ない)。Modal 内にも届く |
 
-### 1.3 ツールが揃えている木の違い(A)
+### FD-1.3 ツールが揃えている木の違い(A)
 
 | フレームワーク | 素の挙動 | ツールの吸収 | 場所 |
 |---|---|---|---|
@@ -92,13 +92,13 @@ Flutter・React Native)によって、**木の見え方と操作の効き方が�
 | UIKit / SwiftUI(iOS in-app) | 検索欄(`UISearchBar` の中身)が in-app だけ `textField` になり、`.SearchField` がブリッジで当たり外れした | 検索の trait か `UISearchTextField` なら `searchField`(XCUITest と同じ) | `InAppSnapshot.elementType` |
 | Compose(iOS) | 容器の外の行(ghost)を、ラベル無しで木に残す | 見切れの判定を容器基準にし、画面端に積もった行の山は遮蔽物扱いしない | `clippingContainer` / `OcclusionSuspicion` |
 
-### 1.4 揃っていない木の違い(B)
+### FD-1.4 揃っていない木の違い(B)
 
 | フレームワーク | 違い | シナリオでの扱い |
 |---|---|---|
 | 自作の部品(SwiftUI の Button で作ったチェックボックス・ラジオ等) | チェック状態を a11y に一切出さない(value も selected trait も無い) | **見本画像を `vision/classifiers/CheckStateClassifier/[ON]`・`[OFF]` に置けば画像で判定できる**(CheckStateClassifier。witness は E2E-iOS の `#cb_agree` / `#radio_*`)。見本が無いと `checkIsON` は「reports no check state」で落ちる。ほかの手段は **echo の文字列**(`agree=true` 等)か、アプリ側で公開する(SwiftUI なら `.accessibilityRepresentation { Toggle(...) }`) |
-| Compose(iOS)の Checkbox/Radio・Flutter(iOS)の Radio | **オンだけ**報告する(オフと「状態を持たない」が同じ見え方) | 同じシナリオで一度オンを見た要素ならオフも確定する。見る前の `checkIsOFF` は通して警告。**見本画像を置けば、見る前のオフも画像で判定できる**(§2.6) |
-| Flutter・Compose(iOS)・Android | indeterminate(一部だけ選択)をオフと区別して出さない(Flutter は `"0"`) | **`[INDETERMINATE]` の見本画像を置けば画像で判定できる**(§2.6)。ほかは echo の文字列で |
+| Compose(iOS)の Checkbox/Radio・Flutter(iOS)の Radio | **オンだけ**報告する(オフと「状態を持たない」が同じ見え方) | 同じシナリオで一度オンを見た要素ならオフも確定する。見る前の `checkIsOFF` は通して警告。**見本画像を置けば、見る前のオフも画像で判定できる**(FD-2.6) |
+| Flutter・Compose(iOS)・Android | indeterminate(一部だけ選択)をオフと区別して出さない(Flutter は `"0"`) | **`[INDETERMINATE]` の見本画像を置けば画像で判定できる**(FD-2.6)。ほかは echo の文字列で |
 | WebKit の `<input type=radio>`(XCUITest 経路) | id の無い `other` 型(ラベル・value `"1"`/`"0"` 付き)で届き、木の規則(id の無い `other` は落とす)で**要素ごと消える** | in-app(DOM 経路)なら読める。XCUITest ではラベルのテキストを指す |
 | SwiftUI・Compose(iOS) | Slider の value が `"50%"` などパーセント表記 | 値は echo の文字列で確かめる |
 | SwiftUI(UITableView) | 画面外の行ラベルが、id 無しで全行分木に残る | ラベルの部分一致で不在検証しない |
@@ -109,9 +109,9 @@ Flutter・React Native)によって、**木の見え方と操作の効き方が�
 
 ---
 
-## 2. 操作
+## FD-2 操作
 
-### 2.1 タップ
+### FD-2.1 タップ
 
 | フレームワーク | 違い | 区分 | ツールの動き |
 |---|---|---|---|
@@ -120,10 +120,10 @@ Flutter・React Native)によって、**木の見え方と操作の効き方が�
 | React Native(iOS in-app) | コールドラウンチ直後にレイアウトが確定し、保存時の座標が1要素ずれる | A | 合成タッチの直前に要素を1回取り直して、今の座標で撃つ |
 | SwiftUI(iOS in-app) | 合成タッチでは Button のジェスチャが発火しない | C | activate を最優先。座標指定も「その点を含む最小の要素」を activate する |
 | Compose(iOS) | 画面外の要素の枠がクランプされ、`isHittable` も壊れている | C | 座標タップを維持(`.tap()`・`isHittable` を使わない) |
-| 全部(iOS in-app) | activate も合成タッチ(要素の窓へ直接送る)も、手前の窓・重なった view を素通りして要素に届く(本物の指では押せない要素も押せる) | C | 撃った点で UIView の hitTest を1回行い、別の view が受けるなら注記 `inapp-tap-outside-hit-area`(判定は変えない)。**判定できるのは UIKit と、UIView に辿れる SwiftUI の要素**(重なった view・別の窓)。**SwiftUI の `.contentShape` 抜けは hitTest に出ない**(AX の当たり判定も「届く」)ので、活性化の点が枠の外側 4 分の 1 にあれば別の注記 `inapp-activation-point-off-centre`(SwiftUI / UIKit のアプリだけ。**RN は活性化の点が押せる範囲と無関係なので使わない**)。**Flutter は判定できない**(当たるのは常に FlutterView)(v159・v160。maintainer-notes §77) |
+| 全部(iOS in-app) | activate も合成タッチ(要素の窓へ直接送る)も、手前の窓・重なった view を素通りして要素に届く(本物の指では押せない要素も押せる) | C | 撃った点で UIView の hitTest を1回行い、別の view が受けるなら注記 `inapp-tap-outside-hit-area`(判定は変えない)。**判定できるのは UIKit と、UIView に辿れる SwiftUI の要素**(重なった view・別の窓)。**SwiftUI の `.contentShape` 抜けは hitTest に出ない**(AX の当たり判定も「届く」)ので、活性化の点が枠の外側 4 分の 1 にあれば別の注記 `inapp-activation-point-off-centre`(SwiftUI / UIKit のアプリだけ。**RN は活性化の点が押せる範囲と無関係なので使わない**)。**Flutter は判定できない**(当たるのは常に FlutterView)(v159・v160。MN-77) |
 | React Native(iOS XCUITest・MCP の `ft_batch` を含む) | Modal(`animationType="fade"` = UIKit のクロスディゾルブ。RN は長さを指定しない)が開く 約 0.52 秒の間に届いた tap は UIKit に捨てられ、何も起きない(本物の指と同じ経路。in-app は合成タッチを窓へ直接送るので起きない)。E2E-RN の xcuitest でダイアログの3本が 16 本中 10 本赤 | A | **出てきたばかりのダイアログ・シートの中の要素を押す前だけ** 0.55 秒待つ(`PresentedOverlayTapWait`。条件: RN・XCUITest で押す・前の tap の木に無かった要素・木が画面の 30% 以上を空けている。注記 `waited-for-presented-overlay`)。**打ち直さない**(実験で、画面を変えないのが正しい「交互にダイアログ」を二重に押した)・**画素を撮らない**(負荷)。長さの実測: iOS 27 Simulator の描画プローブで開く 516〜517ms・閉じる 500ms(5 回)。全画面で開く Modal は拾えない |
 
-### 2.2 スクロール探索の直後のタップ(空打ち)
+### FD-2.2 スクロール探索の直後のタップ(空打ち)
 
 - **Compose / Flutter(iOS)**: スクロール容器が**次の1タッチを消費する** → 探索の終わりに、クリックにならない
   ドラッグ(空打ち)で肩代わりする。**A**(利用者は意識しない)
@@ -136,7 +136,7 @@ Flutter・React Native)によって、**木の見え方と操作の効き方が�
     木を見る整定では CMP の木が慣性の間に凍るので止まったと誤り、「待っても解けない」ように見えていた。既定は空打ち(約 0.3 秒)のまま
     —— `waitForSettle` は利用者が自分で払った直後のタップ向け
 
-### 2.3 スクロール
+### FD-2.3 スクロール
 
 | フレームワーク | 素の制約 | ツールの手段(iOS in-app) | 区分 |
 |---|---|---|---|
@@ -173,7 +173,7 @@ Flutter・React Native)によって、**木の見え方と操作の効き方が�
 - Compose の in-app は、**容器そのもの**(scroll 印の要素)は scroll を断り、受理するのは内側の要素(ツールは容器を
   根に内側を走査する。C)
 
-### 2.4 文字入力・Enter・消去(iOS in-app の受け口の違い。すべて C)
+### FD-2.4 文字入力・Enter・消去(iOS in-app の受け口の違い。すべて C)
 
 | フレームワーク | `type` | `pressEnter` | `clearInput` |
 |---|---|---|---|
@@ -195,7 +195,7 @@ Flutter・React Native)によって、**木の見え方と操作の効き方が�
 - **Android の入力**: Flutter は `findFocus` が半分の確率で入れ物(FlutterView)を返す → 木から編集可能な欄を探し直す(A)。
   Compose は焦点の無い欄への `ACTION_SET_TEXT` が true を返して反映しない → 焦点が立つまで撃たない(A)
 
-### 2.5 ジェスチャ(iOS in-app)
+### FD-2.5 ジェスチャ(iOS in-app)
 
 | 操作 | Compose / Flutter | SwiftUI / UIKit / RN | 区分 |
 |---|---|---|---|
@@ -211,7 +211,7 @@ Flutter・React Native)によって、**木の見え方と操作の効き方が�
 
 ---
 
-### 2.6 チェック状態(`checkIsON` / `checkIsOFF` / `checked=`)
+### FD-2.6 チェック状態(`checkIsON` / `checkIsOFF` / `checked=`)
 
 iOS は実装ごとに状態の出し方が違う(2026-09-18 実測・両モード同値)。**A. 揃えている** ——
 `FTCore.CheckStateReading` が全部を読み、オン / オフ / indeterminate / 不明に畳む。
@@ -262,7 +262,7 @@ Android の4 SUT と RN iOS は、どの部品もオン/オフとも a11y が判
 | 状態を持たない要素(ただのボタン)を指した checkIsON/OFF | 既定(分類器を優先)では、画像からどちらかの判定が付いてしまう(以前は「報告なし」で落ちるか素通り) | 状態を持つ部品だけを指す |
 | 見切れた要素(枠が画面外にはみ出す) | 切り出せないので a11y の判定に戻る(a11y も不明なら不明) | 画面内へ送ってから検証する |
 
-## 3. 待ちと鮮度
+## FD-3 待ちと鮮度
 
 | フレームワーク | 違い | 区分 | ツールの動き |
 |---|---|---|---|
@@ -270,7 +270,7 @@ Android の4 SUT と RN iOS は、どの部品もオン/オフとも a11y が判
 | Compose(Android) | スクロールした後に古い木が返る | A | 自分で画面を動かした直後の1枚はキャッシュを迂回して撮る |
 | Android の WebView(全フレームワーク) | DOM の変更が a11y へ 4〜8 秒遅れる | A | WebView の中のノードだけ `refresh()` してから読む |
 | Compose(iOS) | 縁のぼかし(scroll edge effect)のアニメーションが終わらず、整定が上限に張り付く | A | `filters.*` のアニメーションを動きとして数えない |
-| Compose・Flutter(iOS Simulator) | アプリのプロセスの描画が壊れ、起動し直すまで戻らない(木は正常)。**一色**(白・黒)になるのは Compose・Flutter、**図形だけで文字が一つも無い**形は Compose でだけ観測 | B | 通った検証が画素で文字を確認していない区間の終わりで「描画崩壊の検査」を1回撃ち、見つかったら失敗にする(iOS Simulator のみ・docs/design.md「描画崩壊の検査」) |
+| Compose・Flutter(iOS Simulator) | アプリのプロセスの描画が壊れ、起動し直すまで戻らない(木は正常)。**一色**(白・黒)になるのは Compose・Flutter、**図形だけで文字が一つも無い**形は Compose でだけ観測 | B | 通った検証が画素で文字を確認していない区間の終わりで「描画崩壊の検査」を1回撃ち、見つかったら失敗にする(iOS Simulator のみ・docs/design/「描画崩壊の検査」) |
 | Flutter(iOS) | 慣性が 800ms でも収束しない | C | XCUITest ランナーの整定予算を固定(待ち切らない) |
 | Compose・Flutter(iOS・in-app) | 画面を切り替えた直後、a11y の木は新しい画面なのに絵(自前の Metal 描画)が追いつかない。CMP は起動後の初回訪問でタップが返ってから 0.27〜0.45 秒のあいだ**切り替え前の絵**をバイト同一で返す(2回目の訪問・SwiftUI では起きない) | A | 操作の直前に低解像度の画素と木の指紋を控え、**木が変わったのに画素が操作前のままの間だけ**待ってから撮る(`InAppRenderCatchUp`・v117)。遷移の完了は待たない。操作1回あたり約 12ms、待つのは追いついていない回だけ(初回訪問で約 0.3〜0.4 秒) |
 | Compose(iOS・xcuitest モード) | 上と同じ遅れが XCUITest のスクリーンショットでも起きる。タブを切り替えた直後の 0.3 秒以上、**切り替え前の画面**が返る(木は新しい画面)。ただし絵はバイト同一ではなく、押したタブの強調が載っている | B | **既知の制約**。待たずに1回だけ見る `findImage` / `findImages`(既定 `waitSeconds` 0)は別の画面を切って「無い」と答える。待つ `existImage` と、`waitSeconds` を渡した `findImage` は通る。in-app の v117 を移しても直らない(押した強調で画素が変わるので「画素が操作前のまま」の判定が発火しない)ので入れていない。fleetest 自身の E2E は、待つ版を E2E-CMP 20 S0020 に、待たない版(in-app の証人)を 23 に分け、後者は `Scripts/e2e.sh` が in-app のときだけ回す |
@@ -280,11 +280,11 @@ Android の4 SUT と RN iOS は、どの部品もオン/オフとも a11y が判
 | Android(全般・OS で割れる) | `type` は焦点を要求して文字を書き込むとすぐ返り、ソフトキーボードの表示を待たない(表示要求から表示完了まで中央値 0.2 秒・最大 0.89 秒)。次の解決の木にまだ無いと、後で出てダイアログが動き古い座標を撃つ。iOS の `type` は出現まで返らないので起きない | A | Android だけ、打つ前も次の木にもキーボードが無く改行で終わらない `type` の後、次のロケータ操作の解決の前に最大 1.5 秒(`KeyboardWait.appearSeconds`)、出現を待ってから整定を見る。出なければ注記 `keyboard-not-shown-after-type`・以降の木で出たら `keyboard-appeared-late` |
 | Flutter(Android) | 起動直後の数百 ms はタップを取りこぼす。タップ直後は入力接続が未確立 | B | SUT のシナリオは起動直後・タップ直後に `exist` を1往復挟む |
 | iOS(全フレームワーク・inapp モード) | `waitForSettle` の画素の撮影。in-app のスクリーンショットはアプリ自身の描画しか写さず(キーボード・システムアラート・他プロセスが無い)、アプリのプロセスの中で撮り続けるとメインスレッドを塞ぐ | C | inapp モード(既定)でも撮影は常に XCUITest ランナー(判定はブリッジの中で完結し、画像はホストへ出ない)。木の段は次のステップを解決するドライバ(inapp モードなら in-app ブリッジの木)。Android は instrumentation ブリッジの中で撮る |
-| Compose Multiplatform(iOS) ほか(`waitForSettle`) | 慣性の終わりの描画間隔の最大がフレームワークで違う(iOS の Compose は 1px ずつの這いで 650ms・SwiftUI 368ms・Android は負荷時 385ms)。窓が短いと這いの途中で「止まった」と誤る | A | `quietSeconds` の既定を分ける: iOS の Compose(とフレームワーク不明)= 0.8 秒・それ以外の iOS と Android = 0.5 秒(実測の最大 × 約 1.2。`WaitForSettleDefaults`)。実測は docs/performance-tuning.md §3.34 |
+| Compose Multiplatform(iOS) ほか(`waitForSettle`) | 慣性の終わりの描画間隔の最大がフレームワークで違う(iOS の Compose は 1px ずつの這いで 650ms・SwiftUI 368ms・Android は負荷時 385ms)。窓が短いと這いの途中で「止まった」と誤る | A | `quietSeconds` の既定を分ける: iOS の Compose(とフレームワーク不明)= 0.8 秒・それ以外の iOS と Android = 0.5 秒(実測の最大 × 約 1.2。`WaitForSettleDefaults`)。実測は PT-3.34 |
 
 ---
 
-## 4. WebView
+## FD-4 WebView
 
 | 構成 | 木の出どころ | 操作 | 区分 |
 |---|---|---|---|
@@ -300,15 +300,15 @@ Android の4 SUT と RN iOS は、どの部品もオン/オフとも a11y が判
 
 ---
 
-## 5. 起動の速さ
+## FD-5 起動の速さ
 
 - **CMP(iOS)は SwiftUI より起動が約 0.8 秒遅い**(B・アプリ自身の性質)。in-app の launch の待ちは「アプリのメインスレッドが
-  空いてブリッジが答えるまで」で、差はそこにだけ出る。仕組みの違う XCUITest の launch でも同じ差(docs/performance-tuning.md §6)
+  空いてブリッジが答えるまで」で、差はそこにだけ出る。仕組みの違う XCUITest の launch でも同じ差(PT-6)
 - Android でも CMP の起動は他より遅め。ツールの待ち方(80ms 間隔の問い合わせ)は全フレームワーク共通
 
 ---
 
-## 5.1 各フレームワークの固有部品(E2EX で実測・2026-09-28)
+## FD-5.1 各フレームワークの固有部品(E2EX で実測)
 
 共通契約の SUT に載らない**定番部品**は、別の5 SUT(`E2EXAppCMP/`・`E2EXAppFlutter/`・`E2EXAppRN/`・`E2EXAppAndroid/`・
 `E2EXAppIOS/`。画面・`#id`・echo の契約は `E2EXAppCMP/docs/ui-contract.md` と `ui-contract-wave2.md`、SUT ごとの差分は
@@ -385,7 +385,7 @@ SwiftUI の pinch(SUT が枠で切り取っていなかった)・inputs S0030/40
 
 ---
 
-## 6. ツールの変更で差を詰めた履歴(新しい順)
+## FD-6 ツールの変更で差を詰めた履歴(新しい順)
 
 | 版・コミット | 内容 |
 |---|---|
@@ -403,7 +403,7 @@ SwiftUI の pinch(SUT が枠で切り取っていなかった)・inputs S0030/40
 
 ---
 
-## 7. この文書を直すとき
+## FD-7 この文書を直すとき
 
 - フレームワークで挙動が割れる変更を入れたら、該当節の表に1行足す(区分 A / B / C を必ず付ける)。
   **B を A に変えた**ときは、witness(赤になるシナリオ)を併記する

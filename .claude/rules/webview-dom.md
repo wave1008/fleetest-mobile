@@ -14,7 +14,7 @@ paths:
 
 CLAUDE.md から移した規則(本文は移設前と同一)。この領域のファイルを Read したときに自動で読み込まれる。
 
-- **木の出どころは対象とモードで決まる**(一覧は docs/design.md §木はどこから来るか が唯一の定義元)。
+- **木の出どころは対象とモードで決まる**(一覧は docs/design/ §木はどこから来るか が唯一の定義元)。
   **自作アプリの WebView は DOM**(Android = WebView の版で a11y の属性が入れ替わる(124 は placeholder だけ・
   150 は id だけ)ので、a11y が足りて見えても読む。門は `webView` ノードの有無だけ /
   iOS in-app = WKWebView の a11y が見えない)、**iOS xcuitest は a11y**。
@@ -26,4 +26,4 @@ CLAUDE.md から移した規則(本文は移設前と同一)。この領域の�
   (Android Chrome=CDP / iOS Safari シミュレータ=unix ソケット / iOS Safari 実機=usbmuxd →
   lockdown → TLS)。差し込みの判定は `FTCore.WebViewDOM`(`WebViewDOMTree.swift`)の1箇所。
   **`WebViewDOMSnapshot.swift` へホスト専用の関数を足さない**(ブリッジのソース集合に入っており、
-  足すと dylib に無駄が入って指紋ゲートが鳴る)。**実機 iOS だけの罠3つ**は docs/design.md §実機だけの罠
+  足すと dylib に無駄が入って指紋ゲートが鳴る)。**実機 iOS だけの罠3つ**は docs/design/ §実機だけの罠

@@ -25,13 +25,13 @@ CLAUDE.md から移した規則(本文は移設前と同一)。この領域の�
   `E2EAppCMP` / `E2EXAppCMP` / `E2EYAppCMP`)。**手書きで作り直さず既存を編集する**(xcodegen が暗黙に足していた既定値
   `CODE_SIGN_IDENTITY` / `TARGETED_DEVICE_FAMILY` 等が抜け、実機の署名に効く)・ターゲットの `id` は共有スキームの `BlueprintIdentifier` と一致させる。
   `Info.plist` もコミットするソース。**Flutter / RN の SUT は pbxproj のまま**(CocoaPods・flutter ツールが pbxproj を要る)。
-  旧い `project.pbxproj` が同じ `.xcodeproj` に残ると xcodebuild が「Unable to read project」で落ちる → maintainer-notes §102
+  旧い `project.pbxproj` が同じ `.xcodeproj` に残ると xcodebuild が「Unable to read project」で落ちる → MN-102
 - **iOS だけが持つ witness**: `E2EAppIOS/Sources/UI/OverlayWindow.swift` = **キーウィンドウに
   しない別 UIWindow のモーダル**(全画面 / 上部バナーの2形)と、診断画面の `#btn_request_photos`
   = **OS(SpringBoard)の権限アラートがアプリを覆う形**(別プロセスなので in-app の木に載らない。
   緑の回帰は `scenarios/16_システムアラート.swift`・**陽性対照は `_disabled/94_システムアラート.swift`**)。
   覆い・別ウィンドウに関わる変更は `TestProjects/E2E-iOS/scenarios/15_別ウィンドウのモーダル.swift`
-  の5本で対照を取る(docs/verification.md)。**条件判定の1本**(`ifCanSelect`)は ——
+  の5本で対照を取る(docs/verification/)。**条件判定の1本**(`ifCanSelect`)は ——
   **perform を通らないので操作・検証を直しても守られない**
 - **要素の testTag/`#id`/ラベルの唯一の正は `E2EAppCMP/docs/ui-contract.md`**(全 SUT とシナリオが
   これを参照。片方だけ変えない。`uiContractSync.test.mjs` が「SUT 側の `#id` が母体に実在するか」を
@@ -53,7 +53,7 @@ CLAUDE.md から移した規則(本文は移設前と同一)。この領域の�
   シナリオ側で回避せず SUT の配置を直す —— 送ってから読み返す形にすると `:above()` の
   相手がクランプされた残骸になり、検証そのものが成立しない。
   **確かめ方**: 変更したシナリオは**背の低い実機と背の高いシミュレータの両方**で回す
-  (片方だけの緑は根拠にならない)。**実機は `Scripts/e2e-devices.sh`**(全実機へ --broadcast。docs/verification.md)。**iOS の実機は SUT の成果物が別**(各 SUT の `dist/ios-device`)—— `e2e.sh` は実機用を一度作ってある機械ならソースの鮮度と SDK(Flutter・Xcode)の版で作り直すが(判定は `Scripts/sut-rebuild.sh` の1か所。RN の依存は各ビルドスクリプトが `Scripts/rn-deps.sh` で lock に揃える)、
+  (片方だけの緑は根拠にならない)。**実機は `Scripts/e2e-devices.sh`**(全実機へ --broadcast。docs/verification/)。**iOS の実機は SUT の成果物が別**(各 SUT の `dist/ios-device`)—— `e2e.sh` は実機用を一度作ってある機械ならソースの鮮度と SDK(Flutter・Xcode)の版で作り直すが(判定は `Scripts/sut-rebuild.sh` の1か所。RN の依存は各ビルドスクリプトが `Scripts/rn-deps.sh` で lock に揃える)、
   `e2e.sh` を通さずに SUT を変えたら各 SUT の `scripts/build-ios-device.sh` を先に打つ(古いアプリのまま足した `#id` が not found で赤になる)。
   **実機の有無は物理端末だけに絞った一覧を全行見て決める**(`xcrun devicectl list devices | grep -i physical` /
   `adb devices -l`。`head` で切った一覧から「つながっていない」と言わない)
@@ -73,14 +73,14 @@ CLAUDE.md から移した規則(本文は移設前と同一)。この領域の�
   落ちた `command`・`failureKind`・文言の断片・注記・`appCrash` まで固定する(赤なら何でも ✅ にしない)。
   iOS の権限アラートはボタンで答えるまで消えない(アプリを止めても権限をリセットしても残る)ので、アラートを出す対照には
   `resetPhotos` を付ける(前後で補助シナリオ `98_写真の権限アラートを閉じる` が閉じる)。表の順序も崩さない。
-  載せ忘れは `vscode-fleetest/test/negativeControls.test.mjs` が落とす。経緯は docs/verification.md §陽性対照スイート
+  載せ忘れは `vscode-fleetest/test/negativeControls.test.mjs` が落とす。経緯は docs/verification/ §陽性対照スイート
 
 - **E2EY(`E2EYApp*` / `TestProjects/E2EY-*`)の SUT の「罠」は意図して残す性質で、SUT 側で回避しない**
   (契約 `E2EYAppCMP/docs/ui-contract.md` の各画面の「罠」)。赤を消すために罠を消す直し(離した速さを見ない
   `draggable` への書き換え・最寄りのアンカーへ落とす `FlingBehavior` 等)は**取り消す** —— 直すのはシナリオ(払う速さ等)
-  かツール。ツールの限界と分かった赤は `@Draft("既知の制約: …")` で外し、docs/framework-differences.md §5.1 の
+  かツール。ツールの限界と分かった赤は `@Draft("既知の制約: …")` で外し、FD-5.1 の
   「残っている制約」に並べる。委譲するときは指示書にこれと、**ツールの限界の候補の一覧**(シナリオを座標や別の書き方に
-  替えて隠さない)を書く → maintainer-notes §69.4
+  替えて隠さない)を書く → MN-69.4
 
 - **SUT の UI フレームワーク(Flutter・RN・Compose Multiplatform)の版を上げるときは docs/sut-framework-upgrade.md の手順で**
   (最新の安定版の調べ方・SUT をビルドする全機の SDK・3系統そろえて上げる・RN のひな形の差分と Pods の罠・回す範囲)

@@ -1,6 +1,6 @@
 // `dumpsys window displays` から前面の要求する向きと表示の回転を読み、回転の指示が宣言で断られるかを決める
 // (`AndroidDisplayRotation`)。AndroidDriver.rotate は宣言が回れないときだけ即座に断り、回れるときは
-// 画面が追いつくのを待つ(固定の 5 秒で「遅い」と「回れない」を区別していた負荷下の誤った赤 → maintainer-notes §68.2)
+// 画面が追いつくのを待つ(固定の 5 秒で「遅い」と「回れない」を区別していた負荷下の誤った赤 → MN-68.2)
 
 import XCTest
 @testable import FTCore

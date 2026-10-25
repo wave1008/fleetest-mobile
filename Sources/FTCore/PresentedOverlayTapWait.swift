@@ -1,7 +1,7 @@
 // 本物の指と同じ経路(XCUITest)で、表示の切り替え(RN の Modal の fade)の最中に届いた tap は UIKit に捨てられて飲まれる
 // (in-app は合成タッチを窓へ直接送るので起きない)。出てきたばかりのダイアログ・シートの中の要素を押す前だけ、
 // 切り替えが終わる長さを待つ。**打ち直さない**(画面を変えないのが正しいボタンで二重に押した = 実験の「交互にダイアログ」)・
-// **画素を撮らない**(負荷)。実測と範囲の根拠は docs/framework-differences.md §2.1
+// **画素を撮らない**(負荷)。実測と範囲の根拠は FD-2.1
 public enum PresentedOverlayTapWait {
 
     /// 切り替えの長さ(秒)。実測: React Native 0.86 の Modal(fade = `UIModalTransitionStyleCrossDissolve`。RN は長さを

@@ -66,10 +66,10 @@ public enum FMHostMemory {
     /// 採る間隔(秒)。FM 死活プローブの周期(`FMLivenessProbe.probeIntervalSeconds` = 60)と同じ刻み。
     /// 取得中(`top` が約1秒)に次の周期が来たらその周期は飛ばす(重ねない)
     static let sampleIntervalSeconds: TimeInterval = 60
-    /// リングの保持(秒)= 24 時間。実例は Mac の起動から約6時間で modelmanagerd が殺された回と、約21時間で FM が死んだ回(maintainer-notes §84.5)なので、それを覆う。
+    /// リングの保持(秒)= 24 時間。実例は Mac の起動から約6時間で modelmanagerd が殺された回と、約21時間で FM が死んだ回(MN-84.5)なので、それを覆う。
     /// 1440 行 × 約 200 バイト ≈ 300KB。超えた行は次の書き込みのついでに捨てる
     static let ringMaxAgeSeconds: TimeInterval = 24 * 3600
-    /// 証拠に全点を載せる直近の窓(秒)= 30 分。死の検出は最大で数分遅れる(実例は jetsam から died の記録まで 18 秒 = §84.5)ので、
+    /// 証拠に全点を載せる直近の窓(秒)= 30 分。死の検出は最大で数分遅れる(実例は jetsam から died の記録まで 18 秒 = MN-84.5)ので、
     /// 直前の傾きを毎分で見る窓。これより古い側は枠ごとに間引く
     static let evidenceRecentSeconds: TimeInterval = 30 * 60
     /// 古い側の間引きの枠(秒)= 1 時間。膨張の傾きを見るのに十分で、古い側の証拠の行を ≤ 23(24 時間 - 窓)に抑える

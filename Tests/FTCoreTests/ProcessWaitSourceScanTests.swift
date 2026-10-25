@@ -1,6 +1,6 @@
 // `Process.waitUntilExit()` を Sources に書かない(Shell.swift の ProcessExitWait 宣言の理由 = RunLoop 通知に
 // 依存し、Swift Concurrency の協調スレッド上では終了通知を取りこぼして永久ハングし得る)。
-// 待つときは `ProcessExitWait.prepare*`(run() より前に設定)を使う。9/6 台帳 §3.1 の残件で
+// 待つときは `ProcessExitWait.prepare*`(run() より前に設定)を使う。残件だったため
 // RunnerProfileTransfer / RemoteMonitorFanout / RemoteDeviceFanout / RemoteProjectSync の 4 箇所を置き換えた。
 // 例外は専用 Thread の診断(`sample`)だけ —— 増やすときは理由をここへ書く
 

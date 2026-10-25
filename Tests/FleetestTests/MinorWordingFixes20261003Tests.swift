@@ -1,4 +1,4 @@
-// 2026-10-03 負荷テストの CLI ファズで見つけた文言・検査の食い違い(maintainer-notes §64.7)。
+// 2026-10-03 負荷テストの CLI ファズで見つけた文言・検査の食い違い(MN-64.7)。
 // ①--port 0 が検査を通り「接続拒否・ランナーが止まった」と案内した ②ライブ操作の自動起動が範囲外の
 // ポートでブリッジを起こした(bridge up は同じポートを断る)③status 0 の「error (0)」④(udid だけの呼び出しへの別宛先の
 // 拒否文)は FleetestMCPTests/RefFromAnotherTargetUDIDTests

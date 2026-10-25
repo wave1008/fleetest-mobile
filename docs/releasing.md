@@ -26,7 +26,7 @@
 - リモートランナー(`fleetest remote setup` / `Scripts/align.sh`)は手元のコミットへ揃える(リリース追従の対象外)。`remote setup` は手元の install.sh を送るので `--track-branch` を渡してリリースタグへ移さない(移すと「手元のスクリプト + リリースのバイナリ」になり新しい引数が通じない。`RemoteSetupPlan.installArgs`)。
 
 配布そのものは git clone + `swift build` / `npm run install-local`(docs/user-docs/quick-start_ja.md)。
-プラグインと `install-skill.sh` は廃止済み(理由は docs/maintainer-notes.md §2.3)。既定フローは
+プラグインと `install-skill.sh` は廃止済み(理由は MN-2.3)。既定フローは
 `fleetest init --fleetest-path`(隣の clone)なので、SPM の `from:` を使う版指定は通らない。
 
 ## 版は3つ(独立)

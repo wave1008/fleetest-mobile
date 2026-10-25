@@ -9,7 +9,7 @@ fleetest の Swift DSL は **Shirates(Classic)に準拠**している(コマン�
 
 - 読者は**保守者**(利用者向けの全コマンド説明は docs/commands.md)
 - **この文書が準拠状況の正典**。コマンドを足す・名前を変える・意図的に持たないと決めたときは
-  ここを更新する。docs/design.md「Shirates(Classic) 準拠の方針と承認済みの差分」は
+  ここを更新する。docs/design/「Shirates(Classic) 準拠の方針と承認済みの差分」は
   **理由の説明が要る代表例**を抜き出した表で、全リストではない(理由の詳述はあちらを参照)
 - Shirates 側の出典は `~/github/wave1008/shirates-core`(迷ったらソースを読む)
 
@@ -51,7 +51,7 @@ fleetest の Swift DSL は **Shirates(Classic)に準拠**している(コマン�
 `swipePointToPoint` / `swipeBy` / `swipeElementToElement` / `pinchOut` / `pinchIn` / `gesture` /
 `flickCenterToTop` ほか flick 8種)に付いており、既定の秒数上限(10 秒)をそのコマンド1回だけ
 最大 60 秒まで上げる。シミュレータの testmanagerd が桁外れの秒数で肥大化する実害
-(maintainer-notes §49.1)を受けて、既定を低く抑えたぶんの逃げ道として追加した。
+(MN-49.1)を受けて、既定を低く抑えたぶんの逃げ道として追加した。
 
 ## 要素の選択・タップ
 
@@ -106,7 +106,7 @@ fleetest の Swift DSL は **Shirates(Classic)に準拠**している(コマン�
 | `flickCenterToTop/Bottom/Left/Right` `flickLeftToRight/RightToLeft` `flickBottomToTop/TopToBottom`(8種) | 同名 | ✅ 2026-08-03 **画面基点のみ**。`scrollableElement`/`safeMode` 引数は無い(`scrollFrame` で足りる) |
 | `flickAndGo*` 一族 | `scroll*`/`scrollTo` 系で代替 | ➖ 画面遷移トリガの糖衣は生成側の語彙を増やすだけ |
 | 要素基点 `TestElement.flickTo*` / `flickOut*` | — | ➖ 同上(2026-08-21 判定)。flick 8種は画面基準で移植済みで、要素基点は `swipeBy(sel, …)` が担う |
-| `scrollFrame` | 同名(`scroll*` / `scrollTo` / `withScroll*` / `flick*` の引数。セレクタ式) | ✅ 2026-08-02。**型付きセレクタ(`Sel`)版は持たない = 文字列のみ**(ユーザー決定 2026-08-04・**再提案しない**。1対1を保証するのは対象セレクタまで。理由は design.md) |
+| `scrollFrame` | 同名(`scroll*` / `scrollTo` / `withScroll*` / `flick*` の引数。セレクタ式) | ✅ 2026-08-02。**型付きセレクタ(`Sel`)版は持たない = 文字列のみ**(ユーザー決定 2026-08-04・**再提案しない**。1対1を保証するのは対象セレクタまで。理由は design/) |
 | `startMarginRatio` / `endMarginRatio` | 同名 | ✅ **既定値は fleetest の実測値**(承認済み差分) |
 | `scrollableElement` | — | ➖ `scrollFrame` のセレクタ式で足りる |
 | `ScrollDirection.None` | `FTScrollDirection` に相当なし | ➖ 「スクロールしない」は `scroll:` 引数の省略(Optional)が担う |
@@ -193,7 +193,7 @@ fleetest の Swift DSL は **Shirates(Classic)に準拠**している(コマン�
 | `wait` | 同名 | ✅ |
 | `waitForDisplay` | `waitForDisplay(sel, waitSeconds: 15)` | ✅ 2026-08-03 スクロールしない・戻り値 `FTElement`。Shirates の `throwsException` に相当する引数は持たない(常に失敗として記録する) |
 | `waitForClose` | `waitForClose(sel, waitSeconds: 15)` | ✅ 2026-08-03 **`expression` 省略不可**(Shirates の直前セレクタ再利用の省略形は不採用。`lastElement` は 2026-08-04 に実装済みだが、待ち対象がソース上で読めなくなるため待ち系には省略形を置かない) |
-| — | `waitForSettle(sel?, quietSeconds:, throwsException: true, waitSeconds: 15)` | 🟢 **Shirates に対応物は無い**。画面(`sel` を渡せばその要素の枠。各辺 10% を除く)の画素が `quietSeconds` のあいだ変わらなくなり、さらにアクセシビリティの木が追いつくまで待つ。画像の判定・画素単位の操作・レポート用のスクリーンショットの直前に、スクロールやフリックの慣性が止まるのを待つ**明示のコマンド**(通常の操作は待たない)。**`throwsException`(Shirates の引数名)は、このコマンドの時間切れだけに効く** —— `false` なら失敗にせず注記 `settle-not-reached` を残して `false` を返す。**`sel` の要素が見つからないときは `throwsException` の値によらず常に失敗する**(下の「名前の相違」の `optional:` / `throwsException: false` の全廃は操作・検証について据え置き。時間切れだけが文書化された例外)。他ツールの名前 `waitForAnimationToEnd` は `UnavailableCommands` が受け止め、`waitForSettle()` を案内する。仕様は docs/commands.md「`waitForSettle`」・設計は docs/design.md §4.7 |
+| — | `waitForSettle(sel?, quietSeconds:, throwsException: true, waitSeconds: 15)` | 🟢 **Shirates に対応物は無い**。画面(`sel` を渡せばその要素の枠。各辺 10% を除く)の画素が `quietSeconds` のあいだ変わらなくなり、さらにアクセシビリティの木が追いつくまで待つ。画像の判定・画素単位の操作・レポート用のスクリーンショットの直前に、スクロールやフリックの慣性が止まるのを待つ**明示のコマンド**(通常の操作は待たない)。**`throwsException`(Shirates の引数名)は、このコマンドの時間切れだけに効く** —— `false` なら失敗にせず注記 `settle-not-reached` を残して `false` を返す。**`sel` の要素が見つからないときは `throwsException` の値によらず常に失敗する**(下の「名前の相違」の `optional:` / `throwsException: false` の全廃は操作・検証について据え置き。時間切れだけが文書化された例外)。他ツールの名前 `waitForAnimationToEnd` は `UnavailableCommands` が受け止め、`waitForSettle()` を案内する。仕様は docs/commands.md「`waitForSettle`」・設計は DS-4.7 |
 | `usingWaitSeconds` | `waitSeconds:` 引数 / 実行プロファイル `defaultTimeout` | 🟡 **待つ上限の引数名は全コマンドで `waitSeconds:`**(Shirates と同名。ユーザー決定 2026-09-19。以前は操作・検証が `timeout:`、待機・分岐が `waitSeconds:` と割れていた。実行プロファイルのキー `defaultTimeout` / `scenarioTimeout` と MCP ツールの `timeout` は別物で据え置き) |
 | `waitScreen` / `waitScreenOf` | — | ➖ 画面ニックネーム機構を持たない |
 
@@ -253,7 +253,7 @@ fleetest の Swift DSL は **Shirates(Classic)に準拠**している(コマン�
 | `clipboard` / `readClipboard` / `writeClipboard` | — | ⏳ **足す**(2026-08-21 判定。基準①)。コピー・ペースト機能そのものを検証する画面でだけ要る。**足す条件**: そういう画面が受け手に出たとき(それまでは無くても回る) |
 | `disableCache` / `refreshCache` / `syncCache` / `onDirectAccess` 等 | 内部で自動管理(利用者に露出しない) | ➖ 露出すると生成側が性能問題を誤った手段で解こうとする |
 | `disableHandler` / `enableHandler` / `suppressHandler` / `useHandler` | 同名4つ | ✅ 2026-08-21。**両方要る**: ブロック形は出口で必ず戻る一方、**1つの CAE ブロックの内側にしか置けない** —— `condition` で止めて `expectation` で戻す形は命令形でしか書けない(ユーザー指摘)。入れ子可・抑止したまま落ちたら注記に出る |
-| `withContext` | — | ➖ **概念ごと要らない**(2026-08-21 判定)。Appium の native/web コンテキスト切替に相当するが、fleetest は**WebView を透過的に扱う**(木は a11y、足りなければ DOM。docs/design.md §木はどこから来るか)ので、利用者が切り替える場面が無い |
+| `withContext` | — | ➖ **概念ごと要らない**(2026-08-21 判定)。Appium の native/web コンテキスト切替に相当するが、fleetest は**WebView を透過的に扱う**(木は a11y、足りなければ DOM。docs/design/ §木はどこから来るか)ので、利用者が切り替える場面が無い |
 
 ## セレクタ記法
 
@@ -291,10 +291,10 @@ fleetest の Swift DSL は **Shirates(Classic)に準拠**している(コマン�
 
 | コマンド | 差 |
 |---|---|
-| `hideKeyboard()` | Android・iOS とも対応(冪等)。iOS は木から「何もない点」を選んでタップし(撃つ前に in-app ブリッジの `/tapprobe` で確認)、閉じなければ Enter を送って注記する。詳細は docs/commands.md・docs/design.md「キーボードの観測と `hideKeyboard`」 |
+| `hideKeyboard()` | Android・iOS とも対応(冪等)。iOS は木から「何もない点」を選んでタップし(撃つ前に in-app ブリッジの `/tapprobe` で確認)、閉じなければ Enter を送って注記する。詳細は docs/commands.md・docs/design/「キーボードの観測と `hideKeyboard`」 |
 | `back()` | iOS は**スワイプバック対応のナビ**(NavigationStack 等)を持つ画面でのみ戻れる。独自ナビのアプリではアプリ内の戻るボタンを `tap` する。Android はキーボードが開いていると1回目がキーボードを閉じるのに消費される(OS 仕様) |
 | `keyboardIsShown` / `keyboardIsNotShown` | 取得元が OS で違う(iOS xcuitest = AX ツリーの `.keyboard` / iOS in-app = `UITextEffectsWindow` の可視判定 / Android = ホストが `dumpsys` の `InputMethod` window を見る)。**IME が別プロセスの window でアプリの a11y ツリーに出ない**ため |
-| `clearInput(sel)` | **Flutter の iOS は in-app ブリッジでは消せず XCUITest ブリッジ経由**になる(自動フォールバック。1〜2秒)。Flutter engine への editing state 配送は3回実測して不採用(design.md) |
+| `clearInput(sel)` | **Flutter の iOS は in-app ブリッジでは消せず XCUITest ブリッジ経由**になる(自動フォールバック。1〜2秒)。Flutter engine への editing state 配送は3回実測して不採用(design/) |
 | `tapAppIcon` | 見つからないときの探索方法が OS で違う: Android はドロワーを開いて `flickCenterToTop` で最大8回スクロール探索、iOS は `flickRightToLeft` で最大5ページ送り(2回連続で画面が変化しなければ打ち切り)。iOS は送り切っても無ければ App ライブラリの検索欄で出る名前順の一覧を探し、その一覧に名前の無い行があったときは見えているカテゴリのフォルダも開いて探す(docs/commands.md) |
 
 ## スクロールの指定は `scroll:` だけ(ユーザー決定 2026-09-19)

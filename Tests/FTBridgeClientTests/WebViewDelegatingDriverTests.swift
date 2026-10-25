@@ -400,7 +400,7 @@ final class WebViewDelegatingDriverTests: XCTestCase {
     /// ここで毎回ランナーへ問い合わせると委譲と同じコストに戻り、この機能の意味が消える。
     /// ランナーを触ってよいのは入場時の接続確認と**委譲イベントの直前**だけ
     /// (イベント直前の接続確認は attach セッションの静かなイベント欠落を防ぐ実測起点の防御。
-    /// A/B は docs/verification.md §interop WebView)
+    /// A/B は docs/verification/ §interop WebView)
     func testDomInteropPingsDelegatedOnlyOnEntryAndBeforeEvents() async throws {
         let dom = snapshot([element(1, "WebView"), element(2, "Link", web: true)], webViewPath: "dom-interop")
         let primary = FakeDriver(snapshots: [dom])

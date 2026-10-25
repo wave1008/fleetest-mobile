@@ -110,7 +110,7 @@ export interface MonitorDevice {
   readonly machine?: string;
   /** **他の発行者(共有ランナーの別の利用者)がこのデバイスの画面配信を張っている**
    * (Sources/FTCore/StreamLease.swift)。true の間は配信を起こさずポーリングのままにする ——
-   * 同じデバイスを人数ぶん捕捉するとランナーが痛む(docs/remote-runner.md §18.2)。
+   * 同じデバイスを人数ぶん捕捉するとランナーが痛む(RR-18.2)。
    * 手元のデバイス・単独利用は欠落 = undefined(false と同義)。 */
   readonly streamedByOther?: boolean;
   /** Android 実機のブリッジ(常駐 APK)が生きているか。**設定されるのは Android 実機の
@@ -127,7 +127,7 @@ export interface MonitorDevice {
    * **true のときだけ**開閉のボタンを出す(webview/monitor/foldButtons.js)。
    * (契約は Sources/fleetest/ApiMonitorEvents.swift の ApiMonitorDeviceInfo.foldable) */
   readonly foldable?: boolean;
-  /** 直近のストレージ計測(devices サイクルに乗る。§3 の間隔・inRun 中は撃たない等の規律は
+  /** 直近のストレージ計測(devices サイクルに乗る。計測の間隔・inRun 中は撃たない等の規律は
    * 送信側=Swift の話でここでは関与しない)。測れなかったデバイスは欠落(undefined)のまま —— 0 に
    * 正規化しない(ダッシュボードの「デバイスの健全性」表が「–」と 0 を区別するため)。 */
   readonly storage?: MonitorDeviceStorage;
@@ -139,7 +139,7 @@ export interface MonitorDevice {
   readonly storageRefreshId?: number;
 }
 
-/** run ボードの1レーン(デバイス1枚)。docs/design.md §18.1/§18.2。key は udid(iOS)/serial(Android)で、
+/** run ボードの1レーン(デバイス1枚)。DS-18.1/DS-18.2。key は udid(iOS)/serial(Android)で、
  * webview 側(runBoard.js)がラインビューのタイル(MonitorDevice.udid/serial)と突き合わせて
  * デバイス選択に使う(MonitorDevice.id とは別物 — id は "platform:name" 形で udid/serial ではない)。
  * **`remaining`(レーンごとの残り本数)は持たない** —— shared dispatch は同一 platform のレーンが
@@ -156,7 +156,7 @@ export interface MonitorRunLane {
   readonly scenarioElapsedSeconds?: number;
 }
 
-/** 準備中の端末ごとの供給の段階(FTCore.RunProgressSupply と対。docs/design.md §18.1)。
+/** 準備中の端末ごとの供給の段階(FTCore.RunProgressSupply と対。DS-18.1)。
  * 端末に属さない共有の段階(ランナーのビルド)は name が空文字。step の語彙は
  * "pending"(予定に入ったがまだ始まっていない)/ "runnerBuild" / "booting" / "bridge" / "configuring" / "installing" / "ready"
  * (未知の値は読み手が無視する)。 */
@@ -166,7 +166,7 @@ export interface MonitorRunSupply {
   readonly step: string;
 }
 
-/** run ボードの1 run(1機械ぶん。docs/design.md §18.1)。機械分担の run は `runGroup` を共有する
+/** run ボードの1 run(1機械ぶん。DS-18.1)。機械分担の run は `runGroup` を共有する
  * 複数の MonitorRunEntry に分かれて届く(束ねるのは読み手 = runBoardModel.ts)。 */
 export interface MonitorRunEntry {
   readonly pid: number;
@@ -176,7 +176,7 @@ export interface MonitorRunEntry {
   /** 準備中の端末ごとの供給の段階。供給の情報が無い run は空配列(**版は揃える前提**。
    * ProtocolVersion 53。FTCore.RunProgressRecord.supply と対)。 */
   readonly supply: readonly MonitorRunSupply[];
-  /** 結果を捨てて振り直した累計。**事実だけ**(「遅い」等の判定はしない。docs/design.md §18.5)。 */
+  /** 結果を捨てて振り直した累計。**事実だけ**(「遅い」等の判定はしない。DS-18.5)。 */
   readonly requeued: number;
   /** レーンが離脱した累計。 */
   readonly laneDropouts: number;
@@ -191,13 +191,13 @@ export interface MonitorRunEntry {
   readonly project: string;
   /** プロファイル無し実行(--dry-run 等)では省略されうる。 */
   readonly profile?: string;
-  /** 受信時点の経過秒。以降の秒読みは読み手が自分の時計で進める(docs/design.md §18.3)。 */
+  /** 受信時点の経過秒。以降の秒読みは読み手が自分の時計で進める(DS-18.3)。 */
   readonly elapsedSeconds: number;
   readonly total: number;
   readonly done: number;
   readonly failed: number;
   /** 受信時点の残り見積もり秒。**当面いつも null(=undefined)** —— 実績の無い run は省く
-   * (docs/design.md §18.4)。null は undefined に正規化する(isMonitorRunEntry)。 */
+   * (DS-18.4)。null は undefined に正規化する(isMonitorRunEntry)。 */
   readonly etaSeconds?: number;
   readonly lanes: readonly MonitorRunLane[];
   /** 全シナリオの後の動画の切り出しの進み。切り出しの間だけ(ProtocolVersion 55。FTCore.RunProgressVideoClips と対)。 */
@@ -235,7 +235,7 @@ export type MonitorEvent =
   // OUTPUT ログだけ(配信の停止自体は、hold 中の全タイル state:"unknown" 化で
   // monitorDeviceStreamController の既存の qualifying 判定が畳む)
   | { readonly kind: "monitorHold"; readonly active: boolean }
-  // 機械の dispatch.lock の状態(ApiMonitorLockEvent。docs/remote-runner.md §18.7 M2)。
+  // 機械の dispatch.lock の状態(ApiMonitorLockEvent。RR-18.7 M2)。
   // **machine 欠落 = 手元**(monitorRuns と同じ綴り。リモートぶんは中継する親が埋める)——
   // ロックは機械に1本で、リモートへのディスパッチもローカル run も同じ1本を取る。
   // observed:false は「その機械をもう観測できていない」= 空きではなく**不明**へ戻す合図
@@ -249,7 +249,7 @@ export type MonitorEvent =
       readonly acquiredAt?: string;
       readonly mine: boolean;
     }
-  // フリート横断の run 進捗(docs/design.md §18.2)。**1行 = 1機械ぶん**(monitorLock と同じ相乗り)。
+  // フリート横断の run 進捗(DS-18.2)。**1行 = 1機械ぶん**(monitorLock と同じ相乗り)。
   // machine 欠落 = 手元。observed:false は「その機械をもう観測できていない」で runs は常に空 ——
   // 「run が無い」ではない(読み手は runBoardModel.ts の applyMonitorRunsEvent を通す)
   | {
@@ -434,7 +434,7 @@ function isMonitorRunEntry(value: unknown): value is MonitorRunEntry {
     value.profile = undefined;
   }
   if (value.etaSeconds === null) {
-    // 実績の無い run は省く(docs/design.md §18.4)。省略と同じ「—」表示に正規化する。
+    // 実績の無い run は省く(DS-18.4)。省略と同じ「—」表示に正規化する。
     value.etaSeconds = undefined;
   }
   if (value.videoClips === null) {

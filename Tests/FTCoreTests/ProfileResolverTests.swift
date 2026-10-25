@@ -154,7 +154,7 @@ final class ProfileResolverTests: XCTestCase {
         let ios = try XCTUnwrap(resolved.apps["ios"])
         XCTAssertEqual(ios.bundleID, "com.example.sampleapp")
         // 原本(sourcePath)の相対パスはリポジトリルート基準(= project.rootURL の 2 階層上 = tempDir)。
-        // インストールに使う appPath は既定ワークスペースの apps/ へ向く(docs/remote-runner.md §17)
+        // インストールに使う appPath は既定ワークスペースの apps/ へ向く(RR-17)
         XCTAssertEqual(ios.sourcePath,
                        tempDir.appendingPathComponent("builds/SampleApp.app").path,
                        "appPath 相対はリポジトリルート(<repoRoot>/TestProjects/<name> の 2 階層上)基準")
@@ -1019,7 +1019,7 @@ final class ProfileResolverTests: XCTestCase {
         XCTAssertTrue(sllOnly.fm.enabled, "片方だけでも true なら enabled")
     }
 
-    /// 撤去した `triage` キー(FM の失敗トリアージ。maintainer-notes §21)が残ったプロファイルも
+    /// 撤去した `triage` キー(FM の失敗トリアージ。MN-21)が残ったプロファイルも
     /// 解決でき、run を止めずに「無視する」とだけ言う。他の FM トグルは巻き添えにしない
     func testLeftoverTriageKeyIsIgnoredWithAWarning() throws {
         try writeStandardFixture()

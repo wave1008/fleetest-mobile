@@ -490,7 +490,7 @@ final class CommandDispatchTests: XCTestCase {
     }
 
     /// **`wait` に負値を渡してもプロセスを落とさない**(`UInt64(負の Double)` は trap する)。
-    /// 1プロセス=1シナリオなので crash するとレポートごと消える(design.md §10)。
+    /// 1プロセス=1シナリオなので crash するとレポートごと消える(DS-10)。
     /// このテストは「落ちないこと」自体が assertion で、trap すれば実行プロセスごと死ぬ
     func testNegativeWaitDoesNotCrashTheProcess() {
         let core = makeCore(driver: RecordingDriver())

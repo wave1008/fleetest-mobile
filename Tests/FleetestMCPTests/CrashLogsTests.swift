@@ -248,7 +248,7 @@ final class CrashLogsTests: XCTestCase {
         XCTAssertTrue(text.contains("bundleID"), text)
     }
 
-    // MARK: - Android のヘッダ文言(§19.3 M1・純関数なので adb 不要)
+    // MARK: - Android のヘッダ文言(純関数なので adb 不要)
 
     /// `crashOnly` は ft_logs の引数名ではない(実際は `all`)。ヘッダに内部変数名を
     /// 出さず、渡せる引数の言葉(`all: true`)で言い換えること

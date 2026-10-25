@@ -46,7 +46,7 @@ public enum AppUIFramework: String, Codable, Sendable, CaseIterable {
     /// 中心を返す(直した E2E/E2EX/E2EY-iOS の 1209 要素で発火 0・直す前の `.plain` の行 40 本で全部発火)。
     /// **RN は false** —— `RCTAccessibilityElement`(文字)の点は押せる範囲と無関係に 12〜587pt ずれ、
     /// 直した SUT の 252/564 要素で発火した。自前描画は点が常に中心で情報が無い。新しい語彙は false(黙る側)
-    /// (maintainer-notes §77)
+    /// (MN-77)
     public var activationPointMarksHitArea: Bool { self == .swiftUI || self == .uikit }
 }
 

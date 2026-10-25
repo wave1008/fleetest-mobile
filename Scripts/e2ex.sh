@@ -28,7 +28,7 @@
 # プロファイルで回る。常に `--runner local`(同名のデバイスがリモートにもあり、--runner を付けないと
 # リモートへ飛ぶ)。--align は持たない(Scripts/align.sh を先に)。
 # **`--ios-xcuitest` は既定モード(inapp)で緑のシナリオのうち、決まって赤のものは 2026-10-08 に 1 本**(下の S0020)で、
-# 断続的な赤も残る(一覧は docs/framework-differences.md §5.1 末尾の「残っている制約」・docs/open-issues.md)。代表は 90_不具合の回帰.swift S0020
+# 断続的な赤も残る(一覧は FD-5.1 末尾の「残っている制約」・docs/open-issues.md)。代表は 90_不具合の回帰.swift S0020
 # (XCUITest は容器が「まだ送れるか」を申告しないので、scrollToTop の端の確認が上端で「引っ張る」になる)。
 set -euo pipefail
 

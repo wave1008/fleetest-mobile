@@ -59,13 +59,13 @@ export type MonitorToWebviewMessage =
   // **一覧は表示フィルタ前の全台**(`filter` は「起動中のデバイス」の現在値)。落とすのは
   // webview の入口1箇所(deviceTiles.js の applyDevices)で、**run ボードのツリーはこの
   // フィルタを通さない** —— ビルド中・停止中でもフリートに何が居るかを消さないため
-  // (docs/design.md §18.5)。
+  // (DS-18.5)。
   | {
       readonly type: "devices";
       readonly devices: readonly MonitorDevice[];
       readonly filter: MonitorDeviceFilter;
     }
-  // run ボード(docs/design.md §18)。**1件 = 1機械ぶん**(monitorLock と同じ相乗り。machine 欠落 =
+  // run ボード(DS-18)。**1件 = 1機械ぶん**(monitorLock と同じ相乗り。machine 欠落 =
   // 手元)。observed:false は「その機械をもう観測できていない」で runs は常に空 —— 「run が無い」
   // ではない(受け手は runBoardModel.ts の applyMonitorRunsEvent を通す。src/webview/monitor/runBoard.js)。
   | {
@@ -361,7 +361,7 @@ export type MonitorToWebviewMessage =
   // 送る。webview 側は settingsTab.js の applySettings。切替は setLanguage と対。
   | { readonly type: "language"; readonly value: "auto" | "ja" | "en" }
   // 設定タブのリモート実行セクション(CLI のホスト登録簿)。ready 直後に送る。
-  // webview 側は settingsTab.js の applySettings。変更は setRemoteConfig と対(docs/remote-runner.md §12)。
+  // webview 側は settingsTab.js の applySettings。変更は setRemoteConfig と対(RR-12)。
   | {
       readonly type: "remoteConfig";
       readonly hosts: readonly RemoteHostEntry[];
@@ -688,9 +688,9 @@ export type MonitorFromWebviewMessage =
   | { readonly type: "projectRename"; readonly project: string }
   | { readonly type: "projectDelete"; readonly project: string }
   // デバイス追加モーダルを開いた直後に送る、`fleetest api device-catalog` の再取得リクエスト。
-  // source: 「+既存から選択」モーダルの「デバイス候補のホスト」セレクタの選択(§13 段2)。
+  // source: 「+既存から選択」モーダルの「デバイス候補のホスト」セレクタの選択(RR-13 段2)。
   // remote なら monitorDeviceOps.ts が deviceCommandArgs で `remote exec <machine> -- api device-catalog`
-  // に組み立てる(docs/remote-runner.md §13「プロファイルのリモート対応」)。
+  // に組み立てる(RR-13「プロファイルのリモート対応」)。
   | { readonly type: "deviceCatalogRequest"; readonly source: DeviceCommandSource }
   // 同モーダルで Android のモデル一覧が空(errorCode: "avdmanager-missing")のときだけ出る
   // 導入ボタン。応答は installCmdlineToolsResult。cmdline-tools の導入はローカル専用
@@ -707,7 +707,7 @@ export type MonitorFromWebviewMessage =
       // このダイアログは常に #device-pick-overlay の「+」からしか開かない(register:false = 物理
       // 作成のみ・ホストが --no-register 付与)。登録は #device-pick-overlay の OK
       // (runProfileDevicesSync)が別途行う。source が remote のときはホスト側が --no-register を
-      // 強制する(§13。リモート側のプロファイルは次回ディスパッチの rsync --delete で消えるため、
+      // 強制する(RR-13。リモート側のプロファイルは次回ディスパッチの rsync --delete で消えるため、
       // 正はローカル)。
       readonly register: boolean;
       /** 同名の実体が既にあるとき、消してから作り直す(`api create-device --overwrite`)。
@@ -716,7 +716,7 @@ export type MonitorFromWebviewMessage =
       /** 選んだ OS バージョンがダウンロードが要る(インストール済みでない)Android システムイメージの
        * ときだけ載る。ホストは1枚の確認モーダル(ライセンス同意)を挟んでから
        * `api install-system-image` → 成功後に通常の create-device という順で実行する
-       * (2枚のモーダルを続けて出さない。§13の規律と同じ)。 */
+       * (2枚のモーダルを続けて出さない。RR-13の規律と同じ)。 */
       readonly installSystemImage?: {
         readonly package: string;
         readonly sizeBytes: number | null;
@@ -965,7 +965,7 @@ function isRunProfileDeviceAddEntryLike(value: unknown): value is RunProfileDevi
   );
 }
 
-/** deviceCatalogRequest/installedDevicesRequest/createDevice の source(§13 段2)の検証。
+/** deviceCatalogRequest/installedDevicesRequest/createDevice の source(RR-13 段2)の検証。
  * remote は machine(登録簿のマシン名)が非空文字列であること(空文字は `remote exec` に
  * 渡せない不正値)。 */
 function isDeviceCommandSourceLike(value: unknown): value is DeviceCommandSource {

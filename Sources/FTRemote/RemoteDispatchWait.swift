@@ -35,7 +35,7 @@ public struct DispatchWaitStatus: Equatable, Sendable {
     /// いまロックを掴んでいる人。**nil は「読めなかった」であって「空き」でも「占有」でもない**
     /// —— 自分の前に並んでいる人が居るだけでロックは空いている、という形でも nil になるので、
     /// **nil のときに「誰かの run が走っている」と言ってはいけない**
-    /// (docs/remote-runner.md §18.7「不明と空きを混ぜない」の同型)
+    /// (RR-18.7「不明と空きを混ぜない」の同型)
     public let holder: RemoteDispatchLockInfo?
     /// 待ち始めてからの経過(秒)。待たない(`--wait-lock` 無し)なら 0
     public let elapsedSeconds: Int

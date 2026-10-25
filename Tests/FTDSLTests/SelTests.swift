@@ -142,7 +142,7 @@ final class SelTests: XCTestCase {
                        ".button&&a||.button&&b")
     }
 
-    /// 序数も同じ。文字列版の `(a|b)&&[2]` = 「各節の2番目」に揃える(design.md の既知の非対応と同義)
+    /// 序数も同じ。文字列版の `(a|b)&&[2]` = 「各節の2番目」に揃える(design/ の既知の非対応と同義)
     func testOrdinalAfterOrAppliesToEveryClause() {
         XCTAssertEqual(Sel.text("a").or(.text("b")).nth(2).ftSelector.text, "a&&[2]||b&&[2]")
     }

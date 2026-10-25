@@ -298,7 +298,7 @@ export class MonitorDeviceOps {
 
   /** CPU 描画フォールバックの記憶を解除し、手元のデバイスは restart-devices(2台ずつ並行の down→up)
    * 1ジョブでまとめて再起動する。次回起動は --gpu が付かず host(GPU)。以後また画面凍結して
-   * watchdog の自動フォールバックが走れば CPU に戻る(既知のトレードオフ。docs/design.md §12.4)。
+   * watchdog の自動フォールバックが走れば CPU に戻る(既知のトレードオフ。DS-12.4)。
    * **別の機械のデバイスはその機械で down→up する**(タイルの起動/停止と同じ device ジョブ =
    * `remote exec <machine> -- api stop-device/start-device … --device-machine local`)。
    * `restart-devices` は手元専用(ApiDevicesRestart の foreign: .notHandled)で、名前だけで
@@ -1127,7 +1127,7 @@ export class MonitorDeviceOps {
    * ここでは単純に都度実行する。stdout を全量蓄積し、close 時にまとめて JSON.parse する
    * (単発 JSON 1行の出力なので NDJSON パーサは不要)。
    * source が remote なら deviceCommandArgs が `remote exec <host> -- api device-catalog` に
-   * 組み立てる(§13 段2。個別 ssh 実装は書かない)。local は `api device-catalog` のまま
+   * 組み立てる(RR-13 段2。個別 ssh 実装は書かない)。local は `api device-catalog` のまま
    * (deviceCommandArgs の local 分岐が apiArgs を素通しするため、挙動は1バイトも変わらない)。
    */
   runDeviceCatalog(source: DeviceCommandSource): void {

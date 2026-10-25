@@ -1,4 +1,4 @@
-// サービス(scripts/compose.yaml)の起動と片付けの本体(docs/remote-runner.md §17「順序と失敗の扱い」「片付けの保証」)。
+// サービス(scripts/compose.yaml)の起動と片付けの本体(RR-17「順序と失敗の扱い」「片付けの保証」)。
 // 解釈・検査・計画は FTServices の純粋関数・入力集めは ServicesFacts・削除は ServicesTeardown。ここは順序と I/O だけ。
 //
 // 不変条件:
@@ -147,7 +147,7 @@ final class ServicesSession {
     /// 起動完了の待ちを回す刻み(秒)。コンテナの状態の確認(inspect 約 30〜60ms)を重ねすぎず、起動の検知を遅らせない間隔。
     /// 尽きたとき = なし(待ちの上限は healthcheck の retries × (interval + timeout) + start_period が決める)。
     static let pollIntervalSeconds: Double = 0.25
-    /// `run -d` の上限(秒)。Apple はコンテナごとに VM を起こす(§17 の実測で約 1〜2 秒)。刺さったデーモンだけがこれを超える。
+    /// `run -d` の上限(秒)。Apple はコンテナごとに VM を起こす(RR-17 の実測で約 1〜2 秒)。刺さったデーモンだけがこれを超える。
     private static let containerStartTimeoutSeconds: Double = 120
     /// Apple のコンテナの IP が割り当てられるのを待つ上限(秒)。起動直後の inspect は未割り当てのことがある。尽きたら起動の失敗。
     private static let addressWaitSeconds: Double = 10
@@ -411,7 +411,7 @@ final class ServicesSession {
         return cli.isDocker ? inspect.trimmed : tag
     }
 
-    // MARK: スクリプトへ見せるもの(docs/remote-runner.md §17「スクリプト」)
+    // MARK: スクリプトへ見せるもの(RR-17「スクリプト」)
 
     /// compose.yaml が参照している秘密だけ(名前 → 値)。run-setup.sh / run-teardown.sh の環境へ渡す
     var scriptSecrets: [String: String] {
@@ -630,12 +630,12 @@ final class ServicesSession {
         try persist()
     }
 
-    /// 背景の bind の間隔と上限(秒)。根拠: コンテナの VM の起動は 1〜2 s(§17 の実測)で、ゲートウェイの IP はその後に現れる。
+    /// 背景の bind の間隔と上限(秒)。根拠: コンテナの VM の起動は 1〜2 s(RR-17 の実測)で、ゲートウェイの IP はその後に現れる。
     /// 尽きたとき = 警告を出す(コンテナはプロキシへ繋げず、その失敗はコンテナ側に出る)
     private static let gatewayProxyBindIntervalSeconds: Double = 0.2
     private static let gatewayProxyBindDeadlineSeconds: Double = 30
 
-    /// Apple のコンテナからは Mac の 127.0.0.1 に届かない(§17 の実測)= 内部ネットワークのゲートウェイの IP に、計画と同じ番号で
+    /// Apple のコンテナからは Mac の 127.0.0.1 に届かない(RR-17 の実測)= 内部ネットワークのゲートウェイの IP に、計画と同じ番号で
     /// 道を作る。run 専用のプロキシを 127.0.0.1 に立て(解決した宛先がこの内部ネットワークへ向くもの = DNS rebinding を断る)、
     /// ゲートウェイの IP:番号 からそこへ流す転送器(BSD ソケット。NWListener はブリッジのアドレスに bind できない)を背景で立てる。
     /// **ゲートウェイの IP は最初のコンテナが付いてから Mac のブリッジに現れ、全部外れると消える**(実測)ので、最初のコンテナを
@@ -880,7 +880,7 @@ final class ServicesSession {
 
     static let gatewayHostName = "fleetest-gateway"
 
-    /// **O_APPEND で追記するだけ**(書き直し = 新しい inode は起動中のコンテナから見えない。§17 の実測)。
+    /// **O_APPEND で追記するだけ**(書き直し = 新しい inode は起動中のコンテナから見えない。RR-17 の実測)。
     private func appendHost(_ hostsFile: URL, address: String, names: [String]) throws {
         let fd = open(hostsFile.path, O_WRONLY | O_APPEND | O_NOFOLLOW)
         guard fd >= 0 else {
@@ -1125,7 +1125,7 @@ final class ServicesSession {
 
     // MARK: 管理口の公開の検知
 
-    /// Docker の管理口(2375 / 2376)が非ループバックで LISTEN なら起動しない(docs/remote-runner.md §17「実行基盤の管理口」。
+    /// Docker の管理口(2375 / 2376)が非ループバックで LISTEN なら起動しない(RR-17「実行基盤の管理口」。
     /// コンテナがそこへ届くとホストのファイルをマウントできる)。見られなかったときは1行言って進む(「無い」とは言わない)。
     static func refuseIfDockerAPIIsExposed(scan: () -> DockerTCPExposure.Scan = { DockerTCPExposure.scan() },
                                            log: (String) -> Void) throws {
