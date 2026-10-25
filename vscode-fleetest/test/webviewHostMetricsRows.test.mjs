@@ -329,7 +329,7 @@ test("同じ tick までに複数届いたら最後の1つだけを使う", (t) 
   assert.deepEqual(values(rowFor(document, "mac2")), ["25%", "40%", "25%", "0", "0"]);
 });
 
-test("容量の表示は既定 OFF(素の CPU/GPU/MEM)で、設定の切替でその場で書き換わる", (t) => {
+test("容量の表示は既定 ON で、設定の切替でその場で書き換わる", (t) => {
   const { window, document } = createWebview();
   t.after(() => window.close());
 
@@ -338,12 +338,14 @@ test("容量の表示は既定 OFF(素の CPU/GPU/MEM)で、設定の切替で�
   send(window, { type: "hostMetricsMachines", machines: ["mac2"] });
   send(window, { ...hostMetricsSample("mac2", 0.9, {}, {}, 20), gpuCores: 64, memTotalBytes: 128 * 1024 ** 3 });
   send(window, hostMetricsSample(undefined, 0.1, {}, {}, 24));
-  assert.deepEqual(labelsOf(""), ["CPU", "GPU", "MEM"], "既定は容量を出さない");
-  assert.deepEqual(labelsOf("mac2"), ["CPU", "GPU", "MEM"]);
+  assert.deepEqual(labelsOf(""), ["CPU 24", "GPU 38", "MEM 32"], "既定は容量を出す");
+  assert.deepEqual(labelsOf("mac2"), ["CPU 20", "GPU 64", "MEM 128"]);
+  assert.equal(document.getElementById("settings-show-machine-capacity").checked, true, "チェックボックスも既定 ON");
+  send(window, { type: "showMachineCapacity", value: false });
+  assert.deepEqual(labelsOf(""), ["CPU", "GPU", "MEM"]);
+  assert.equal(document.getElementById("settings-show-machine-capacity").checked, false, "チェックボックスも追従する");
   send(window, { type: "showMachineCapacity", value: true });
   assert.deepEqual(labelsOf(""), ["CPU 24", "GPU 38", "MEM 32"], "ON にした時点で届いている値を出す");
-  assert.deepEqual(labelsOf("mac2"), ["CPU 20", "GPU 64", "MEM 128"]);
-  assert.equal(document.getElementById("settings-show-machine-capacity").checked, true, "チェックボックスも追従する");
   const capacityOf = (machine, metric) =>
     rowFor(document, machine).querySelector(`.host-metric[data-metric="${metric}"] .hm-label .hm-capacity`);
   assert.equal(capacityOf("", "mem").textContent, "32", "数字だけ別の要素(色を変えて右寄せ)");

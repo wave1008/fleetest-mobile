@@ -357,7 +357,7 @@ export class MonitorPanelController implements vscode.Disposable {
     private readonly workspaceState: vscode.Memento,
   ) {
     this.pollingMode = workspaceState.get<boolean>("monitor.pollingMode", false);
-    this.showMachineCapacity = workspaceState.get<boolean>("monitor.showMachineCapacity", false);
+    this.showMachineCapacity = workspaceState.get<boolean>("monitor.showMachineCapacity", true);
     this.tilePaneHeight = workspaceState.get<number>("monitor.tilePaneHeight");
     // 既定 ON(webview 側 splitter.js の「!== false」と揃える。片方だけ変えない)。
     // 既定 true(webview 側 splitter.js の「!== false」と揃える。片方だけ変えない)。

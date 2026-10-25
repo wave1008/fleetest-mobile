@@ -3169,7 +3169,7 @@ button.settings-remote-hosts-move-up {
   width: 22px;
   height: 22px;
   padding: 0;
-  border: none;
+  border: 1px solid var(--vscode-widget-border, rgba(128, 128, 128, 0.35));
   border-radius: 4px;
   background: transparent;
   color: var(--vscode-icon-foreground, var(--vscode-foreground));

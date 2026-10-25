@@ -692,9 +692,9 @@ export function hostMetricsMachines() {
 /** 容量付きの名札(CPU n / GPU n / MEM n)の系列と素の名前。行ごとに桁が変わるので幅を揃える対象 */
 const HM_CAPACITY_LABEL_METRICS = ['cpu', 'gpu', 'mem'];
 const HM_CAPACITY_LABEL_NAMES = { cpu: 'CPU', gpu: 'GPU', mem: 'MEM' };
-/** 設定タブ「メモリ容量、コア数を表示する」(既定 OFF = 素の CPU / GPU / MEM)。
+/** 設定タブ「メモリ容量、コア数を表示する」(既定 ON。OFF = 素の CPU / GPU / MEM)。
  *  値は monitorPanel.ts の showMachineCapacity メッセージで届く */
-let hmShowCapacity = false;
+let hmShowCapacity = true;
 
 export function setShowMachineCapacity(show) {
   hmShowCapacity = show;
