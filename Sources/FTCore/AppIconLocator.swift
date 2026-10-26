@@ -48,22 +48,30 @@ public enum AppIconLocator {
         return FTRect(x: snapshot.screen.x, y: top, width: snapshot.screen.width, height: bottom - top)
     }
 
-    /// 名前順一覧の行を押せるか: 中心が画面内で、検索バーの下・キーボードの上(覆われた行を押すとキーボードに当たる)
+    /// 名前順一覧の行を押せるか: 中心が画面内で、**行の全体が**検索バーの下・キーボードの上に収まる(覆われた行を押すと
+    /// キーボードに当たる。検索バーに潜りかけた行は中心が帯の中でも押して起動しなかった = OI-30 の送った後の形・中心 172・バーの下端 162)
     public static func isTappableInAppLibraryList(_ row: ElementInfo, in snapshot: SnapshotResponse) -> Bool {
         let point = centre(of: row)
         let band = appLibraryListBand(in: snapshot)
         return TapTargetGeometry.isPointOnScreen(x: point.x, y: point.y, screen: snapshot.screen)
-            && point.y > band.top && point.y < band.bottom
+            && row.frame.y >= band.top - TapTargetGeometry.clipTolerance
+            && row.frame.y + row.frame.height <= band.bottom + TapTargetGeometry.clipTolerance
     }
 
-    /// 一覧を下へ送る(指は上へ)ドラッグ: 押してよい帯の 80% → 20%(帯の 60% ぶん動かす)。帯が潰れていれば nil
-    public static func appLibraryListDragPath(in snapshot: SnapshotResponse)
+    /// 一覧を送るドラッグ。`row` が木にあれば、それを押してよい帯の中央へ運ぶ量だけ(行き過ぎていれば逆向きに戻す)、
+    /// 無ければ一覧を下へ送る(指は上へ・帯の 80% → 20%)。どちらも1回の移動は帯の 60% まで。帯が潰れていれば nil。
+    /// **慣性で行き過ぎない速さで撃つのは呼び手**(移動量どおりに動く前提の量)
+    public static func appLibraryListDragPath(in snapshot: SnapshotResponse, bringing row: ElementInfo? = nil)
         -> (fromX: Double, fromY: Double, toX: Double, toY: Double)? {
         let band = appLibraryListBand(in: snapshot)
         let span = band.bottom - band.top
         guard span > 0 else { return nil }
         let x = snapshot.screen.x + snapshot.screen.width / 2
-        return (x, band.top + span * 0.8, x, band.top + span * 0.2)
+        guard let row else { return (x, band.top + span * 0.8, x, band.top + span * 0.2) }
+        // + = 中身を下へ(指を下へ)
+        let delta = max(min((band.top + band.bottom) / 2 - centre(of: row).y, span * 0.6), -span * 0.6)
+        let from = delta < 0 ? band.top + span * 0.8 : band.top + span * 0.2
+        return (x, from, x, from + delta)
     }
 
     /// 名前順一覧に名前の無い行があるか。**SpringBoard はアプリの名前を欠いたまま行を描くことがある**(実測:

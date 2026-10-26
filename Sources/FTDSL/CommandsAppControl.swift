@@ -319,8 +319,10 @@ private let tapAppIconSettleSeconds = 1.5
 /// App ライブラリの名前順一覧を送る上限(安全弁)。実際の終端は2回連続の不変化(一覧の末尾)。
 /// 1回の送りは見えている一覧の 60%(72pt の行で約3行)なので、30回で約90本のアプリまで届く
 private let tapAppIconLibraryMaxDrags = 30
-/// 一覧を送るドラッグの所要秒。ゆっくり引いて慣性で行き過ぎない(送った分だけ動かす)
-private let tapAppIconLibraryDragSeconds = 0.5
+/// 一覧を送るドラッグの速さ[pt/秒]。**慣性を出さない**ことが目的で、距離ぶんの時間を取る(`StepExecutor.reverseSweepDragSpeed`
+/// = 120 と同じ考え方。所要の下限 0.6 秒・上限 3 秒も `StepExecutor.slowDrag` と同じ)。0.5 秒固定だった頃は 230pt の送りが
+/// 386pt 流れ、行が検索バーに潜って押しても起動しなかった(OI-30)
+private let tapAppIconLibraryDragSpeed = 120.0
 
 /// 前面になるまで `waitSeconds`(= `tunables.screenWaitTimeout`)ポーリングする。
 /// 戻り値: true = 前面 / false = 問えて前面でなかった / nil = 一度も問えなかった(判定材料なし)。
@@ -526,6 +528,7 @@ public func tapAppIcon(_ appIconName: String? = nil,
             var sawUnnamedRow = false
             while true {
                 sawUnnamedRow = sawUnnamedRow || AppIconLocator.appLibraryListHasUnnamedRow(in: list)
+                var seen: ElementInfo?
                 if let row = AppIconLocator.findIcon(appIconName, in: list) {
                     let (settled, latest) = try await settledIcon(from: row)
                     if let settled, let latest, AppIconLocator.isTappableInAppLibraryList(settled, in: latest) {
@@ -534,13 +537,15 @@ public func tapAppIcon(_ appIconName: String? = nil,
                         return
                     }
                     if let latest { list = latest }
+                    seen = settled ?? AppIconLocator.findIcon(appIconName, in: list)
                 }
                 drags += 1
                 guard drags <= tapAppIconLibraryMaxDrags,
-                      let path = AppIconLocator.appLibraryListDragPath(in: list) else { break }
+                      let path = AppIconLocator.appLibraryListDragPath(in: list, bringing: seen) else { break }
+                let distance = abs(path.toY - path.fromY)
                 try await driver.drag(fromX: path.fromX, fromY: path.fromY, toX: path.toX, toY: path.toY,
                                       pressSeconds: FlowStep.defaultDragPressSeconds,
-                                      durationSeconds: tapAppIconLibraryDragSeconds)
+                                      durationSeconds: min(max(distance / tapAppIconLibraryDragSpeed, 0.6), 3.0))
                 list = try await driver.snapshot()
                 let signature = AppIconLocator.signature(of: list)
                 listUnchanged = signature == listSignature ? listUnchanged + 1 : 0

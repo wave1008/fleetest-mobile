@@ -34,7 +34,8 @@ enum BridgeRequestTrace {
         if let body, let text = String(data: redactingTypedText(body), encoding: .utf8) {
             trace["body"] = String(text.prefix(bodyPrefixLength))
         }
-        if path == "/snapshot", let response,
+        // SpringBoard の木(`/systemui/snapshot`)も同じ形で抜く(tapAppIcon・システムアラートの調査)
+        if path == "/snapshot" || path == "/systemui/snapshot", let response,
            let root = try? JSONSerialization.jsonObject(with: response) as? [String: Any],
            let elements = root["elements"] as? [[String: Any]] {
             var frames: [String: [Double]] = [:]

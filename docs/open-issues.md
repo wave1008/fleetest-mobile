@@ -45,19 +45,6 @@
 - 要る材料: 遅い画面を `waitFor` で待って作った下書きを、そのまま回して赤になった実例。あれば、直前に待った要素への tap に
   `waitSeconds:` を出す直し方が根拠を持つ
 
-### OI-30 App ライブラリの検索結果で、キーボードの下に隠れた行を `tapAppIcon` が押す
-- 状態: 再現済み
-- 確認: コミット未記録(2026-10-27)
-- 経緯: 2026-10-27 の回帰(8e499095)で E2E-RN の xcuitest モード「アプリの外へ出ても戻ってこられること」S0020 が、
-  Simulator -06 だけで 3 回中 3 回赤(他の 7 台は緑)
-
-- 症状: `appSwitcher` の後の `tapAppIcon "FT E2E RN"` が「tapped the icon at (201,558) but com.ftester.e2e.rn did not come to the
-  foreground within 15s」。-06 はホームのページにこのアプリが無く、App ライブラリの検索で探す。失敗時の絵では「FT E2E RN」の行が
-  ソフトウェアキーボードの下に隠れていて、(201,558) はキーボードの上
-- 見立て(確かめていない): 隠れた行を押さない判定(`AppIconLocator.isTappableInAppLibraryList`。キーボードの上端で帯を切る)が
-  キーボードを見落とした(SpringBoard の木で `keyboardFrame` が取れていない等)。次に見るもの: 赤の回の SpringBoard の木の
-  `keyboardFrame` と、一覧の帯の計算
-
 ## run の中で自動回復するようにしたもの(原因は環境側に残る)
 
 ### OI-4 Android Emulator の表示が止まり、ブリッジの撮影が数分前の絵を返し続ける

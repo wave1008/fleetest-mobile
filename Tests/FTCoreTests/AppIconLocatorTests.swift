@@ -82,6 +82,25 @@ final class AppIconLocatorTests: XCTestCase {
         XCTAssertEqual(path?.fromX, 201)
     }
 
+    /// 行が見えていれば、それを帯(162..545)の中央 353.5 へ運ぶ量だけ送る。検索バーに潜りかけた行(送りで行き過ぎた形)は
+    /// 押さずに逆向き(指を下へ)に戻す。1回の移動は帯の 60% まで
+    func testLibraryDragBringsTheSeenRowToTheMiddleOfTheBand() {
+        let list = libraryList(keyboard: true)
+        func row(_ y: Double) -> ElementInfo {
+            ElementInfo(ref: 9, type: "clickable", identifier: nil, label: "FT E2E RN", value: nil, placeholder: nil,
+                        enabled: true, frame: FTRect(x: 0, y: y, width: 402, height: 72), depth: 2)
+        }
+        let underBar = row(136)   // 中心 172 は帯の中だが、上端がバー(〜162)に潜っている
+        XCTAssertFalse(AppIconLocator.isTappableInAppLibraryList(underBar, in: list))
+        let back = AppIconLocator.appLibraryListDragPath(in: list, bringing: underBar)
+        XCTAssertEqual((back?.toY ?? 0) - (back?.fromY ?? 0), 353.5 - 172, accuracy: 0.01, "指を下へ戻す量")
+        let underKeyboard = row(522)   // 中心 558 はキーボードの下
+        let up = AppIconLocator.appLibraryListDragPath(in: list, bringing: underKeyboard)
+        XCTAssertEqual((up?.toY ?? 0) - (up?.fromY ?? 0), 353.5 - 558, accuracy: 0.01, "指を上へ送る量")
+        let far = AppIconLocator.appLibraryListDragPath(in: list, bringing: row(2000))
+        XCTAssertEqual((far?.toY ?? 0) - (far?.fromY ?? 0), -383 * 0.6, accuracy: 0.01, "1回は帯の 60% まで")
+    }
+
     // MARK: - findIcon
 
     func testFindIconMatchesExactLabel() {
