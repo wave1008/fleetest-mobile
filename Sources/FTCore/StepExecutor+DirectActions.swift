@@ -150,6 +150,21 @@ extension StepExecutor {
         // ドライバの端申告を確かめた読みは**次の周回の読みとして使い回す**
         // (捨てて撮り直すと、端の確定のために木を1周ぶん余計に読む)
         var carried: (signature: String, snapshot: SnapshotResponse, settled: Bool, changed: Bool)?
+        let vertical = direction == .up || direction == .down
+        // **端を申告しない構成(iOS の XCUITest)の確かめは短いドラッグで撃つ**(`EdgeProbe`): 全力の送りが基準より
+        // 動かなかった = 途中で端に当たった、と読めたら、端を確かめる送りを引っ張りにならない短いドラッグに替える。
+        // 基準は指の移動量(経路が分かるとき)か、この送りの中の1本前の全力の送りが動かした量(scrollFrame 未指定 =
+        // ブリッジ既定の払いで経路が分からないとき)。端の確定は今までどおり署名の不変だけ(短いドラッグで中身が動けば
+        // 署名が変わり、全力の送りへ戻る)
+        var lastFullSwipe: (before: SnapshotResponse, travel: Double?)?
+        var lastFullMoved: Double?
+        var probeNext = false
+        var lastWasProbe = false
+        var probes = 0
+        var probeEvidence: (moved: Double, travel: Double)?
+        var probeFlush = false
+        // 短いドラッグの始点にする「動いた中身」の #id(ref は撮るたびに振り直されるので id で控える。EdgeProbe.path)
+        var probeAnchorIDs: Set<String> = []
         for _ in 0..<limit {
             let settled: (signature: String, snapshot: SnapshotResponse, settled: Bool, changed: Bool)
             if let carried {
@@ -159,8 +174,8 @@ extension StepExecutor {
             }
             carried = nil
             if !settled.settled { sawUnsettled = true }
-            let contentSignature = Self.edgeSignature(settled.snapshot,
-                                                        contentRegion: edgeContentRegion(step: step, in: settled.snapshot))
+            let region = edgeContentRegion(step: step, in: settled.snapshot)
+            let contentSignature = Self.edgeSignature(settled.snapshot, contentRegion: region)
             // **ドライバが「確かに動かした」と申告した直後(previous == nil)は戻りを数えない**: 飛ぶたびに同じ並びになる
             // 一覧(RN の FlatList)では、動いても前に見た署名と同じになる。申告は推測より強い
             let revisited = previous != nil && contentSignature != previous
@@ -168,6 +183,30 @@ extension StepExecutor {
             unchanged = (contentSignature == previous || revisited) ? unchanged + 1 : 0
             if let previous, contentSignature != previous, !revisited { lastChangeAt = clock.now }
             seenSignatures.insert(contentSignature)
+            if let last = lastFullSwipe {
+                let moved = EdgeProbe.contentDisplacement(before: last.before.elements, after: settled.snapshot.elements,
+                                                          region: region, vertical: vertical)
+                if let moved, let reference = last.travel ?? lastFullMoved,
+                   EdgeProbe.stoppedShort(displacement: moved, fingerTravel: reference) {
+                    probeNext = true
+                    probeEvidence = (moved, reference)
+                // 「揃った」は中身が動いた回だけ読む。nil(共通の行が残らないほど動いた = 窓の狭い一覧)も動いた側に数える
+                } else if moved != 0,
+                          EdgeProbe.flushAgainstStaticFrame(before: last.before.elements, after: settled.snapshot.elements,
+                                                            region: region, finger: direction) {
+                    probeNext = true
+                    probeFlush = true
+                }
+                if probeNext {
+                    probeAnchorIDs = EdgeProbe.movedIDs(before: last.before.elements, after: settled.snapshot.elements,
+                                                        region: region)
+                }
+                lastFullMoved = moved
+                lastFullSwipe = nil
+            }
+            // 短いドラッグで中身が動いた = 端ではなかった → 全力の送りへ戻る
+            if lastWasProbe, unchanged == 0 { probeNext = false }
+            lastWasProbe = false
             // ヒント跳躍(WebView): 端までの残り距離が分かるときは長距離ドラッグで寄せる
             let jump = Self.offscreenEdgeJump(snapshot: settled.snapshot, finger: direction)
             // **変わってから `edgeClaimGraceAfterMove` 経つまでは端と確定しない**: 端へ飛ぶと続きを
@@ -193,8 +232,8 @@ extension StepExecutor {
             // 確認の1本を送ると引っ張り更新に化ける実測があるため、送る前に分かるものは送らない)。
             // 容器を一意に決められない・申告が無い(iOS・旧ブリッジ)ときは nil のままなので
             // 今までどおり撃って確かめる
-            if let scrollingElement = Self.scrollContainerElement(step: step, in: settled.snapshot,
-                                                                  vertical: direction == .up || direction == .down),
+            let scrollingElement = Self.scrollContainerElement(step: step, in: settled.snapshot, vertical: vertical)
+            if let scrollingElement,
                ScrollActionAvailability.atEdge(
                    container: scrollingElement,
                    enclosing: Self.enclosingScrollables(of: scrollingElement, step: step, in: settled.snapshot),
@@ -209,11 +248,30 @@ extension StepExecutor {
                 sentSwipes += 1
                 continue
             }
-            if try await swipeWithFallback(direction, intent: .edge,
-                                           path: scrollPath(step: step, intent: .edge,
-                                                            in: settled.snapshot),
+            if probeNext, let region,
+               let probePath = EdgeProbe.path(in: region, finger: direction, avoiding: settled.snapshot.elements,
+                                              moved: probeAnchorIDs) {
+                if try await dragWithFallback(path: probePath,
+                                              durationSeconds: EdgeProbe.durationSeconds,
+                                              phase: &phase) { viaXCUITest = true }
+                sentSwipes += 1
+                probes += 1
+                lastWasProbe = true
+                continue
+            }
+            let path = scrollPath(step: step, intent: .edge, in: settled.snapshot)
+            if try await swipeWithFallback(direction, intent: .edge, path: path,
                                            phase: &phase) { viaXCUITest = true }
             sentSwipes += 1
+            // 端を申告しない構成のときだけ、次の周回で中身の動いた量を基準と比べる
+            // (ドライバの申告・容器の scrollActions がある構成は今までどおり)。**iOS だけ** —— `EdgeProbe.distance` は pt で
+            // 詰めた値で、Android の木は px(30px ≈ 11dp は Flutter のタッチの遊び 18 に届かず、端でなくても動かない =
+            // 早すぎる端の確定になる)
+            // **上端(指を下へ)だけ**: 副作用(引っ張って更新)があるのは上端だけ(EdgeProbe の冒頭)
+            if !isAndroid, direction == .down, driver.reachedEdgeOnLastSwipe == nil, scrollingElement?.scrollActions == nil {
+                lastFullSwipe = (settled.snapshot,
+                                 path.map { vertical ? abs($0.toY - $0.fromY) : abs($0.toX - $0.fromX) })
+            }
             // **ドライバが「もう端」と言えるなら、署名の2回不変を待たない**。
             // 位置を直接動かせる経路(Android の CDP・in-app の contentOffset)は
             // 「余地が無い」を**事実として**知っており、こちらの推測より強い。
@@ -248,6 +306,13 @@ extension StepExecutor {
         if let note = pendingScrollFrameNote { notes.append(note) }
         if viaXCUITest { notes.append("fell back to XCUITest") }
         if hintJumps > 0 { notes.append("\(hintJumps) long drag(s) from scroll hints") }
+        if probes > 0 {
+            noteCodesThisStep.insert(.edgeProbedGently)
+            let why = probeFlush ? "the content came to rest flush with the edge of its frame"
+                : probeEvidence.map { "the last swipe moved the content \(Int($0.moved.rounded()))pt,"
+                    + " short of \(Int($0.travel.rounded()))pt" } ?? "the last swipe stopped short"
+            notes.append("confirmed the edge with \(probes) short drag(s) instead of full swipes (\(why))")
+        }
         if sawUnsettled { note(.settleCapped, into: &notes) }
         return StepOutcome(status: .passed,
                            driverFallback: notes.isEmpty ? nil : notes.joined(separator: " / "))

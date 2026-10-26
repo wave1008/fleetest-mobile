@@ -404,7 +404,7 @@ Android の4 SUT と RN iOS は、どの部品もオン/オフとも a11y が判
 **残っている制約(`@Draft` の理由と対応)**: **E2EY**: RN の collapsible-tab-view でタブを替えた直後、iOS では行がヘッダの裏に居る(in-app の木に覆っている物が出ないので名指しも回避もできない。XCUITest の木には `#Toolbar` として出る)/ iOS で半分開いた gorhom のシートが一覧の上からの払いで伸びない(XCUITest の本物の払いでも同じ・見出しからなら伸びる。木にグラバーが出ないので伸ばす場所を決められない。Android は直した)/ SwiftUI で不透明度 0 にして隠した FAB・バーは XCUITest の木に残る(`.accessibilityHidden` を付けても残った。in-app は外す)ので、XCUITest では隠れた後の `notExist` が赤 / SwiftUI のシートが半分以上開いている間は、iOS が背面をアクセシビリティから外すので XCUITest の木に背面が出ない(in-app は読める)(以上 E2EY の `@Draft`)/ Flutter の iOS で scrollToTop が引っ張って更新になる/ Android の一部の欄で
 ACTION_SET_TEXT が拒まれる / Android のツールチップ・一部のオートコンプリートの候補が木に出ない / Flutter iOS の
 スナックバーが見つからない(FM が止まった Mac で観測。帰属未確定)。
-**xcuitest モードだけで赤(既定の in-app は緑・`Scripts/e2ex.sh --ios-xcuitest`)**: 決まって赤のものは 2026-10-08 に 13 → 1(CMP の 90_不具合の回帰 S0020 = 上端の確かめの1本が引っ張って更新になる。未修正と明記した証人)。
+**xcuitest モードだけで赤(既定の in-app は緑・`Scripts/e2ex.sh --ios-xcuitest`)**: 決まって赤のものは 2026-10-08 に 13 → 1(CMP の 90_不具合の回帰 S0020 = 上端の確かめの1本が引っ張って更新になる。未修正と明記した証人)。**この1本は 2026-10-26 に直した**(端を申告しない iOS の構成の `scrollToTop` では、送りの後に中身の先頭が動かない枠の縁へ揃った・基準より動かなかったら、端の確かめを 30pt・1 秒の短いドラッグで撃つ = `FTCore.EdgeProbe`。4 台 × 3 回で S0020 と逆向きの「引っ張って更新できること」が 24/24。行に `#id` が無い・揃わない一覧には残る)。
 断続的に赤: CMP の sticky(13 回中 1 回・原因未特定。docs/open-issues.md)/ Flutter の dialogs S0020(4 回中 1 回・欄の焦点が立つ前の打鍵)。
 この日に直したもの: CMP の refresh S0010(端の署名で固有 id の文字表示のラベルを比べない)/ Flutter の tooltip・menu(XCUITest の
 縮んだ木の補正・木の取得の 2 秒の待ちの解消)/ RN の sticky(貼り付く見出しの下の行を撃つ前に送る)・date(英語ロケールのセレクタ)/

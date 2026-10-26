@@ -263,9 +263,11 @@ tap("OK")
       FTFinger(x: 0.5, y: 0.3).move(x: 0.5, y: 0.85, durationSeconds: 1.0).hold(seconds: 0.3)
   }
   ```
-- With **iOS xcuitest mode** (`iosMode: "xcuitest"`), `scrollToTop()` at the top of the list
-  **runs one extra refresh** (the swipe that confirms the edge becomes a pull, because XCUITest does
-  not tell whether a container can still scroll). It does not happen with the default iOS mode
+- With **iOS xcuitest mode** (`iosMode: "xcuitest"`), XCUITest does not tell whether a container can
+  still scroll, so the tool confirms the edge with short, slow drags (which do not pull). But for a list
+  **whose rows have no `#id`**, or a **short list (one swipe reaches the end) whose rows do not come to rest flush with the list's frame**, it
+  cannot switch to that check, and `scrollToTop()` at the top of the list **can run one extra refresh**
+  (the swipe that confirms the edge becomes a pull). It does not happen with the default iOS mode
 - **On Flutter's iOS, `scrollToTop()` back to the top can also trigger a refresh** (under investigation)
 - Same workaround for both: in scenarios that verify the refresh count, do not read the count
   **after** `scrollToTop()` (verify the count before it)

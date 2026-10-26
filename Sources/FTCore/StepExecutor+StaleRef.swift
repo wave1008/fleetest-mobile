@@ -58,10 +58,11 @@ extension StepExecutor {
                 if blockedByAlert {
                     // ステップ開始の確認(executeAction の入口の waitOutSystemUI)の後に出たアラート。同じ門で閉じる/待つ:
                     // 登録のボタンが無ければ予算まで待って systemUICovered で落ちる(登録は「次に出る」という予告でもある)
-                    noteCodesThisStep.insert(.systemAlertRetried)
                     if let covered = try await waitOutSystemUI(step: step, phase: &phase) {
                         return StepOutcome(status: covered)
                     }
+                    // 閉じられた(消えた)と分かってから立てる = 閉じられずに落ちた回に「撃ち直した」と記録しない
+                    noteCodesThisStep.insert(.systemAlertRetried)
                     continue
                 }
                 noteCodesThisStep.insert(.staleRefRetried)

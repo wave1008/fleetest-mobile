@@ -1,8 +1,8 @@
 // 90_不具合の回帰.swift
 // E2EX-CMP で見つけた fleetest 側の不具合の回帰テスト(2026-09-28)。修正済みのものは緑を保つこと。
-// **S0020 の iOS XCUITest だけは未修正で赤**(XCUITest は容器が「まだ送れるか」を申告しないので、
-// 端を確かめる送りが上端で「引っ張る」になる)。利用者向けの説明は
-// docs/user-docs/reference/writing/ui_component_patterns_ja.md の「現時点の制約」。
+// S0020 の iOS XCUITest は 2026-10-26 に修正(XCUITest は容器が「まだ送れるか」を申告しないので、端を確かめる送りが
+// 上端で「引っ張る」になっていた → 上端の確かめを短いドラッグにする = FTCore.EdgeProbe)。利用者向けの説明は
+// docs/user-docs/reference/writing/ui_component_patterns_ja.md の「引っ張って更新」。
 // 検索バーへの type の重複(iOS hybrid・修正済み)は 15_検索バー.swift が見る。
 
 import FTDSL
@@ -35,7 +35,7 @@ class 修正した不具合が再発しないこと {
         }
     }
 
-    @Test("引っ張って更新の一覧で scrollToTop が更新を走らせない(Android は修正済み・iOS XCUITest は未修正)")
+    @Test("引っ張って更新の一覧で scrollToTop が更新を走らせない(全ブリッジ・修正済み)")
     func S0020() {
         scenario {
             scene(1, "下端から上端へ戻しても更新回数は 0 のはず") {

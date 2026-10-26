@@ -189,7 +189,9 @@ final class NoteCoverageTests: XCTestCase {
         // (and-home)で、単純なキーだけの一致では別々の表の同名見出しに誤発火するため
         // y/x の幾何制約を必須にした(MCPServer.duplicateRegionNote の当該コメント参照)
         "duplicateRegionNote": Coverage(fixtures: ["ios-browser_jma_hscroll"], bytes: 391),
-        "scrollFrameCandidates": Coverage(fixtures: ["and-form_keyboard", "and-place_expanded", "and-results", "ios-browser_startpage", "ios-maps_route_options", "ios-maps_station", "ios-maps_suggest_guides", "ios-maps_suggest_keyboard", "ios-maps_transit_boarding_cards", "ios-maps_transit_steps", "ios-maps_transit_steps_expanded", "ios-messages_keyboard", "ios-news_feed", "ios-place_guides_scrolled"], bytes: 3429),
+        "scrollFrameCandidates": Coverage(fixtures: ["and-form_keyboard", "and-place_expanded", "and-results", "ios-browser_startpage", "ios-maps_route_options", "ios-maps_station", "ios-maps_suggest_guides", "ios-maps_suggest_keyboard", "ios-maps_transit_boarding_cards", "ios-maps_transit_steps", "ios-maps_transit_steps_expanded", "ios-messages_keyboard", "ios-news_feed", "ios-place_guides_scrolled"], bytes: 3194),
+        // 2026-10-26: 3429 → 3194。スクロールする要素に id が無いとき、枠のぴったり同じ包みの id で名指しするようにした
+        // (`ScrollFrameCandidates.sameFrameSelector`)。変わった 9 画面を1件ずつ見て、どれも同じ容器へ届く名前と確認
         // 2026-08-15 に J1順位表(両OS)を追加して +555 バイト。and-/ios- とも 120要素上限で
         // 38〜42件が脱落する高密度ページ(ios-browser_nationwide と同型)
         "truncationNote": Coverage(fixtures: ["and-browser_j1_standings", "ios-browser_j1_standings", "ios-browser_nationwide", "ios-browser_startpage", "ios-browser_yahoo_top", "ios-maps_station", "ios-news_feed"], bytes: 2149),

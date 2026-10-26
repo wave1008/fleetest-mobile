@@ -18,11 +18,15 @@ public enum ScrollFrameCandidates {
         /// 画面と交差させた後の矩形(表示されている範囲)
         public let visible: FTRect
         public let selector: String?
+        /// `selector` が名指す要素の ref。ふつうは `ref` と同じで、枠の同じ包みからセレクタを借りたとき
+        /// (`sameFrameSelector`)だけ包みの ref。同名が並ぶときの添字(`selectorIndex`)はこちらで数える
+        public let selectorRef: Int
 
-        public init(ref: Int, visible: FTRect, selector: String?) {
+        public init(ref: Int, visible: FTRect, selector: String?, selectorRef: Int? = nil) {
             self.ref = ref
             self.visible = visible
             self.selector = selector
+            self.selectorRef = selectorRef ?? ref
         }
     }
 
@@ -53,7 +57,15 @@ public enum ScrollFrameCandidates {
             result.append(Candidate(ref: element.ref, visible: visible,
                                     selector: selector(for: element)))
         }
-        return result
+        // **名指しできない候補だけ、枠の同じ包みからセレクタを借りる**。同じ枠のスクロール要素どうしの統合(上)の
+        // 後に行う = 送る本体の名前があればそちらが先(`#WebView` の中の `#StartPageCollectionView`)
+        return result.map { candidate in
+            guard candidate.selector == nil,
+                  let element = snapshot.elements.first(where: { $0.ref == candidate.ref }),
+                  let borrowed = sameFrameSelector(element, in: snapshot.elements) else { return candidate }
+            return Candidate(ref: candidate.ref, visible: candidate.visible,
+                             selector: borrowed.selector, selectorRef: borrowed.ref)
+        }
     }
 
     /// `ft_snapshot` の先頭に出す注記。**2つ以上あるときだけ**返す(1つしか無い画面で
@@ -100,7 +112,7 @@ public enum ScrollFrameCandidates {
         let sameName = snapshot.elements.filter { element in
             Self.selector(for: element) == selector
         }
-        return sameName.firstIndex { $0.ref == candidate.ref }
+        return sameName.firstIndex { $0.ref == candidate.selectorRef }
     }
 
     /// 矩形から**書けるセレクタ**を引く(飛び越しの注記で「どれを指定すればよいか」を名指しする)。
@@ -151,6 +163,19 @@ public enum ScrollFrameCandidates {
             return SelectorNaming.needsEscaping(label) ? "=\(label)" : label
         }
         return nil
+    }
+
+    /// スクロールする要素自身に書けるセレクタが無いとき、**枠がぴったり同じ別の要素**(包み)のセレクタ。
+    /// Flutter の Android は id を包みの `other` に付け、実際に送る `scrollView` には付けない(`#carousel_tags`)。
+    /// `scrollFrame:` は指した要素の枠で容器を決めるので、同じ枠の包みを指せば同じ容器に届く(実測)。
+    /// 借りないと「どれにも id が無い = ref を渡せ」と事実と違う案内になり、向きに合う候補の提案も出なかった
+    static func sameFrameSelector(_ element: ElementInfo,
+                                  in elements: [ElementInfo]) -> (selector: String, ref: Int)? {
+        let key = frameKey(element.frame)
+        return elements.lazy
+            .filter { $0.ref != element.ref && frameKey($0.frame) == key }
+            .compactMap { other in selector(for: other).map { ($0, other.ref) } }
+            .first
     }
 
     static func frameKey(_ rect: FTRect) -> String {

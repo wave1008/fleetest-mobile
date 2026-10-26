@@ -56,6 +56,25 @@ final class SystemAlertUndeliveredRetryTests: XCTestCase {
         XCTAssertFalse(outcome.notes.contains(.systemAlertRetried))
     }
 
+    /// 登録のボタンがアラートに無く閉じられない回は、覆いで落ち、撃ち直しの注記を立てない(撃ち直していない)
+    func testWhenTheAlertCannotBeClosedNoRetryIsRecorded() async {
+        let log = CallLog()
+        let primary = FakeAppDriver(name: "primary", log: log, snapshotElements: [[target()]])
+        primary.tapErrors = [blocked]
+        let fallback = FakeAppDriver(name: "fallback", log: log, snapshotElements: [alertTree()])
+        // 開始の確認では居ない → 断られた後はずっと出ている(登録のボタンが無いので閉じられない)
+        fallback.systemAlertFrames = [SystemAlertProbeResponse(present: false),
+                                      SystemAlertProbeResponse(present: true, title: "写真ライブラリへのアクセス",
+                                                               buttons: ["許可しない"])]
+        let executor = StepExecutor(driver: primary, fallbackDriver: fallback, isAndroid: false, tunables: RunTunables())
+        executor.systemAlertWatchlist.register(SystemAlertRule(alert: "*写真ライブラリ*", button: "Appの使用中は許可"))
+        let outcome = await executor.execute(FlowStep(action: "tap", locator: FlowLocator(id: "target"), timeout: 1))
+        XCTAssertFalse(StepExecutor.isSuccess(outcome.status))
+        XCTAssertEqual(outcome.failureKind, .systemUICovered)
+        XCTAssertFalse(outcome.notes.contains(.systemAlertRetried), "閉じられなかったのに撃ち直しを記録した")
+        XCTAssertEqual(log.entries.filter { $0.hasPrefix("primary.tap") }, ["primary.tap(ref:1)"])
+    }
+
     /// 理由の付かない 422(入力・ドラッグ等 = 途中まで届いたかもしれない)は、登録があっても撃ち直さない
     func testAnUnstructuredRefusalIsNotSentAgain() async {
         let (executor, _, log) = make(refusal: DriverError.badResponse(status: 422, body: "a system alert is in front"),

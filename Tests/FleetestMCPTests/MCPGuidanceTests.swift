@@ -140,6 +140,15 @@ final class MCPGuidanceTests: XCTestCase {
             status: 422, body: "cannot append to a password field")), "")
     }
 
+    /// 座標の ft_tap がアラートで届けずに断られたら、ref の門と同じ出口(`ft_tap alertButton:`)を足す。
+    /// 理由の付かない 422(ダブルタップ等の同じ本文)には出さない = 文言の一致で決めない
+    func testSystemAlertBlockedTapPointsToAlertButton() {
+        let hint = MCPServer.systemAlertBlockedHint(DriverError.systemAlertBlocked(detail: "a system alert is in front"))
+        XCTAssertTrue(hint.contains("alertButton"), hint)
+        XCTAssertEqual(MCPServer.systemAlertBlockedHint(DriverError.badResponse(
+            status: 422, body: "a system alert is in front of the app")), "")
+    }
+
     func testNoReadableWindowHintIgnoresUnrelatedErrors() {
         XCTAssertEqual(MCPServer.noReadableWindowHint(DriverError.badResponse(
             status: 500, body: "no-active-window-root:" + " …")), "")

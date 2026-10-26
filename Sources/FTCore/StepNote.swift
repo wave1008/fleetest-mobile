@@ -306,6 +306,10 @@ public enum StepNote: String, Sendable, Codable, CaseIterable {
     /// システムアラートが前面にあってブリッジが**届けずに**断り(`DriverError.systemAlertBlocked`)、登録(iosAlertHandler)で
     /// 閉じてから撃ち直した(`executeActionRetryingUndelivered`)。立つのは断りが1回でもあった回だけ
     case systemAlertRetried = "system-alert-retried"
+    /// scrollToEdge の端の確かめを、全力の送りではなく短くゆっくりしたドラッグで撃った(`EdgeProbe`。端を申告しない
+    /// 構成 = iOS の XCUITest で、直前の送りが指の移動量より動かなかったとき)。確かめの送りが上端で引っ張って更新に
+    /// 化けないようにする経路が働いた回を数える印
+    case edgeProbedGently = "edge-probed-gently"
     /// **測定用(`FT_STALE_TAP_PROBE=1` のときだけ立つ)**: XCUITest の ref タップで、撃つ直前に撮り直した木に要素がもう
     /// 控えた枠に居なかった(`TapHitAreaMiss.Kind.movedBeforeFire`)。**判定は変えない・撃ち直さない**。率を見て `/tap` にも
     /// `/type` と同じ断り → 引き直しを入れるかを決める
@@ -413,6 +417,9 @@ public enum StepNote: String, Sendable, Codable, CaseIterable {
         case .staleRefRetried:
             return "the bridge refused the action without performing it because the element had moved,"
                 + " so the target was resolved again from a fresh tree"
+        case .edgeProbedGently:
+            return "the edge was confirmed with short slow drags instead of full swipes, so a pull-to-refresh at the edge"
+                + " was not triggered"
         case .systemAlertRetried:
             return "a system alert came up just before the action, so the bridge refused it without delivering it;"
                 + " the alert was closed by iosAlertHandler and the action was sent again"

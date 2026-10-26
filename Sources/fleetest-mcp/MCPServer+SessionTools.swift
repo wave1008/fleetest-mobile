@@ -230,10 +230,12 @@ extension MCPServer {
             platform: launchDriver is AndroidDriver ? "android" : "ios",
             summary: resumes ? "activate \(bundleID) (resumed, not relaunched)"
                               : "launch \(bundleID)"), args: args)
-        // snapshotAfter の読みは system alert の予約(上)を消費するので、立てた後に読む
+        // snapshotAfter の読みは system alert の予約(上)を消費するので、立てた後に読む。
+        // **操作前の木と比べない**(outsideTheAppTree: true): 起動し直しは前と同じ最初の画面に着くのが普通で、resume は背面から
+        // 戻した木と前面だった頃の木を比べることになる。どちらも一致して「効かなかったかも」と出て、撃ち直しを誘っていた(実測)
         return text(springBoardNote + (resumes ? "Activated: \(bundleID) (resumed without relaunching)"
                              : "Launched: \(bundleID)")
-            + waitForWithoutSnapshotAfterNote(args) + (await snapshotAfterBody(args, outsideTheAppTree: false)))
+            + waitForWithoutSnapshotAfterNote(args) + (await snapshotAfterBody(args, outsideTheAppTree: true)))
     }
 
     func ftOpenUrl(_ args: [String: Any]) async throws -> [[String: Any]] {

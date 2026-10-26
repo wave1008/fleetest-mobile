@@ -634,6 +634,7 @@ extension MCPServer {
                 + Self.setTextRefusedHint(tool: tool, args: resolved,
                                           message: error.localizedDescription)
                 + Self.noReadableWindowHint(error)
+                + Self.systemAlertBlockedHint(error)
                 + Self.accessibilityOutageHint(error)
                 + (runNote.map { " " + $0 } ?? "")
                 + (unknownArgumentNote.isEmpty ? "" : " " + unknownArgumentNote)

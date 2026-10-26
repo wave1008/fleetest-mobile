@@ -1022,6 +1022,13 @@ extension MCPServer {
     private static let handleAlertFirst = "Handle the alert first: `ft_tap alertButton: \"<button>\"`"
         + " presses one of its buttons and returns to your app"
 
+    /// 座標の ft_tap は ref の門(アラートの確認)を通らないので、ブリッジがアラートで届けずに断った 422
+    /// (`DriverError.systemAlertBlocked`)に、ref の門と同じ出口をここで足す(ブリッジの本文はシナリオ向けで iosAlertHandler しか言わない)
+    static func systemAlertBlockedHint(_ error: Error) -> String {
+        guard case DriverError.systemAlertBlocked? = error as? DriverError else { return "" }
+        return "\n" + handleAlertFirst + "."
+    }
+
     // **internal**(MCPServer+ScreenTools.swift の ft_type ref なし失敗経路も使う。他ファイルの
     // 拡張から呼ぶので private のままにできない)。一発物の照会 = target 無しで前面のアラートだけ聞く
     static func frontSystemAlert(driver: AppDriver) async -> String? {

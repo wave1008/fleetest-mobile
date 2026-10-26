@@ -45,6 +45,45 @@ final class ScrollFrameCandidatesTests: XCTestCase {
         XCTAssertNil(ScrollFrameCandidates.note(snap))
     }
 
+    /// Flutter の Android: id は同じ枠の包み(other)にあり、送る scrollView には無い。包みの id で指せる
+    /// (`scrollFrame:` は指した要素の枠で容器を決める)ので、「id が無い・ref を渡せ」と言わない
+    func testAnIdOnTheSameFrameWrapperNamesTheScrollableThatHasNone() {
+        let carousel = FTRect(x: 0, y: 620, width: 400, height: 80)
+        let snap = snapshot([
+            element(1, id: "list_rows", frame: FTRect(x: 0, y: 100, width: 400, height: 500)),
+            element(2, type: "scrollView", frame: FTRect(x: 0, y: 100, width: 400, height: 500), scrollable: true),
+            element(3, id: "carousel_tags", frame: carousel),
+            element(4, type: "scrollView", frame: carousel, scrollable: true),
+        ])
+        let found = ScrollFrameCandidates.candidates(in: snap)
+        XCTAssertEqual(found.map(\.selector), ["#list_rows", "#carousel_tags"])
+        XCTAssertEqual(StepExecutor.directionMatchedScrollFrameCandidate(in: snap, vertical: false), "#carousel_tags")
+        XCTAssertFalse(ScrollFrameCandidates.note(snap)?.contains("no id") ?? true, ScrollFrameCandidates.note(snap) ?? "-")
+    }
+
+    /// 送る本体どうしの統合が先: 同じ枠の包みに id があっても、スクロールする子に名前があればそちら
+    func testTheScrollingChildsOwnNameWinsOverTheWrapper() {
+        let frame = FTRect(x: 0, y: 100, width: 400, height: 500)
+        let snap = snapshot([
+            element(1, id: "WebView", frame: frame),
+            element(2, type: "scrollView", frame: frame, scrollable: true),
+            element(3, type: "collectionView", id: "StartPageCollectionView", frame: frame, scrollable: true),
+            element(4, type: "scrollView", frame: FTRect(x: 0, y: 620, width: 400, height: 80), scrollable: true),
+        ])
+        XCTAssertEqual(ScrollFrameCandidates.candidates(in: snap).first?.selector, "#StartPageCollectionView")
+    }
+
+    /// 同じ id の包みが2つ並ぶときは、借りた名前にも添字と枠を付ける(どちらを指すか分からない並びにしない)
+    func testBorrowedDuplicateNamesKeepTheirIndex() throws {
+        let a = FTRect(x: 0, y: 100, width: 400, height: 60), b = FTRect(x: 0, y: 400, width: 400, height: 60)
+        let snap = snapshot([
+            element(1, id: "cards", frame: a), element(2, type: "scrollView", frame: a, scrollable: true),
+            element(3, id: "cards", frame: b), element(4, type: "scrollView", frame: b, scrollable: true),
+        ])
+        let note = try XCTUnwrap(ScrollFrameCandidates.note(snap))
+        XCTAssertTrue(note.contains("#cards[0]") && note.contains("#cards[1]"), note)
+    }
+
     func testOffscreenContainerIsNotACandidate() {
         let snap = snapshot([
             element(1, id: "drawer", frame: FTRect(x: -400, y: 0, width: 400, height: 800),
