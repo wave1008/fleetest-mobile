@@ -71,6 +71,12 @@ public enum AppIconLocator {
         }
     }
 
+    /// App ライブラリの検索が開いているか(取り消しボタンは検索中の検索バーの中にだけ出る)。前の操作が開いたまま残すと、
+    /// ホームを2回押しても閉じない(OI-30)
+    public static func isAppLibrarySearchOpen(_ snapshot: SnapshotResponse) -> Bool {
+        appLibrarySearchCancelButton(in: snapshot) != nil
+    }
+
     /// App ライブラリのカテゴリのフォルダを開くボタンの識別子(上から順)。カテゴリの枠(大きいアイコン)と同じ識別子を持ち
     /// value(「17個のアプリ」等)を持つ小さいアイコン。名前は表示言語で変わるので識別子の共有で取る
     public static func appLibraryFolderButtonIDs(in snapshot: SnapshotResponse) -> [String] {

@@ -516,11 +516,59 @@ public func tapAppIcon(_ appIconName: String? = nil,
             return false
         }
 
+        // App ライブラリの検索の名前順一覧(list)から探して撃つ。押せる位置(検索バーの下・キーボードの上)に来るまで一覧を送る。
+        // 見つからなければ失敗(撃ち直しはしない)
+        func tapInAppLibraryList(_ first: SnapshotResponse) async throws {
+            var list = first
+            var listSignature = AppIconLocator.signature(of: list)
+            var listUnchanged = 0
+            var drags = 0
+            var sawUnnamedRow = false
+            while true {
+                sawUnnamedRow = sawUnnamedRow || AppIconLocator.appLibraryListHasUnnamedRow(in: list)
+                if let row = AppIconLocator.findIcon(appIconName, in: list) {
+                    let (settled, latest) = try await settledIcon(from: row)
+                    if let settled, let latest, AppIconLocator.isTappableInAppLibraryList(settled, in: latest) {
+                        try await driver.tap(ref: settled.ref)
+                        try await afterTap(settled)
+                        return
+                    }
+                    if let latest { list = latest }
+                }
+                drags += 1
+                guard drags <= tapAppIconLibraryMaxDrags,
+                      let path = AppIconLocator.appLibraryListDragPath(in: list) else { break }
+                try await driver.drag(fromX: path.fromX, fromY: path.fromY, toX: path.toX, toY: path.toY,
+                                      pressSeconds: FlowStep.defaultDragPressSeconds,
+                                      durationSeconds: tapAppIconLibraryDragSeconds)
+                list = try await driver.snapshot()
+                let signature = AppIconLocator.signature(of: list)
+                listUnchanged = signature == listSignature ? listUnchanged + 1 : 0
+                listSignature = signature
+                if listUnchanged >= 2 { break }
+            }
+            // 一覧に名前の無い行があったときだけ(AppIconLocator.appLibraryListHasUnnamedRow の doc)、カテゴリの
+            // フォルダを上から順に開いて探す。見えているカテゴリだけ・開いたフォルダの中も見えている分だけ(どちらも送らない)
+            if sawUnnamedRow, try await tapInAppLibraryFolders(list) { return }
+            throw FTCommandError.message("App icon not found.(\(appIconName)) — not on the home screen pages "
+                + "nor in the App Library list"
+                + (sawUnnamedRow ? " (the list had rows without a name; the visible category folders "
+                    + "were opened too)" : ""))
+        }
+
         try await driver.home()
         if platform == "ios" { try await driver.home() }
 
         var last = try await driver.snapshot()
         try checkHomeScreenTreeMatchesDisplay(last)
+        // **App ライブラリの検索が開いたままなら、最初からその一覧で探す**: 前の操作(前のシナリオの赤を含む)が検索を開いたまま
+        // 残すと、ホームを2回押しても閉じない。その木の行をホームのページの経路で撃つとキーボードの判定を通らず、キーボードの
+        // 下の行を押した(OI-30: -06 で同じ (201,558) を撃ち続けた)
+        if platform == "ios", AppIconLocator.isAppLibrarySearchOpen(last) {
+            let (list, _) = try await readUntil { KeyboardWait.shownState($0) != false }
+            try await tapInAppLibraryList(list)
+            return
+        }
         if let icon = AppIconLocator.findIcon(appIconName, in: last) {
             let (tapped, snapshot) = try await tapSettled(icon)
             if tapped { return }
@@ -565,41 +613,12 @@ public func tapAppIcon(_ appIconName: String? = nil,
                 // 撃つスコープ経路は type を断る(ref の名前空間が違う)。行が押せる位置に来るまで一覧を送る
                 if platform == "ios", let field = AppIconLocator.appLibrarySearchField(in: last) {
                     try await driver.tap(ref: field.ref)
-                    var list = try await driver.snapshot()
-                    var listSignature = AppIconLocator.signature(of: list)
-                    var listUnchanged = 0
-                    var drags = 0
-                    var sawUnnamedRow = false
-                    while true {
-                        sawUnnamedRow = sawUnnamedRow || AppIconLocator.appLibraryListHasUnnamedRow(in: list)
-                        if let row = AppIconLocator.findIcon(appIconName, in: list) {
-                            let (settled, latest) = try await settledIcon(from: row)
-                            if let settled, let latest, AppIconLocator.isTappableInAppLibraryList(settled, in: latest) {
-                                try await driver.tap(ref: settled.ref)
-                                try await afterTap(settled)
-                                return
-                            }
-                            if let latest { list = latest }
-                        }
-                        drags += 1
-                        guard drags <= tapAppIconLibraryMaxDrags,
-                              let path = AppIconLocator.appLibraryListDragPath(in: list) else { break }
-                        try await driver.drag(fromX: path.fromX, fromY: path.fromY, toX: path.toX, toY: path.toY,
-                                              pressSeconds: FlowStep.defaultDragPressSeconds,
-                                              durationSeconds: tapAppIconLibraryDragSeconds)
-                        list = try await driver.snapshot()
-                        let signature = AppIconLocator.signature(of: list)
-                        listUnchanged = signature == listSignature ? listUnchanged + 1 : 0
-                        listSignature = signature
-                        if listUnchanged >= 2 { break }
-                    }
-                    // 一覧に名前の無い行があったときだけ(AppIconLocator.appLibraryListHasUnnamedRow の doc)、カテゴリの
-                    // フォルダを上から順に開いて探す。見えているカテゴリだけ・開いたフォルダの中も見えている分だけ(どちらも送らない)
-                    if sawUnnamedRow, try await tapInAppLibraryFolders(list) { return }
-                    throw FTCommandError.message("App icon not found.(\(appIconName)) — not on the home screen pages "
-                        + "nor in the App Library list"
-                        + (sawUnnamedRow ? " (the list had rows without a name; the visible category folders "
-                            + "were opened too)" : ""))
+                    // **キーボードが上がりきるまで読み直してから帯を決める**: 押した直後の木はキーボードを画面の外の矩形で申告し、
+                    // その木で「押せる」とした行が、撃つ瞬間には上がってきたキーボードの下になる(OI-30: 中心 558 の行・キーボードの
+                    // 上端 545)。申告の無い構成(ハードウェアキーボード等 = shownState nil)は待たない
+                    let (list, _) = try await readUntil { KeyboardWait.shownState($0) != false }
+                    try await tapInAppLibraryList(list)
+                    return
                 }
                 throw FTCommandError.message("App icon not found.(\(appIconName))")
             }
