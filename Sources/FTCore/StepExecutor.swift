@@ -577,8 +577,8 @@ public final class StepExecutor {
     let tunables: RunTunables
 
     /// 対象アプリの UI フレームワーク(`AppUIFrameworkQuery` の答え。nil = 不明)。
-    /// **使うのは空打ちの発火条件(shouldEmptyDrag)と、待つ間の読み直しの迂回(repollBypassesCache)だけ**。
-    /// 他の判定には持ち込まない
+    /// **使うのは空打ちの発火条件(shouldEmptyDrag・swipeLeavesNoInertia)と、整定のしきい値(restsWithinThreshold)と、
+    /// 待つ間の読み直しの迂回(repollBypassesCache)だけ**。他の判定には持ち込まない
     let uiFramework: AppUIFramework?
 
     /// 要素が現れる・値が変わるのを**待つ間の 2 回目以降の読み**で、ドライバのキャッシュを迂回するか。
@@ -611,6 +611,17 @@ public final class StepExecutor {
     var shouldEmptyDrag: Bool {
         guard ProcessInfo.processInfo.environment["FT_EMPTY_DRAG"] != "off" else { return false }
         return releasesScrollTouch && uiFramework?.isSelfRendered == true
+    }
+
+    /// 探索の送り1本が慣性を残さないか(見つけた後の空打ちを省いてよい唯一の形)。**Flutter の in-app の送りだけ** ——
+    /// in-app ブリッジは Flutter をセマンティクスの scroll で送り、Flutter はそれを速度 0 のドラッグとして処理する
+    /// (flutter/lib/src/widgets/gesture_detector.dart の `_getVerticalDragUpdateHandler` = `primaryVelocity: 0.0`)。
+    /// 続く空打ちは本物の合成ドラッグなので空打ち自身が慣性を作り、流れている間 Flutter は一覧の中の操作を全部塞ぐ
+    /// (Scrollable の IgnorePointer = `isBlockingUserActions`)。整定の 2pt のしきい値は尾の這いを「止まった」と読むので、
+    /// 直後のタップは activate も合成タッチも効かないまま ✅ になった(E2EY-Flutter の折りたたみヘッダ。FD-2.2)。
+    /// Compose の in-app の送りはアニメで動くので対象外(空打ちが要らない根拠が無い)。XCUITest で撃った送りは慣性を残す
+    func swipeLeavesNoInertia(swipedViaXCUITest: Bool) -> Bool {
+        primaryCaptureOmitsSystemUI && !swipedViaXCUITest && uiFramework == .flutter
     }
 
     /// 掴んだ要素に対して空打ちを撃つか。アプリのフレームワークが判っていればそれ、

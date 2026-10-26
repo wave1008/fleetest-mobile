@@ -511,6 +511,8 @@ extension StepExecutor {
         // 負値だと 0...(-1) が ClosedRange 生成で trap(クラッシュ)するため 0 で下限クランプ
         let maxSwipes = max(0, step.maxSwipes ?? tunables.defaultMaxSwipes)
         var viaXCUITest = false
+        // この探索の動きが慣性を残したか = 見つけた後に空打ちを撃つ根拠(settleAfterFind)。ドラッグは常に残しうる側に数える
+        var leftInertia = false
         var hintJumps = 0
         var settleCapped = false
         // 自己補正の材料(直前の周回のツリー)。**較正値は持たず毎周測り直す**
@@ -668,12 +670,15 @@ extension StepExecutor {
                         // swipes が 0 のまま報告され、「2周不変で打ち切り」と弾切れ後の逆走査が
                         // 寄せの周回では一切効かない
                         swipes += 1
+                        leftInertia = true
                         previousSnapshot = snapshot
                         continue
                     }
                     let finger = FTSwipeDirection(rawValue: recovery.direction ?? "") ?? direction
-                    if try await swipeWithFallback(finger, intent: .search, path: path,
-                                                   phase: &phase) { viaXCUITest = true }
+                    let swipedViaXCUITest = try await swipeWithFallback(finger, intent: .search, path: path,
+                                                                        phase: &phase)
+                    if swipedViaXCUITest { viaXCUITest = true }
+                    if !swipeLeavesNoInertia(swipedViaXCUITest: swipedViaXCUITest) { leftInertia = true }
                     swipes += 1
                     previousSnapshot = snapshot
                     continue
@@ -699,6 +704,7 @@ extension StepExecutor {
                     if await slowDrag(jump: jump,
                                       container: ScrollGeometry.viewport(viewport, excludingKeyboard: effectiveKeyboard),
                                       vertical: alongVertical, phase: &phase) {
+                        leftInertia = true
                         swipes += 1
                         previousSnapshot = snapshot
                         continue
@@ -722,7 +728,8 @@ extension StepExecutor {
                     // スワイプしていない周回(attempt == 0)は静止しているので追加コストを払わない
                     if attempt > 0 {
                         settleCapped = try await settleAfterFind(step: step, element: element,
-                                                                 snapshot: snapshot, phase: &phase)
+                                                                 snapshot: snapshot, afterInertialMove: leftInertia,
+                                                                 phase: &phase)
                     }
                     // **成功時も swipes を載せる**: 失敗文にしか使わなかった頃は既定の 0 で
                     // 害が無かったが、MCP の ft_scroll_to が所要時間の内訳へ出すようになり、
@@ -746,6 +753,7 @@ extension StepExecutor {
                    elements: snapshot.elements),
                await slowDrag(jump: reach.jump, container: reach.outer, vertical: true, phase: &phase) {
                 bringIntoViewDrags += 1
+                leftInertia = true
                 swipes += 1
                 previousSnapshot = snapshot
                 if pendingScrollFrameNote == nil {
@@ -912,6 +920,7 @@ extension StepExecutor {
                                                                     excludingKeyboard: effectiveKeyboard),
                                   phase: &phase) {
                     hintJumps += 1
+                    leftInertia = true
                     swipes += 1
                     previousSnapshot = snapshot
                     continue
@@ -920,10 +929,12 @@ extension StepExecutor {
                 // 速度を残す(FTSwipeIntent.searchFling)。一度でも動いた後は掛けない —— 木の公開の遅れで
                 // 「動かなかった」に見える周回があり、そこで慣性を足すと対象を飛び越す
                 let intent: FTSwipeIntent = !contentEverMoved && unmovedRounds > 0 ? .searchFling : .search
-                if try await swipeWithFallback(direction, intent: intent,
-                                               path: scrollPath(step: step, intent: intent,
-                                                                in: snapshot),
-                                               phase: &phase) { viaXCUITest = true }
+                let swipedViaXCUITest = try await swipeWithFallback(direction, intent: intent,
+                                                                    path: scrollPath(step: step, intent: intent,
+                                                                                     in: snapshot),
+                                                                    phase: &phase)
+                if swipedViaXCUITest { viaXCUITest = true }
+                if !swipeLeavesNoInertia(swipedViaXCUITest: swipedViaXCUITest) { leftInertia = true }
                 swipes += 1
                 previousSnapshot = snapshot
             }

@@ -138,7 +138,7 @@ extension StepExecutor {
                    TapTargetGeometry.offscreenScrollGateCentre(for: element,
                                                               screen: snapshot.screen) == nil {
                     _ = try await settleAfterFind(step: step, element: element,
-                                                  snapshot: snapshot, phase: &phase)
+                                                  snapshot: snapshot, afterInertialMove: true, phase: &phase)
                     // **連続2回一致まで待つ**(settleAfterScroll より強い)。逆走査のドラッグは
                     // 遅い代わりに離した後もしばらく減速しながら動き、**掴んだ座標が
                     // タップまでにずれる**(実測: 176px ずれて隣の行を叩いた)
@@ -157,9 +157,13 @@ extension StepExecutor {
     /// 1 周の変位が `SettleMotion.restThresholdPt` 以内なら止まったとみなすか。**iOS だけ**。
     /// Android の一覧(RecyclerView 等)は這っている間もフリング中で、その間のタッチは「フリングを止める」に
     /// 消費されてタップにならない(M1Ultra で実測: 探索直後の tap が緑のまま行を選ばず、次の検証で赤)。
-    /// Android は従来どおり枠・署名が完全に一致するまで待つ
+    /// Android は従来どおり枠・署名が完全に一致するまで待つ。
+    /// **iOS の Flutter も外す**: Flutter は一覧が動いている間(慣性の這いを含む)その中の操作を全部塞ぐ(Scrollable の
+    /// IgnorePointer = `isBlockingUserActions`)ので、這っている最中のタップは activate も合成タッチも効かず流れを止めるだけになる
+    /// (E2EY-Flutter の折りたたみヘッダ: 1.98pt/周で「止まった」と読んで撃ち、緑のまま押せていなかった)。Flutter の木は
+    /// 這いの間も毎回変わる(in-app は小数の枠)ので、完全な一致は「本当に止まった」を言える
     func restsWithinThreshold(_ moved: Double) -> Bool {
-        !isAndroid && moved <= SettleMotion.restThresholdPt
+        !isAndroid && uiFramework != .flutter && moved <= SettleMotion.restThresholdPt
     }
 
     /// `settle: false` のステップの操作後の整定を飛ばすか。**飛ばすときは待つ代わりに次の解決を
@@ -173,8 +177,10 @@ extension StepExecutor {
     /// 探索が要素を見つけた直後の後始末。**スワイプを撃った周回だけ**呼ぶ。戻り値は
     /// 「静止待ちが収束せず打ち切られた」= 呼び手はそれを注記に載せる。
     /// **順序に意味がある**(逆にすると Android で誤タップが再発する。実測)
+    /// `afterInertialMove` = 探索の動きが慣性を残しうる(`swipeLeavesNoInertia` でない送り・ドラッグが1本でもあった)。
+    /// false なら空打ちを撃たない —— 空打ちは慣性を吸うための操作で、吸う慣性が無いと空打ち自身が慣性を作る
     func settleAfterFind(step: FlowStep, element: ElementInfo,
-                                 snapshot: SnapshotResponse,
+                                 snapshot: SnapshotResponse, afterInertialMove: Bool,
                                  phase: inout PhaseAccumulator) async throws -> Bool {
         // 順序:
         //  1. **空打ちの極小ドラッグ**: iOS(Compose)のスクロール容器は次の1タッチを
@@ -217,7 +223,7 @@ extension StepExecutor {
                             snapshot.screen.y + snapshot.screen.height
                                 - Self.bottomUncoveredBand - 1)
         var drag: (from: (x: Double, y: Double), to: (x: Double, y: Double))?
-        if shouldEmptyDrag(for: element),
+        if afterInertialMove, shouldEmptyDrag(for: element),
            Self.emptyDragIsSafe(x: x, y: y, of: element,
                                 in: snapshot.elements, screen: snapshot.screen),
            let end = Self.emptyDragEnd(of: element, x: x, y: y, searching: step.direction,

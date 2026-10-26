@@ -147,6 +147,15 @@ Flutter・React Native)によって、**木の見え方と操作の効き方が�
   - **RN・SwiftUI・UIKit・Android では撃たない**(RN は横4pt の抜きが `pressRetentionOffset` 内でクリックになり、
     Android は 2pt ドラッグがクリックとして発火する)。**不明なら撃たない**
   - 殺しスイッチ `FT_EMPTY_DRAG=off`(保守者向け)
+  - **Flutter の in-app の送り(inapp-boost モード)だけで見つけたときは撃たない**(`StepExecutor.swipeLeavesNoInertia`)。
+    in-app ブリッジは Flutter をセマンティクスの scroll で送り、Flutter はそれを速度 0 のドラッグとして処理する = 吸う慣性が無い。
+    撃つと空打ち(本物の合成ドラッグ)自身が慣性を作り、流れている間 Flutter は一覧の中の操作を全部塞ぐ(Scrollable の
+    IgnorePointer)ので、2pt のしきい値で「止まった」と読んだ直後のタップが activate も合成タッチも効かずに ✅ になった
+    (2026-10-27 E2EY-Flutter の折りたたみヘッダ: 撃つと 16 本中 6 本赤・探索の後に 0.5 秒待つだけで 12/12)。
+    XCUITest へ落ちた送り・ドラッグが1本でも混じれば撃つ。Compose の in-app の送りはアニメで動くので撃つ(要らない根拠が無い)
+  - **整定(探索の後・署名)は Flutter では完全に止まるまで待つ**(`StepExecutor.restsWithinThreshold`)。Compose の尾の這い
+    (1 周 2pt 以内)は中心を撃てば届くので止まったとみなすが、Flutter は這っている間も操作を塞ぐ(XCUITest へ落ちた送りの後の空打ちで
+    568.2 → 564.2pt と這う最中に撃って同じ赤になった)
   - **吸われる原因は「慣性が残っている間にタッチが届くこと」**(2026-10-11 実測: 空打ちを止めた E2E-CMP の `ios-xcuitest` で、
     `scrollTo` → `tap` は 3 回とも吸われ、間に `waitForSettle` を挟むと 3 回とも届いた。待ちは 2.3〜2.6 秒 = 探索が見つけた後に残る慣性)。
     木を見る整定では CMP の木が慣性の間に凍るので止まったと誤り、「待っても解けない」ように見えていた。既定は空打ち(約 0.3 秒)のまま
@@ -384,6 +393,7 @@ Android の4 SUT と RN iOS は、どの部品もオン/オフとも a11y が判
 | スクロール探索が、末尾で続きを読み込む一覧を途中で打ち切る → 探索の打ち切りにも `edgeClaimGraceAfterMove` | 全モード |
 | フォーカスを取らない別ウィンドウ(ExposedDropdown・Spinner の候補)の中身が木に無い → Android ブリッジ(v75)が同じアプリの手前の窓の中身を足す(`inOverlayWindow`。覆いの判定から除外) | Android |
 | 横の探索(ページャ)で見つけた直後にページが前へ戻り、対象が消える → 探索後の空打ち(自前描画の容器が吸う1タッチの肩代わり)を**探索の軸と直交する向き**へ抜く(`StepExecutor.emptyDragEnd`。横へ抜くとページャがページ送りとして受けていた) | iOS(Compose・Flutter) |
+| 探索で見つけた Flutter の行への tap が、activate も合成タッチも効かずに緑(次の検証で赤)→ Flutter は一覧が動いている間(慣性の這いを含む)中の操作を全部塞ぐ(Scrollable の IgnorePointer)。①整定の 2pt のしきい値を Flutter には使わず完全に止まるまで待つ(`StepExecutor.restsWithinThreshold`。Android と同じ扱い)②in-app の送りだけで見つけたときは空打ちを撃たない(空打ち自身が慣性を作る。FD-2.2)。E2EY-Flutter の折りたたみヘッダ | iOS(Flutter) |
 | RN の PagerView(`UIPageViewController`)を in-app で送れず探索が「何も動かない」で打ち切る → 指の下が `UIPageViewController` のスクロールビューなら 501 で XCUITest へ回す(v133) | iOS in-app |
 | XCUITest の探索が見つけた直後の tap が Compose の全幅の行(ListItem)で吸われて遷移せず、緑のまま次で赤 → ①フリングの尾(1pt/周で 1 秒以上這う)を止まったとみなす(`SettleMotion.restThresholdPt` = 2pt。1 点比較の減速判定は撮る間隔のぶれで「増加」に見えて打ち切っていたので 2 点ずつの和で比べる)②横に抜けられない全幅の行の空打ちは画面の中心へ寄る向きに縦へ抜く(`StepExecutor.emptyDragEnd`。インセットの行は従来どおり横) | iOS(Compose・Flutter) |
 | Wipe Data の直後・作りたての AVD で、最初のテキスト入力に Gboard の「入力レイアウトの選択」シートが出てキーボードと画面の下半分を覆う(1度出たら次からは出ない = Wipe した台の最初の1本だけ赤)→ ブリッジがアプリを起動する前に、自前の空の画面でキーボードを出して閉じておく(v80 `ImeOnboarding.primeOnce`・言語ごとに1回。Gboard の IME ウィンドウに Button が2つ同じ行に並ぶ形だけ・左を押す。**入力の経路では閉じない** = 待つ間に欄が動いて Flutter で欄を見失う) | Android |

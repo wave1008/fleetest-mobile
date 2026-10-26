@@ -20,8 +20,13 @@ private final class EmptyDragFiresRowDriver: AppDriver {
     private(set) var coordinateTaps = 0
     /// true = 空打ちで画面が変わる / false = 変わらない(対照)
     let dragChangesScreen: Bool
+    /// true = 縦のドラッグ(救済の距離寄せ)を断る = 救済は送りに落ちる
+    let verticalDragsThrow: Bool
 
-    init(dragChangesScreen: Bool) { self.dragChangesScreen = dragChangesScreen }
+    init(dragChangesScreen: Bool, verticalDragsThrow: Bool = false) {
+        self.dragChangesScreen = dragChangesScreen
+        self.verticalDragsThrow = verticalDragsThrow
+    }
 
     func status() async throws -> StatusResponse {
         StatusResponse(ready: true, device: "fake", osVersion: "-", sessionBundleID: nil)
@@ -43,7 +48,9 @@ private final class EmptyDragFiresRowDriver: AppDriver {
     }
     func drag(fromX: Double, fromY: Double, toX: Double, toY: Double,
               pressSeconds: Double, durationSeconds: Double) async throws {
-        if fromY == toY { emptyDrags += 1 } else { moves += 1 }
+        if fromY == toY { emptyDrags += 1; return }
+        if verticalDragsThrow { throw DriverError.badResponse(status: 501, body: "drag") }
+        moves += 1
     }
 
     func snapshot() async throws -> SnapshotResponse {
@@ -118,5 +125,20 @@ final class EmptyDragStaleRefTests: XCTestCase {
         XCTAssertEqual(driver.emptyDrags, 1, "空打ちが撃たれていない = この経路を通っていない")
         XCTAssertEqual(driver.tappedRefs, [4], "取り直した対象を撃っていない")
         XCTAssertTrue(StepExecutor.isSuccess(result.status), "\(result.status)")
+    }
+
+    /// 救済が Flutter の in-app の送りだけで済んだら空打ちを撃たない(慣性が無い。swipeLeavesNoInertia)。
+    /// 対照の Compose は撃つ = 救済の経路を通っていることの確認
+    func testGhostReliefBySwipeSkipsTheEmptyDragOnlyForFlutterInApp() async throws {
+        for (app, expected) in [(AppUIFramework.flutter, 0), (.compose, 1)] {
+            let driver = EmptyDragFiresRowDriver(dragChangesScreen: false, verticalDragsThrow: true)
+            let result = await StepExecutor(driver: driver, primaryCaptureOmitsSystemUI: true, releasesScrollTouch: true,
+                                            isAndroid: false, tunables: RunTunables(), uiFramework: app)
+                .execute(FlowStep(action: "tap", locator: FlowLocator(id: "target")))
+            XCTAssertGreaterThan(driver.moves, 0, "\(app): 救済の送りが撃たれていない")
+            XCTAssertEqual(driver.emptyDrags, expected, "\(app)")
+            XCTAssertEqual(driver.tappedRefs, [4], "\(app)")
+            XCTAssertTrue(StepExecutor.isSuccess(result.status), "\(app): \(result.status)")
+        }
     }
 }

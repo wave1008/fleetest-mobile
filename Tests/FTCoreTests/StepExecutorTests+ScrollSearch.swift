@@ -774,6 +774,21 @@ extension StepExecutorTests {
         XCTAssertTrue(outcome.notes.contains(.settleCapped), "Android では這う動きを止まったと言わない: \(outcome.notes)")
     }
 
+    /// iOS の Flutter も同じ: 一覧が動いている間は中の操作を全部塞ぐので、這う尾を止まったとみなさない
+    /// (E2EY-Flutter の折りたたみヘッダで、1.98pt/周の這いの最中に撃ったタップが効かずに緑になった)。対の Compose は止まったとみなす
+    func testCreepingIsNotTreatedAsSettledOnIOSFlutter() async throws {
+        for (app, capped) in [(AppUIFramework.flutter, true), (.compose, false)] {
+            let script: [[ElementInfo]] = [[], [], []] + (0..<60).map { movingRow(y: 300 + Double($0)) }
+            let primary = FakeAppDriver(name: "primary", log: CallLog(), snapshotElements: script)
+            let executor = StepExecutor(driver: primary, isAndroid: false, tunables: RunTunables(), uiFramework: app)
+
+            let outcome = await executor.execute(
+                FlowStep(action: "scrollTo", locator: FlowLocator(id: "row_01"), direction: "up", maxSwipes: 5))
+
+            XCTAssertEqual(outcome.notes.contains(.settleCapped), capped, "\(app): \(outcome.notes)")
+        }
+    }
+
     /// 対: 閾値より大きく動き続ける画面は従来どおり打ち切る(「常に止まった」と言う変異を落とす)
     func testStillMovingBeyondTheThresholdIsCapped() async throws {
         let log = CallLog()

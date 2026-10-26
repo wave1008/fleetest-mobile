@@ -30,6 +30,9 @@ CLAUDE.md から移した規則(本文は移設前と同一)。この領域の�
   フレームワークを推定しない**(実アプリの 10/22 画面が Compose と同形・RN は Flutter と同形。
   docs/verification/)。③は非公開属性なので `Tests/Fixtures/AXClass/` の等号テストで Xcode の版の
   変化を検出し、取れなければ nil = 撃たない側へ縮退する
+  **探索の動きが慣性を残さなかったとき(Flutter の in-app の送りだけ = `swipeLeavesNoInertia`)は撃たない** —— 空打ち自身が
+  慣性を作り、流れている間 Flutter は操作を塞ぐ(FD-2.2)。送りを足す経路は `leftInertia` / `ghostLeftInertia` を立てる
+  同じ理由で**整定の 2pt のしきい値(`restsWithinThreshold`)を Flutter には使わない**(這いの最中のタップは届かない = Android と同じ扱い)
 - **アプリの UI フレームワークは `FTCore.AppUIFrameworkQuery` だけで決める**(語彙 `AppUIFramework` =
   iOS: compose / flutter / reactNative / swiftUI / uikit、Android: compose / flutter / reactNative / androidView)。
   順は**静的(.app / .ipa / .apk の目印 → iOS シミュレータに入っているバンドル → 台帳 `AppFrameworkLedger`)→
