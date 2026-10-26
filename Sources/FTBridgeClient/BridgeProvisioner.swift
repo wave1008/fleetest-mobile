@@ -2063,8 +2063,7 @@ public struct BridgeProvisioner: Sendable {
                         ownerRepo: status.ownerRepo,
                         isOwnRepo: status.ownerRepo.map {
                             BridgeOwnership.isSameRepo($0, self.repoRoot) } ?? false,
-                        ownerExists: status.ownerRepo.map {
-                            FileManager.default.fileExists(atPath: $0) } ?? false,
+                        ownerExists: status.ownerRepo.map(BridgeOwnership.ownerWorkspaceExists) ?? false,
                         hasStateFile: FileManager.default.fileExists(
                             atPath: stateDir.appendingPathComponent("bridge-\(port).pid").path)
                             || FileManager.default.fileExists(

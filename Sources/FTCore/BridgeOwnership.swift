@@ -10,14 +10,14 @@ public enum BridgeOwnership: Equatable, Sendable {
     case own
     /// 別の実在するワークスペースが起こした。**止めない・起動し直さない**
     case foreign(owner: String)
-    /// 申告先のディレクトリが消えている = 確定した孤児。自分のものと同じく止めてよい
+    /// 申告先にワークスペースが無い(`ownerWorkspaceExists`)= 確定した孤児。自分のものと同じく止めてよい
     case orphan(owner: String)
     /// 申告の無い旧ブリッジで、自分の台帳も無い
     case unknown
 
     /// - ownerRepo: /status の自己申告(`FT_OWNER_REPO`。nil = 申告しない旧ブリッジ)
     /// - isOwnRepo: 申告パスが自分のクローンか(`isSameRepo`)
-    /// - ownerExists: 申告パスがディレクトリとして実在するか
+    /// - ownerExists: 申告パスにワークスペースが実在するか(`ownerWorkspaceExists`)
     /// - hasStateFile: 自分の台帳(`.pid` / `.inapp`)がそのポートにあるか
     ///
     /// **申告を台帳より先に見る** —— 台帳はポートしか持たないので、自分の古い台帳が残るポートに
@@ -62,6 +62,15 @@ public enum BridgeOwnership: Equatable, Sendable {
         let file = argument[argument.index(argument.lastIndex(of: "-")!, offsetBy: 1)...]
         guard let port = UInt16(file.dropLast(".xctestrun".count)) else { return nil }
         return RunnerProcess(udid: String(command[destination].dropFirst(3)), port: port, ownerRepo: owner)
+    }
+
+    /// 申告パスにワークスペースが実在するか(`Package.swift` があるか。fleetest は Package.swift の無い場所では動かない)。
+    /// **ディレクトリの実在では決めない** —— 動き続けるランナーは結果(`.fleetest/xcresult/…/Staging`)を起動時のパスへ
+    /// 書き続けるので、クローンを移した(改名した)後も旧パスに `.fleetest` だけを作り直す。それを「別の実在する
+    /// ワークスペース」と読むと、自分の旧ランナーを止められないまま、その端末が毎回の供給で落ちる
+    public static func ownerWorkspaceExists(_ path: String) -> Bool {
+        FileManager.default.fileExists(
+            atPath: URL(fileURLWithPath: path).appendingPathComponent("Package.swift").path)
     }
 
     /// 申告パスが自分のクローンか。`/private` の有無・末尾の `/`・シンボリックリンクの表記揺れを畳む

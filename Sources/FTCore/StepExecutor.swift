@@ -791,7 +791,7 @@ public final class StepExecutor {
                 }
                 let outcome: StepOutcome
                 do {
-                    outcome = try await executeActionRetryingStaleRef(
+                    outcome = try await executeActionRetryingUndelivered(
                         action, step: step, fingerprint: fingerprint, phase: &phase)
                 } catch {
                     // 投げた経路でも collect してブリッジの記録(armed)を残さず、集めた事実は失敗の outcome に載せる。

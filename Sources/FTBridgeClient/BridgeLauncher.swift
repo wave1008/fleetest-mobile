@@ -849,7 +849,7 @@ public struct BridgeLauncher: Sendable {
             guard let runner = BridgeOwnership.runnerProcess(fromCommand: String(line)),
                   udids.contains(runner.udid),
                   !BridgeOwnership.isSameRepo(runner.ownerRepo, repoRoot),
-                  FileManager.default.fileExists(atPath: runner.ownerRepo) else { continue }
+                  BridgeOwnership.ownerWorkspaceExists(runner.ownerRepo) else { continue }
             result[runner.udid, default: []].append(runner)
         }
         return result

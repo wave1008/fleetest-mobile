@@ -214,7 +214,8 @@ final class StaleRefRunnerWiringTests: XCTestCase {
         let refuse = try body(of: "func refuseStaleRef(", in: router)
         XCTAssertTrue(refuse.contains("BridgeError(422,"))
         XCTAssertTrue(refuse.contains("reason: BridgeAPI.staleRefReason"))
-        XCTAssertTrue(router.contains("reason: error.reason"), "BridgeError の理由が応答に載っていない")
+        XCTAssertTrue(router.contains(": error.reason") && router.contains("status: error.status, reason: reason)"),
+                      "BridgeError の理由が応答に載っていない")
     }
 
     /// /type と /clear は、打つ前のタップの**前に**木を撮り直して確かめる

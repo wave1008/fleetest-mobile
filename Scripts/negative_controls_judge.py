@@ -34,7 +34,9 @@ def judge_scenario(spec, result):
 
     if spec["expect"] == "green":
         if passed:
-            return "ok", []
+            # 緑でも、守っている経路を通った印(注記)が無ければその経路を確かめていない
+            missing = [n for n in spec.get("notesContains", []) if n not in _notes(result)]
+            return ("fail", [f"緑だが注記 {n} が無い(この経路を通っていない): {sorted(_notes(result))}" for n in missing]) if missing else ("ok", [])
         fs = _failed_step(result)
         return "fail", [f"緑のはずが赤: {fs.get('description')} — {(fs.get('detail') or '')[:200]}"]
 

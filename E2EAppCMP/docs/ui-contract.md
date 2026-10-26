@@ -512,6 +512,9 @@ FM が修復できるかを検証する。
 |---|---|---|---|
 | `#txt_photos_result` | Text | `photos=<v>` 初期 `photos=none` | v ∈ `none`/`authorized`/`limited`/`denied`/`restricted`/`notDetermined` |
 | `#btn_request_photos` | Button | `写真へのアクセスを要求` | 押すと **SpringBoard の権限アラート**が出る。**in-app の木には載らない**(別プロセス)ので fallback 経由でだけ見える |
+| `#txt_late_target` | Text | `late=<v>` 初期 `late=none` | v ∈ `none`/`tapped`(`#btn_late_target` を押すと `tapped`) |
+| `#btn_photos_then_unlock` | Button | `写真を要求して対象を止める` | 押すと `#btn_late_target` を 4 秒無効にし、その間の 1.5 秒後に写真の権限アラートを出す(**撃つ直前に覆われる**形。`_disabled/93` の陽性対照)。**`#btn_crash` の後(画面の末尾)に置く** —— 前に挟むと既存のボタンが下へずれ、最小サポート画面で下部タブに隠れる |
+| `#btn_late_target` | Button | `遅れて押せる対象` | 初期は有効。`#btn_photos_then_unlock` の後 4 秒だけ無効 |
 
 `#txt_ocr_faint` は**全 SUT が持つ**(occlusion-guard の OCR 段(Tier-2)を通す witness)。
 期待文字列は ASCII —— `RegionText.languages(for:)` が英語モデルを選ぶので速く正確になる

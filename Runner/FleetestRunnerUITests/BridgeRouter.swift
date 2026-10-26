@@ -151,18 +151,24 @@ final class BridgeRouter {
             // **アラートに遮られて XCTest が諦めた操作を 200 にしない**(issue は record で握りつぶされる)。
             // 422 = 「セッションはあるが今は無理」(409 は requireApp だけ = ホストが activate を撃つ)
             if let blocked = InterruptionGuard.shared.take() {
-                response = .error(InterruptionGuard.message(blocked), status: 422)
+                response = .error(InterruptionGuard.message(blocked), status: 422,
+                                  reason: InterruptionGuard.notDeliveredReason(path: request.path))
             }
             return response
         } catch let error as BridgeError {
             // 遮られて諦めた結果の二次的な失敗(要素が見つからない等)より、遮った事実を先に言う
             if let blocked = InterruptionGuard.shared.take() {
-                return .error(InterruptionGuard.message(blocked), status: 422)
+                return .error(InterruptionGuard.message(blocked), status: 422,
+                              reason: InterruptionGuard.notDeliveredReason(path: request.path))
             }
-            return .error(error.message, status: error.status, reason: error.reason)
+            // 撃つ前の門(CoordinatePinch)の断りも、確定と言えるのは `/tap` だけ(2本指・連続の合成は途中の1本目が届いている)
+            let reason = error.reason == BridgeAPI.systemAlertBlockedReason
+                ? InterruptionGuard.notDeliveredReason(path: request.path) : error.reason
+            return .error(error.message, status: error.status, reason: reason)
         } catch {
             if let blocked = InterruptionGuard.shared.take() {
-                return .error(InterruptionGuard.message(blocked), status: 422)
+                return .error(InterruptionGuard.message(blocked), status: 422,
+                              reason: InterruptionGuard.notDeliveredReason(path: request.path))
             }
             return .error("\(error)", status: 500)
         }
@@ -221,7 +227,10 @@ final class BridgeRouter {
             target.launch()
         }
         guard target.state == .runningForeground || target.wait(for: .runningForeground, timeout: BridgeRouter.launchForegroundWaitSeconds) else {
-            throw BridgeError(500, "could not launch \(req.bundleID) — check that it is installed")
+            // 観測した事実(前面に来なかった・その時の state)だけを言う。未インストールか起動直後に落ちたかは
+            // ここでは分けられない(落ちた回はホストがクラッシュレポートを添える)
+            throw BridgeError(500, "could not launch \(req.bundleID): it was not in the foreground"
+                + " \(Int(BridgeRouter.launchForegroundWaitSeconds))s after launch (app state: \(target.state.ftName))")
         }
         app = target
         sessionBundleID = req.bundleID
@@ -1843,6 +1852,18 @@ final class BridgeRouter {
             return try decoder.decode(type, from: body)
         } catch {
             throw BridgeError(400, "malformed JSON in the request body: \(error)")
+        }
+    }
+}
+
+private extension XCUIApplication.State {
+    var ftName: String {
+        switch self {
+        case .notRunning: return "not running"
+        case .runningBackgroundSuspended: return "suspended in the background"
+        case .runningBackground: return "running in the background"
+        case .runningForeground: return "running in the foreground"
+        default: return "unknown"
         }
     }
 }

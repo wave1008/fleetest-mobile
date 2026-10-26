@@ -29,6 +29,39 @@ final class BridgeOwnershipTests: XCTestCase {
                        .foreign(owner: "/other"))
     }
 
+    /// 改名で移ったクローンの旧パスには、動き続けるランナーが `.fleetest/xcresult` だけを作り直す。それはワークスペースではない
+    func testAWorkspaceIsWherePackageSwiftIsNotWhereADirectoryIs() throws {
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("ftowner-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir.appendingPathComponent(".fleetest/xcresult"),
+                                                withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        XCTAssertFalse(BridgeOwnership.ownerWorkspaceExists(dir.path))
+        XCTAssertFalse(BridgeOwnership.ownerWorkspaceExists(dir.path + "-gone"))
+        try Data().write(to: dir.appendingPathComponent("Package.swift"))
+        XCTAssertTrue(BridgeOwnership.ownerWorkspaceExists(dir.path))
+    }
+
+    /// 持ち主の生存を作る呼び手(供給・doctor・foreignRunners)は全部 `ownerWorkspaceExists` を通る。
+    /// 1箇所でもディレクトリの実在へ戻すと、供給と doctor が同じブリッジを別の持ち主と読む
+    func testEveryOwnerExistenceCheckGoesThroughOwnerWorkspaceExists() throws {
+        let sources = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("Sources")
+        var statusCallers: [String] = []
+        var launcher = ""
+        let enumerator = try XCTUnwrap(FileManager.default.enumerator(at: sources, includingPropertiesForKeys: nil))
+        for case let url as URL in enumerator where url.pathExtension == "swift" {
+            let text = try String(contentsOf: url, encoding: .utf8)
+            if url.lastPathComponent == "BridgeLauncher.swift" { launcher = text }
+            statusCallers += text.components(separatedBy: "\n").filter { $0.contains("ownerExists: status.") }
+        }
+        XCTAssertEqual(statusCallers.count, 2, "供給(BridgeProvisioner)と doctor の2箇所")
+        for line in statusCallers { XCTAssertTrue(line.contains("ownerWorkspaceExists"), line) }
+        XCTAssertTrue(launcher.contains("ownerWorkspaceExists(runner.ownerRepo)"), "foreignRunners")
+        XCTAssertFalse(launcher.contains("fileExists(atPath: runner.ownerRepo)"), "foreignRunners")
+    }
+
     func testSameRepoFoldsPathSpellings() throws {
         let dir = FileManager.default.temporaryDirectory
             .appendingPathComponent("ftowner-\(UUID().uuidString)")

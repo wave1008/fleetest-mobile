@@ -43,6 +43,6 @@ final class RunnerInterruptionGuardScanTests: XCTestCase {
                       "要求の頭で控えを消していない(前の要求の控えが次の要求を 422 にする)")
         XCTAssertEqual(body.components(separatedBy: "InterruptionGuard.shared.take()").count - 1, 3,
                        "成功の経路と2つの catch の全部で控えを見ること")
-        XCTAssertEqual(body.components(separatedBy: "status: 422)").count - 1, 3)
+        XCTAssertEqual(body.components(separatedBy: "InterruptionGuard.message(blocked), status: 422").count - 1, 3)
     }
 }

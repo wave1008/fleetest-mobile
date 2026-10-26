@@ -137,7 +137,7 @@ enum CoordinatePinch {
     /// 422 にする理由は 409/501 を避ける契約(BridgeRouterStatusContractTests)。問い合わせは SE3 の tap の中で 100〜130ms
     private static func refuseIfSystemAlertInFront() throws {
         if let blocked = SystemAlertProbe.front() {
-            throw BridgeError(422, InterruptionGuard.message(blocked))
+            throw BridgeError(422, InterruptionGuard.message(blocked), reason: BridgeAPI.systemAlertBlockedReason)
         }
     }
 

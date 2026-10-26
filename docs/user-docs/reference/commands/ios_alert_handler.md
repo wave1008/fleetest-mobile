@@ -134,7 +134,12 @@ the alert to clear (or be closed by a registered button), and fails with
   This covers xcuitest mode, and in inapp-boost mode the operations the in-app bridge cannot perform
   (home, the app switcher, coordinate drags and long presses). The step fails with
   `a system alert is in front of the app (title: …, buttons: …)` and the alert is left as it
-  is — the tool never presses an alert button on its own, and never retries the operation.
+  is — without a registration, the tool never presses an alert button on its own and never retries
+  the operation. **With a registration, a tap is sent again**: when an alert that was not there at
+  the start of the step comes up just before the tap, that tap is known not to have been delivered,
+  so the tool closes the alert with the registered button and sends the tap once more (the report
+  notes `system-alert-retried`). Typing, double taps and drags are not sent again — part of them may
+  already have gone through.
 - **`clearAppData()` resets permissions**, so the same prompts appear again on the next run —
   useful when a scenario should always start from the not-yet-decided state.
 - For using this from MCP, see [MCP server](../tools/mcp_server.md).

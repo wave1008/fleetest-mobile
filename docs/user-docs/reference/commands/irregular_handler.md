@@ -50,7 +50,9 @@ func beforeEach() {
 
 If a declared interruption appears **between** sending an interaction and it taking effect, the
 tool cannot tell whether the interaction already landed. It never resends it — resending could
-double-fire something that already went through (a submit, a purchase). If the step that closed
+double-fire something that already went through (a submit, a purchase). (The one exception is an
+interaction known not to have been delivered — a tap blocked by an iOS system alert; see
+[iOS system alerts](ios_alert_handler.md).) If the step that closed
 the interruption then fails, a note like this is recorded:
 
 ```

@@ -19,7 +19,7 @@ enum UnmanagedBridgeAction: Equatable {
 
 enum UnmanagedBridgeTriage {
     /// - ownerRepo: /status の自己申告(nil = 申告しない旧ブリッジ)
-    /// - ownerExists: 申告パスがディレクトリとして実在するか
+    /// - ownerExists: 申告パスにワークスペースが実在するか(`BridgeOwnership.ownerWorkspaceExists`)
     /// - isOwnRepo: 申告パスが自リポジトリのルートか
     /// - hasStateFile: 自リポジトリの状態ファイル(.pid / .inapp)があるか
     /// - stale: protocolVersion が現行と不一致か(自リポジトリ資産の入れ替え判定にのみ使う。

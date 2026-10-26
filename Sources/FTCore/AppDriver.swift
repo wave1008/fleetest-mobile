@@ -289,6 +289,7 @@ extension DriverError: StepFailureKindProviding {
         switch self {
         case .bridgeUnreachable, .bridgeConnectionRefused, .bridgeIdentityMismatch: return .driverUnreachable
         case .badResponse, .staleRef: return .driverError
+        case .systemAlertBlocked: return .systemUICovered
         }
     }
 }
@@ -390,8 +391,12 @@ public enum DriverError: Error, LocalizedError {
     case bridgeIdentityMismatch(String)
     /// ブリッジが「ref が指していた要素はもう同じ場所に居ない」と**何も撃たずに**断った
     /// (`ErrorResponse.reason == BridgeAPI.staleRefReason`)。撃っていないので、木を撮り直して引き直し、
-    /// 撃ち直してよい唯一の拒否。detail はブリッジの文言
+    /// 撃ち直してよい拒否の1つ。detail はブリッジの文言
     case staleRef(detail: String)
+    /// システムアラートが前面にあって、ブリッジが**届けていないと確定できる**形で断った
+    /// (`ErrorResponse.reason == BridgeAPI.systemAlertBlockedReason`。今は XCUITest ランナーの `/tap` だけ)。
+    /// 登録(iosAlertHandler)があれば閉じてから撃ち直してよい。detail はブリッジの文言(題名・ボタンを含む)
+    case systemAlertBlocked(detail: String)
 
     public var errorDescription: String? {
         switch self {
@@ -409,6 +414,8 @@ public enum DriverError: Error, LocalizedError {
         case .staleRef(let detail):
             return "The driver refused to act on a stale reference; nothing was sent. Take a new snapshot and"
                 + " resolve the target again. \(detail)"
+        case .systemAlertBlocked(let detail):
+            return "The driver returned an error (422): \(detail)"
         }
     }
 

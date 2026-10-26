@@ -400,9 +400,8 @@ struct Doctor: AsyncParsableCommand {
 
             switch UnmanagedBridgeTriage.decide(
                 ownerRepo: status.ownerRepo,
-                ownerExists: status.ownerRepo.map {
-                    FileManager.default.fileExists(atPath: $0) } ?? false,
-                isOwnRepo: status.ownerRepo == root.path,
+                ownerExists: status.ownerRepo.map(BridgeOwnership.ownerWorkspaceExists) ?? false,
+                isOwnRepo: status.ownerRepo.map { BridgeOwnership.isSameRepo($0, root) } ?? false,
                 hasStateFile: hasPid || hasInApp,
                 stale: stale) {
             case .skipHealthy:

@@ -47,6 +47,13 @@ final class InterruptionGuard {
         return blocked
     }
 
+    /// 422 に添える `reason`。**届いていないと確定できる要求だけ** `BridgeAPI.systemAlertBlockedReason`(ホストが閉じてから
+    /// 撃ち直してよい印)。`/tap` は単発の1発で、遮られれば撃つ前の門(CoordinatePinch)か XCTest が合成せずに諦める
+    /// (実測・このファイルの冒頭)。入力・ダブルタップ・ドラッグ等は途中まで届いた可能性が残るので nil(撃ち直させない)
+    static func notDeliveredReason(path: String) -> String? {
+        path == "/tap" ? BridgeAPI.systemAlertBlockedReason : nil
+    }
+
     /// 422 の本文。**押していない・撃ち直していない**ことと、閉じる手段を言う
     static func message(_ blocked: Blocked) -> String {
         let buttons = blocked.buttons.isEmpty ? "" : ", buttons: " + blocked.buttons.joined(separator: " / ")

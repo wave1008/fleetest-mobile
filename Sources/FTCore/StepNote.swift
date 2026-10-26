@@ -300,9 +300,12 @@ public enum StepNote: String, Sendable, Codable, CaseIterable {
     /// 最中か古い枠へ指を置いていた)。立たない = 既に静止していた
     case settledBeforeGesture = "settled-before-gesture"
     /// ブリッジが ref の指す要素はもう同じ場所に居ないと**撃たずに断り**(`DriverError.staleRef`)、木を撮り直して
-    /// 引き直した(`executeActionRetryingStaleRef`)。立つのは断りが1回でもあった回だけ。**緑の run でこの経路が
+    /// 引き直した(`executeActionRetryingUndelivered`)。立つのは断りが1回でもあった回だけ。**緑の run でこの経路が
     /// 働いたかを数える唯一の印**(無いと、経路が黙って効かなくなっても赤の率でしか気付けない)
     case staleRefRetried = "stale-ref-retried"
+    /// システムアラートが前面にあってブリッジが**届けずに**断り(`DriverError.systemAlertBlocked`)、登録(iosAlertHandler)で
+    /// 閉じてから撃ち直した(`executeActionRetryingUndelivered`)。立つのは断りが1回でもあった回だけ
+    case systemAlertRetried = "system-alert-retried"
     /// **測定用(`FT_STALE_TAP_PROBE=1` のときだけ立つ)**: XCUITest の ref タップで、撃つ直前に撮り直した木に要素がもう
     /// 控えた枠に居なかった(`TapHitAreaMiss.Kind.movedBeforeFire`)。**判定は変えない・撃ち直さない**。率を見て `/tap` にも
     /// `/type` と同じ断り → 引き直しを入れるかを決める
@@ -410,6 +413,9 @@ public enum StepNote: String, Sendable, Codable, CaseIterable {
         case .staleRefRetried:
             return "the bridge refused the action without performing it because the element had moved,"
                 + " so the target was resolved again from a fresh tree"
+        case .systemAlertRetried:
+            return "a system alert came up just before the action, so the bridge refused it without delivering it;"
+                + " the alert was closed by iosAlertHandler and the action was sent again"
         case .settledAfterLaunch:
             return "the screen was still laying out after the launch, so the target was resolved again once it settled"
         case .visionAnomalyRetried:

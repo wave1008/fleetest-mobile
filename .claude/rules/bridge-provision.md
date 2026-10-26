@@ -138,7 +138,9 @@ CLAUDE.md から移した規則(本文は移設前と同一)。この領域の�
   (`sweepTunnelOnlyPorts`)は、同じポート・同じ宛先のランナーが居ないことをプロセス表で確かめてから止める
   (`PortHolder.stopOrphanedTunnelHolder`)→ MN-61
 - **別の実在するワークスペースのブリッジは、供給が止めない・起動し直さない**(`FTCore.BridgeOwnership`。
-  `/status` の `ownerRepo` を台帳より先に見る。doctor の処遇 `UnmanagedBridgeTriage` と共有)。版が同じなら
+  `/status` の `ownerRepo` を台帳より先に見る。doctor の処遇 `UnmanagedBridgeTriage` と共有)。**「実在」は申告先に `Package.swift` があること**
+  (`BridgeOwnership.ownerWorkspaceExists`。ディレクトリの実在で決めない —— 移した/改名したクローンの旧パスには、動き続ける旧ランナーが
+  `.fleetest/xcresult` だけを作り直すので、自分の旧ランナーを他人扱いしてその端末が毎回の供給で落ちた)。版が同じなら
   `.reuseForeign` でそのまま使い、再利用できないなら `.blockedByForeign` でそのデバイスだけ断る。
   **`.reuse` に通さない** —— こちらにはツールチェーンの記録も劣化の印も無いので「記録が無い」で起動し直し、
   相手のランナーを止める(2026-10-01 に実際に本線のランナーを止めた)。**`/status` に答えないランナーの持ち主は

@@ -71,6 +71,16 @@
       }
     },
     {
+      "project": "E2E-iOS", "file": "93_届けずに断られたタップの撃ち直し.swift", "profile": "ios-xcuitest", "os": "ios",
+      "class": "届けずに断られたタップの撃ち直し",
+      "resetPhotos": "com.ftester.e2e.ios",
+      "guards": "ステップ開始の確認の後・撃つ直前に出た登録済みの権限アラートに遮られたタップ(ブリッジが届けずに断った = system-alert-blocked)は、閉じてから撃ち直す",
+      "watches": ["Sources/FTCore/StepExecutor+StaleRef.swift", "Runner/FleetestRunnerUITests/InterruptionGuard.swift", "Runner/FleetestRunnerUITests/CoordinatePinch.swift", "Sources/FTBridgeClient/BridgeClient.swift"],
+      "scenarios": {
+        "S0010": { "expect": "green", "notesContains": ["system-alert-retried"] }
+      }
+    },
+    {
       "project": "E2E-iOS", "file": "91_クラッシュ検知.swift", "profile": "ios-inapp-boost", "os": "ios",
       "class": "クラッシュ検知でブリッジ切断とレポートが記録されること",
       "guards": "アプリのクラッシュを .ips 付きで記録する(inapp-boost モード)",

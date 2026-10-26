@@ -196,8 +196,12 @@ final class FakeAppDriver: AppDriver {
         return try collectResult.get()
     }
 
+    /// ref タップが先頭から順に投げるエラー(使い切ったら成功する)。ブリッジの断りの擬似
+    var tapErrors: [Error] = []
+
     func tap(ref: Int) async throws {
         log.entries.append("\(name).tap(ref:\(ref))")
+        if !tapErrors.isEmpty { throw tapErrors.removeFirst() }
         afterTap?()
     }
 

@@ -44,13 +44,20 @@ public enum BridgeAPI {
     /// - ソースの分割・コメントだけの変更は指紋の貼り替えだけでよい(版は据え置き)
     /// - **撤去した版の番号は再利用しない**(37・48 は欠番): その版が稼働中の環境を確実に入れ替えるため
     /// 各版で何を変えたかは `git log -L '/bridgeProtocolVersion =/,+1:Sources/FTCore/BridgeDTO.swift'` で引く
-    public static let bridgeProtocolVersion = 215
+    public static let bridgeProtocolVersion = 217
 
     /// `ErrorResponse.reason` の値: ref が指していた要素が、撃つ時点でもう同じ場所に居ない(古い ref)。
     /// **何も撃たずに断った**ことを保証する(422)。ホストは新しい木から引き直して撃ち直してよい。
     /// 同期相手: Runner/.../BridgeRouter+TextInput.swift・BridgeRouter.swift(`refuseStaleRef`)・
     /// `DriverError.staleRef`(BridgeClient.check が写す)
     public static let staleRefReason = "stale-ref"
+
+    /// `ErrorResponse.reason` の値: システムアラートが前面にあって、**撃たずに断った / XCTest が合成せずに諦めた**(422)。
+    /// 付くのは届いていないと確定できる要求だけ(XCUITest ランナーの `/tap`。`InterruptionGuard.notDeliveredReason`)——
+    /// 入力・ダブルタップ・ドラッグは途中まで届いた可能性が残るので付けない。ホストは登録(iosAlertHandler)で閉じてから撃ち直してよい。
+    /// 同期相手: Runner/.../InterruptionGuard.swift・BridgeRouter.swift(`handle`)・CoordinatePinch.swift・
+    /// `DriverError.systemAlertBlocked`(BridgeClient.check が写す)
+    public static let systemAlertBlockedReason = "system-alert-blocked"
 
     /// **ホームボタンの iPhone か**(画面の寸法だけで決まる純粋判定)。
     ///
@@ -1667,7 +1674,7 @@ public struct AppStateResponse: Codable {
 
 public struct ErrorResponse: Codable {
     public var error: String
-    /// 機械可読な断りの理由(文言ではなくこれで分岐する)。今は `BridgeAPI.staleRefReason` だけ。
+    /// 機械可読な断りの理由(文言ではなくこれで分岐する)。`BridgeAPI.staleRefReason` / `BridgeAPI.systemAlertBlockedReason`。
     /// 無いエラーは省略(nil)= 従来どおり status と本文だけ
     public var reason: String?
     public init(error: String, reason: String? = nil) {

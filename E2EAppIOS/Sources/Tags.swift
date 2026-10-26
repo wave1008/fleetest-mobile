@@ -189,6 +189,10 @@ enum Tags {
     static let btnCrashCancel = "btn_crash_cancel"
     static let btnRequestPhotos = "btn_request_photos"
     static let txtPhotosResult = "txt_photos_result"
+    /// 「操作可能になるのを待っている間に権限アラートが出る」形(ブリッジが届けずに断ったタップの撃ち直しの陽性対照)
+    static let txtLateTarget = "txt_late_target"
+    static let btnPhotosThenUnlock = "btn_photos_then_unlock"
+    static let btnLateTarget = "btn_late_target"
 
     // 情報
     static let txtAboutMarker = "txt_about_marker"
