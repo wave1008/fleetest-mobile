@@ -199,7 +199,7 @@ extension StepExecutor {
                 }
                 if probeNext {
                     probeAnchorIDs = EdgeProbe.movedIDs(before: last.before.elements, after: settled.snapshot.elements,
-                                                        region: region)
+                                                        region: region, vertical: vertical)
                 }
                 lastFullMoved = moved
                 lastFullSwipe = nil
@@ -260,15 +260,21 @@ extension StepExecutor {
                 continue
             }
             let path = scrollPath(step: step, intent: .edge, in: settled.snapshot)
-            if try await swipeWithFallback(direction, intent: .edge, path: path,
-                                           phase: &phase) { viaXCUITest = true }
+            let swipedViaXCUITest = try await swipeWithFallback(direction, intent: .edge, path: path, phase: &phase)
+            if swipedViaXCUITest { viaXCUITest = true }
             sentSwipes += 1
             // 端を申告しない構成のときだけ、次の周回で中身の動いた量を基準と比べる
             // (ドライバの申告・容器の scrollActions がある構成は今までどおり)。**iOS だけ** —— `EdgeProbe.distance` は pt で
             // 詰めた値で、Android の木は px(30px ≈ 11dp は Flutter のタッチの遊び 18 に届かず、端でなくても動かない =
             // 早すぎる端の確定になる)
-            // **上端(指を下へ)だけ**: 副作用(引っ張って更新)があるのは上端だけ(EdgeProbe の冒頭)
-            if !isAndroid, direction == .down, driver.reachedEdgeOnLastSwipe == nil, scrollingElement?.scrollActions == nil {
+            // **上端(指を下へ)だけ**: 副作用(引っ張って更新)があるのは上端だけ(EdgeProbe の冒頭)。
+            // **本物の指の送りだったときだけ**: inapp-boost モードの in-app の送り(Compose / Flutter はアクセシビリティの
+            // scroll)は端で撃っても引っ張りにならず、確かめを本物の短いドラッグに替えると逆に引っ張って更新を走らせた
+            // (E2EX-CMP の S0020 が inapp-boost でだけ赤 = 実測)。inapp-boost モードの印は primaryCaptureOmitsSystemUI
+            // (そのモードでだけ立つ = 主ドライバが in-app)、XCUITest へ回った送りは本物の指
+            let fingerSwipe = !primaryCaptureOmitsSystemUI || swipedViaXCUITest
+            if !isAndroid, direction == .down, fingerSwipe, driver.reachedEdgeOnLastSwipe == nil,
+               scrollingElement?.scrollActions == nil {
                 lastFullSwipe = (settled.snapshot,
                                  path.map { vertical ? abs($0.toY - $0.fromY) : abs($0.toX - $0.fromX) })
             }

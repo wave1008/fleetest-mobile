@@ -256,6 +256,43 @@ final class EdgeProbeTests: XCTestCase {
         XCTAssertTrue(driver.drags.isEmpty, "Android で短いドラッグを撃った")
     }
 
+    /// **inapp-boost モードの in-app の送り(本物の指ではない)では撃たない** —— 端で撃っても引っ張りにならない送りを、本物の
+    /// 短いドラッグに替えると逆に引っ張って更新が走った(E2EX-CMP の S0020 が inapp-boost でだけ赤)
+    func testInAppBoostScrollsThatAreNotFingerSwipesKeepTheirConfirmation() async {
+        let inApp = PullToRefreshListDriver()
+        let outcome = await StepExecutor(driver: inApp, primaryCaptureOmitsSystemUI: true, isAndroid: false,
+                                         tunables: RunTunables()).execute(scrollToTop())
+        guard case .passed = outcome.status else { return XCTFail("\(outcome.status)") }
+        XCTAssertTrue(inApp.drags.isEmpty, "in-app の送りの確かめを本物のドラッグに替えた")
+    }
+
+    /// inapp-boost モードでも、送りが XCUITest へ回った回(本物の指)は短いドラッグで確かめる
+    func testInAppBoostSwipesThatFellBackToXCUITestUseTheProbe() async {
+        // 同じ画面を in-app と XCUITest の2つの口から操作する(状態は1つ)
+        let screen = PullToRefreshListDriver()
+        let outcome = await StepExecutor(driver: screen, primaryCaptureOmitsSystemUI: true, typeDriver: screen,
+                                         typeDriverGestures: ["swipe"], isAndroid: false,
+                                         tunables: RunTunables()).execute(scrollToTop())
+        guard case .passed = outcome.status else { return XCTFail("\(outcome.status)") }
+        XCTAssertGreaterThan(screen.fullSwipes, 0)
+        XCTAssertEqual(screen.pulls, 0)
+        XCTAssertTrue(outcome.notes.contains(.edgeProbedGently), "\(outcome.notes)")
+    }
+
+    /// 始点の候補は中身と一緒に同じ量だけ動いた要素だけ。後から現れた吹き出し・別の動き方をしたバーのボタンは入れない
+    func testMovedIDsAreOnlyTheElementsThatMovedWithTheContent() {
+        let before = [element("row_05", y: 200), element("row_06", y: 256), element("row_07", y: 312),
+                      element("bar_button", y: 800)]
+        let after = [element("row_05", y: 400), element("row_06", y: 456), element("row_07", y: 512),
+                     element("bar_button", y: 860), element("new_posts_pill", y: 120)]
+        XCTAssertEqual(EdgeProbe.movedIDs(before: before, after: after, region: nil, vertical: true),
+                       ["row_05", "row_06", "row_07"])
+        // 横にずれた(動き方の違う)要素も入れない
+        let skewed = [element("row_05", y: 400, x: 40), element("row_06", y: 456), element("row_07", y: 512)]
+        XCTAssertEqual(EdgeProbe.movedIDs(before: Array(before.prefix(3)), after: skewed, region: nil, vertical: true),
+                       ["row_06", "row_07"])
+    }
+
     /// 既定の定数(根拠は EdgeProbe の doc)。変えるなら閾値とタッチの遊びの両方を見直すこと
     func testTheProbeConstantsArePinned() {
         XCTAssertEqual(EdgeProbe.distance, 30)

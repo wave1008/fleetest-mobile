@@ -1,6 +1,7 @@
 // scrollToEdge の「端の確かめ」を引っ張りにしない短いドラッグ(純粋関数)。呼び口は StepExecutor+DirectActions.swift の
 // executeDirectScrollToEdge の1箇所。使うのは**ドライバも容器も端を申告しない構成の iOS の上端(scrollToTop)だけ**
-// (XCUITest と、in-app の Compose / Flutter の送り)。上端だけなのは、副作用(引っ張って更新)があるのが上端だけで、
+// (送りを XCUITest で撃ったときだけ。inapp-boost の in-app の送り = AX の scroll は端で引っ張りにならず、本物のドラッグに替えると
+// 逆に更新が走る)。上端だけなのは、副作用(引っ張って更新)があるのが上端だけで、
 // 横のページャ・下端で続きを読む一覧では短いドラッグが元の位置へ戻る/読み込みを起こさず、途中を端と誤る余地を作るから ——
 // 端は「木が2回続けて変わらない」でしか分からず、確かめの全力の送りが上端で引っ張って更新を走らせていた
 // (E2EX-CMP の引っ張って更新: 上端に着いた送りでは走らず、着いた後の送り1本ごとに更新が1回走る = 実測)
@@ -87,10 +88,22 @@ public enum EdgeProbe {
         fingerTravel > 0 && displacement < fingerTravel
     }
 
-    /// 送りの前後で動いた(= スクロールしている中身の)`#id`。前後の木に1つずつあって枠が変わったもの + 後にだけ現れたもの
-    public static func movedIDs(before: [ElementInfo], after: [ElementInfo], region: FTRect?) -> Set<String> {
+    /// 送りの前後で**中身と一緒に動いた**(= スクロールしている中身の)`#id`。中身は一体で動くので、前後の木に1つずつあって、
+    /// 軸の向きに**大多数と同じ量**(±1pt)だけ動き、もう一方の軸には動いていないものだけ。**後から現れた要素(送りの途中に出た
+    /// 吹き出し・浮動ボタン)と、別の量・向きで動いた要素(隠れるバーのボタン)は入れない** —— それらはスクロールに引き取られないので、
+    /// 短いドラッグの始点にするとタップに化けうる。共通の要素が無ければ空(呼び手は押せる型を避ける格子へ落ちる)
+    public static func movedIDs(before: [ElementInfo], after: [ElementInfo], region: FTRect?, vertical: Bool) -> Set<String> {
         let old = unique(before, in: region), new = unique(after, in: region)
-        return Set(new.filter { id, element in old[id].map { $0.frame != element.frame } ?? true }.keys)
+        var deltas: [String: (along: Double, across: Double)] = [:]
+        for (id, element) in new {
+            guard let previous = old[id] else { continue }
+            let dx = element.frame.x - previous.frame.x, dy = element.frame.y - previous.frame.y
+            deltas[id] = vertical ? (dy, dx) : (dx, dy)
+        }
+        // 大多数の動き = 0 でない移動量の最頻値(1pt 単位に丸めて数える)
+        let counts = Dictionary(grouping: deltas.values.filter { $0.along != 0 }.map { $0.along.rounded() }, by: { $0 })
+        guard let content = counts.max(by: { $0.value.count < $1.value.count })?.key else { return [] }
+        return Set(deltas.filter { abs($0.value.along - content) <= 1 && abs($0.value.across) <= 1 }.keys)
     }
 
     /// 確かめのドラッグの経路: 容器の中の点から指の向きへ `distance`。
