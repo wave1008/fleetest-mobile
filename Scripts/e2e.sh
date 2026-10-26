@@ -50,6 +50,9 @@
 #                                   # 終わりに推奨として出る(Scripts/verification_watch.py)。
 #                                   # --ios-xcuitest / --performance では付けても回さない(対照はモードを表で
 #                                   # 決めている・時間の比較を乱す)
+#   Scripts/e2e.sh --build-only    # SUT の鮮度を確かめて要ればビルドするだけ(run しない。Scripts/regress.py が最初に全機で撃つ)
+#   Scripts/e2e.sh --as-part       # 全体の一部として回す(Scripts/regress.py が撃つ)。検証済みの印・verification_watch の推奨・
+#                                   # 陽性対照はここでは扱わない(一部だけで「全部成功」と書かないため。まとめ役が最後に1回)
 #   Scripts/e2e.sh --record        # 各プロファイルの一時コピー(<名前>-record-tmp.json。実行後に削除)に
 #                                   # record:true を付けて実行し、録画パイプラインの整合を
 #                                   # Scripts/check-recordings.py で検証する(元のプロファイルは書き換えない)
@@ -92,6 +95,8 @@ NEGATIVE=0
 # macOS・Xcode を上げたら付けて回す —— Create ML / Core ML が書く場所が変わると、サンドボックスの中で学習が黙って失敗する
 RETRAIN_CLASSIFIERS=0
 RETRAINED_PROJECTS=""
+BUILD_ONLY=0
+AS_PART=0
 
 for arg in "$@"; do
   case "$arg" in
@@ -106,6 +111,8 @@ for arg in "$@"; do
     --performance) PERFORMANCE=1 ;;
     --negative) NEGATIVE=1 ;;
     --retrain-classifiers) RETRAIN_CLASSIFIERS=1 ;;
+    --build-only) BUILD_ONLY=1 ;;
+    --as-part) AS_PART=1 ;;
     --cmp|--ios-native|--android-native|--flutter|--rn) SUTS="$SUTS ${arg#--}" ;;
     *) echo "不明な引数: $arg" >&2; exit 2 ;;
   esac
@@ -279,6 +286,7 @@ EOF_PAIRS
 if [ "$ALIGN" = 1 ]; then align_runners; fi
 
 run_profile() {  # $1 = プロジェクト名, $2 = プロファイル名
+  if [ "$BUILD_ONLY" = 1 ]; then return 0; fi
   echo ""
   echo "═══ $1 / $2 ═══"
   RAN_PROFILES="$RAN_PROFILES$1 $2
@@ -351,6 +359,7 @@ run_profile() {  # $1 = プロジェクト名, $2 = プロファイル名
 # XCUITest では既知の制約で赤になるので、in-app のときだけ
 # (同期相手: TestProjects/E2E-CMP/scenarios/23_絵の追いつき_inapp.swift)
 run_inapp_witness() {  # $1 = プロジェクト名, $2 = シナリオ ID
+  if [ "$BUILD_ONLY" = 1 ]; then return 0; fi
   [ "$IOS_PROFILE" = "ios-inapp-boost" ] || return 0
   echo ""
   echo "═══ $1 / ios-inapp-boost(in-app の証人: $2)═══"
@@ -453,6 +462,11 @@ for sut in $SUTS; do
   esac
 done
 
+if [ "$BUILD_ONLY" = 1 ]; then
+  echo "✅ SUT の鮮度の確認とビルドを終えました(--build-only)"
+  exit 0
+fi
+
 # **--align が見たプロファイルと、実際に回したプロファイルがズレていないか**。
 # planned_profiles は実行ループの写しなので、SUT やプロファイルを足したときに片方だけ直すと
 # align が別の集合を見に行く(黙って「揃えるものはありません」と言う)。落とさず警告する
@@ -468,7 +482,7 @@ fi
 # 陽性対照は本体と別に数える: 印(bridge_marker)は「ブリッジの入力が緑の E2E を通った」記録なので
 # 本体の FAILED だけで決める。exit には両方を載せる
 NEG_FAILED=0
-if [ "$NEGATIVE" = 1 ] && [ "$PERFORMANCE" = 0 ] && [ "$IOS_PROFILE" != "ios-xcuitest" ]; then
+if [ "$NEGATIVE" = 1 ] && [ "$AS_PART" = 0 ] && [ "$PERFORMANCE" = 0 ] && [ "$IOS_PROFILE" != "ios-xcuitest" ]; then
   NEG_ARGS=()
   [ "$RUN_IOS" = 0 ] && NEG_ARGS+=(--android)
   [ "$RUN_ANDROID" = 0 ] && NEG_ARGS+=(--ios)
@@ -496,7 +510,10 @@ if [ "$NEG_FAILED" = 1 ]; then
   echo "❌ 陽性対照に期待と違うものがあります(上の「陽性対照の判定」)"
 fi
 # 緑の run では通らない経路の検証は既定で回さない。見ている部分が前回 ✅ から変わったものだけ推奨する(合否に入れない)
-STALE_VERIFICATIONS="$(python3 "$ROOT/Scripts/verification_watch.py" stale 2>/dev/null || true)"
+STALE_VERIFICATIONS=""
+if [ "$AS_PART" = 0 ]; then
+  STALE_VERIFICATIONS="$(python3 "$ROOT/Scripts/verification_watch.py" stale 2>/dev/null || true)"
+fi
 if [ -n "$STALE_VERIFICATIONS" ]; then
   echo "💡 見ている部分が前回 ✅ のときから変わった検証があります(回すのはユーザーの指示があるときだけ):"
   printf '%s\n' "$STALE_VERIFICATIONS" | while IFS=$'\t' read -r unit why; do
@@ -512,7 +529,7 @@ fi
 
 # **通した状態を覚えるのは全部成功したときだけ** —— 失敗したまま印を更新すると、
 # 次回から「検証済み」と言い張る装置になる
-if [ "$FAILED" = 0 ] && [ "$RUN_IOS" = 1 ]; then
+if [ "$FAILED" = 0 ] && [ "$RUN_IOS" = 1 ] && [ "$AS_PART" = 0 ]; then
   MARKER="$(bridge_marker "$RUN_MODE")"
   mkdir -p "$(dirname "$MARKER")"
   bridge_digest "$RUN_MODE" > "$MARKER"

@@ -10,7 +10,7 @@
 #   - デバイス実行(E2E)の全体(ユーザー方針 2026-10-13「全実施を指示されたとき以外は範囲を絞る」):
 #     `fleetest run` / `fleetest api run` に --scenario / --folder / --failed のどれも無い(--dry-run・--help は通す)/
 #     `Scripts/e2e.sh` `e2ex.sh` `e2ey.sh`(シナリオを絞る引数を持たない = 常に全体)/ `--scenario` の無い `e2e-devices.sh` /
-#     `Scripts/e2e-negative.sh` に --project が無い
+#     `Scripts/e2e-negative.sh` に --project が無い / `Scripts/regress.py`(--dry-run を除く)
 #   - **起動するスクリプトファイルの中身も同じ規則で見る**(`bash <file>`・`bash -c "<file> …"`・`nohup <file>`・実行権限の直接起動。
 #     同じコマンドの中で heredoc に書いたスクリプトも本文を見る)。中身を見ないと、実行をファイルに書いて起こすだけで素通りする
 #     (2026-10-13 に3回)。パスの `$VAR` は同じコマンドの `VAR=…` だけで展開し、展開できない `.sh` は断る。
@@ -276,6 +276,11 @@ def device_run_problems(words, env, full_ok, depth):
                            " --scenario で絞る(全実施を頼まれたときだけ FT_FULL_TEST=1 を書く)")
         elif head in FULL_SUITE_SCRIPTS and head != "e2e-devices.sh":
             reasons.append(f"{head} はシナリオを絞る引数を持たない(常にスイート全体)。全実施を指示されたとき以外は"
+                           " fleetest run --scenario で絞る(全実施を頼まれたときだけ FT_FULL_TEST=1 を書く)")
+        # 回帰のまとめ役(Scripts/regress.py。python3 経由でも)は常に全体。--dry-run は割り振りの見込みだけ
+        target = os.path.basename(words[1]) if head.startswith("python") and len(words) >= 2 else head
+        if target == "regress.py" and not has_flag(words, ("--dry-run",)):
+            reasons.append("regress.py は回帰の全体(E2E / E2EX / E2EY を全マシンで)。全実施を指示されたとき以外は"
                            " fleetest run --scenario で絞る(全実施を頼まれたときだけ FT_FULL_TEST=1 を書く)")
         if head == "e2e-negative.sh" and not has_flag(words, ("--project",)):
             reasons.append("e2e-negative.sh に --project が無い(陽性対照の全体)。--project で絞る"
