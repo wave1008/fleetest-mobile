@@ -66,4 +66,34 @@ final class ClipRecoveryPageGranularTests: XCTestCase {
         let primary = await run(.swiftUI)
         XCTAssertTrue(primary.log.entries.contains("primary.swipe"), "SwiftUI は容器基準の短い送りのまま(置き換えると退行する)")
     }
+
+    /// XCUITest で撃つ構成(in-app でない)でも、縁を浮動小数で割っただけの要素は見切れと数えない。
+    /// witness: E2EX-Flutter のグリッド(xcuitest モード)で、容器の上端 170 に `#cell_46` が y=169.99998(見えている部分に
+    /// 切り詰めた枠)で出て、極小の戻しが全力の送りへ落ちて飛び越し、流れて消えた
+    func testAMatchThatSplitsTheEdgeByRoundingIsFoundWithoutAnotherSwipe() async {
+        let grid = el(1, "grid_main", FTRect(x: 0, y: 170, width: 402, height: 704), scrollable: true)
+        let cell = ElementInfo(ref: 2, type: "button", identifier: "cell_46", label: "セル 46", value: nil, placeholder: nil,
+                               enabled: true, frame: FTRect(x: 134, y: 169.99998982747397, width: 134, height: 132.0486755371094),
+                               depth: 2)
+        let primary = FakeAppDriver(name: "primary", log: CallLog(), snapshotElements: [[grid, cell]])
+        let outcome = await StepExecutor(driver: primary, isAndroid: false, tunables: RunTunables(), uiFramework: .flutter)
+            .execute(FlowStep(action: "scrollTo", locator: FlowLocator(id: "cell_46"), direction: "down", maxSwipes: 4))
+        guard case .passed = outcome.status else { return XCTFail("\(outcome.status)") }
+        XCTAssertFalse(primary.log.entries.contains { $0.hasPrefix("primary.swipe") }, "\(primary.log.entries)")
+        XCTAssertTrue(primary.dragCalls.isEmpty, "\(primary.log.entries)")
+    }
+
+    /// 許容は 0.5 まで: それを超えるはみ出しは本物の見切れ
+    func testClipToleranceIsHalfAPointAndRealClipsStillCount() {
+        let viewport = FTRect(x: 0, y: 170, width: 402, height: 704)
+        func clipped(_ y: Double) -> Bool {
+            TapTargetGeometry.isClippedByViewport(el(1, "c", FTRect(x: 0, y: y, width: 134, height: 134)), screen: viewport)
+        }
+        XCTAssertEqual(TapTargetGeometry.clipTolerance, 0.5)
+        XCTAssertFalse(clipped(169.99998))
+        XCTAssertFalse(clipped(170 - 1.0 / 3))
+        XCTAssertTrue(clipped(169.4))
+        XCTAssertTrue(clipped(170 + 704 - 134 + 0.6))
+        XCTAssertFalse(clipped(170 + 704 - 134 + 0.4))
+    }
 }

@@ -865,7 +865,8 @@ public enum TapTargetGeometry {
     }
 
     /// 要素が画面の縁で**見切れている**か。ビューポートより大きい要素(長文など)は
-    /// どう送っても収まらないので false(送り続けて maxSwipes を使い切らせない)
+    /// どう送っても収まらないので false(送り続けて maxSwipes を使い切らせない)。
+    /// はみ出しが `clipTolerance` 以下なら縁ぴったり = 見切れていない
     public static func isClippedByViewport(_ element: ElementInfo, screen: FTRect) -> Bool {
         let frame = element.frame
         // **等しいときは「大きい」ではない**: リストの行は容器と同じ幅を持つのが普通で、
@@ -873,11 +874,19 @@ public enum TapTargetGeometry {
         // 可視とみなされ、タップが容器の外のタブバーに当たって別画面へ遷移した)
         guard frame.height > 0, frame.width > 0,
               frame.height <= screen.height, frame.width <= screen.width else { return false }
-        return frame.y < screen.y
-            || frame.y + frame.height > screen.y + screen.height
-            || frame.x < screen.x
-            || frame.x + frame.width > screen.x + screen.width
+        let t = clipTolerance
+        return frame.y < screen.y - t
+            || frame.y + frame.height > screen.y + screen.height + t
+            || frame.x < screen.x - t
+            || frame.x + frame.width > screen.x + screen.width + t
     }
+
+    /// 見切れと数えないはみ出し[pt / Android は px]。座標の浮動小数の割れを吸う: Flutter は見切れた要素の枠を
+    /// 見えている部分へ切り詰めて出し、その縁が容器の縁を 1e-5 だけ割る(E2EX-Flutter のグリッド: 容器の上端 170 に
+    /// `#cell_46` が y=169.99998)。割れを見切れと読むと戻しの寄せが極小になって全力の送りへ落ち、対象を飛び越した。
+    /// CMP の in-app でも下端 766.67 が割れた。0.5 = 割れ(1e-5)と XCUITest の座標の刻み(1/3pt)を吸い、
+    /// 1pt のはみ出しは本物の見切れとして従来どおり扱う(`testClippedByViewportDetectsEachEdge`)
+    public static let clipTolerance: Double = 0.5
 
     /// **またぎ解消に必要な最小スクロール量**(+マージン)。またぎ補正に recoveryJump
     /// (容器の 40% 位置へ寄せる)を使うと寄せ過ぎる —— 実害: SwiftUI の素の

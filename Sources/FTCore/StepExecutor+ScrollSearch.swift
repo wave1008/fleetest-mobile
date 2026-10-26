@@ -619,20 +619,14 @@ extension StepExecutor {
                     ?? containerViewport
                 // **in-app の自前描画(Compose / Flutter)の送りは path の長さに関係なく a11y の scroll = 1ページ**なので、
                 // 見切れを戻す1本が逆側へ飛び越して往復し、予算を使い切った(E2EY-CMP の反転チャット: 容器の外の
-                // #msg_40 を8本で拾えず)。この経路では戻しを必ず距離どおりのドラッグで撃ち(下の slowDrag)、
-                // **縁にぴったり(浮動小数の差で見切れ扱い)なら見つかったとする**。
+                // #msg_40 を8本で拾えず)。この経路では戻しを必ず距離どおりのドラッグで撃つ(下の slowDrag)。
+                // 縁にぴったり(浮動小数の差)は見切れと数えない(`TapTargetGeometry.clipTolerance`)。
                 // 中心が中なら撃つ、にはしない —— 見切れた行の中心を撃つと別の行に当たる(Compose iOS の実測・上の doc)。
                 // SwiftUI は含めない(下の +28% は SwiftUI の実測)
                 let pagesPerSwipe = typeDriver != nil
                     && AppUIFrameworkQuery.hostsOwnTouches(element, app: uiFramework) == true
-                // 1pt 未満のはみ出しは縁ぴったり(実測: 下端 766.67 と容器の下端 766.67 が浮動小数で割れた)
-                let flushWithEdge = pagesPerSwipe
-                    && !Self.isClippedByViewport(element, screen: FTRect(x: viewport.x - 1, y: viewport.y - 1,
-                                                                         width: viewport.width + 2,
-                                                                         height: viewport.height + 2))
                 if attempt < maxSwipes,
-                   Self.isClippedByViewport(element, screen: viewport),
-                   !flushWithEdge {
+                   Self.isClippedByViewport(element, screen: viewport) {
                     // **寄せる前にも fail-fast を通す**(未検出側と同じ判定)。ここを飛ばすと
                     // 解決できない明示 scrollFrame のまま viewport が画面全体へ落ち、寄せの1本が
                     // 文書化した「1本も振らない」を素通りして全画面スワイプになる
@@ -689,7 +683,7 @@ extension StepExecutor {
                 // 同じ向きへ1回だけ、**容器の半分の距離を慣性の出ない遅いドラッグで**送り直す(縁から出始めた要素の先頭は中央までしか
                 // 動かない = 飛び越さない)。探索の払いで送ると慣性で反対側の縁の外まで流れ、以後は遠ざかる向きに送り続けて見つからなかった
                 // (E2EY-RN の XCUITest と Android の横向きで実測)。ドラッグが撃てなければ送らずに従来どおり見つかったとする。
-                // in-app の 1 ページ送り(pagesPerSwipe)は除く(上の flushWithEdge と同じ理由)
+                // in-app の 1 ページ送り(pagesPerSwipe)は除く(1本で1ページ動くので、半分の距離の寄せにならない)
                 // **見えている厚みが指で押せる大きさ未満のときだけ**(`leadingEdgeNudgeMinVisiblePt`)。Android はどのフレームワークでも
                 // 見切れた行の枠を見えている部分へ詰めるので、縁に付いただけで送ると探索のたびに遅いドラッグ(最大 3 秒)を払う。
                 // 押せる大きさが見えていれば人もそのまま押す(RN の XCUITest の 140pt のカードは縁に付いていても押せる)
