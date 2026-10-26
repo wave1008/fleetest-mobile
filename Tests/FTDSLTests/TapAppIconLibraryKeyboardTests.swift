@@ -1,5 +1,6 @@
-// tapAppIcon の App ライブラリの検索: 検索欄を押した直後の木はキーボードを画面の外で申告するので、キーボードが上がるまで
-// 読み直してから「押せる行」を決める。直後の木で決めると、上がってきたキーボードの下になった行を押す(OI-30)
+// tapAppIcon の App ライブラリの検索: キーボードの下に隠れた行を押さない(OI-30)。xcuitest モードの SpringBoard の木
+// (ランナーの /systemui/snapshot)はキーボードの申告を載せないので、木に載るキーボードの窓(inputView)で帯を決める。
+// 検索欄を押した直後の木にはまだ窓が無いので、上がるまで読み直してから決める
 
 import XCTest
 @testable import FTDSL
@@ -15,7 +16,8 @@ final class TapAppIconLibraryKeyboardTests: XCTestCase {
     }
 
     /// ホームのページにはアプリが無く、App ライブラリの検索欄だけがある。検索欄を押すと一覧が出て、最初の `offscreenReads` 枚は
-    /// キーボードが画面の外・その後は上端 545。一覧を送ると行が上がる
+    /// キーボードの窓が無く・その後は窓(inputView)が上端 545 に載る。キーボードの申告(keyboardFrame)は載せない
+    /// (/systemui/snapshot と同じ)。一覧を送ると行が上がる
     private final class LibraryDriver: AppDriver, @unchecked Sendable {
         // @unchecked の根拠: 状態は lock の下でしか触らない
         private let lock = NSLock()
@@ -52,8 +54,6 @@ final class TapAppIconLibraryKeyboardTests: XCTestCase {
                     return SnapshotResponse(sessionBundleID: nil, screen: screen, elements: [field], truncatedCount: 0)
                 }
                 listReads += 1
-                let keyboard = listReads <= offscreenReads
-                    ? FTRect(x: 0, y: 874, width: 402, height: 329) : FTRect(x: 0, y: 545, width: 402, height: 329)
                 let ref = 500 + listReads
                 let frame = FTRect(x: 0, y: dragged ? 300 : 522, width: 402, height: 72)
                 rowFrames[ref] = frame
@@ -63,8 +63,13 @@ final class TapAppIconLibraryKeyboardTests: XCTestCase {
                                          placeholder: nil, enabled: true, frame: FTRect(x: 296, y: 97, width: 80, height: 33), depth: 2)
                 let row = ElementInfo(ref: ref, type: "clickable", identifier: nil, label: "FT E2E RN", value: nil,
                                       placeholder: nil, enabled: true, frame: frame, depth: 2)
-                return SnapshotResponse(sessionBundleID: nil, screen: screen, elements: [bar, cancel, row], truncatedCount: 0,
-                                        keyboardShown: true, keyboardFrame: keyboard)
+                var elements = [bar, cancel, row]
+                if listReads > offscreenReads {
+                    elements.append(ElementInfo(ref: 3, type: "other", identifier: "inputView", label: nil, value: nil,
+                                                placeholder: nil, enabled: true,
+                                                frame: FTRect(x: 0, y: 545, width: 402, height: 329), depth: 1))
+                }
+                return SnapshotResponse(sessionBundleID: nil, screen: screen, elements: elements, truncatedCount: 0)
             }
         }
         func tap(ref: Int) async throws {
@@ -111,7 +116,7 @@ final class TapAppIconLibraryKeyboardTests: XCTestCase {
         return core
     }
 
-    /// キーボードが上がる前の2枚で「押せる」と読まず、上がった後の木でキーボードの下と分かって一覧を送ってから押す
+    /// キーボードの窓が出る前の2枚で「押せる」と読まず、出た後の木でキーボードの下と分かって一覧を送ってから押す
     func testWaitsForTheKeyboardBeforeChoosingTheRow() {
         let driver = LibraryDriver(offscreenReads: 2)
         let core = run(driver)

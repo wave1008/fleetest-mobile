@@ -28,8 +28,24 @@ public enum AppIconLocator {
         let bar = snapshot.elements.first { $0.identifier == appLibrarySearchBarID }?.frame
         let top = bar.map { $0.y + $0.height } ?? snapshot.screen.y
         var bottom = snapshot.screen.y + snapshot.screen.height
-        if KeyboardWait.isShown(snapshot), let keyboard = snapshot.keyboardFrame { bottom = min(bottom, keyboard.y) }
+        if let keyboard = appLibraryKeyboardFrame(in: snapshot) { bottom = min(bottom, keyboard.y) }
         return (top, bottom)
+    }
+
+    /// SpringBoard の木のキーボードの枠。申告(`keyboardFrame`)があればそれ、無ければ**木に載るキーボードの窓**
+    /// (`TapTargetGeometry.keyboardChromeIdentifiers` = inputView / SystemInputAssistantView)の上端から下。
+    /// **xcuitest モードの SpringBoard の木(ランナーの `/systemui/snapshot`)はキーボードの申告を載せない** —— 申告だけを
+    /// 見ていた頃は帯が画面の下端まで広がり、キーボードの下の行を押した(OI-30: -06 の「FT E2E RN」の行・中心 558・窓の上端 545)。
+    /// 画面の中に高さを持って載っている窓だけ数える(画面の外へ下がった窓 = 出ていない)
+    public static func appLibraryKeyboardFrame(in snapshot: SnapshotResponse) -> FTRect? {
+        if KeyboardWait.isShown(snapshot), let keyboard = snapshot.keyboardFrame { return keyboard }
+        let bottom = snapshot.screen.y + snapshot.screen.height
+        let windows = snapshot.elements.filter {
+            guard let id = $0.identifier, TapTargetGeometry.keyboardChromeIdentifiers.contains(id) else { return false }
+            return $0.frame.height > 0 && $0.frame.y < bottom
+        }.map(\.frame)
+        guard let top = windows.map(\.y).min() else { return nil }
+        return FTRect(x: snapshot.screen.x, y: top, width: snapshot.screen.width, height: bottom - top)
     }
 
     /// 名前順一覧の行を押せるか: 中心が画面内で、検索バーの下・キーボードの上(覆われた行を押すとキーボードに当たる)

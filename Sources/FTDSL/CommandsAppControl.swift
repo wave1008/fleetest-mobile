@@ -565,8 +565,7 @@ public func tapAppIcon(_ appIconName: String? = nil,
         // 残すと、ホームを2回押しても閉じない。その木の行をホームのページの経路で撃つとキーボードの判定を通らず、キーボードの
         // 下の行を押した(OI-30: -06 で同じ (201,558) を撃ち続けた)
         if platform == "ios", AppIconLocator.isAppLibrarySearchOpen(last) {
-            let (list, _) = try await readUntil { KeyboardWait.shownState($0) != false }
-            try await tapInAppLibraryList(list)
+            try await tapInAppLibraryList(last)
             return
         }
         if let icon = AppIconLocator.findIcon(appIconName, in: last) {
@@ -613,10 +612,10 @@ public func tapAppIcon(_ appIconName: String? = nil,
                 // 撃つスコープ経路は type を断る(ref の名前空間が違う)。行が押せる位置に来るまで一覧を送る
                 if platform == "ios", let field = AppIconLocator.appLibrarySearchField(in: last) {
                     try await driver.tap(ref: field.ref)
-                    // **キーボードが上がりきるまで読み直してから帯を決める**: 押した直後の木はキーボードを画面の外の矩形で申告し、
-                    // その木で「押せる」とした行が、撃つ瞬間には上がってきたキーボードの下になる(OI-30: 中心 558 の行・キーボードの
-                    // 上端 545)。申告の無い構成(ハードウェアキーボード等 = shownState nil)は待たない
-                    let (list, _) = try await readUntil { KeyboardWait.shownState($0) != false }
+                    // **キーボードが上がるまで読み直してから帯を決める**: 押した直後の木にはまだキーボードが無く、その木で「押せる」と
+                    // した行が、撃つ瞬間には上がってきたキーボードの下になる(OI-30)。出ない構成(ハードウェアキーボード)は waitSeconds
+                    // 待ってから今の木で進む(見えている行は押せる)
+                    let (list, _) = try await readUntil { AppIconLocator.appLibraryKeyboardFrame(in: $0) != nil }
                     try await tapInAppLibraryList(list)
                     return
                 }

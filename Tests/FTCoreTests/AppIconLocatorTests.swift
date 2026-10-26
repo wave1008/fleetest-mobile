@@ -17,6 +17,28 @@ final class AppIconLocatorTests: XCTestCase {
                          elements: elements, truncatedCount: 0)
     }
 
+    // MARK: - appLibraryKeyboardFrame
+
+    /// キーボードの申告が無い木(xcuitest モードの /systemui/snapshot)では、木に載るキーボードの窓の上端から下をキーボードとする。
+    /// 画面の外へ下がった窓は出ていない。申告があればそれを使う
+    func testAppLibraryKeyboardComesFromTheTreeWhenNotReported() {
+        let screen = FTRect(x: 0, y: 0, width: 402, height: 874)
+        func window(_ id: String, y: Double, h: Double) -> ElementInfo {
+            ElementInfo(ref: 9, type: "other", identifier: id, label: nil, value: nil, placeholder: nil, enabled: true,
+                        frame: FTRect(x: 0, y: y, width: 402, height: h), depth: 1)
+        }
+        let up = SnapshotResponse(sessionBundleID: nil, screen: screen,
+                                  elements: [window("inputView", y: 545, h: 329), window("SystemInputAssistantView", y: 545, h: 45)],
+                                  truncatedCount: 0)
+        XCTAssertEqual(AppIconLocator.appLibraryKeyboardFrame(in: up)?.y, 545)
+        let down = SnapshotResponse(sessionBundleID: nil, screen: screen, elements: [window("inputView", y: 874, h: 329)],
+                                    truncatedCount: 0)
+        XCTAssertNil(AppIconLocator.appLibraryKeyboardFrame(in: down))
+        let reported = SnapshotResponse(sessionBundleID: nil, screen: screen, elements: [], truncatedCount: 0,
+                                        keyboardShown: true, keyboardFrame: FTRect(x: 0, y: 500, width: 402, height: 374))
+        XCTAssertEqual(AppIconLocator.appLibraryKeyboardFrame(in: reported)?.y, 500)
+    }
+
     // MARK: - appLibrarySearchField
 
     /// App ライブラリの検索欄は識別子で拾う(実測の木: searchField id=dewey-search-field ph="アプリライブラリ")
