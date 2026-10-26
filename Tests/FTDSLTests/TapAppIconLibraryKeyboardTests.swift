@@ -1,4 +1,4 @@
-// tapAppIcon の App ライブラリの検索: キーボードの下に隠れた行を押さない(OI-30)。xcuitest モードの SpringBoard の木
+// tapAppIcon の App ライブラリの検索: キーボードの下に隠れた行を押さない。xcuitest モードの SpringBoard の木
 // (ランナーの /systemui/snapshot)はキーボードの申告を載せないので、木に載るキーボードの窓(inputView)で帯を決める。
 // 検索欄を押した直後の木にはまだ窓が無いので、上がるまで読み直してから決める
 

@@ -191,7 +191,8 @@ grep やシェル(`cat`)で見るだけのとき・新しいファイルを読�
   **弾かれたポートだけ**起動し直す)/ **④起動し直しの要らない段から検証する**(単体テスト →
   dry-run → 生きているブリッジ1台での MCP 確認 → 最後にデバイス実行)。
   **ワイヤ形式(DTO の enum・フィールド)を変えたら必ず版を上げる**
-- **回帰は E2E をこの Mac(M2Ultra)で・E2EX を M1Ultra で同時に回す**(ユーザー指示 2026-09-28):
+- **回帰は E2E をこの Mac(M2Ultra)で・E2EX を M1Ultra で同時に回す**(ユーザー指示 2026-09-28。全マシンの待ち行列で回すなら
+  `Scripts/regress.py` = docs/verification/operations.md):
   `Scripts/e2e.sh --local`(手元のデバイスだけ)と `Scripts/e2ex.sh --on M1Ultra`(ssh でランナーの
   クローンに入り、そこで SUT をビルドして回す)を同時に起こす。先に commit → `Scripts/align.sh`
   (向こうで動くのは align 済みのコミット)。E2EX の SUT は M1Ultra でビルドする(競合しない・負荷分散)

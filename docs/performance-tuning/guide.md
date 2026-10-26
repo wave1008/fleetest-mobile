@@ -832,7 +832,16 @@ window/transition/animator の `*_scale` はチューニングノブではなく
 - **シナリオ設計の見直し**: 上記 iPhone Air フレークのようなデバイス依存アサーションの排除は、
   どんな高速化より成功率に効く
 
-### PT-8.1 回帰をマシン間で動的に割り当てる(2026-10-27 検討・**未着手**。後日対応)
+### PT-8.1 回帰をマシン間で動的に割り当てる(2026-10-27 検討・**案 A を `Scripts/regress.py` として実装**)
+
+**実装と確認(2026-10-27)**: `Scripts/regress.py`(使い方は docs/verification/operations.md の `Scripts/e2e.sh` の節)。下の「壊れる 4 か所」は
+①スクリプトの `--build-only` ②③`--as-part`(印・推奨・陽性対照はまとめ役が全部の仕事が緑のときに1回・絞った回は書かない)
+④`Scripts/test-scope-guard.py` が `regress.py` を全体の実行として扱う、で手当てした。E2EX・E2EY の Flutter だけに絞った 6 本で
+3 台に 2 本ずつ配られ全部緑(段 1 の SUT の確認とビルド 98 秒・全体 5.7 分)。`--dry-run` の見込みは、今日の実測を記録に入れて
+固定の割り当て 37.6 分 → 待ち行列 32.7 分。**残り: 同じコミットで固定の割り当てと交互に 2 回ずつ回して全体の所要を比べる(未実施)**。
+約束(SUT の表とスクリプトの一致・仕事の選び方・`--as-part` で印を書かない)は `regressPlan.test.mjs` / `inappE2EGate.test.mjs` /
+`e2exGate.test.mjs` が固定する
+
 
 **動機(実測)**: 2026-10-27 の回帰はスイートをマシンに固定で割り当てた(E2E = この Mac・E2EX = M1Ultra・E2EY = M1Max。各マシンで
 既定モード → xcuitest モードの順)。所要は **この Mac 35.6 分・M1Ultra 25.6 分・M1Max 29.7 分**(M1Max は Simulator が 4 台)で、

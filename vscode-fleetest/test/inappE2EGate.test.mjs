@@ -27,7 +27,7 @@ const BINARY_EXISTS = existsSync(BINARY_PATH)
 /** ゲートの2ブロック(判定・記録)だけを取り出し、変数を差し替えて実行する。
  * marker は「ブリッジ名(= モード名と同じ値)→ 中身」。bridge_marker が組み立てるパス($ROOT/.fleetest/<bridge>-e2e-verified)
  * に置くので、テスト側でパスの組み立て規則を二重に持たない。 */
-function runGate({ profile, failed, markers = {}, digest }) {
+function runGate({ profile, failed, markers = {}, digest, asPart = false }) {
   const dir = mkdtempSync(join(tmpdir(), 'engine-gate-'))
   mkdirSync(join(dir, '.fleetest'), { recursive: true })
   for (const [engine, body] of Object.entries(markers)) {
@@ -44,6 +44,7 @@ function runGate({ profile, failed, markers = {}, digest }) {
     `RUN_IOS=1`,
     `IOS_PROFILE=${JSON.stringify(profile)}`,
     `FAILED=${failed}`,
+    `AS_PART=${asPart ? 1 : 0}`,
     // api 呼び出しは固定値に差し替える(このテストはゲートの分岐を見るもので、
     // digest の中身は BridgeContractTests の担当)
     detect.replace(/^bridge_digest\(\).*$/m, `bridge_digest() { echo ${JSON.stringify(digest)}; }`),
@@ -113,4 +114,9 @@ test('ゲートが呼ぶ api サブコマンドが実在する',
   // --bridge が受ける値(この2つを渡す)が help に出ていること
   assert.match(help, /inapp/)
   assert.match(help, /xcuitest/)
+})
+
+test('全体の一部(--as-part = Scripts/regress.py の仕事)なら全部成功でも印を書かない(一部だけで「検証済み」にしない)', () => {
+  const { readMarker } = runGate({ profile: 'ios-inapp-boost', failed: 0, digest: 'abc', asPart: true })
+  assert.equal(readMarker('inapp'), null)
 })

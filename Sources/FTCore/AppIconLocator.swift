@@ -35,7 +35,7 @@ public enum AppIconLocator {
     /// SpringBoard の木のキーボードの枠。申告(`keyboardFrame`)があればそれ、無ければ**木に載るキーボードの窓**
     /// (`TapTargetGeometry.keyboardChromeIdentifiers` = inputView / SystemInputAssistantView)の上端から下。
     /// **xcuitest モードの SpringBoard の木(ランナーの `/systemui/snapshot`)はキーボードの申告を載せない** —— 申告だけを
-    /// 見ていた頃は帯が画面の下端まで広がり、キーボードの下の行を押した(OI-30: -06 の「FT E2E RN」の行・中心 558・窓の上端 545)。
+    /// 見ていた頃は帯が画面の下端まで広がり、キーボードの下の行を押した(Simulator -06 の「FT E2E RN」の行・中心 558・窓の上端 545)。
     /// 画面の中に高さを持って載っている窓だけ数える(画面の外へ下がった窓 = 出ていない)
     public static func appLibraryKeyboardFrame(in snapshot: SnapshotResponse) -> FTRect? {
         if KeyboardWait.isShown(snapshot), let keyboard = snapshot.keyboardFrame { return keyboard }
@@ -49,7 +49,7 @@ public enum AppIconLocator {
     }
 
     /// 名前順一覧の行を押せるか: 中心が画面内で、**行の全体が**検索バーの下・キーボードの上に収まる(覆われた行を押すと
-    /// キーボードに当たる。検索バーに潜りかけた行は中心が帯の中でも押して起動しなかった = OI-30 の送った後の形・中心 172・バーの下端 162)
+    /// キーボードに当たる。検索バーに潜りかけた行は中心が帯の中でも押して起動しなかった = 送りが行き過ぎた形・中心 172・バーの下端 162)
     public static func isTappableInAppLibraryList(_ row: ElementInfo, in snapshot: SnapshotResponse) -> Bool {
         let point = centre(of: row)
         let band = appLibraryListBand(in: snapshot)
@@ -96,7 +96,7 @@ public enum AppIconLocator {
     }
 
     /// App ライブラリの検索が開いているか(取り消しボタンは検索中の検索バーの中にだけ出る)。前の操作が開いたまま残すと、
-    /// ホームを2回押しても閉じない(OI-30)
+    /// ホームを2回押しても閉じない
     public static func isAppLibrarySearchOpen(_ snapshot: SnapshotResponse) -> Bool {
         appLibrarySearchCancelButton(in: snapshot) != nil
     }

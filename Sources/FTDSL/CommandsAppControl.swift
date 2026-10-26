@@ -321,7 +321,7 @@ private let tapAppIconSettleSeconds = 1.5
 private let tapAppIconLibraryMaxDrags = 30
 /// 一覧を送るドラッグの速さ[pt/秒]。**慣性を出さない**ことが目的で、距離ぶんの時間を取る(`StepExecutor.reverseSweepDragSpeed`
 /// = 120 と同じ考え方。所要の下限 0.6 秒・上限 3 秒も `StepExecutor.slowDrag` と同じ)。0.5 秒固定だった頃は 230pt の送りが
-/// 386pt 流れ、行が検索バーに潜って押しても起動しなかった(OI-30)
+/// 386pt 流れ、行が検索バーに潜って押しても起動しなかった
 private let tapAppIconLibraryDragSpeed = 120.0
 
 /// 前面になるまで `waitSeconds`(= `tunables.screenWaitTimeout`)ポーリングする。
@@ -568,7 +568,7 @@ public func tapAppIcon(_ appIconName: String? = nil,
         try checkHomeScreenTreeMatchesDisplay(last)
         // **App ライブラリの検索が開いたままなら、最初からその一覧で探す**: 前の操作(前のシナリオの赤を含む)が検索を開いたまま
         // 残すと、ホームを2回押しても閉じない。その木の行をホームのページの経路で撃つとキーボードの判定を通らず、キーボードの
-        // 下の行を押した(OI-30: -06 で同じ (201,558) を撃ち続けた)
+        // 下の行を押した(Simulator -06 で同じ (201,558) を撃ち続けた)
         if platform == "ios", AppIconLocator.isAppLibrarySearchOpen(last) {
             try await tapInAppLibraryList(last)
             return
@@ -618,7 +618,7 @@ public func tapAppIcon(_ appIconName: String? = nil,
                 if platform == "ios", let field = AppIconLocator.appLibrarySearchField(in: last) {
                     try await driver.tap(ref: field.ref)
                     // **キーボードが上がるまで読み直してから帯を決める**: 押した直後の木にはまだキーボードが無く、その木で「押せる」と
-                    // した行が、撃つ瞬間には上がってきたキーボードの下になる(OI-30)。出ない構成(ハードウェアキーボード)は waitSeconds
+                    // した行が、撃つ瞬間には上がってきたキーボードの下になる。出ない構成(ハードウェアキーボード)は waitSeconds
                     // 待ってから今の木で進む(見えている行は押せる)
                     let (list, _) = try await readUntil { AppIconLocator.appLibraryKeyboardFrame(in: $0) != nil }
                     try await tapInAppLibraryList(list)

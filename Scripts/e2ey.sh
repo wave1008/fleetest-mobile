@@ -200,7 +200,7 @@ else
 fi
 # **印を更新するのは全部成功したときだけ**(失敗したまま更新すると「検証済み」と言い張る装置になる)。
 # `[ … ] && { … }` の形にしない(偽のとき終了ステータス 1 を残す。Scripts/e2e.sh の末尾と同じ理由)
-if [ "$FAILED" = 0 ] && [ "$RUN_IOS" = 1 ] && [ "$AS_PART" = 0 ]; then
+if [ "$FAILED" = 0 ] && [ "$RUN_IOS" = 1 ] && [ "${AS_PART:-0}" = 0 ]; then
   MARKER="$(bridge_marker "$RUN_MODE")"
   mkdir -p "$(dirname "$MARKER")"
   bridge_digest "$RUN_MODE" > "$MARKER"

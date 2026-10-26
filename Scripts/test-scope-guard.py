@@ -277,9 +277,11 @@ def device_run_problems(words, env, full_ok, depth):
         elif head in FULL_SUITE_SCRIPTS and head != "e2e-devices.sh":
             reasons.append(f"{head} はシナリオを絞る引数を持たない(常にスイート全体)。全実施を指示されたとき以外は"
                            " fleetest run --scenario で絞る(全実施を頼まれたときだけ FT_FULL_TEST=1 を書く)")
-        # 回帰のまとめ役(Scripts/regress.py。python3 経由でも)は常に全体。--dry-run は割り振りの見込みだけ
-        target = os.path.basename(words[1]) if head.startswith("python") and len(words) >= 2 else head
-        if target == "regress.py" and not has_flag(words, ("--dry-run",)):
+        # 回帰のまとめ役(Scripts/regress.py。python3 経由でも)は常に全体。--dry-run は割り振りの見込みだけ。
+        # **パス付きの起動だけ数える**(PATH に無いので素の名前では起動できない。素の名前で数えると、本文の行頭に
+        # 「regress.py の…」と書いたコミットメッセージの行を起動と読んで断った)
+        invoked = words[1] if head.startswith("python") and len(words) >= 2 else words[0]
+        if os.path.basename(invoked) == "regress.py" and "/" in invoked and not has_flag(words, ("--dry-run",)):
             reasons.append("regress.py は回帰の全体(E2E / E2EX / E2EY を全マシンで)。全実施を指示されたとき以外は"
                            " fleetest run --scenario で絞る(全実施を頼まれたときだけ FT_FULL_TEST=1 を書く)")
         if head == "e2e-negative.sh" and not has_flag(words, ("--project",)):

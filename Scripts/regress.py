@@ -148,6 +148,8 @@ def run_logged(cmd, cwd, log_path, env):
 
 
 def main():
+    # ファイルや nohup へ出すときもブロックで溜めない(進み具合を途中で読めるように。作業者のスレッドが並行に書く)
+    sys.stdout.reconfigure(line_buffering=True)
     ap = argparse.ArgumentParser(description="回帰をマシン間の待ち行列で回す(PT-8.1)")
     ap.add_argument("--suites", default="e2e,e2ex,e2ey")
     ap.add_argument("--suts", default="", help="SUT を絞る(cmp,ios-native,android-native,flutter,rn)。絞った回は検証済みの印を書かない")
@@ -195,7 +197,7 @@ def main():
                 args = [f"Scripts/{script}", "--build-only"] + [f"--{s}" for s in suts] + (["--local"] if suite == "e2e" else [])
                 cmd, cwd = command(machine, host, args)
                 code = run_logged(cmd, cwd, os.path.join(run_dir, f"build-{suite}@{machine}.log"), env)
-                if code == SSH_UNREACHABLE:
+                if host is not None and code == SSH_UNREACHABLE:
                     print(f"   ❌ {machine}: 届きません(以後この機械は使いません)")
                     dead.add(machine)
                     return
@@ -232,7 +234,8 @@ def main():
             code = run_logged(cmd, cwd, log, env)
             elapsed = time.time() - t0
             with lock:
-                if code == SSH_UNREACHABLE:
+                # 255 を「届かない」と読むのは ssh を通すリモートだけ(手元のスクリプトの終了コードは届いた結果)
+                if host is not None and code == SSH_UNREACHABLE:
                     # マシンに届かない = 仕事は回っていない。一度だけ待ち行列へ戻して他のマシンに任せる
                     dead.add(machine)
                     if not job.requeued:
@@ -291,8 +294,16 @@ def main():
                            capture_output=True, text=True).stdout.strip()
     if stale:
         print("💡 見ている部分が前回 ✅ のときから変わった検証があります(回すのはユーザーの指示があるときだけ):")
+        # 書式は Scripts/e2e.sh の末尾と同じ(片方だけ変えない)
         for line in stale.splitlines():
-            print(f"   - {line}")
+            unit, _, why = line.partition("\t")
+            why = "未記録" if why == "never" else "変更あり"
+            if unit.startswith("negative:"):
+                rest = unit[len("negative:"):]
+                project, path = rest.split("/", 1)[0], rest.rsplit("/", 1)[-1]
+                print(f"   - 陽性対照 {rest}({why})→ Scripts/e2e-negative.sh --project {project} --file {path}")
+            else:
+                print(f"   - {unit}({why})→ Scripts/{unit}.sh")
 
     neg_failed = False
     if opts.negative:

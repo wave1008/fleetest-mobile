@@ -529,7 +529,7 @@ fi
 
 # **通した状態を覚えるのは全部成功したときだけ** —— 失敗したまま印を更新すると、
 # 次回から「検証済み」と言い張る装置になる
-if [ "$FAILED" = 0 ] && [ "$RUN_IOS" = 1 ] && [ "$AS_PART" = 0 ]; then
+if [ "$FAILED" = 0 ] && [ "$RUN_IOS" = 1 ] && [ "${AS_PART:-0}" = 0 ]; then
   MARKER="$(bridge_marker "$RUN_MODE")"
   mkdir -p "$(dirname "$MARKER")"
   bridge_digest "$RUN_MODE" > "$MARKER"
