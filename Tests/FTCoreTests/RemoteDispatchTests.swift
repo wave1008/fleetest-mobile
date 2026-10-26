@@ -705,8 +705,45 @@ final class RemoteDispatchTests: XCTestCase {
             + "export PATH=\"/opt/homebrew/bin:/usr/local/bin:$PATH\" && "
             + "export FT_DISPATCH_LOCK_HELD='local' && export FT_DISPATCHED_RUN=1 && test -x '\(binary)' || "
             + "{ echo \"fleetest binary not found on remote — run: swift build --product fleetest\" >&2; exit 90; } && "
-            + "'\(binary)' project sync >/dev/null 2>&1 || true && "
+            + "{ ft_sync_out=$('\(binary)' project sync 2>&1) || "
+            + "{ echo \"warning: fleetest project sync failed on the runner (continuing with the current"
+            + " Package.swift):\" >&2; printf '%s\\n' \"$ft_sync_out\" | tail -n 20 >&2; }; } && "
             + "'\(binary)' 'run' '--project' 'E2E' '--profile' 'ios-inapp-boost' '--quiet'")
+    }
+
+    /// **前処理の project sync は、失敗しても run へ進み、しかも黙らない**。ランナー機のログインシェル(macOS の既定は
+    /// zsh)と bash の両方で、合成したコマンドを偽の fleetest に対して実際に動かす(文字列の等号だけだと、
+    /// 波括弧の組の終了コードが `&&` の連鎖を切る形を見逃す)
+    func testRemoteRunCommandSurfacesProjectSyncFailureAndStillRuns() throws {
+        let base = FileManager.default.temporaryDirectory
+            .appendingPathComponent("ft-sync-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: base) }
+        let layout = RemoteLayout(base: base.path, issuer: "alice", home: "/Users/ci")
+        try FileManager.default.createDirectory(atPath: layout.workDir, withIntermediateDirectories: true)
+        try Data().write(to: URL(fileURLWithPath: layout.workDir + "/Package.swift"))
+        let binary = URL(fileURLWithPath: layout.binary)
+        try FileManager.default.createDirectory(at: binary.deletingLastPathComponent(),
+                                                withIntermediateDirectories: true)
+        let command = RemoteShell.remoteRunCommand(layout: layout, fleetestArgs: ["run"], streamOwner: nil)
+
+        for syncFails in [true, false] {
+            try """
+                #!/bin/sh
+                if [ "$1" = project ]; then echo noise; \(syncFails ? "echo sync-boom; exit 1" : "exit 0"); fi
+                echo RAN
+                """.write(to: binary, atomically: true, encoding: .utf8)
+            try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: binary.path)
+            for shell in ["/bin/zsh", "/bin/bash"] {
+                let result = try Shell.run([shell, "-c", command])
+                XCTAssertEqual(result.status, 0, "\(shell) syncFails=\(syncFails): \(result.output)")
+                XCTAssertTrue(result.output.contains("RAN"), "\(shell) syncFails=\(syncFails): \(result.output)")
+                XCTAssertEqual(result.output.contains("warning: fleetest project sync failed"), syncFails,
+                               "\(shell): \(result.output)")
+                XCTAssertEqual(result.output.contains("sync-boom"), syncFails, "\(shell): \(result.output)")
+                // 成功した sync の出力は従来どおり出さない
+                if !syncFails { XCTAssertFalse(result.output.contains("noise"), "\(shell): \(result.output)") }
+            }
+        }
     }
 
     /// **run は「このロックは親が握っている」印を運び、exec は運ばない**。

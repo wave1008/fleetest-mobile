@@ -1,0 +1,16 @@
+{
+  "app": "ft_e2e_ios",
+  "devices": [
+    {
+      "platform": "ios",
+      "machine": "M1mini",
+      "name": "iPhone 17 Pro(iOS 27.0)-01",
+      "model": "iPhone 17 Pro",
+      "osVersion": "iOS 27.0",
+      "udid": "A10076A6-6ED1-4A96-AA61-2514434BA0CA"
+    }
+  ],
+  "heal": true,
+  "iosMode": "inapp-boost",
+  "wipeDataOnBloat": true
+}

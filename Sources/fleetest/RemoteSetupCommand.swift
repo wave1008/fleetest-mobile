@@ -42,6 +42,32 @@ private func runInheritedSSH(_ argv: [String]) throws -> Int32 {
     return process.terminationStatus
 }
 
+/// 作業フォルダの Package.swift のツール依存を今のクローンへ向け直す(`RemoteSetupPlan.repointedToolDependency`)。
+/// 読みは stdout だけ(ssh の警告を中身に混ぜて書き戻さない)。直すものが無ければ skip
+private func repointWorkManifest(hostSpec: RemoteHostSpec,
+                                 layout: RemoteLayout) -> (status: RemoteSetupStepStatus, detail: String) {
+    let manifest = RemoteSetupPlan.workManifestPath(layout: layout)
+    guard let read = try? Shell.runData(setupSSHBase + [hostSpec.sshTarget,
+                                                        RemoteSetupPlan.readWorkManifestCommand(layout: layout)]) else {
+        return (.fail, "could not read \(manifest) on the remote")
+    }
+    if read.status == 1 { return (.skip, "") }
+    guard read.status == 0, let content = String(data: read.data, encoding: .utf8) else {
+        return (.fail, "could not read \(manifest) on the remote (exit \(read.status))")
+    }
+    guard let repointed = RemoteSetupPlan.repointedToolDependency(manifest: content, layout: layout) else {
+        return (.skip, "")
+    }
+    let write = try? Shell.run(setupSSHBase + [hostSpec.sshTarget,
+                                               RemoteSetupPlan.writeWorkManifestCommand(layout: layout,
+                                                                                        readByteCount: read.data.count)],
+                               stdin: Data(repointed.content.utf8))
+    guard let write, write.status == 0 else {
+        return (.fail, "could not rewrite \(manifest) on the remote (exit \(write?.status ?? -1))\n\(write?.tail ?? "")")
+    }
+    return (.ok, "repointed the tool dependency in Package.swift from \(repointed.previousPath) to \(layout.toolRoot)")
+}
+
 private func runRemoteAlignment(hostSpec: RemoteHostSpec, layout: RemoteLayout, revision: String) throws -> Int32 {
     guard let executable = ExecutablePath.current else {
         throw RemoteDispatchError.remoteSetupFailed("could not resolve the local alignment executable")
@@ -318,6 +344,9 @@ extension RemoteCommand {
                 emit("install", .fail, "could not create \(layout.workDir) on the remote (mkdir exited \(mkdirStatus))")
                 try summarizeAndExit()
             }
+            let repoint = repointWorkManifest(hostSpec: hostSpec, layout: layout)
+            if repoint.status != .skip { emit("workspace", repoint.status, repoint.detail) }
+            if repoint.status == .fail { try summarizeAndExit() }
             let localInstall = repoRoot.appendingPathComponent("Scripts/install.sh").path
             let remoteInstall = "/tmp/fleetest-remote-setup-\(stamp)-install.sh"
             let installScpStatus = (try? runInheritedSSH(

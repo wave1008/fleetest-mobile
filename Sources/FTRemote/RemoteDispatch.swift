@@ -1191,8 +1191,10 @@ public enum RemoteShell {
     /// リモートで実行する1本の sh コマンド。cwd = layout.workDir(受け手パッケージ)、バイナリは
     /// layout.toolRoot 配下の絶対パス(相対 `./.build/...` は cwd が work のため使えない)。
     /// バイナリ不在は exit 90(RemoteRunDispatcher がこの値だけ「ビルドしてください」の専用
-    /// メッセージに変える)。project sync は失敗を黙認する(`|| true`) — 失敗しても実体は
+    /// メッセージに変える)。project sync は失敗しても run へ進む —— 失敗しても実体は
     /// 後続の run が明確に失敗するので、ここで止めると本来の失敗理由が sync の方に隠れる。
+    /// **ただし黙らない**: 失敗したら出力の末尾を stderr へ出す(黙ると、Package.swift のツール依存が
+    /// 古いパスのまま sync の検証で戻され続けても、ビルドの「パスが無い」まで原因が見えなかった)。
     /// SSH の Background セッションのまま直接実行する(ユーザーの launchd ドメインへ昇格させる
     /// 処理は挟まない)。コンソールにログインしている限りそのままで launchd ドメイン
     /// (CoreSimulator 等)へ到達できる(実測)
@@ -1212,7 +1214,10 @@ public enum RemoteShell {
         let binary = quote(layout.binary)
         let guardCmd = "test -x \(binary) || { echo \"fleetest binary not found on remote"
             + " — run: swift build --product fleetest\" >&2; exit 90; }"
-        let syncCmd = "\(binary) project sync >/dev/null 2>&1 || true"
+        // 波括弧の組の終了コードは最後の文 = 成功なら代入の 0・失敗なら tail の 0(`&&` の連鎖を切らない)
+        let syncCmd = "{ ft_sync_out=$(\(binary) project sync 2>&1) || "
+            + "{ echo \"warning: fleetest project sync failed on the runner (continuing with the current"
+            + " Package.swift):\" >&2; printf '%s\\n' \"$ft_sync_out\" | tail -n 20 >&2; }; }"
         let args = fleetestArgs.map(quote).joined(separator: " ")
         let launch = "\(binary) \(args)"
         // 非対話 ssh の PATH は /usr/bin:/bin:/usr/sbin:/sbin だけで Homebrew が入らない。

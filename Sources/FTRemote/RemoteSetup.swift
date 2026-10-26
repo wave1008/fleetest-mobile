@@ -114,6 +114,58 @@ public enum RemoteSetupPlan {
         "mkdir -p \(RemoteShell.quote(layout.workDir))"
     }
 
+    public static func workManifestPath(layout: RemoteLayout) -> String {
+        layout.workDir + "/Package.swift"
+    }
+
+    /// 作業フォルダの Package.swift を読むコマンド。exit 1 = まだ無い(初回は install.sh の
+    /// `fleetest init` が今のクローンで作る)
+    public static func readWorkManifestCommand(layout: RemoteLayout) -> String {
+        let path = RemoteShell.quote(workManifestPath(layout: layout))
+        return "test -f \(path) || exit 1; cat \(path)"
+    }
+
+    /// 作業フォルダの Package.swift のツール依存を `layout.toolRoot` へ向け直した内容(直すものが無ければ nil)。
+    /// クローンの置き場が変わると、install.sh は既存の宣言を書き換えず、検証ゲート(`doctor --roots-only`)は
+    /// 実行ファイルの位置で解決するので通り、ディスパッチの `project sync` は検証で戻されて古いパスでビルドが落ちる。
+    /// 作業フォルダはツールが作る物(受け手の資産ではない)なのでここで直す。向け直すのは `<base>` 直下を指す
+    /// `.package(path:)` だけ(クローンは常にそこ = `RemoteLayout.toolRoot`。他のパス依存は触らない)と、
+    /// その旧ディレクトリ名の `package: "<名>"`(SPM はパス依存のパッケージ名をディレクトリ名から導く)
+    public static func repointedToolDependency(manifest: String,
+                                               layout: RemoteLayout) -> (content: String, previousPath: String)? {
+        guard let regex = try? NSRegularExpression(pattern: #"\.package\(path:\s*"([^"]+)"\)"#) else { return nil }
+        let ns = manifest as NSString
+        let stale = regex.matches(in: manifest, range: NSRange(location: 0, length: ns.length)).filter { match in
+            let path = ns.substring(with: match.range(at: 1))
+            return path != layout.toolRoot && (path as NSString).deletingLastPathComponent == layout.base
+        }
+        guard let first = stale.first else { return nil }
+        let previousPath = ns.substring(with: first.range(at: 1))
+        let newName = (layout.toolRoot as NSString).lastPathComponent
+        var content = manifest
+        // 後ろから置き換える = 手前の一致の位置(UTF-16 のオフセット)が動かない
+        for match in stale.reversed() {
+            guard let range = Range(match.range, in: content) else { return nil }
+            content.replaceSubrange(range, with: ".package(path: \"\(layout.toolRoot)\")")
+        }
+        for match in stale {
+            let oldName = (ns.substring(with: match.range(at: 1)) as NSString).lastPathComponent
+            content = content.replacingOccurrences(of: "package: \"\(oldName)\"", with: "package: \"\(newName)\"")
+        }
+        return (content, previousPath)
+    }
+
+    /// 向け直した内容(stdin)で Package.swift を置き換えるコマンド。**置き換えるのは今のファイルの長さが
+    /// 読んだ長さと同じときだけ**(exit 3)—— 読みが欠けていたら(`Shell` の出力の打ち切り)欠けた中身で
+    /// 上書きしない。一時ファイル + mv で、途中で切れても元のファイルは壊れない
+    public static func writeWorkManifestCommand(layout: RemoteLayout, readByteCount: Int) -> String {
+        let path = RemoteShell.quote(workManifestPath(layout: layout))
+        let tmp = RemoteShell.quote(workManifestPath(layout: layout) + ".fleetest-tmp")
+        return "[ \"$(wc -c < \(path) | tr -d ' ')\" = '\(readByteCount)' ] || "
+            + "{ echo 'Package.swift changed while it was being read' >&2; exit 3; }; "
+            + "cat > \(tmp) && mv \(tmp) \(path)"
+    }
+
     /// scp 済みのローカルスクリプトをリモートで実行し、終了コードに関わらず一時ファイルを消す。
     /// `$?` を保存してから `rm` し、保存した値で exit する(失敗パスでも一時ファイルを残さない)。
     ///

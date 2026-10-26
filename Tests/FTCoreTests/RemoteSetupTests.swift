@@ -73,6 +73,73 @@ final class RemoteSetupTests: XCTestCase {
                        "mkdir -p '/Users/ci/fleetest-runner/users/alice/work'")
     }
 
+    // MARK: - RemoteSetupPlan.repointedToolDependency / writeWorkManifestCommand
+
+    private static let repointLayout = RemoteLayout(base: "/Users/ci/fleetest-runner", issuer: "alice", home: "/Users/ci")
+
+    /// クローンの置き場が変わった作業フォルダ(実地 2026-10-26: foundation-tester → fleetest-mobile)。
+    /// base 直下を指す宣言と、旧ディレクトリ名のパッケージ名を向け直し、他のパス依存と他の名前は触らない
+    func testRepointsStaleToolDependencyAndPackageNames() throws {
+        let manifest = """
+            dependencies: [
+                .package(path: "/Users/ci/fleetest-runner/foundation-tester"),
+                .package(path: "/Users/ci/libs/foundation-tester"),
+            ],
+            .product(name: "FTDSL", package: "foundation-tester"),
+            .product(name: "FTScenarioRunner", package: "foundation-tester"),
+            .product(name: "Other", package: "other"),
+            """
+        let result = try XCTUnwrap(RemoteSetupPlan.repointedToolDependency(manifest: manifest,
+                                                                           layout: Self.repointLayout))
+        XCTAssertEqual(result.previousPath, "/Users/ci/fleetest-runner/foundation-tester")
+        XCTAssertEqual(result.content, """
+            dependencies: [
+                .package(path: "/Users/ci/fleetest-runner/fleetest-mobile"),
+                .package(path: "/Users/ci/libs/foundation-tester"),
+            ],
+            .product(name: "FTDSL", package: "fleetest-mobile"),
+            .product(name: "FTScenarioRunner", package: "fleetest-mobile"),
+            .product(name: "Other", package: "other"),
+            """)
+    }
+
+    /// 今のクローンを指している・base の外だけを指している(利用者のパス依存)なら直さない(= 毎回書き戻さない)
+    func testRepointLeavesCurrentAndForeignDependenciesAlone() {
+        for manifest in [
+            #".package(path: "/Users/ci/fleetest-runner/fleetest-mobile"), package: "fleetest-mobile""#,
+            #".package(path: "/Users/ci/fleetest-runner/users/alice/vendored")"#,
+            #".package(path: "/Users/ci/elsewhere/foundation-tester")"#,
+            "",
+        ] {
+            XCTAssertNil(RemoteSetupPlan.repointedToolDependency(manifest: manifest, layout: Self.repointLayout),
+                         manifest)
+        }
+    }
+
+    /// 置き換えは「今のファイルの長さ = 読んだ長さ」のときだけ。本物の sh で、欠けた読み(長さ違い)では
+    /// 元のファイルを1バイトも変えず exit 3、一致すれば stdin の内容に置き換わること
+    func testWriteWorkManifestRefusesWhenTheReadWasIncomplete() throws {
+        let base = FileManager.default.temporaryDirectory.appendingPathComponent("ft-repoint-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: base) }
+        let layout = RemoteLayout(base: base.path, issuer: "alice", home: "/Users/ci")
+        try FileManager.default.createDirectory(atPath: layout.workDir, withIntermediateDirectories: true)
+        let path = RemoteSetupPlan.workManifestPath(layout: layout)
+        let original = "0123456789\n"
+        try original.write(toFile: path, atomically: true, encoding: .utf8)
+
+        let refused = try Shell.run(["/bin/zsh", "-c",
+            RemoteSetupPlan.writeWorkManifestCommand(layout: layout, readByteCount: original.utf8.count - 1)],
+            stdin: Data("NEW\n".utf8))
+        XCTAssertEqual(refused.status, 3, refused.output)
+        XCTAssertEqual(try String(contentsOfFile: path, encoding: .utf8), original)
+
+        let written = try Shell.run(["/bin/zsh", "-c",
+            RemoteSetupPlan.writeWorkManifestCommand(layout: layout, readByteCount: original.utf8.count)],
+            stdin: Data("NEW\n".utf8))
+        XCTAssertEqual(written.status, 0, written.output)
+        XCTAssertEqual(try String(contentsOfFile: path, encoding: .utf8), "NEW\n")
+    }
+
     // MARK: - RemoteSetupPlan.runAndCleanupCommand
 
     func testRunAndCleanupCommand() {
