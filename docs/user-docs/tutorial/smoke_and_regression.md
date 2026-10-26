@@ -10,7 +10,7 @@ Here, smoke is the open-product-details test (made in the Quick Start), and regr
 ### Prompt for the AI
 
 ```text
-In the fleetest test project project1, create a smoke folder under scenarios/ and move OpenProductDetails.swift into it. Do not move AddToCart.swift.
+In project1, create a smoke folder under scenarios/ and move OpenProductDetails.swift into it. Do not move AddToCart.swift.
 After moving, confirm that it still compiles.
 ```
 
@@ -37,7 +37,7 @@ Expected result:
 ### Prompt for the AI
 
 ```text
-With the ios-run profile of the fleetest test project project1, run only the scenarios in the smoke folder.
+With the ios-run profile of project1, run only the scenarios in the smoke folder.
 ```
 
 <details>
@@ -62,7 +62,7 @@ Next, run everything without naming a folder (regression) and compare how many r
 ### Prompt for the AI
 
 ```text
-With the ios-run profile of the fleetest test project project1, run all scenarios.
+With the ios-run profile of project1, run all scenarios.
 ```
 
 Expected result:

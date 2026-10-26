@@ -9,7 +9,7 @@ Add to the devices you set up in the Quick Start.
 ### Prompt for the AI
 
 ```text
-Add one more iPhone Simulator to the run profile ios-run in the fleetest test project project1.
+Add one more Simulator to the run profile ios-run in project1.
 If there aren't enough, you can create one with the same model and OS.
 Then show me the profile's updated device list.
 ```
@@ -30,7 +30,7 @@ From the CLI, run the following. `--count` makes the run profile hold N devices 
 
 Expected result:
 
-- Check the **Profiles** tab of the Device Monitor.
+- One Simulator is added (check it in the **Profiles** tab of the Device Monitor).
 
 <br>
 

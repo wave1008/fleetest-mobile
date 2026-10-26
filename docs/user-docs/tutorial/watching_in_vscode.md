@@ -11,7 +11,6 @@ Run "fleetest: Show Device Monitor" from the Command Palette, or click **fleetes
 Expected result:
 
 - Three panes, top to bottom: the **Line View** (the row of device tiles), the **Grid View** (the enlarged screen of the selected device) and the **Run Log View** (the run log of the selected device).
-- The runs in progress, with how many are done and the time left.
 
 <img src="../images/tutorial/en/vscode_device_monitor.png" width="720" alt="Device Monitor">
 
@@ -22,7 +21,7 @@ Click a tile in the Line View to select the device. It is easiest to see when yo
 ### Prompt for the AI
 
 ```text
-In the fleetest test project project1, run the add-to-cart test with the run profile ios-run.
+In project1, run the add-to-cart test with the run profile ios-run.
 ```
 
 Expected result:
@@ -65,7 +64,7 @@ Expected result:
 ### Prompt for the AI
 
 ```text
-For iOS runs of the fleetest test project project1, keep recordings only for failed scenarios.
+For iOS runs of project1, keep recordings only for failed scenarios.
 ```
 
 Expected result:

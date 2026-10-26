@@ -72,8 +72,7 @@ Clone https://github.com/wave1008/sut-ec-mobile next to this folder, then run ba
 
 Expected result:
 
-- Apple Container and a JDK are installed with Homebrew if missing (the first run takes a few minutes to fetch the Linux kernel and the images).
-- It ends with `Done. fleetest starts and stops the server on every run.`
+- The process completes without errors.
 - `TestProjects/project1/workspace/scripts/compose.yaml` is created.
 
 <details>
@@ -99,15 +98,17 @@ Create the app profile and the run profile.
 For iOS:
 
 ```text
-In the fleetest test project project1, build the sut-ec-mobile iOS app and create its profiles. The app's display name is "SUT Store". Use two devices. The app ID is com.sutec.mobile.ios.
-Use JDK 25 for the build (Homebrew's openjdk@25, at /opt/homebrew/opt/openjdk@25). Don't modify any shell configuration files.
+In project1, build the sut-ec-mobile iOS app and create its profiles.
+The app's display name is "SUT Store". Use two devices. The app ID is com.sutec.mobile.ios.
+Use JDK 25 for the build (Homebrew's openjdk@25, at /opt/homebrew/opt/openjdk@25).
 ```
 
 For Android:
 
 ```text
-In the fleetest test project project1, build the sut-ec-mobile Android app and create its profiles. The app's display name is "SUT Store". Use two devices. The app ID is com.sutec.mobile.android.
-Use JDK 25 for the build (Homebrew's openjdk@25, at /opt/homebrew/opt/openjdk@25). Don't modify any shell configuration files.
+In project1, build the sut-ec-mobile Android app and create its profiles.
+The app's display name is "SUT Store". Use two devices. The app ID is com.sutec.mobile.android.
+Use JDK 25 for the build (Homebrew's openjdk@25, at /opt/homebrew/opt/openjdk@25).
 ```
 
 <details>
@@ -168,7 +169,7 @@ Let's create a happy-path test up to opening a product.
 ### Prompt for the AI
 
 ```text
-In the fleetest test project project1, create one "open-product-details test" for SUT Store on iOS. Name the file OpenProductDetails.swift.
+In project1, create one "open-product-details test" for SUT Store on iOS. Name the file OpenProductDetails.swift.
 It checks the happy path (the normal flow) of opening a product from the home screen until its product details are shown. Put the step that switches the app to English mode in setUpDevice.
 Stop once you've told me the file name of the new scenario.
 ```
@@ -203,7 +204,7 @@ Let's run the scenarios you created.
 ### Prompt for the AI
 
 ```text
-Run the scenarios of the fleetest test project project1 with the ios-run profile.
+Run the scenarios of project1 with the ios-run profile.
 ```
 
 - If an MCP permission dialog appears, allow it.
@@ -240,12 +241,12 @@ Every run writes a Markdown report per scenario to `TestProjects/<project>/repor
 
 When a run fails, the server's log is kept at `TestProjects/<project>/results/runs/<month>/<runID>/services/server.log`.
 
-Let's summarize the reports and analyze the errors.
+Let's summarize the reports and analyze the test results.
 
 ### Prompt for the AI
 
 ```text
-Summarize the latest run of the fleetest test project project1. If anything failed, use the report to find out why. Do not fix the scenario yet.
+Summarize the latest run of project1. If anything failed, use the report to find out why. Do not fix the scenario yet.
 ```
 
 Expected result:

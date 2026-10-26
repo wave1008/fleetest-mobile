@@ -72,8 +72,7 @@ https://github.com/wave1008/sut-ec-mobile をこのフォルダの隣に clone �
 
 期待する結果:
 
-- Apple Container と JDK が無ければ Homebrew で入ります(初回は Linux カーネルとイメージの取得で数分かかります)。
-- 最後に `Done. fleetest starts and stops the server on every run.` と出ます。
+- エラーなしで処理が完了します。
 - `TestProjects/project1/workspace/scripts/compose.yaml` ができます。
 
 <details>
@@ -99,15 +98,17 @@ bash ../sut-ec-mobile/fleetest/prepare.sh
 iOS の場合:
 
 ```text
-fleetest のテストプロジェクト project1 に、sut-ec-mobile の iOS アプリをビルドしてプロファイルを作成して。アプリの表示名は「SUT Store」。デバイスは2台にして。アプリ ID は com.sutec.mobile.ios。
-ビルドには JDK 25(Homebrew の openjdk@25。/opt/homebrew/opt/openjdk@25)を使って。シェルの設定ファイルは変更しないで。
+project1 に、sut-ec-mobile の iOS アプリをビルドしてプロファイルを作成して。
+アプリの表示名は「SUT Store」。デバイスは2台にして。アプリ ID は com.sutec.mobile.ios。
+ビルドには JDK 25(Homebrew の openjdk@25。/opt/homebrew/opt/openjdk@25)を使って。
 ```
 
 Android の場合:
 
 ```text
-fleetest のテストプロジェクト project1 に、sut-ec-mobile の Android アプリをビルドしてプロファイルを作成して。アプリの表示名は「SUT Store」。デバイスは2台にして。アプリ ID は com.sutec.mobile.android。
-ビルドには JDK 25(Homebrew の openjdk@25。/opt/homebrew/opt/openjdk@25)を使って。シェルの設定ファイルは変更しないで。
+project1 に、sut-ec-mobile の Android アプリをビルドしてプロファイルを作成して。
+アプリの表示名は「SUT Store」。デバイスは2台にして。アプリ ID は com.sutec.mobile.android。
+ビルドには JDK 25(Homebrew の openjdk@25。/opt/homebrew/opt/openjdk@25)を使って。
 ```
 
 <details>
@@ -167,7 +168,7 @@ VSCode のデバイスモニターの「プロファイル」タブを開き、�
 ### AIへの指示文
 
 ```text
-fleetest のテストプロジェクト project1 で、SUT Store の「商品詳細を開くテスト」を iOS で1本作成して。ファイル名は 商品詳細を開く.swift にして。
+project1 で、SUT Store の「商品詳細を開くテスト」を iOS で1本作成して。ファイル名は 商品詳細を開く.swift にして。
 ホームから商品を1つ開いて商品詳細が表示されるまでの基本ルート(正常に進む流れ)を確かめる。アプリを日本語モードに切り替える処理は setUpDevice に書いて。
 シナリオのファイル名を報告したら終わりにして。
 ```
@@ -202,7 +203,7 @@ fleetest のテストプロジェクト project1 で、SUT Store の「商品詳
 ### AIへの指示文
 
 ```text
-fleetest のテストプロジェクト project1 のシナリオを ios-run プロファイルで実行して。
+project1 のシナリオを ios-run プロファイルで実行して。
 ```
 
 - MCPの許可ダイアログが表示された場合は許可してください。
@@ -240,12 +241,12 @@ VSCode からは **Test Explorer** でシナリオを選び、**実行**をク�
 
 失敗したときは、サーバーのログが `TestProjects/<プロジェクト>/results/runs/<月>/<runID>/services/server.log` に残ります。
 
-レポートを要約し、エラーを分析してみましょう。
+レポートを要約し、テスト結果を分析してみましょう。
 
 ### AIへの指示文
 
 ```text
-fleetest のテストプロジェクト project1 の直近の実行結果を要約し、失敗があればレポートから原因を調べて。シナリオはまだ直さないで。
+project1 の直近の実行結果を要約し、失敗があればレポートから原因を調べて。シナリオはまだ直さないで。
 ```
 
 期待する結果:
