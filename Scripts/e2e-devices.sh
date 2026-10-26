@@ -15,6 +15,7 @@
 #   Scripts/e2e-devices.sh --cmp        # SUT を絞る(--ios-native / --android-native / --flutter / --rn も同様。併記可)
 #   Scripts/e2e-devices.sh --local      # この Mac の実機だけ(M1Ultra の iPhone 13 を外す)
 #   Scripts/e2e-devices.sh --rebuild    # 実機用の SUT を必ずビルドし直す
+#   Scripts/e2e-devices.sh --record     # 録画する(既定は録画しない = `--set record=false`)
 #   Scripts/e2e-devices.sh --cmp --ios --scenario 画像で要素を探す.S0030   # シナリオを絞る(繰り返し可。Class か Class.method)
 #     **全実施を頼まれたとき以外は --scenario で絞る**(絞らない起動は Scripts/test-scope-guard.py が断る。全実施は FT_FULL_TEST=1)
 #
@@ -35,9 +36,11 @@ RUN_ANDROID=1
 LOCAL_ONLY=0
 SUTS=""
 SCENARIOS=()
+RECORD_FLAG="--set record=false"   # 回帰は録画しない(--record で録画する)
 while [ $# -gt 0 ]; do
   case "$1" in
     --rebuild) FORCE_REBUILD=1 ;;
+    --record) RECORD_FLAG="" ;;
     --ios) RUN_ANDROID=0 ;;
     --android) RUN_IOS=0 ;;
     --local) LOCAL_ONLY=1 ;;
@@ -67,7 +70,7 @@ run_devices() {  # $1 = プロジェクト名, $2 = プロファイル名
   echo "═══ $1 / $2(実機・--broadcast)═══"
   local runner_flag=""
   [ "$LOCAL_ONLY" = 1 ] && runner_flag="--runner local"
-  if "$FLEETEST" run --project "$1" --profile "$2" --broadcast $runner_flag ${SCENARIOS[@]+"${SCENARIOS[@]}"}; then
+  if "$FLEETEST" run --project "$1" --profile "$2" --broadcast $runner_flag $RECORD_FLAG ${SCENARIOS[@]+"${SCENARIOS[@]}"}; then
     echo "✅ $1 / $2"
     SUMMARY="${SUMMARY}✅ $1 / $2
 "

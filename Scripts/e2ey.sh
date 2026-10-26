@@ -17,6 +17,7 @@
 #   Scripts/e2ey.sh --ios-xcuitest  # **iOS だけ**を xcuitest モードで(--ios-inapp-boost も同様)
 #   Scripts/e2ey.sh --ios           # OS を絞る(--android も同様)
 #   Scripts/e2ey.sh --rebuild       # SUT を必ず再ビルドしてから実行
+#   Scripts/e2ey.sh --record        # 録画する(既定は録画しない = `--set record=false`。回帰は録画しないのが既定)
 #   Scripts/e2ey.sh --on M1Ultra    # **丸ごとその機械で回す**(ssh でランナーのクローンに入り、そこで SUT をビルドして
 #                                   # そこのデバイスで実行する。残りの引数はそのまま向こうへ渡す)。向こうで動くのは
 #                                   # align 済みのコミット + そこの clone の中身なので、ツールを直したら
@@ -61,9 +62,11 @@ for h in json.load(sys.stdin).get("hosts", []):
   exec ssh -tt -o BatchMode=yes "$HOST" "zsh -lc 'cd $REMOTE_CLONE && Scripts/e2ey.sh $*'"
 fi
 
+RECORD_FLAG="--set record=false"
 for arg in "$@"; do
   case "$arg" in
     --rebuild) FORCE_REBUILD=1 ;;
+    --record) RECORD_FLAG="" ;;
     --ios) RUN_ANDROID=0 ;;
     --android) RUN_IOS=0 ;;
     --ios-inapp-boost) IOS_PROFILE="ios-inapp-boost"; IOS_MODE_ONLY=1 ;;
@@ -121,7 +124,7 @@ RESULTS=""
 run_profile() {  # $1 = プロジェクト名, $2 = プロファイル名
   echo ""
   echo "═══ $1 / $2 ═══"
-  if "$FLEETEST" run --project "$1" --profile "$2" --runner local; then
+  if "$FLEETEST" run --project "$1" --profile "$2" --runner local $RECORD_FLAG; then
     RESULTS="${RESULTS}✅ $1 / $2
 "
   else

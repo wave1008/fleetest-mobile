@@ -53,6 +53,8 @@
 #   Scripts/e2e.sh --record        # 各プロファイルの一時コピー(<名前>-record-tmp.json。実行後に削除)に
 #                                   # record:true を付けて実行し、録画パイプラインの整合を
 #                                   # Scripts/check-recordings.py で検証する(元のプロファイルは書き換えない)
+#                                   # **付けなければ録画しない**(`--set record=false`。回帰は録画しないのが既定 =
+#                                   # ユーザー決定 2026-10-27。録画の切り出しが run ごとに 12〜23 秒の後始末だった)
 #
 # 実行中は macOS のクラッシュダイアログを止め、終了時に元へ戻す(Scripts/crash-dialog.sh。e2ex.sh も同じ)。
 #
@@ -313,7 +315,10 @@ run_profile() {  # $1 = プロジェクト名, $2 = プロファイル名
   fi
   local since_marker
   since_marker="$(mktemp)"
-  if "$FLEETEST" run --project "$1" --profile "$profile" $perf_flag $runner_flag; then
+  # 回帰は録画しない(--record のときだけ一時コピーの record:true に任せる)
+  local record_flag="--set record=false"
+  [ -n "$tmp_profile_path" ] && record_flag=""
+  if "$FLEETEST" run --project "$1" --profile "$profile" $perf_flag $runner_flag $record_flag; then
     echo "✅ $1 / $profile"
   else
     echo "❌ $1 / $profile"
@@ -351,7 +356,9 @@ run_inapp_witness() {  # $1 = プロジェクト名, $2 = シナリオ ID
   echo "═══ $1 / ios-inapp-boost(in-app の証人: $2)═══"
   local runner_flag=""
   [ "$LOCAL_ONLY" = 1 ] && runner_flag="--runner local"
-  if "$FLEETEST" run --project "$1" --profile ios-inapp-boost --scenario "$2" $runner_flag; then
+  local record_flag="--set record=false"
+  [ "$RECORD" = 1 ] && record_flag=""
+  if "$FLEETEST" run --project "$1" --profile ios-inapp-boost --scenario "$2" $runner_flag $record_flag; then
     echo "✅ $1 / ios-inapp-boost(証人)"
   else
     echo "❌ $1 / ios-inapp-boost(証人)"
