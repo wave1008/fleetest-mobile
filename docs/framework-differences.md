@@ -435,6 +435,7 @@ SwiftUI の pinch(SUT が枠で切り取っていなかった)・inputs S0030/40
 
 | 版・コミット | 内容 |
 |---|---|
+| iOS v218 | XCUITest ランナーの `type` / `clearInput` は、直前の読みで焦点があった欄を押し直さない・消去の右端の押下は2周目から。焦点のある欄を短い間隔で2回押すと編集メニュー(Paste / Select All)が出て画面に残っていた(CMP で再現・SwiftUI では出ない。証人: E2E の各 SUT のテキスト入力の `notExist(".menuItem")`) |
 | Android v111 | 複数行を申告する欄の `pressEnter` を keyevent 66(改行)へ回す。`ACTION_IME_ENTER` が複数行の RN で何もせずに成功を返していた(証人: E2EX の `入力の種類` S0010 場面4。Compose は未解決 = OI-34) |
 | — | React Native の XCUITest で、出てきたばかりのダイアログ・シートの中の要素を押す前だけ表示の切り替え(0.55 秒)を待つ(`PresentedOverlayTapWait`)。fade の最中の tap が捨てられていた |
 | `9bbf17dd` | 入力系(`type` / `pressEnter` / `clearInput`)の 409 を、MCP・ライブ操作でも XCUITest へ回す(`DriverError.isTextInputFallback` / `isClearInputFallback`)。この表の「→ XCUITest へ」は DSL でしか成り立っておらず、**同じ構成の同じ操作が `ft_type`(`pressEnter: true` を含む) / `ft_clear_input` では落ちていた** |

@@ -142,7 +142,8 @@ final class BridgeRouterStatusContractTests: XCTestCase {
             }
             searchFrom = read.upperBound
         }
-        XCTAssertEqual(frames, 2, "焦点の欄の枠を読む箇所の数が変わった = この走査を見直すこと")
+        // 周回の中の1箇所だけ(1周目の前・空に見える欄の消去では押さない = 焦点のある欄の押し直しで編集メニューが出る)
+        XCTAssertEqual(frames, 1, "焦点の欄の枠を読む箇所の数が変わった = この走査を見直すこと")
         let helper = try XCTUnwrap(handlerBody("tapFieldEndIfHittable", in: source))
         let hittable = try XCTUnwrap(helper.range(of: "guard field.isHittable else { return }"), "叩けない欄を叩かない門が無い")
         let frame = try XCTUnwrap(helper.range(of: "let frame = field.frame"))

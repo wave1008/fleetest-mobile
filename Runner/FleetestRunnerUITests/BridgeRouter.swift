@@ -44,6 +44,11 @@ final class BridgeRouter {
     /// 直近スナップショットの ref→要素。handleType の読み返しが「対象の identifier」と
     /// 「入力前の値」をここから採る(ライブクエリを撃たずに済ませるため)
     var refElements: [Int: ElementInfo] = [:]
+    /// 直近の GET /snapshot で焦点を持っていた ref(キーボードが画面に出ていたときだけ)。**次の POST の1回だけ使える**
+    /// (`handle` が POST の入口で `focusedRefForThisRequest` へ移して捨てる = 撮った後に操作が挟まった焦点は信じない)。
+    /// /type・/clear が「焦点が既にある欄を押し直さない」ために読む(押し直すと短い間隔の2回押しになり iOS の編集メニューが出て残る)
+    var lastReadFocusedRef: Int?
+    var focusedRefForThisRequest: Int?
     /// `/systemui/snapshot` が振る ref。**アプリの refFrames と別に持つ**のが要点 ——
     /// 同じ表に書くと、システム UI を1枚撮っただけで直前のアプリの ref が全部無効になる
     /// (xcuitest モードはブリッジが1本しかなく、主ドライバと共有している)
@@ -98,6 +103,11 @@ final class BridgeRouter {
     func handle(_ request: BridgeHTTPServer.Request) -> BridgeHTTPServer.Response {
         InterruptionGuard.shared.reset()
         skipSettle = request.skipSettle
+        focusedRefForThisRequest = nil
+        if request.method == "POST" {
+            focusedRefForThisRequest = lastReadFocusedRef
+            lastReadFocusedRef = nil
+        }
         // 処理中は観測の読み(ResponseMeasurement のタイマー)を撃たせない: XCTest の待ちは main の RunLoop を入れ子で回すので、
         // タイマーが操作の途中に割り込みうる
         ResponseMeasurement.requestDepth += 1
@@ -286,7 +296,11 @@ final class BridgeRouter {
         refIdentity = cap.identities
         // ref → 要素(handleType の読み返しが identifier / 直前の値を使う)。frame と同じ寿命
         refElements = Dictionary(uniqueKeysWithValues: zip(cap.elements.map(\.ref), cap.elements))
-        let response = snapshotResponse(cap, elements: withFocusedFlag(cap.elements, app: app))
+        let flagged = withFocusedFlag(cap.elements, app: app)
+        // 隠れたキーボードは画面の外の矩形で来る(KeyboardWait.onScreen と同じ判定)
+        let keyboardOnScreen = cap.keyboardFrame.map { $0.minY < cap.screen.maxY } ?? false
+        lastReadFocusedRef = keyboardOnScreen ? flagged.first { $0.focused == true }?.ref : nil
+        let response = snapshotResponse(cap, elements: flagged)
         // レスポンス計測の観測中なら、この木も読みとして残す(計測していなければ何もしない)
         ResponseMeasurement.recordHostRead(response, startMs: readStarted, endMs: ResponseMeasurement.nowMs())
         return .json(response)

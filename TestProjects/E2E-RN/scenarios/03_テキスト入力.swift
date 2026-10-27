@@ -175,6 +175,8 @@ class テキスト入力が正しくechoされること {
                 }.expectation {
                     select("#txt_echo_single").textIs("single=")
                     select("#txt_echo_length").textIs("len=0")
+                    // 焦点のある欄を短い間隔で押し直すと iOS の編集メニュー(Paste / Select All)が出て残る(実機 SE3 の CMP で再現)
+                    ios { notExist(".menuItem") }
                 }
             }
             scene(11, "無引数の clearInput はフォーカス中の入力欄(パスワード)を空にする") {

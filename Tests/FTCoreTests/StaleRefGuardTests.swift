@@ -231,6 +231,34 @@ final class StaleRefRunnerWiringTests: XCTestCase {
         }
     }
 
+    /// **焦点のある欄を短い間隔で押し直さない**(iOS の編集メニュー Paste / Select All が出て画面に残り、次の操作が当たりうる。
+    /// 実機 SE3・Simulator の CMP で再現 = E2E-CMP テキスト入力の notExist(".menuItem") が旧ランナーで赤)。
+    /// ① /type・/clear は直前の読みで焦点があった欄を押さない
+    func testTypeAndClearDoNotTapAFieldThatAlreadyHasFocus() throws {
+        let input = try runnerSource("BridgeRouter+TextInput.swift")
+        let type = try body(of: "private func typeAndReadBack(", in: input)
+        let skipAt = try XCTUnwrap(type.range(of: "!alreadyFocusedInput(ref)")?.lowerBound, "/type が焦点の有無を見ていない")
+        let typeTapAt = try XCTUnwrap(type.range(of: "tapBeforeTyping(")?.lowerBound)
+        XCTAssertLessThan(skipAt, typeTapAt)
+        let clear = try body(of: "private func clearFocusedInput(", in: input)
+        XCTAssertTrue(clear.contains("if alreadyFocusedInput(ref)"), "/clear が焦点の有無を見ていない")
+    }
+
+    /// ② 消去の右端の押下は2周目から(1周目で空にならなかった = カーソルが末尾に無かったときだけ。同じ理由)
+    func testClearTapsTheFieldEndOnlyFromTheSecondRound() throws {
+        let clear = try body(of: "private func clearFocusedInput(", in: try runnerSource("BridgeRouter+TextInput.swift"))
+        XCTAssertEqual(clear.components(separatedBy: "tapFieldEndIfHittable(").count - 1, 1,
+                       "右端の押下が周回の外(1周目の前・空に見える欄の消去)にも残っている")
+        XCTAssertTrue(clear.contains("if rounds > 1 { tapFieldEndIfHittable(app, focused) }"), "右端の押下が1周目から撃たれる")
+    }
+
+    /// ③ 焦点の控えは読みの直後の POST の1回だけ使う(撮った後に操作が挟まった焦点は信じない。同じ理由)
+    func testTheReadFocusIsUsedByOnlyTheNextPost() throws {
+        let handle = try body(of: "func handle(_ request: BridgeHTTPServer.Request)", in: try runnerSource("BridgeRouter.swift"))
+        XCTAssertTrue(handle.contains("focusedRefForThisRequest = lastReadFocusedRef"))
+        XCTAssertTrue(handle.contains("lastReadFocusedRef = nil"), "焦点の控えを POST の後も使い回している")
+    }
+
     /// 測定用のプローブ: /tap は probeStaleRef のときだけ、整定の待ちの後・撃つ前に確かめ、**断らず**全部の返し口で結果を返す
     func testTapProbeChecksBeforeFiringWithoutRefusing() throws {
         let router = try runnerSource("BridgeRouter.swift")

@@ -68,7 +68,7 @@ extension BridgeRouter {
         }
         let focusBefore = focusBeforeTappingNonInput(app, ref: req.ref)
         var tapped: CGPoint?
-        if let ref = req.ref {
+        if let ref = req.ref, !alreadyFocusedInput(ref) {
             // キーボードの出現は直後の typeText の前の待ち(上限つき)が待つ(keyboards クエリは
             // キーボードが別プロセス扱いのため常にタイムアウトし逆効果だった。2026-07-12実測)
             let point = try resolvePoint(ref: ref, x: nil, y: nil)
@@ -391,12 +391,19 @@ extension BridgeRouter {
         if let ref = req.ref {
             try requireExpectedRef(ref, expect: req.expect)
             try requireRefStillOnScreen(app, ref: ref)
-            let point = try resolvePoint(ref: ref, x: nil, y: nil)
-            let focusBefore = Self.focusMark(app)
-            Self.tapBeforeTyping(coordinate(app, point))
-            let refIsTextInput = refElements[ref].map(TypeReadback.isTextInput) ?? false
-            focused = try Self.awaitClearFocusTarget(app, tapped: point, focusBefore: focusBefore,
-                                                     refIsTextInput: refIsTextInput)
+            // 押さずに済ませるのは、ライブの焦点の欄が ref の欄(枠が ref の中心を含む)だと確かめられたときだけ
+            if alreadyFocusedInput(ref), let target = refElements[ref],
+               case let live = Self.focusedInput(app), live.exists,
+               live.frame.contains(CGPoint(x: target.frame.centerX, y: target.frame.centerY)) {
+                focused = live
+            } else {
+                let point = try resolvePoint(ref: ref, x: nil, y: nil)
+                let focusBefore = Self.focusMark(app)
+                Self.tapBeforeTyping(coordinate(app, point))
+                let refIsTextInput = refElements[ref].map(TypeReadback.isTextInput) ?? false
+                focused = try Self.awaitClearFocusTarget(app, tapped: point, focusBefore: focusBefore,
+                                                         refIsTextInput: refIsTextInput)
+            }
         } else {
             let typed = Self.focusedInput(app)
             let f = typed.exists ? typed : app.descendants(matching: .any)
@@ -419,8 +426,8 @@ extension BridgeRouter {
             // 区別できない。長さも分からないので固定本数の当て推量で消す——空欄への delete は
             // no-op なので外れて多く撃っても損は無く、それでも残るほど長ければ次の /type の
             // 読み返し不一致が唯一の合図になる(2026-08-31・実機実測)
+            // 先に右端を押さない(焦点のある欄を短い間隔で押し直すと編集メニューが出て残る。下の周回の doc)
             try Self.requirePresent(focused)
-            tapFieldEndIfHittable(app, focused)
             ResponseMeasurement.noteInjection()
             app.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue,
                                  count: Self.invisibleContentDeleteBurst))
@@ -436,7 +443,10 @@ extension BridgeRouter {
             previous = text
             rounds += 1
             try Self.requirePresent(focused)
-            tapFieldEndIfHittable(app, focused)
+            // **右端を押してカーソルを末尾へ寄せるのは2周目から**(1周目で残った = カーソルが末尾に無かったときだけ)。
+            // 焦点のある欄を短い間隔で2回押すと iOS の編集メニュー(Paste / Select All)が出て画面に残り、次の操作が
+            // それに当たりうる(実機 SE3・CMP: 中心 → 右端の連打で再現・1 秒以上空ければ出ない)。カーソルが末尾なら1周目で空になる
+            if rounds > 1 { tapFieldEndIfHittable(app, focused) }
             // 打鍵は app 全体へ(要素へ向けると、叩いた後に焦点が動いたとき要素スコープの失敗でランナーを落とし得る。
             // 入力先は叩いた欄 = 最前のレスポンダ。下の木で読み返す経路と同じ)
             ResponseMeasurement.noteInjection()
@@ -483,6 +493,14 @@ extension BridgeRouter {
     /// 叩くと手前の部品を押す(実機 iPhone SE3 の CMP: キーボード表示中にパスワード欄が下のタブバーの裏へ回り、
     /// 枠の右端は「情報」タブの上だった)。叩かなくても削除キーは焦点の欄(最前のレスポンダ)へ届き、
     /// カーソルが末尾でなければ消し残りは読み返しのループが拾う(消せなければ 422)。isHittable は要素ごとに往復する(数十 ms)
+    /// 直前の読み(GET /snapshot)で ref の入力欄が焦点を持ち、キーボードが出ていた(`focusedRefForThisRequest`)。
+    /// **そのときは打つ前・消す前に欄を押さない** —— 押し直すと短い間隔の2回押しになり、iOS の編集メニューが出て残る。
+    /// 撮った後に焦点が移っていれば、type は読み返しが別の欄の変化として断り(otherInputThatChanged)、clear は呼び手がライブの焦点を確かめる
+    func alreadyFocusedInput(_ ref: Int) -> Bool {
+        guard focusedRefForThisRequest == ref, let target = refElements[ref] else { return false }
+        return TypeReadback.isTextInput(target)
+    }
+
     private func tapFieldEndIfHittable(_ app: XCUIApplication, _ field: XCUIElement) {
         guard field.isHittable else { return }
         let frame = field.frame
