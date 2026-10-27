@@ -237,6 +237,8 @@ enum ApiRunMachineFanout {
         // 購読の登録より前の中断は子を起こす前に抜ける(DeviceMachineRunner.run の同じ箇所)
         try parentInterrupt.exitIfSet(noticedAt: "the dispatch lock acquisition", log: { logStderr($0) })
 
+        let isInterrupted = parentInterrupt.isSet
+        let interruptedAtLastExit = LockedValue(false)
         let outcomes = await withTaskGroup(of: (Int, FleetEntryOutcome).self) { taskGroup in
             for (position, entry) in active.enumerated() {
                 let (groupIndex, group, ids) = entry
@@ -263,6 +265,8 @@ enum ApiRunMachineFanout {
             }
             var collected: [Int: FleetEntryOutcome] = [:]
             for await (position, outcome) in taskGroup {
+                // ロックの解放(ssh で秒単位)より前に取る = 最後の子が終わった時点の値(MultiTargetRunner と同じ時点)
+                interruptedAtLastExit.withLock { $0 = isInterrupted() }
                 collected[position] = outcome
                 prelock.release(afterChildOf: outcome.host, exitCode: outcome.exitCode)
             }
@@ -270,7 +274,7 @@ enum ApiRunMachineFanout {
         }
         // 子が全員終わった時点の値で仕分ける(後の解放・多重化の待ちの間に来た中断で、本物の欠落を中断に読み替えない。
         // DeviceMachineRunner.run と同じ)。配り手の印・registry の取り消しを立てるのも中断の購読だけ
-        let interruptedWhileChildrenRan = parentInterrupt.isSet()
+        let interruptedWhileChildrenRan = interruptedAtLastExit.value
         // 残りの安全網(各機械は子の終了時に解放済み。理由は DeviceMachineRunner.run と同じ)
         prelock.releaseAll(exitCodes: Dictionary(
             outcomes.map { ($0.host, $0.exitCode) }, uniquingKeysWith: { first, _ in first }))
@@ -399,6 +403,14 @@ enum ApiRunMachineFanout {
         process.standardOutput = stdoutPipe
         process.standardError = stderrPipe
         let exitStream = ProcessExitWait.prepare(process)
+        // 起こす直前に中断を見る(FleetRunner.runEntry と同じ)。起こさなかった子は起動の失敗と同じ形で終わりを知らせる
+        if InterruptRelay.hasReceivedInterrupt {
+            logStderr("[\(machineLabel)] interrupted — this sub-run was not started")
+            dispatch?.dispatcher.childExited(entry: dispatch?.entry ?? index)
+            continuation.yield(.exited(index: index, status: 130,
+                                       assigned: dispatch.map { $0.dispatcher.assignedIDs(entry: $0.entry) }))
+            return 130
+        }
         do {
             try process.run()
         } catch {

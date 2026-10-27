@@ -585,6 +585,12 @@ enum FleetRunner {
         process.standardOutput = pipe
         process.standardError = pipe
         let exitStream = ProcessExitWait.prepare(process)
+        // 起こす直前に中断を見る(親の最後の確認からこのタスクが走るまでの間の中断で、起こしてから止める形にしない)。
+        // 起こした後の中断は下の relay(catchUp)が子へ伝える
+        if InterruptRelay.hasReceivedInterrupt {
+            log("[\(hostLabel)] interrupted — this sub-run was not started")
+            return 130
+        }
         do {
             try process.run()
         } catch {

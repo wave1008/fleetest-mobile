@@ -283,6 +283,8 @@ enum DeviceMachineRunner {
         defer { interruptRelay?.stop() }
         // 購読の登録より前(ロックの取得から登録まで)の中断は、子を起こす前にここで抜ける(後の中断は購読と各子の relay が受ける)
         try parentInterrupt.exitIfSet(noticedAt: "the dispatch lock acquisition", log: { FleetRunner.log($0) })
+        let isInterrupted = parentInterrupt.isSet
+        let interruptedAtLastExit = LockedValue(false)
         let outcomes = await withTaskGroup(of: (Int, FleetEntryOutcome).self) { taskGroup in
             for (index, group, ids) in active {
                 taskGroup.addTask {
@@ -317,6 +319,8 @@ enum DeviceMachineRunner {
             }
             var collected: [Int: FleetEntryOutcome] = [:]
             for await (index, outcome) in taskGroup {
+                // ロックの解放(ssh で秒単位)より前に取る = 最後の子が終わった時点の値(MultiTargetRunner と同じ時点)
+                interruptedAtLastExit.withLock { $0 = isInterrupted() }
                 collected[index] = outcome
                 prelock.release(afterChildOf: outcome.host, exitCode: outcome.exitCode)
             }
@@ -324,7 +328,7 @@ enum DeviceMachineRunner {
         }
         // 子が全員終わった時点の値で仕分ける(後の走査の間に来た中断で、本物の欠落・配れなかった分を中断に読み替えない)。
         // 配り手の印を立てるのも中断の購読だけなので、静的・動的とも同じ値
-        let interruptedWhileChildrenRan = parentInterrupt.isSet()
+        let interruptedWhileChildrenRan = interruptedAtLastExit.value
         // 各機械のロックは**その子が終わった時点で**上の `release(afterChildOf:)` が外し済み
         // (正常終了(0/1)は無条件、それ以外は生死を確かめてから。RemoteRunDispatcher.releaseDispatchLockAsParent
         // の宣言参照)。ここと末尾の bare `defer { prelock.releaseAll() }` は残り(子を起こさなかった

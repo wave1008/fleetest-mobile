@@ -1,3 +1,4 @@
+import FTCore
 import Foundation
 import XCTest
 @testable import fleetest
@@ -210,5 +211,22 @@ final class InterruptRelayTests: XCTestCase {
         processRelay.stop()
         observerRelay.stop()
         XCTAssertEqual(InterruptRelay.registeredCount, 0)
+    }
+
+    /// 中断を受けた後の runEntry は子を起こさずに 130(親の最後の確認からタスクが走るまでの間の中断で、起こしてから止めない)
+    func testRunEntryDoesNotStartAChildAfterAnInterrupt() async throws {
+        let keep = InterruptRelay.observing {}   // シグナルソースを張っておく(無いと SIGINT でテストごと落ちる)
+        defer { keep.stop() }
+        kill(getpid(), SIGINT)
+        let deadline = Date().addingTimeInterval(5)
+        while !InterruptRelay.hasReceivedInterrupt, Date() < deadline { try await Task.sleep(for: .milliseconds(20)) }
+        let marker = FileManager.default.temporaryDirectory.appendingPathComponent("runEntry-\(UUID().uuidString)").path
+        defer { try? FileManager.default.removeItem(atPath: marker) }
+        let code = await FleetRunner.runEntry(
+            binary: "/usr/bin/touch", args: [marker], hostLabel: "t",
+            ticket: DispatchTicketIssuer.issue(runGroup: "G", environment: [:]), lockMarker: nil,
+            healCollection: HealSourceWriteBack.Collection())
+        XCTAssertEqual(code, 130)
+        XCTAssertFalse(FileManager.default.fileExists(atPath: marker), "中断の後に子を起こした")
     }
 }
