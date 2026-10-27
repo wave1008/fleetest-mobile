@@ -15,8 +15,14 @@ struct RunCommonOptions: ParsableArguments {
     @Option(help: "Test project name (defaults to the only one in TestProjects/, or the default project)")
     var project: String?
 
-    @Option(help: "Run profile name (profiles/runs/<name>.json). Includes device provisioning and auto-install. Cannot be combined with --platform/--port/--serial/--app-id")
-    var profile: String?
+    /// 繰り返せるのは `fleetest run` だけ(複数対象の1回実行 = RR-8.2)。`api run` は validate() で2つ以上を断る。
+    /// **単一プロファイルの経路は全部 `profile`(先頭の1つ)を読む** —— 2つ以上のときは run() が先に
+    /// MultiTargetRunner へ分岐するので、単一経路に複数値は届かない
+    @Option(name: .customLong("profile"),
+            help: "Run profile name (profiles/runs/<name>.json). Includes device provisioning and auto-install. Cannot be combined with --platform/--port/--serial/--app-id. `fleetest run` accepts it more than once to run several profiles of the project in one invocation (see --target)")
+    var profiles: [String] = []
+
+    var profile: String? { profiles.first }
 
     @Flag(name: .customLong("skip-build"), help: "Skip the swift build before running")
     var skipBuild = false

@@ -32,6 +32,7 @@ final class RunCommandFlagParityTests: XCTestCase {
         "--junit": "CI 向けの JUnit XML 出力。拡張は NDJSON をそのまま読む",
         "--quiet": "ステップ行を止めてサマリだけ出す。api run は常に NDJSON なので概念が無い",
         "--split": "--fleet の分配方式。--fleet が CLI 専用なので従属",
+        "--target": "複数のプロジェクトの対象を1回で回す(RR-8.2。MultiTargetRunner)。拡張は1プロファイルずつ api run を起こすので口が要らない(api run は --profile の繰り返しも断る = RunRejectionParityTests の divergent)",
     ]
 
     /// `fleetest api run` にだけあるもの。

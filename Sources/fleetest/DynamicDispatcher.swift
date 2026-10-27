@@ -110,6 +110,8 @@ final class DynamicDispatcher: Sendable {
     /// 誰にも渡さなかったシナリオ(全部の子が終わった後に読む)
     var unhandedIDs: [String] { state.withLock { $0.pending.map(\.id) } }
     var isInterrupted: Bool { state.withLock { $0.interrupted } }
+    /// まだ誰にも渡していないシナリオ(複数対象の配り手 MultiTargetRunner が仕事の残りの見込みに使う。読むだけ)
+    var pendingScenarios: [DynamicSplit.Scenario] { state.withLock { $0.pending } }
 
     // MARK: - 判定
 

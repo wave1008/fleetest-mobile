@@ -326,6 +326,15 @@ struct RunScenarios: AsyncParsableCommand {
               + "up to this many seconds (docs/user-docs/fleet/remote_runners.md). Cannot be combined with --force-lock"))
     var waitLock: Int?
 
+    /// 複数のプロジェクトの対象を1回で回す(RR-8.2)。`<project>:<profile>` を繰り返す。`--project`/`--profile` と併用不可。
+    /// 同じプロジェクトの複数プロファイルは `--profile` の繰り返しでもよい。**`api run` には無い**(拡張は1プロファイルずつ起こす)
+    @Option(name: .customLong("target"),
+            help: ArgumentHelp("Run several targets in one invocation: <project>:<profile>, repeatable. Each free "
+                + "machine takes the next target and the last targets are shared scenario by scenario. "
+                + "Cannot be combined with --project/--profile; with two or more targets, --broadcast/--fleet/"
+                + "--runner/--dry-run/--scenario/--folder/--failed/--port/--platform/--serial/--device are not accepted"))
+    var targetSpecs: [String] = []
+
     /// ブロードキャスト実行。warmup のように「全デバイスがそれぞれ準備される」
     /// ことが目的の run 向け。分配だけを `ScenarioDispatch.broadcast` に差し替え、他は通常 run
     /// (ProfileRunner.run)と同じ経路。**--profile が要る**(レーン = プロファイルのデバイス)
@@ -344,7 +353,38 @@ struct RunScenarios: AsyncParsableCommand {
             explicit: common.platform, gaveIOSTarget: !ports.isEmpty, gaveAndroidTarget: common.serial != nil)
     }
 
+    /// 複数対象の指定(`--target` または `--profile` の繰り返し)。単一は空
+    func multiTargets() throws -> [MultiTargetRunner.Target] {
+        try MultiTargetRunner.targets(project: common.project, profiles: common.profiles, targetSpecs: targetSpecs)
+    }
+
+    /// 単一対象として検査・実行するための写し(`--target` 1個、または複数対象の先頭)。
+    /// 複数対象でも共通の検査(--set・--junit 等)は先頭の対象で1回通す
+    private func asSingleTarget(_ target: MultiTargetRunner.Target) -> RunScenarios {
+        var copy = self
+        copy.common.project = target.project
+        copy.common.profiles = [target.profile]
+        copy.targetSpecs = []
+        return copy
+    }
+
     func validate() throws {
+        let targets = try multiTargets()
+        guard let first = targets.first else { return try validateSingleTarget() }
+        if targets.count >= 2 {
+            if let message = MultiTargetRunner.firstRejection(flags: [
+                ("--broadcast", broadcast), ("--fleet", fleet != nil), ("--runner", runner != nil),
+                ("--dry-run", dryRun), ("--scenario", !scenarios.isEmpty), ("--folder", !folders.isEmpty),
+                ("--failed", failed), ("--port", !ports.isEmpty), ("--platform", common.platform != nil),
+                ("--serial", common.serial != nil), ("--app-id", common.appID != nil),
+                ("--device", !common.devices.isEmpty), ("--device-machine", common.deviceMachine != nil),
+                ("--all-machines", common.allMachines), ("--work-queue", common.workQueue),
+            ]) { throw ValidationError(message) }
+        }
+        try asSingleTarget(first).validateSingleTarget()
+    }
+
+    private func validateSingleTarget() throws {
         try RunCommonOptions.rejectZeroPorts(ports)
         // レポートは run 後に書くので、書けない先は**始める前に**言う(フリート run では
         // 20 分走ってから分かっていた)。末尾の書き込み失敗が警告のみの規律は変えない
@@ -453,6 +493,22 @@ struct RunScenarios: AsyncParsableCommand {
     }
 
     func run() async throws {
+        let targets = try multiTargets()
+        if targets.count >= 2 {
+            let exitCode = try await MultiTargetRunner.run(
+                targets: targets, setOverrides: try RunProfileSetOverride.parse(setOverrides),
+                noLPT: common.noLPT, lptHistoryRuns: common.lptHistoryRuns,
+                performanceMode: performanceMode, forceLock: forceLock, waitLock: waitLock,
+                remoteDir: common.remoteDir, remoteTimeout: common.remoteTimeout,
+                quiet: quiet, junit: junit, skipBuild: common.skipBuild, reportDir: reportDir)
+            if exitCode != 0 { throw ExitCode(exitCode) }
+            return
+        }
+        // `--target` 1個は通常の経路へ読み替える(以降は --project/--profile を渡したのと同じ)
+        if let only = targets.first {
+            try await asSingleTarget(only).run()
+            return
+        }
         // ビルドの前に起こした準備の段は、どの経路(失敗・中断・対象なし)で抜けても、供給のタスクが終わってから片付ける
         // (`defer` の中では待てないので、本体の外側のここで1回だけ通す。EarlySupplyBox の宣言)
         let early = ProfileRunner.EarlySupplyBox()

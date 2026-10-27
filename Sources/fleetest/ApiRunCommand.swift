@@ -126,6 +126,11 @@ struct ApiRunCommand: AsyncParsableCommand {
             throw ValidationError("--debug can only be used with exactly one --scenario")
         }
         try common.validateTargeting(ports: ports)
+        // 複数対象の1回実行(RR-8.2)は fleetest run だけ。拡張は1プロファイルずつ起こす
+        if common.profiles.count > 1 {
+            throw ValidationError("--profile can only be given once here"
+                + " (api run starts one profile per run; use `fleetest run --profile … --profile …` for several)")
+        }
         // このコマンドの --profile 無し経路(runDirect)は単一接続を逐次に流すだけで、
         // `fleetest run` の runParallel に相当する多重ポート経路を持たない
         if ports.count > 1 {

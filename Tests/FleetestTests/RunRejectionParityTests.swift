@@ -93,10 +93,13 @@ final class RunRejectionParityTests: XCTestCase {
     private static let divergent: [String: String] = [
         "port given twice": "api run の --profile 無し経路(runDirect)は単一接続を逐次に流すだけで、"
             + "fleetest run の runParallel に相当する多重ポート経路を持たない。黙って1本目だけ使わずに拒否する",
+        "profile given twice": "複数対象の1回実行(RR-8.2。MultiTargetRunner)は fleetest run だけ。"
+            + "拡張は1プロファイルずつ api run を起こすので、黙って1本目だけ使わずに拒否する",
     ]
 
     private static let divergentCombinations: [Combination] = [
         .init(label: "port given twice", arguments: ["--port", "8123", "--port", "8124"], rejected: true),
+        .init(label: "profile given twice", arguments: ["--profile", "p", "--profile", "q"], rejected: true),
     ]
 
     /// 両方が拒否するが**逃げ道の案内だけ**が違う打鍵。規則は同じで、片方にしか無い

@@ -41,6 +41,23 @@ enum DeviceMachineRunner {
                      disabledMachines: Set<String>,
                      overrides: [String: RunProfileSetValue] = [:]) throws -> [Group]? {
         if explicitHost != nil { return nil }
+        let (grouped, excluded) = try resolveGroups(
+            project: project, profileName: profileName, deviceFilter: deviceFilter,
+            disabledMachines: disabledMachines, overrides: overrides)
+        // **`--device` で絞った結果がリモートの1機械だけでも計画を返す**(無効の機械を外した場合と同じ理由)。
+        // nil だと単一経路がその行の machine を見ずに手元で起こそうとする(実機 iPhone 13 = M1Ultra を
+        // `--device` だけで指すと、この Mac から Wi-Fi 越しにブリッジを起こして全シナリオがワーカー0台で赤になった)。
+        // 手元だけに絞れた場合は従来どおり単一経路
+        let narrowedToOneRemote = !deviceFilter.isEmpty && grouped.count == 1 && grouped[0].machine != nil
+        guard grouped.count > 1 || excluded || narrowedToOneRemote else { return nil }
+        return grouped
+    }
+
+    /// 無効の機械を外した機械ごとのグループ(1機械だけでも返す)。`plan` と複数対象の run(MultiTargetRunner)が共有する。
+    /// 戻り値の excluded = 無効の機械を1台でも外したか
+    static func resolveGroups(project: TestProject, profileName: String, deviceFilter: [String],
+                              disabledMachines: Set<String>,
+                              overrides: [String: RunProfileSetValue] = [:]) throws -> (groups: [Group], excluded: Bool) {
         var devices = ProfileResolver.runDeviceMachines(
             project: project, runProfileName: profileName, overrides: overrides)
         if !deviceFilter.isEmpty {
@@ -63,17 +80,11 @@ enum DeviceMachineRunner {
             throw ProfileError.responseMeasurementDeviceCount(run: profileName, count: kept.count)
         }
         let grouped = DeviceMachineGrouping.groups(kept) { $0.machine }
-        // **`--device` で絞った結果がリモートの1機械だけでも計画を返す**(無効の機械を外した場合と同じ理由)。
-        // nil だと単一経路がその行の machine を見ずに手元で起こそうとする(実機 iPhone 13 = M1Ultra を
-        // `--device` だけで指すと、この Mac から Wi-Fi 越しにブリッジを起こして全シナリオがワーカー0台で赤になった)。
-        // 手元だけに絞れた場合は従来どおり単一経路
-        let narrowedToOneRemote = !deviceFilter.isEmpty && grouped.count == 1 && grouped[0].machine != nil
-        guard grouped.count > 1 || !excluded.isEmpty || narrowedToOneRemote else { return nil }
-        return grouped.map { group in
+        return (grouped.map { group in
             Group(machine: group.machine,
                   deviceNames: group.devices.map(\.name),
                   platforms: Set(group.devices.map(\.platform)))
-        }
+        }, !excluded.isEmpty)
     }
 
     /// マシンごとのサブ実行を並行に走らせ、1画面の集計を出す。戻り値 = 各サブ実行の非0の最大
