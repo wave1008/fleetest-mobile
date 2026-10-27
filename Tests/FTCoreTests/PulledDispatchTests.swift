@@ -17,6 +17,8 @@ final class PulledDispatchTests: XCTestCase {
             asked.withLock { $0.append("\(platform):\(lane)") }
             return replies.withLock { $0.isEmpty ? nil : $0.removeFirst() }
         }
+        let stops = LockedValue(0)
+        func stopWaiting() { stops.withLock { $0 += 1 } }
     }
 
     private func makeQueue(_ catalog: [ScenarioRunItem], source: FakeSource,
@@ -158,5 +160,25 @@ final class PulledDispatchTests: XCTestCase {
         XCTAssertEqual(summary.failed, 0)
         XCTAssertEqual(startedTotal, 0)
         XCTAssertTrue(source.asked.value.isEmpty)
+    }
+
+    /// 中断は pulled の配り手の待ちを解く(run の設定より前に来た中断も、後に来た中断も)。
+    /// 渡し済みの返事が届かなかったレーンは親の none の相手にならず、子が中断のあと終わらなかった
+    func testInterruptStopsThePullSourceWhetherItComesBeforeOrAfterTheRunStarts() async throws {
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent("PulledDispatchTests-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        addTeardownBlock { try? FileManager.default.removeItem(at: root) }
+        let orchestrator = RunOrchestrator(
+            project: TestProject(name: "Pulled", rootURL: root), workers: [],
+            settings: ScenarioExecutionSettings(fm: FMConfig(enabled: false)),
+            reportDir: root.appendingPathComponent("reports"),
+            progressHistoryRuns: 1, clearResidualSystemAlert: nil)
+        let source = FakeSource([])
+        orchestrator.requestInterrupt()
+        _ = await orchestrator.run(items: [item("A")], defaultPlatform: "ios", dispatch: .pulled(source: source))
+        XCTAssertEqual(source.stops.value, 1, "run より前の中断で待ちを解いていない")
+        orchestrator.requestInterrupt()
+        XCTAssertEqual(source.stops.value, 2, "run が配り手を持った後の中断で待ちを解いていない")
     }
 }

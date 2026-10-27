@@ -257,15 +257,17 @@ Flutter と RN の実機用は **Release 構成**(Flutter の Debug は flutter 
   `--performance`(性能計測モード。上記「モニターと E2E」) / `--negative`(最後に陽性対照スイートも回す) /
   `--retrain-classifiers`(各 SUT の画像分類器のキャッシュを消してから回す) /
   `--align`(下記) / `--build-only`(SUT の鮮度確認とビルドだけ) / `--as-part`(全体の一部として回す = 検証済みの印・
-  `verification_watch` の推奨・陽性対照を扱わない)。後ろの2つは `Scripts/regress.py` が撃つ口(`e2ex.sh` / `e2ey.sh` にもある)
+  `verification_watch` の推奨・陽性対照を扱わない)。`--build-only` は `Scripts/regress.py` が撃つ口(`e2ex.sh` / `e2ey.sh` にもある)
 - **回帰は録画しない**(2026-10-27 ユーザー決定)。4本のスクリプト(e2e / e2ex / e2ey / e2e-devices)は既定で
   `--set record=false` を渡し、`--record` のときだけ録画する。録画の切り出しが run ごとの後始末の大半だった(PT-8.1)
-- **全マシンで回すときは `Scripts/regress.py`**(PT-8.1 の案 A): 仕事 = run 1 本ぶん(スイート × SUT × OS/モード)を、
-  この Mac と登録で有効なリモートが「空いたら記録の長い順に取る」待ち行列で回す。最初に全マシンで SUT の鮮度確認とビルド
-  (`--build-only`)を並列に済ませ、各スクリプトは `--as-part` で呼ぶ。印・推奨・陽性対照(`--negative`)はまとめ役が最後に1回。
-  所要の記録は `.fleetest/regress-durations.json`(仕事 × マシン)・ログは `.fleetest/regress/<時刻>/`。
-  `--ios-xcuitest` で xcuitest モードの仕事も足す・`--suites` / `--suts` で絞る(絞った回は印を書かない)・
-  `--dry-run` で割り振りの見込みだけ出す。**先に commit → `Scripts/align.sh`**(リモートはアライン済みのコミットで動く)
+- **全マシンで回すときは `Scripts/regress.py`**: 回帰の対象(スイート × SUT × OS/モード = `<プロジェクト>:<プロファイル>`)を
+  `fleetest run --target …` の1回に並べる薄い包み(配り方は RR-8.2 = 空いたマシンが次の対象を取り、終わり際はシナリオ単位で手伝う)。
+  最初に全マシンで SUT の鮮度確認とビルド(各スクリプトの `--build-only`)を並列に済ませ、run の後で in-app の証人・画像分類器を
+  使えなかったシナリオの検査・検証済みの印(全部緑のときだけ)・推奨・陽性対照(`--negative`)を1回。ログは `.fleetest/regress/<時刻>/`
+  (段 1 のビルド)。E2EX / E2EY のプロファイルにもリモートのデバイスがある(スクリプトは `--runner local` で回すので影響しない)。
+  `--ios-xcuitest` で xcuitest モードの対象も足す・`--suites` / `--suts` で絞る(絞った回は印を書かない)・
+  `--dry-run` で対象と撃つコマンドだけ出す。SUT をそろえられないマシンがあれば回さない(設定タブでそのマシンを無効にすれば外れる)。
+  **先に commit → `Scripts/align.sh`**(リモートはアライン済みのコミットで動く)
 - **`e2e.sh` / `e2ex.sh` / `e2ey.sh` は引数に関係なく「スイート全体」として `Scripts/test-scope-guard.py` が断る**(全実施を頼まれたときだけ
   `FT_FULL_TEST=1`)。絞った確認は `fleetest run --project <P> --profile <prof> --scenario <クラス>` で通るシナリオを名指しする
 - **回帰の分担(ユーザー指示 2026-09-28。`Scripts/regress.py` を使わないときの形)**: E2E はこの Mac(M2Ultra)で `Scripts/e2e.sh --local`、

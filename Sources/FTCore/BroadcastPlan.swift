@@ -24,6 +24,9 @@ public enum ScenarioDispatch: Sendable {
 public protocol ScenarioPullSource: Sendable {
     /// lane = `RunWorker.logicalName`(空いたデバイスの名前。無ければ空文字)
     func next(platform: String, lane: String) async -> String?
+    /// 中断: 返事を待っている要求と以後の要求を全部 nil で終わらせる。**親の返事を当てにしない** ——
+    /// 渡し済みの返事が届かなかったレーンは、親が中断で none を返す相手にならず、子が終わらなくなる
+    func stopWaiting()
 }
 
 /// ブロードキャストの1レーン = 実行プロファイルの1デバイス

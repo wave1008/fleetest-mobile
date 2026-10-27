@@ -443,6 +443,8 @@ final class MultiTargetCoordinator: Sendable {
         var unstarted: [String]
         var running: [String: Set<Int>] = [:]
         var launched: Set<Pair> = []
+        /// 仕事ごとの「終わる見込みの時刻」の記憶[ms]。始めた・加わったときの見込みの早いほう(expectedFreeAt を見よ)
+        var anchor: [String: Double] = [:]
         var dead: Set<Int> = []
         var active = 0
         var interrupted = false
@@ -542,6 +544,9 @@ final class MultiTargetCoordinator: Sendable {
                                 s.status[m] = .finished
                                 break
                             }
+                            if let finish = expectedFinish(job: id, adding: m, state: s, now: now) {
+                                s.anchor[id] = min(s.anchor[id] ?? .infinity, finish)
+                            }
                             s.unstarted.removeAll { $0 == id }
                             s.running[id, default: []].insert(m)
                             s.status[m] = .busy(id)
@@ -612,16 +617,33 @@ final class MultiTargetCoordinator: Sendable {
         return total / Double(max(lane.devices, 1))
     }
 
-    /// 走っている仕事の残りが、走っているマシン全部で終わる見込みの時刻(全員が一緒に終わる近似)。
-    /// 残りが無ければ「今」。見込みを過ぎても空かない場合の繰り下げは JobSchedule 側の安全弁に任せる
+    /// 走っている仕事が終わる見込みの時刻 = min(記憶した時刻, 今 + 残りの見込み)。
+    /// **「今 + 残り」だけにしない** —— 毎回いまから作り直すので、見込みより遅れても期限を過ぎた側へ一度も倒れず、
+    /// JobSchedule の安全弁が効かない(FM が落ちて遅くなった手元を「もうすぐ空く速いマシン」と見続け、空いた2台が
+    /// 未着手の仕事を取らずに10分以上待った)。記憶した時刻は遅れを覚え、残りの見込みは早く進んだ分を拾う
     private func expectedFreeAt(job id: String, running s: State, now: Double) -> Double {
+        let rest = remainingFinish(job: id, members: s.running[id] ?? [], now: now)
+        return min(s.anchor[id] ?? .infinity, rest ?? now)
+    }
+
+    /// その仕事を members で回したときの「今 + 残り」。速さはマシンごとの 1/見込み の和。残りが無ければ nil
+    private func remainingFinish(job id: String, members: Set<Int>, now: Double) -> Double? {
+        guard let job = jobs[id] else { return nil }
         var rate = 0.0
-        for m in s.running[id] ?? [] {
-            guard let job = jobs[id], let lane = job.lanes[m] else { continue }
+        for m in members {
+            guard let lane = job.lanes[m] else { continue }
             let fitting = job.pending().filter { lane.platforms.contains($0.platform) }
             let total = fitting.reduce(0.0) { $0 + job.estimateMs($1, lane.entry) } / Double(max(lane.devices, 1))
             if total > 0 { rate += 1 / total }
         }
-        return rate > 0 ? now + 1 / rate : now
+        return rate > 0 ? now + 1 / rate : nil
+    }
+
+    /// machine が始める・加わるときの終わる見込み(固定費の後から加わった速さで回る近似)
+    private func expectedFinish(job id: String, adding machine: Int, state s: State, now: Double) -> Double? {
+        let overhead = machine < overheadMs.count ? overheadMs[machine] : 0
+        guard let rest = remainingFinish(job: id, members: (s.running[id] ?? []).union([machine]), now: now + overhead)
+        else { return nil }
+        return rest
     }
 }

@@ -23,8 +23,10 @@ final class MultiTargetRunnerTests: XCTestCase {
 
         static func key(_ job: String, _ machine: Int) -> String { "\(job)#\(machine)" }
 
-        /// lanes: 仕事 → そのマシンの添字の集合(entry はマシンの添字と同じにする)。scenarios: 仕事 → 本数(1本 1000ms)
-        init(machines: Int, lanes: [String: Set<Int>], scenarios: [String: Int], order: [String]) {
+        /// lanes: 仕事 → そのマシンの添字の集合(entry はマシンの添字と同じにする)。scenarios: 仕事 → 本数。
+        /// msPerScenario: マシン → 1本の見込み[ms](無ければ 1000)
+        init(machines: Int, lanes: [String: Set<Int>], scenarios: [String: Int], order: [String],
+             msPerScenario: [Int: Double] = [:]) {
             for (job, count) in scenarios {
                 pending.withLock {
                     $0[job] = (0..<count).map { DynamicSplit.Scenario(id: "\(job).s\($0)", platform: "ios") }
@@ -38,7 +40,7 @@ final class MultiTargetRunnerTests: XCTestCase {
                 return MultiTargetCoordinator.Job(
                     id: id, lanes: laneMap,
                     pending: { [self] in pending.withLock { $0[id] ?? [] } },
-                    estimateMs: { _, _ in 1000 },
+                    estimateMs: { _, entry in msPerScenario[entry] ?? 1000 },
                     childExited: { [self] entry in exited.withLock { $0.append((id, entry)) } },
                     interrupt: { [self] in interrupted.withLock { $0.append(id) } })
             }
@@ -53,6 +55,15 @@ final class MultiTargetRunnerTests: XCTestCase {
                     launches.withLock { $0.append((job, machine)) }
                     finishers.withLock { $0[Self.key(job, machine)] = finished }
                 })
+        }
+
+        /// 張られたタイマーを全部撃つ(手動の時計を進めたあとに呼ぶ)
+        func fireTimers() {
+            let pendingTimers = timers.withLock { list -> [(afterMs: Double, fire: @Sendable () -> Void)] in
+                defer { list = [] }
+                return list
+            }
+            for timer in pendingTimers { timer.fire() }
         }
 
         var launched: [String] { launches.withLock { $0.map { "\($0.job)@\($0.machine)" } } }
@@ -75,6 +86,22 @@ final class MultiTargetRunnerTests: XCTestCase {
         XCTAssertEqual(h.launched.count, 2, "空いている2台が両方すぐ仕事を取る: \(h.launched)")
         XCTAssertEqual(h.launched.first, "A@0", "見込みの長い仕事から取る(宣言順 B,A に依らない)")
         XCTAssertEqual(Set(h.launched), ["A@0", "B@1"])
+    }
+
+    /// 速いマシンの仕事が見込みより遅れている(残りが減らない)とき、遅いマシンは待ち続けず未着手の仕事を取る。
+    /// 終わる見込みを毎回「今 + 残り」で作り直すと期限を過ぎた側へ倒れず、安全弁が効かなかった
+    func testSlowerMachineStopsWaitingOnceTheFastMachineIsOverdue() {
+        let h = Harness(machines: 2, lanes: ["A": [0], "B": [0, 1]],
+                        scenarios: ["A": 10, "B": 2], order: ["A", "B"], msPerScenario: [0: 1000, 1: 10000])
+        h.coordinator.start()
+        XCTAssertEqual(h.launched, ["A@0"], "遅いマシンは速いマシンが空くのを待つ(10s + 2s < 20s)")
+        // A は 10s の見込み。28s を過ぎると 超過ぶん倒した空き時刻 + 2s >= 今 + 20s になる
+        h.clock.withLock { $0 = 27000 }
+        h.fireTimers()
+        XCTAssertEqual(h.launched, ["A@0"], "まだ待つほうが早い: \(h.launched)")
+        h.clock.withLock { $0 = 30000 }
+        h.fireTimers()
+        XCTAssertEqual(h.launched, ["A@0", "B@1"], "速いマシンが見込みを大きく過ぎたら遅いマシンが取る: \(h.launched)")
     }
 
     func testThirdMachineJoinsTheLongestRunningJobWhenNothingIsUnstarted() {

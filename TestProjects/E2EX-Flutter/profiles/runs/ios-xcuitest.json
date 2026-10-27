@@ -66,6 +66,86 @@
       "model": "iPhone 17 Pro",
       "osVersion": "iOS 27.0",
       "enabled": true
+    },
+    {
+      "platform": "ios",
+      "machine": "M1Max",
+      "name": "iPhone 17 Pro(iOS 27.0)-01",
+      "model": "iPhone 17 Pro",
+      "osVersion": "iOS 27.0",
+      "udid": "58CC649F-31C3-4AAA-911A-0BF693395FFD"
+    },
+    {
+      "platform": "ios",
+      "machine": "M1Max",
+      "name": "iPhone 17 Pro(iOS 27.0)-02",
+      "model": "iPhone 17 Pro",
+      "osVersion": "iOS 27.0",
+      "udid": "400455DE-CDD5-486B-BD3D-42E95202EE40"
+    },
+    {
+      "platform": "ios",
+      "machine": "M1Max",
+      "name": "iPhone 17 Pro(iOS 27.0)-03",
+      "model": "iPhone 17 Pro",
+      "osVersion": "iOS 27.0",
+      "udid": "67F9FCA1-95FC-45C9-8EB5-D0408C5BFCCF"
+    },
+    {
+      "platform": "ios",
+      "machine": "M1Max",
+      "name": "iPhone 17 Pro(iOS 27.0)-04",
+      "model": "iPhone 17 Pro",
+      "osVersion": "iOS 27.0",
+      "udid": "490372D0-56A1-45C0-A806-E80AE822E1E4"
+    },
+    {
+      "platform": "ios",
+      "machine": "M1Ultra",
+      "name": "iPhone 17 Pro(iOS 27.0)-01",
+      "model": "iPhone 17 Pro",
+      "osVersion": "iOS 27.0",
+      "udid": "E1A517B3-2E0A-45AD-9C32-38AF315F39F7"
+    },
+    {
+      "platform": "ios",
+      "machine": "M1Ultra",
+      "name": "iPhone 17 Pro(iOS 27.0)-02",
+      "model": "iPhone 17 Pro",
+      "osVersion": "iOS 27.0",
+      "udid": "D5D8497F-CCBB-4FD4-A003-792EE592FBE1"
+    },
+    {
+      "platform": "ios",
+      "machine": "M1Ultra",
+      "name": "iPhone 17 Pro(iOS 27.0)-03",
+      "model": "iPhone 17 Pro",
+      "osVersion": "iOS 27.0",
+      "udid": "D1DF733B-FF67-43B3-888E-129F1FF4BAFC"
+    },
+    {
+      "platform": "ios",
+      "machine": "M1Ultra",
+      "name": "iPhone 17 Pro(iOS 27.0)-04",
+      "model": "iPhone 17 Pro",
+      "osVersion": "iOS 27.0",
+      "udid": "95212B76-43ED-4F10-9421-93485C5FBF7A"
+    },
+    {
+      "platform": "ios",
+      "machine": "M1Ultra",
+      "name": "iPhone 17 Pro(iOS 27.0)-05",
+      "model": "iPhone 17 Pro",
+      "osVersion": "iOS 27.0",
+      "udid": "9110CD4C-DE42-49CD-A278-18A580DA5094"
+    },
+    {
+      "platform": "ios",
+      "machine": "M1Ultra",
+      "name": "iPhone 17 Pro(iOS 27.0)-06",
+      "model": "iPhone 17 Pro",
+      "osVersion": "iOS 27.0",
+      "udid": "6C7ADCB9-B221-4377-85BA-5258DEC86C69"
     }
   ]
 }

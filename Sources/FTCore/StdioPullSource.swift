@@ -44,6 +44,15 @@ public final class StdioPullSource: ScenarioPullSource {
         }
     }
 
+    public func stopWaiting() {
+        let remaining = state.withLock { s -> [CheckedContinuation<String?, Never>] in
+            s.eof = true
+            defer { s.waiters = [:] }
+            return Array(s.waiters.values)
+        }
+        for continuation in remaining { continuation.resume(returning: nil) }
+    }
+
     /// 端末のエコーを戻す(ssh -tt の先でだけ変えている)。何度呼んでもよい
     public func restoreTerminal() {
         let saved = state.withLock { s -> termios? in

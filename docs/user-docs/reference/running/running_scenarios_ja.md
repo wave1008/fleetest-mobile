@@ -23,7 +23,7 @@ FM を呼ぶのは実行プロファイルの `fmTextVisibilityCheck` / `screenL
 | オプション | 説明 |
 |---|---|
 | `--project <project>` | テストプロジェクト名(省略時の解決順は [creating_project_ja.md](../project/creating_project_ja.md) 参照) |
-| `--profile <profile>` | 実行プロファイル名(`profiles/runs/<name>.json`)。ブリッジ供給と自動インストールを含む。**`--platform`/`--port`/`--serial`/`--app-id` とは併用できない**(プロファイルがそれらを全部供給するため)——併用すると黙って無視されず、エラーになる |
+| `--profile <profile>` | 実行プロファイル名(`profiles/runs/<name>.json`)。ブリッジ供給と自動インストールを含む。**`--platform`/`--port`/`--serial`/`--app-id` とは併用できない**(プロファイルがそれらを全部供給するため)——併用すると黙って無視されず、エラーになる。`fleetest run` では繰り返して指定でき(`--profile ios-run --profile android-run`)、そのプロジェクトの複数のプロファイルを1回で回す(下の `--target` と同じ割り振り) |
 | `--scenario <id>` | シナリオ ID。クラス名だけならそのクラスの全シナリオ、`Class.method` で1本を指定。複数回指定可・既定は全件。`@Deleted`/`@Draft` シナリオは完全一致のときだけ実行される |
 | `--folder <folder>` | 実行するシナリオフォルダ(`scenarios/` 直下のサブフォルダ)。複数回指定可、`--scenario`/`--failed` と併用可 |
 | `--failed` | 前回失敗したシナリオだけ実行する。結果は毎回 `(project, profile)` 単位で `.fleetest/last-results/` に記録される —— あるプロファイルで落ちたシナリオが、別プロファイルの緑で隠れることはなく、`--profile` を指定しない実行は専用の区分を持つ。`--failed` はこの実行に指定した(または `--profile` 無しならその区分の)プロファイルの記録だけを見る。「失敗」はそのシナリオの直近の実行が通らなかったことで、**開始できなかったシナリオ**(担当のワーカー・デバイスが無い・run が中断された・デバイスの用意に失敗した)も含む。別の OS 向けの宣言で意図的に対象外になったシナリオは含まない |
@@ -41,6 +41,7 @@ FM を呼ぶのは実行プロファイルの `fmTextVisibilityCheck` / `screenL
 | `--wait-lock <秒>` | この Mac で別の run が走っているとき、すぐ失敗せずに待機列に並んで待つ上限(秒) |
 | `--device <名>` | 実行プロファイルのそのデバイスだけで実行する(複数回指定可)。`--broadcast` の絞り込みにも使える |
 | `--all-machines` | `--device` の名前が複数のマシンのデバイスに当たるとき、断らずに当たった全マシンで実行する |
+| `--target <プロジェクト>:<プロファイル>` | 複数のプロジェクト・プロファイルを1回の実行で回す(繰り返して指定する。例: `--target AppA:ios-run --target AppB:android-run`)。空いたマシンが次の対象を受け取り、残りが少なくなった対象は空いたマシンもシナリオ単位で手伝う。各マシンが同時に回すのは1つの対象だけ。`--project`/`--profile` とは併用できず、対象が2つ以上のときは `--broadcast`・`--runner`・`--dry-run`・`--scenario`・`--folder`・`--failed`・`--device` なども併用できない。`fleetest api run` には無い |
 | `--platform <ios\|android>` | `--profile` 無しでの対象プラットフォーム(既定 `ios`) |
 | `--app-id <bundleID>` | テスト対象のアプリの bundle ID。`--profile` 無しのときだけ必要(プロファイルがあれば実行プロファイルのアプリプロファイルから決まる)。`--set app=...` とは別物(実行プロファイルの `app` キーはアプリ**プロファイル名**を指す) |
 | `--serial <s>` | Android デバイスの serial(`--profile` 無しのとき) |

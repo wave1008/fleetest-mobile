@@ -1024,6 +1024,8 @@ public final class RunOrchestrator: Sendable {
     /// 遅延参加が1台も来なかったときの中止理由(nil = 中止していない)。**中止も interruptRequested を立てて
     /// 配布を止める**が、利用者の中断ではないので、中断のときだけ省く後始末は `stoppedByUser` で見分ける
     private let lateJoinAbort = LockedValue<String?>(nil)
+    /// pulled の配り手(中断で待ちを解く相手)。requestInterrupt と run の設定のどちらが先でも解けるよう、中断済みかを一緒に持つ
+    private let pullInterrupt = LockedValue<(source: (any ScenarioPullSource)?, interrupted: Bool)>((nil, false))
     /// ScenarioHost.run(registerChildProcess:) への素通し(呼び出し側が実行中の子を SIGTERM
     /// できるようにする登録口。FTCore は fleetest ターゲットの型を知らないので closure で受ける)
     private let registerChildProcess: (@Sendable (Process) -> @Sendable () -> Void)?
@@ -1163,6 +1165,11 @@ public final class RunOrchestrator: Sendable {
 
     public func requestInterrupt() {
         Task { await interruptRequested.request() }
+        let source = pullInterrupt.withLock { p -> (any ScenarioPullSource)? in
+            p.interrupted = true
+            return p.source
+        }
+        source?.stopWaiting()
     }
 
     private func deviceUnreachable(_ serial: String) async -> Bool {
@@ -1303,6 +1310,11 @@ public final class RunOrchestrator: Sendable {
             }
         case .pulled(let source):
             isPulled = true
+            let alreadyInterrupted = pullInterrupt.withLock { p -> Bool in
+                p.source = source
+                return p.interrupted
+            }
+            if alreadyInterrupted { source.stopWaiting() }
             let grouped = Dictionary(grouping: items) { $0.info.platform ?? defaultPlatform }
             let workerPlatforms = Set(workers.map(\.platform)).union(lateWorkers?.platforms ?? [])
             // shared と違い、担当ワーカーのない platform のシナリオを失敗にしない —— 配られていない

@@ -66,6 +66,36 @@ final class StdioPullSourceTests: XCTestCase {
         XCTAssertEqual(written.withLock { $0.count }, 1, "EOF 後の要求は書かずに nil にする")
     }
 
+    /// 中断(stopWaiting)で、返事の来ない要求も以後の要求も nil になる(親の返事を当てにしない)
+    func testStopWaitingResolvesWaitingAndFutureRequestsWithoutAReply() async {
+        let input = makePipe()
+        let written = LockedValue<[String]>([])
+        let source = StdioPullSource(inputFD: input.read, write: { line in written.withLock { $0.append(line) } })
+        // 解けないと永遠に待つので、2 秒で打ち切って "timeout" を返す(タスクグループは子が終わるまで抜けないので使わない)
+        func nextOrTimeout() async -> String? {
+            let box = LockedValue<CheckedContinuation<String?, Never>?>(nil)
+            return await withCheckedContinuation { continuation in
+                box.withLock { $0 = continuation }
+                Task {
+                    let value = await source.next(platform: "android", lane: "a")
+                    box.withLock { $0?.resume(returning: value); $0 = nil }
+                }
+                Task {
+                    try? await Task.sleep(for: .seconds(2))
+                    box.withLock { $0?.resume(returning: "timeout"); $0 = nil }
+                }
+            }
+        }
+        async let waiting = nextOrTimeout()
+        for _ in 0..<200 where written.withLock({ $0.isEmpty }) { try? await Task.sleep(for: .milliseconds(10)) }
+        source.stopWaiting()
+        let first = await waiting
+        XCTAssertNil(first, "待っている要求が中断で解けない")
+        let later = await nextOrTimeout()
+        XCTAssertNil(later, "中断後の要求が nil にならない")
+        XCTAssertEqual(written.withLock { $0.count }, 1, "中断後の要求は書かずに nil にする")
+    }
+
     /// 要求と無関係な行(他の JSON・壊れた行)は無視する
     func testUnrelatedInputLinesAreIgnored() async {
         let input = makePipe()
