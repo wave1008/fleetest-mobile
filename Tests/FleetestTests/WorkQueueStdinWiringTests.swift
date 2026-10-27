@@ -12,15 +12,29 @@ final class WorkQueueStdinWiringTests: XCTestCase {
         return try String(contentsOf: root.appendingPathComponent(path), encoding: .utf8)
     }
 
-    /// `func run() async throws {` の直後の、コメントでない最初の行
-    private func firstStatementOfRun(in text: String, file: String) -> String? {
+    /// `func run() async throws {` の直後の、コメントでない行(先頭から count 行)
+    private func statementsOfRun(in text: String, file: String, count: Int) -> [String] {
         guard let range = text.range(of: "    func run() async throws {\n") else {
             XCTFail("\(file) に run() が見つからない")
-            return nil
+            return []
         }
-        return text[range.upperBound...].split(separator: "\n")
+        return Array(text[range.upperBound...].split(separator: "\n")
             .map { $0.trimmingCharacters(in: .whitespaces) }
-            .first { !$0.isEmpty && !$0.hasPrefix("//") }
+            .filter { !$0.isEmpty && !$0.hasPrefix("//") }
+            .prefix(count))
+    }
+
+    private func firstStatementOfRun(in text: String, file: String) -> String? {
+        statementsOfRun(in: text, file: file, count: 1).first
+    }
+
+    /// 計測のプロファイルを --work-queue で断るのは、stdin を移した直後(供給・ビルドより前)。run / api run の両方
+    func testBothRunEntriesRejectMeasurementWithWorkQueueBeforeSupply() throws {
+        for file in ["Sources/fleetest/Fleetest.swift", "Sources/fleetest/ApiRunCommand.swift"] {
+            let lines = statementsOfRun(in: try source(file), file: file, count: 2)
+            XCTAssertEqual(lines.last, "try common.rejectWorkQueueMeasurement(setOverrides: setOverrides)",
+                           "\(file): run() の2行目で計測と --work-queue の併用を断っていない")
+        }
     }
 
     func testBothRunEntriesClaimStdinBeforeAnythingElse() throws {

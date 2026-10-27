@@ -59,6 +59,13 @@ enum MultiTargetRunner {
         }
     }
 
+    /// 残った仕事が使うマシンのラベルだけ(添字の順のまま)。飛ばした対象だけが使うマシンのロックを取らない
+    /// (取ると `--wait-lock` ぶん待ったうえ、使わないマシンを最後まで占有する)。machineLabels 自体は添字の基準なので削らない
+    static func labelsInUse(_ machineLabels: [String], entryMaps: [Set<Int>]) -> [String] {
+        let used = entryMaps.reduce(into: Set<Int>()) { $0.formUnion($1) }
+        return machineLabels.indices.filter { used.contains($0) }.map { machineLabels[$0] }
+    }
+
     /// 2つ以上の対象と併用できないフラグの最初の1つ(純粋関数。順序は利用者に見せたい順)
     static func firstRejection(flags: [(name: String, isSet: Bool)]) -> String? {
         flags.first(where: { $0.isSet }).map {
@@ -226,7 +233,8 @@ enum MultiTargetRunner {
             project: jobs[0].project, remoteDir: remoteDir, forceLock: forceLock, waitLock: waitLock,
             runGroup: runGroup, mode: .cliRun, log: { FleetRunner.log($0) }))
         defer { prelock.releaseAll() }
-        guard prelock.acquireInOrder(machines: DispatchPrelock.machinesToLock(machineLabels)) else {
+        guard prelock.acquireInOrder(machines: DispatchPrelock.machinesToLock(
+            labelsInUse(machineLabels, entryMaps: jobs.map { Set($0.entryByMachine.keys) }))) else {
             throw ValidationError("interrupted while acquiring dispatch locks — starting no sub-run")
         }
         let lockMarkers = prelock.markers

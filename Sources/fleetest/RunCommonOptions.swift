@@ -184,6 +184,18 @@ extension RunCommonOptions {
     ///   (run は `--port` が2つ以上なら RunOrchestrator 経由で録画できる・api run の runDirect は常に持たない)
     /// - dry-run はデバイスにも録画にも触れないので `--set` はそもそも使われない(profile-only キーを
     ///   dry-run で試すだけの打鍵を止めない)
+    /// `--work-queue` の子はレスポンス計測のプロファイルを断る(run / api run の入口で stdin を移した直後に1回)。
+    /// 配り手から1本ずつもらう子は反復(responseRepeat)を回せない = 親は同じ ID を1回しか配らないので、指定の回数を回さずに成功する。
+    /// **供給より前**(run は先行供給がビルドより前に始まる)
+    func rejectWorkQueueMeasurement(setOverrides: [String]) throws {
+        guard workQueue, let profile else { return }
+        let project = try ScenarioHost.project(named: project)
+        if ProfileResolver.declaresResponseMeasurement(
+            project: project, runName: profile, overrides: try RunProfileSetOverride.parse(setOverrides)) {
+            throw ValidationError("--work-queue cannot run a response-measurement profile (repeats would be skipped)")
+        }
+    }
+
     @discardableResult
     func validateSet(setOverrides: [String],
                      flagCollisions: [(flag: String, key: String, isSet: Bool)],

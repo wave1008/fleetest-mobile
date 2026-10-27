@@ -424,8 +424,6 @@ enum ProfileRunner {
         items = LPTOrdering.apply(items, project: project, defaultPlatform: defaultPlatform,
                                   enabled: lpt, historyRuns: lptHistoryRuns, log: { ConsoleOut.out($0) })
         if resolved.responseMeasurement {
-            // 配り手から1本ずつもらう子は反復を回せない(親は同じ ID を1回しか配らない)。入口を足しても黙って回数が欠けないよう子でも断る
-            if workQueue { throw ValidationError("--work-queue cannot run a response-measurement profile (repeats would be skipped)") }
             items = ResponseMeasurementRepeat.expand(items, count: resolved.responseRepeat)
         }
         // ApiRunCommand.run と同じ関数(RunStartLine)で組み立てる(CLAUDE.md「2 実装の差」対策)

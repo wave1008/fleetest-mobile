@@ -221,6 +221,7 @@ struct ApiRunCommand: AsyncParsableCommand {
     func run() async throws {
         // 子プロセスを1本も起こす前に(供給の adb なども stdin を受け継ぐ)
         if common.workQueue { _ = WorkQueueStdin.claim() }
+        try common.rejectWorkQueueMeasurement(setOverrides: setOverrides)
         // pause等のイベントが既定の全バッファに滞留すると読み手(VSCode拡張)と相互待ちになる
         // (ScenarioRunnerMain.swift の --debug 実装と同じ理由)。--debug 以外も常に行バッファにする
         setvbuf(stdout, nil, _IOLBF, 0)

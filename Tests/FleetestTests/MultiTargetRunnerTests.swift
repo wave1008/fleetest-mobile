@@ -171,6 +171,14 @@ final class MultiTargetRunnerTests: XCTestCase {
         XCTAssertTrue(h.coordinator.isInterrupted)
     }
 
+    /// ロックを取るのは残った仕事が使うマシンだけ(飛ばした対象だけが使うマシンは取らない)・添字の順のまま
+    func testLabelsInUseKeepOnlyMachinesOfRemainingJobs() {
+        let labels = ["local", "M1Ultra", "M1Max"]
+        XCTAssertEqual(MultiTargetRunner.labelsInUse(labels, entryMaps: [[0], [2]]), ["local", "M1Max"])
+        XCTAssertEqual(MultiTargetRunner.labelsInUse(labels, entryMaps: [[2, 0]]), ["local", "M1Max"])
+        XCTAssertEqual(MultiTargetRunner.labelsInUse(labels, entryMaps: []), [])
+    }
+
     func testAbnormalExitRetiresTheMachine() {
         let h = Harness(machines: 2, lanes: ["A": [0, 1], "B": [0, 1]],
                         scenarios: ["A": 10, "B": 10], order: ["A", "B"])
