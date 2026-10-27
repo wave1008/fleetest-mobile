@@ -73,28 +73,19 @@ enum ApiRunMachineFanout {
         // 改めて行う(RR-18.10「全員が同じ順序でしか取らないなら、循環待ちは作れない」= local だけ順序の外に出さない)。
         // api run に --force-lock は無い。**待っていることは NDJSON にも出す**(単機の api run と同じ出し口。
         // 渡し忘れると、複数機械のプロファイルだけ実行ログビューが無言のまま止まって見える → MN-62.4)
-        var localLock: LocalDispatchLock.Holder?
-        do {
-            localLock = try LocalDispatchLock(
+        var localLock = try parentInterrupt.acquireLocalLock(log: { logStderr($0) }) {
+            try LocalDispatchLock(
                 runGroup: runGroup, waitLock: options.waitLock, log: { logStderr($0) },
                 emitWaiting: LocalDispatchLock.apiRunWaitingEmitter()).acquire(interruptCheck: parentInterrupt.isSet)
-        } catch where parentInterrupt.isSet() {
-            logStderr("==> \(error.localizedDescription)")
-            throw DeviceMachineRunner.interruptedBeforeAnySubRun
         }
         defer { localLock?.release() }
 
         // 割り当てを決めるにはシナリオ一覧が要る(DeviceMachineRunner.run と同じ理由。ここで1回だけ
         // ローカルビルドする。ローカルの子には --skip-build を渡す = 下の buildChildArgs 参照)
-        let all: [ScenarioInfo]
-        do {
+        let all = try parentInterrupt.stage("the scenario build", log: { logStderr($0) }) {
             try ScenarioHost.build(project: project) { logStderr($0) }
-            all = try ScenarioHost.list(project: project)
-        } catch where parentInterrupt.isSet() {
-            try parentInterrupt.exitIfSet(during: "the scenario build", log: { logStderr($0) })
-            throw error
+            return try ScenarioHost.list(project: project)
         }
-        try parentInterrupt.exitIfSet(during: "the scenario build", log: { logStderr($0) })
         guard !all.isEmpty else {
             throw ValidationError(
                 "no scenarios (add a @TestClass under TestProjects/\(project.name)/scenarios/)")
@@ -181,9 +172,12 @@ enum ApiRunMachineFanout {
                 project: project, profileName: profileName, setOverrides: options.setOverrides,
                 localDeviceNames: local.group.deviceNames,
                 localScenarios: selected.filter { ids.contains($0.id) }, broadcast: false,
-                waitLock: options.waitLock, log: { logStderr($0) })
+                waitLock: options.waitLock, interruptCheck: parentInterrupt.isSet, log: { logStderr($0) })
         }
 
+        // ここまでの中断で runStarted を出さない(出すと runFinished の無い run が拡張に残る)。下の DispatchPrelock の待ちの中断は
+        // runStarted の後に来るので、その形では runFinished の無い run が残る
+        try parentInterrupt.exitIfSet(noticedAt: "the scenario assignment", log: { logStderr($0) })
         // total は対象外を除いた本数(単機の ApiRunCommand と同じ: スキップは runStarted に数えない)
         writeLine(encode(ApiRunStartedEvent(total: selected.count - notApplicable.count)))
 
@@ -241,7 +235,7 @@ enum ApiRunMachineFanout {
         }
         defer { cancelRelay.stop() }
         // 購読の登録より前の中断は子を起こす前に抜ける(DeviceMachineRunner.run の同じ箇所)
-        try parentInterrupt.exitIfSet(during: "the dispatch lock acquisition", log: { logStderr($0) })
+        try parentInterrupt.exitIfSet(noticedAt: "the dispatch lock acquisition", log: { logStderr($0) })
 
         let outcomes = await withTaskGroup(of: (Int, FleetEntryOutcome).self) { taskGroup in
             for (position, entry) in active.enumerated() {
@@ -274,6 +268,9 @@ enum ApiRunMachineFanout {
             }
             return (0..<active.count).compactMap { collected[$0] }
         }
+        // 子が全員終わった時点の値で仕分ける(後の解放・多重化の待ちの間に来た中断で、本物の欠落を中断に読み替えない。
+        // DeviceMachineRunner.run と同じ)。配り手の印・registry の取り消しを立てるのも中断の購読だけ
+        let interruptedWhileChildrenRan = parentInterrupt.isSet()
         // 残りの安全網(各機械は子の終了時に解放済み。理由は DeviceMachineRunner.run と同じ)
         prelock.releaseAll(exitCodes: Dictionary(
             outcomes.map { ($0.host, $0.exitCode) }, uniquingKeysWith: { first, _ in first }))
@@ -283,7 +280,7 @@ enum ApiRunMachineFanout {
         if let dispatcher {
             let ids = dispatcher.unhandedIDs
             if !ids.isEmpty {
-                let interrupted = dispatcher.isInterrupted || registry.isCancelled
+                let interrupted = interruptedWhileChildrenRan
                 interruptedWithWorkLeft = interrupted
                 logStderr(DeviceMachineRunner.neverHandedLine(ids: ids, interrupted: interrupted))
                 if !interrupted {
@@ -299,7 +296,7 @@ enum ApiRunMachineFanout {
         let (totalPassed, totalFailed, totalSkipped, runID, testSeconds, unfinishedTotal) = await multiplexed
         // 配ったのに子が終わりを知らせなかった分(子が受け取る前の中断など)。中断なら 130・それ以外は 1
         if unfinishedTotal > 0 {
-            if (dispatcher?.isInterrupted ?? false) || registry.isCancelled {
+            if interruptedWhileChildrenRan {
                 interruptedWithWorkLeft = true
             } else {
                 neverHandedFailure = true

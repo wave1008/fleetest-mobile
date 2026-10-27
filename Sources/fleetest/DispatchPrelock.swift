@@ -9,7 +9,7 @@
 // **順序の鍵(UUID)はロックより前に要る**ので、キャッシュに無い機械だけ先に1往復して採る
 // (`fillMissingUUIDs`)。採らないと、その機械への**初回ディスパッチでは順序付けが効かない**。
 //
-// 配線は3つの fan-out(ApiRunMachineFanout / DeviceMachineRunner / FleetRunner)から。
+// 配線は4つの fan-out(ApiRunMachineFanout / DeviceMachineRunner / MultiTargetRunner / FleetRunner)から。
 // **緑の run では1度も実行されない**(競合が起きないと順序も待ちも観測できない)ので、
 // 取得と解放は `Actions` で差し替えられる形にしてある(`DispatchPrelockTests`)。
 
@@ -84,16 +84,12 @@ final class DispatchPrelock {
     /// (飛ばした機械は誰にとっても取れないか、取れた人だけが先へ進む)。
     ///
     /// **中断(SIGINT/SIGTERM)を受けたら、ここまでに握ったロックを逆順で外して `false` を返す**。
-    /// **戻り値 `false` = 中断された**(呼び手 = `DeviceMachineRunner`/`ApiRunMachineFanout` は
-    /// これを見たら子を1つも起こさずに抜ける)。**throws ではなく Bool にしてある** ——
-    /// `FleetRunner`(`--fleet`)も同じ Actions/`acquireInOrder` を呼ぶが、中断時の打ち切りは
-    /// まだそちらに配線していない(この変更のスコープ外)。`throws` にすると戻り値を見ない
-    /// 既存呼び出しごとコンパイルが壊れるので、`@discardableResult` で無視しても壊れない形にし、
-    /// 中断を待たずに子を起こす退行は残しても**ビルドは壊さない**側を選ぶ。
+    /// **戻り値 `false` = 中断された**(4つの呼び手はどれも、これを見たら子を1つも起こさずに抜ける。機械分担・複数対象・
+    /// api run は 130、`--fleet` は今は ValidationError = OI-29)。
     ///
     /// 見るのは①各機械へ進む直前 ②1台ぶんの取得が失敗した直後 ③全部取り終えた直後 の3箇所 —— ①だけだと、既に成功して
     /// いた取得の直後に来た中断は次の反復まで気づかない。③が無いと最後の1台の取得の最中に来た中断を見ないまま true を返し、
-    /// 呼び手が子を起こしてから止めた(陽性対照で exit 15 の子が3本)
+    /// 呼び手が子を起こしてから止める
     @discardableResult
     func acquireInOrder(machines: [String]) -> Bool {
         let ordered = DispatchOrder.sorted(fillMissingUUIDs(actions.keys(machines)))

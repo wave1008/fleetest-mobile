@@ -2,6 +2,7 @@
 // 破ると: 速いマシンが空いているのに遅いマシンが長いシナリオを取って全体が延びる / 供給中のレーンを空きと数えて
 // 誰にも渡らない / 返事待ちの子が中断を見られず止まる / 落ちた子へ渡した分が二重に走る。
 
+import ArgumentParser
 import XCTest
 import FTCore
 @testable import fleetest
@@ -195,6 +196,13 @@ final class DynamicDispatcherTests: XCTestCase {
             XCTAssertFalse(text.contains("ValidationError(\"interrupted while acquiring"),
                            "\(file) がロックの取得中の中断を ValidationError(64)で投げている")
         }
+        // 渡したのに結果が無い分(子が受け取る前の中断など)も終了コードへ載せる
+        for (file, marker) in [("Sources/fleetest/DeviceMachineRunner.swift", "if missing > 0 {"),
+                               ("Sources/fleetest/MultiTargetRunner.swift", "if missing > 0 {"),
+                               ("Sources/fleetest/ApiRunMachineFanout.swift", "if unfinishedTotal > 0 {")] {
+            let text = try String(contentsOf: root.appendingPathComponent(file), encoding: .utf8)
+            XCTAssertTrue(text.contains(marker), "\(file) が結果の無いシナリオを終了コードへ載せていない")
+        }
     }
 
     /// 3経路の親は入口の中断の印(ParentInterrupt)を手元のロックの先取りより前に立て、そのロックの待ちにも渡す。
@@ -212,14 +220,55 @@ final class DynamicDispatcherTests: XCTestCase {
             XCTAssertLessThan(watch.lowerBound, lock.lowerBound, "\(file) が入口の印をロックの先取りより後で立てている")
             XCTAssertTrue(text.contains(".acquire(interruptCheck: parentInterrupt.isSet)"),
                           "\(file) が手元のロックの待ちに入口の印を渡していない")
+            XCTAssertTrue(text.contains("try parentInterrupt.acquireLocalLock("),
+                          "\(file) が手元のロックの待ちの中断を 130 へ読み替えていない")
+            XCTAssertTrue(text.contains("interruptCheck: parentInterrupt.isSet, log:"),
+                          "\(file) が手元のデバイスの使用中の待ちに入口の印を渡していない")
+            // 先取りのロックは使用中の待ちより前に手放す(握ったまま待つとこの Mac の他の run を待たせる)
+            let release = try XCTUnwrap(text.range(of: "localLock?.release()\n"), file)
+            let leaseWait = try XCTUnwrap(text.range(of: "try ProfileRunner.rejectIfLocalDevicesLeasedBeforeDispatch("), file)
+            XCTAssertLessThan(release.lowerBound, leaseWait.lowerBound, "\(file) がロックを握ったまま使用中を待っている")
         }
-        // 渡したのに結果が無い分(子が受け取る前の中断など)も終了コードへ載せる
-        for (file, marker) in [("Sources/fleetest/DeviceMachineRunner.swift", "if missing > 0 {"),
-                               ("Sources/fleetest/MultiTargetRunner.swift", "if missing > 0 {"),
-                               ("Sources/fleetest/ApiRunMachineFanout.swift", "if unfinishedTotal > 0 {")] {
-            let text = try String(contentsOf: root.appendingPathComponent(file), encoding: .utf8)
-            XCTAssertTrue(text.contains(marker), "\(file) が結果の無いシナリオを終了コードへ載せていない")
+    }
+
+    // MARK: - 入口の中断の印(ParentInterrupt)の段の振る舞い
+
+    /// 中断済みなら手元のロックを取りに行かない(列に並ばない・--force-lock で奪わない)
+    func testAnInterruptedParentDoesNotGoForTheLocalLock() {
+        let watch = DeviceMachineRunner.ParentInterrupt(isSetForTesting: { true })
+        let attempted = LockedValue(false)
+        XCTAssertThrowsError(try watch.acquireLocalLock(log: { _ in }) {
+            attempted.withLock { $0 = true }
+            return nil
+        }) { error in XCTAssertEqual((error as? ExitCode)?.rawValue, 130, "\(error)") }
+        XCTAssertFalse(attempted.value, "中断済みなのにロックを取りに行った")
+    }
+
+    /// 待ちの最後の周で取れても、その間に来た中断を見て、取ったロックを外してから 130 で抜ける
+    /// (外さないと、呼び手の defer が張られる前に投げるのでプロセスの終わりまで握る)
+    func testALockTakenWhileTheInterruptArrivedIsReleasedBeforeExiting() {
+        let interrupted = LockedValue(false)
+        let released = LockedValue(false)
+        let watch = DeviceMachineRunner.ParentInterrupt(isSetForTesting: { interrupted.value })
+        XCTAssertThrowsError(try watch.acquireLocalLock(log: { _ in }) {
+            interrupted.withLock { $0 = true }
+            return LocalDispatchLock.Holder { released.withLock { $0 = true } }
+        }) { error in XCTAssertEqual((error as? ExitCode)?.rawValue, 130, "\(error)") }
+        XCTAssertTrue(released.value, "取ったロックを外さずに抜けた")
+    }
+
+    /// 段の中で中断に落ちた誤り(端末の Ctrl-C でビルドが落ちた)は 130。中断でない誤りはそのまま投げる
+    func testAStageMapsAnInterruptedFailureTo130AndPassesOtherFailuresThrough() {
+        struct BuildFailed: Error {}
+        let interrupted = LockedValue(false)
+        let watch = DeviceMachineRunner.ParentInterrupt(isSetForTesting: { interrupted.value })
+        XCTAssertThrowsError(try watch.stage("the scenario build", log: { _ in }) { () throws -> Int in throw BuildFailed() }) {
+            XCTAssertTrue($0 is BuildFailed, "中断でない誤りを読み替えた: \($0)")
         }
+        XCTAssertThrowsError(try watch.stage("the scenario build", log: { _ in }) { () throws -> Int in
+            interrupted.withLock { $0 = true }
+            throw BuildFailed()
+        }) { XCTAssertEqual(($0 as? ExitCode)?.rawValue, 130, "\($0)") }
     }
 
     /// レスポンス計測の run は動的にしない(反復は子だけが展開し、親は同じ ID を1回しか配らない)

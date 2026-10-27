@@ -121,16 +121,18 @@ enum ProfileRunner {
     /// 手元の子の拒否より先にリモートの子がロックを取り、断られた run の半分が走って同時刻の
     /// 別 run のリモート分を丸ごと弾いていた(負荷テスト M12)。
     /// 判定材料が揃わない(プロファイル解決の失敗等)ときは何もしない = 手元の子の判定に任せる。
-    /// DeviceMachineRunner と ApiRunMachineFanout の2経路から呼ぶ。
+    /// DeviceMachineRunner・ApiRunMachineFanout・MultiTargetRunner の3経路から呼ぶ。
     ///
     /// **`waitLock` があれば、この機械の dispatch.lock と同じ刻み(`WaitLockPolling`)で
     /// 待ってから再判定する**(この機械は dispatch.lock で1マシン1 run を守っているので、
     /// 走行中の run が終わればデバイスの lease は必ず空く = 待てば必ず解消する)。無ければ即座に断る
-    /// (`LocalDeviceLeaseWaitPolicy.decide`)。上限に達しても空かなければ今と同じ文言で断る
+    /// (`LocalDeviceLeaseWaitPolicy.decide`)。上限に達しても空かなければ今と同じ文言で断る。
+    /// **待ちの毎周の頭と、断る前に `interruptCheck` を見て、中断なら 130(`interruptedBeforeAnySubRun`)で抜ける** —— 呼び手(機械分担の親)は
+    /// 入口の印でシグナルの既定動作を止めているので、見ないと Ctrl-C が `--wait-lock` の上限まで効かない
     static func rejectIfLocalDevicesLeasedBeforeDispatch(
         project: TestProject, profileName: String, setOverrides: [String: RunProfileSetValue],
         localDeviceNames: [String], localScenarios: [ScenarioInfo], broadcast: Bool,
-        waitLock: Int? = nil,
+        waitLock: Int? = nil, interruptCheck: () -> Bool,
         leaseStateDir: URL? = (try? RepoRoot.find())?.appendingPathComponent(".fleetest"),
         log: (String) -> Void = { _ in },
         sleepSeconds: (Int) -> Void = { Thread.sleep(forTimeInterval: Double($0)) }
@@ -147,11 +149,16 @@ enum ProfileRunner {
             full, iosScenarios: counts.ios, androidScenarios: counts.android,
             trim: !broadcast, leaseStateDir: leaseStateDir)
         var elapsed = 0
+        let stage = { "the check of the local device(s) (waited \(elapsed)s)" }
         while true {
+            // 周の頭で見る(眠っている間の中断を、次の判定の成功・上限の断りより先に拾う)
+            if interruptCheck() { try DeviceMachineRunner.ParentInterrupt.exit(noticedAt: stage(), log: log) }
             do {
                 try rejectIfDevicesLeasedBeforePreparation(resolved: resolved, leaseStateDir: leaseStateDir)
                 return
             } catch {
+                // 判定の最中に来た中断も、使用中の断りより先に言う(上限の周・--wait-lock 無しの1回きりの判定)
+                if interruptCheck() { try DeviceMachineRunner.ParentInterrupt.exit(noticedAt: stage(), log: log) }
                 guard LocalDeviceLeaseWaitPolicy.decide(elapsedSeconds: elapsed, waitLock: waitLock)
                     == .retry else {
                     throw ProfileWorkerFactory.InstallError(message: error.localizedDescription

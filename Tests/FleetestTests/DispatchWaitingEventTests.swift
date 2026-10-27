@@ -126,7 +126,7 @@ final class DispatchWaitingEventTests: XCTestCase {
             if text.contains("LocalDispatchLock(") { constructing.insert(file) }
         }
         let apiRun: Set<String> = ["ApiRunCommand.swift", "ApiRunMachineFanout.swift"]
-        let cliRun: Set<String> = ["Fleetest.swift", "DeviceMachineRunner.swift"]
+        let cliRun: Set<String> = ["Fleetest.swift", "DeviceMachineRunner.swift", "MultiTargetRunner.swift"]
         XCTAssertEqual(constructing, apiRun.union(cliRun).union(["DispatchPrelock.swift"]),
                        "手元のロックを取る経路が増えた/減った —— NDJSON の出し口を渡すかを決めて表へ載せる")
         for file in apiRun {

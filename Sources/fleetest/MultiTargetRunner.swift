@@ -151,14 +151,10 @@ enum MultiTargetRunner {
             + " — each free machine takes the next target; the last targets are shared scenario by scenario")
 
         // build を直列化するための先取り。配分が確定したら必ず手放し、本取得は DispatchPrelock が全順序で行う
-        var localLock: LocalDispatchLock.Holder?
-        do {
-            localLock = try LocalDispatchLock(
+        var localLock = try parentInterrupt.acquireLocalLock(log: { FleetRunner.log($0) }) {
+            try LocalDispatchLock(
                 runGroup: runGroup, waitLock: waitLock, forceLock: forceLock,
                 log: { FleetRunner.log($0) }).acquire(interruptCheck: parentInterrupt.isSet)
-        } catch where parentInterrupt.isSet() {
-            FleetRunner.log("==> \(error.localizedDescription)")
-            throw DeviceMachineRunner.interruptedBeforeAnySubRun
         }
         defer { localLock?.release() }
 
@@ -167,15 +163,10 @@ enum MultiTargetRunner {
         var listed: [String: [ScenarioInfo]] = [:]
         var healByProject: [String: HealSourceWriteBack.Collection] = [:]
         for target in resolvedTargets where built.insert(target.project.name).inserted {
-            let found: [ScenarioInfo]
-            do {
+            let found = try parentInterrupt.stage("the scenario build", log: { FleetRunner.log($0) }) {
                 if !skipBuild { try ScenarioHost.build(project: target.project, log: { FleetRunner.log($0) }) }
-                found = try ScenarioHost.listForRun(project: target.project, dryRun: false, compilesOCR: false)
-            } catch where parentInterrupt.isSet() {
-                try parentInterrupt.exitIfSet(during: "the scenario build", log: { FleetRunner.log($0) })
-                throw error
+                return try ScenarioHost.listForRun(project: target.project, dryRun: false, compilesOCR: false)
             }
-            try parentInterrupt.exitIfSet(during: "the scenario build", log: { FleetRunner.log($0) })
             guard !found.isEmpty else {
                 throw ValidationError(
                     "no scenarios (add a @TestClass under TestProjects/\(target.project.name)/scenarios/)")
@@ -229,6 +220,10 @@ enum MultiTargetRunner {
             return 0
         }
 
+        // ビルドを直列化する先取りは、使用中の待ちより前に手放す(DeviceMachineRunner.run と同じ順序。握ったまま待つと、
+        // 断られて終わるかもしれない run がこの Mac の他の run を --wait-lock ぶん待たせる)
+        localLock?.release()
+        localLock = nil
         // 手元のデバイスの二重使用はどの機械へも配る前に断る(DeviceMachineRunner.run と同じ位置・同じ理由)
         for job in jobs {
             guard let local = job.groups.first(where: { $0.machine == nil }) else { continue }
@@ -237,10 +232,8 @@ enum MultiTargetRunner {
                 project: job.project, profileName: job.profile, setOverrides: setOverrides,
                 localDeviceNames: local.deviceNames,
                 localScenarios: job.infos.filter { ids.contains($0.id) }, broadcast: false,
-                waitLock: waitLock, log: { FleetRunner.log($0) })
+                waitLock: waitLock, interruptCheck: parentInterrupt.isSet, log: { FleetRunner.log($0) })
         }
-        localLock?.release()
-        localLock = nil
 
         // 4. 使う全マシンの dispatch.lock を最初に取り、全部の仕事が終わるまで持つ
         let binary = FleetRunner.selfBinaryPath()
@@ -313,11 +306,14 @@ enum MultiTargetRunner {
         let relay = InterruptRelay.observing(catchUp: true) { coordinator.interrupt() }
         defer { relay.stop() }
         // 購読の登録より前の中断は子を起こす前に抜ける(DeviceMachineRunner.run の同じ箇所)
-        try parentInterrupt.exitIfSet(during: "the dispatch lock acquisition", log: { FleetRunner.log($0) })
+        try parentInterrupt.exitIfSet(noticedAt: "the dispatch lock acquisition", log: { FleetRunner.log($0) })
         let wallStart = clock()
         coordinator.start()
         await coordinator.waitUntilFinished()
         let wallMs = clock() - wallStart
+        // 子が全員終わった時点の値で仕分ける(後の対象ごとの走査の間に来た中断で、ほかの対象の本物の欠落を中断に読み替えない。
+        // DeviceMachineRunner.run と同じ)。配り手・coordinator の印を立てるのも中断の購読だけ
+        let interrupted = parentInterrupt.isSet()
 
         // 6. 後始末と集計
         let results = outcomes.withLock { $0 }
@@ -327,14 +323,12 @@ enum MultiTargetRunner {
 
         var neverHandedFailure = false
         var interruptedWithWorkLeft = false
-        let interrupted = coordinator.isInterrupted
         for job in jobs {
             let ids = job.dispatcher.unhandedIDs
             guard !ids.isEmpty else { continue }
-            FleetRunner.log("[\(job.id)] " + DeviceMachineRunner.neverHandedLine(
-                ids: ids, interrupted: job.dispatcher.isInterrupted))
-            if job.dispatcher.isInterrupted { interruptedWithWorkLeft = true }
-            if !job.dispatcher.isInterrupted {
+            FleetRunner.log("[\(job.id)] " + DeviceMachineRunner.neverHandedLine(ids: ids, interrupted: interrupted))
+            if interrupted { interruptedWithWorkLeft = true }
+            if !interrupted {
                 neverHandedFailure = true
                 for id in ids {
                     LastResultsStore.record(project: job.project, scenarioID: id, passed: false, profile: job.profile)
@@ -361,7 +355,7 @@ enum MultiTargetRunner {
                                                outcomes: results, machineLabels: machineLabels)
             // 渡したのに結果が無い分(子が受け取る前の中断など)。中断なら 130・それ以外は 1
             if missing > 0 {
-                if job.dispatcher.isInterrupted { interruptedWithWorkLeft = true } else { neverHandedFailure = true }
+                if interrupted { interruptedWithWorkLeft = true } else { neverHandedFailure = true }
             }
         }
         if let junit, let junitTempDir {

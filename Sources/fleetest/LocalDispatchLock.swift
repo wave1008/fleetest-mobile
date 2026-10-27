@@ -158,7 +158,8 @@ final class LocalDispatchLock {
             stopOwnRelay = {}
         } else {
             let interrupted = InterruptFlag()
-            let relay = InterruptRelay.observing { interrupted.mark() }
+            // catchUp: 登録より前に来た中断(呼び手の段の間)も見て、待たずに抜ける
+            let relay = InterruptRelay.observing(catchUp: true) { interrupted.mark() }
             isInterrupted = { interrupted.isSet }
             stopOwnRelay = { relay.stop() }
         }

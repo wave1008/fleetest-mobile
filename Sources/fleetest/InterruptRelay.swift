@@ -122,6 +122,11 @@ final class InterruptRelay {
         state.withLock { $0.received = false }
     }
 
+    /// このプロセスが一度でも中断を受けたか。`forwardToAll` が購読を呼ぶより先に立てるので、購読の通知順に依らない
+    static var hasReceivedInterrupt: Bool {
+        state.withLock { $0.received }
+    }
+
     /// 現在登録されている子の数(テスト用)
     static var registeredCount: Int {
         state.withLock { $0.targets.count }

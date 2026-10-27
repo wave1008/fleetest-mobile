@@ -4,6 +4,7 @@
 // 同時刻に始まった本来の run のリモート分を丸ごと弾いた。
 // デバイスの鍵を simctl/adb を引かずに決めるため、手元のデバイスは物理 iOS(udid の記載をそのまま使う)で組む。
 
+import ArgumentParser
 import XCTest
 @testable import FTCore
 import FTBridgeClient
@@ -46,7 +47,54 @@ final class LocalLeaseRefusalBeforeDispatchTests: XCTestCase {
             project: project, profileName: "fleet", setOverrides: [:],
             localDeviceNames: ["A", "B"],
             localScenarios: (0..<scenarios).map { ScenarioInfo(id: "C.S\($0)", title: "t") },
-            broadcast: false, leaseStateDir: stateDir)
+            broadcast: false, interruptCheck: { false }, leaseStateDir: stateDir)
+    }
+
+    /// 眠っている間に来た中断は、次の周の頭で拾って 130 で抜ける(上限まで待たない・使用中の断りに化けない)
+    func testAnInterruptWhileWaitingForALocalDeviceStopsTheWait() {
+        RunLease.write(stateDir: stateDir, key: "UA", pid: otherLivePID)
+        let slept = LockedValue(0)
+        let logged = LockedValue<[String]>([])
+        XCTAssertThrowsError(try ProfileRunner.rejectIfLocalDevicesLeasedBeforeDispatch(
+            project: project, profileName: "fleet", setOverrides: [:],
+            localDeviceNames: ["A", "B"], localScenarios: [ScenarioInfo(id: "C.S0", title: "t")],
+            broadcast: false, waitLock: 300, interruptCheck: { slept.value >= 1 }, leaseStateDir: stateDir,
+            log: { line in logged.withLock { $0.append(line) } },
+            sleepSeconds: { _ in slept.withLock { $0 += 1 } })) { error in
+            XCTAssertEqual((error as? ExitCode)?.rawValue, 130, "\(error)")
+        }
+        XCTAssertEqual(slept.value, 1, "中断の後も待ち続けている")
+        XCTAssertTrue(logged.value.contains { $0.contains("interrupt noticed at the check of the local device(s)") },
+                      "\(logged.value)")
+    }
+
+    /// 眠っている間に空いても、同じ間に来た中断が勝つ(空いたことを成功として返すと、中断の後に全マシンへ配る)
+    func testAnInterruptWinsOverADeviceThatFreedDuringTheSameSleep() {
+        RunLease.write(stateDir: stateDir, key: "UA", pid: otherLivePID)
+        let interrupted = LockedValue(false)
+        XCTAssertThrowsError(try ProfileRunner.rejectIfLocalDevicesLeasedBeforeDispatch(
+            project: project, profileName: "fleet", setOverrides: [:],
+            localDeviceNames: ["A", "B"], localScenarios: [ScenarioInfo(id: "C.S0", title: "t")],
+            broadcast: false, waitLock: 300, interruptCheck: { interrupted.value }, leaseStateDir: stateDir,
+            sleepSeconds: { [stateDir] _ in
+                RunLease.remove(stateDir: stateDir!, key: "UA")
+                interrupted.withLock { $0 = true }
+            })) { error in
+            XCTAssertEqual((error as? ExitCode)?.rawValue, 130, "\(error)")
+        }
+    }
+
+    /// 判定の最中に来た中断は、上限で断る周でも使用中の断りに化けない(--wait-lock 無し = 1回きりの判定)
+    func testAnInterruptDuringTheOnlyCheckIsNotReportedAsARefusal() {
+        RunLease.write(stateDir: stateDir, key: "UA", pid: otherLivePID)
+        let calls = LockedValue(0)
+        XCTAssertThrowsError(try ProfileRunner.rejectIfLocalDevicesLeasedBeforeDispatch(
+            project: project, profileName: "fleet", setOverrides: [:],
+            localDeviceNames: ["A", "B"], localScenarios: [ScenarioInfo(id: "C.S0", title: "t")],
+            broadcast: false, waitLock: nil,
+            interruptCheck: { calls.withLock { $0 += 1; return $0 >= 2 } }, leaseStateDir: stateDir)) { error in
+            XCTAssertEqual((error as? ExitCode)?.rawValue, 130, "\(error)")
+        }
     }
 
     /// 手元のデバイスを別の生きた run が握っていれば、デバイスと保持者を名指しして断る
@@ -83,12 +131,13 @@ final class LocalLeaseRefusalBeforeDispatchTests: XCTestCase {
         XCTAssertNoThrow(try check(scenarios: 0))
     }
 
-    /// 配線: 2 経路とも**子の起動より前**に呼ぶ(型では守れないのでソースで固定する)
-    func testBothFanoutsCheckBeforeLaunchingChildren() throws {
+    /// 配線: 3 経路(run の機械分担・api run の機械分担・複数対象)とも**子の起動より前**に呼ぶ(型では守れないのでソースで固定する)
+    func testAllFanoutsCheckBeforeLaunchingChildren() throws {
         let root = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
         for (path, launch) in [("Sources/fleetest/DeviceMachineRunner.swift", "FleetRunner.runEntry("),
-                               ("Sources/fleetest/ApiRunMachineFanout.swift", "ApiRunStartedEvent(total: selected")] {
+                               ("Sources/fleetest/ApiRunMachineFanout.swift", "ApiRunStartedEvent(total: selected"),
+                               ("Sources/fleetest/MultiTargetRunner.swift", "coordinator.start()")] {
             let text = try String(contentsOf: root.appendingPathComponent(path), encoding: .utf8)
             let guardCall = try XCTUnwrap(text.range(of: "try ProfileRunner.rejectIfLocalDevicesLeasedBeforeDispatch("),
                                           "\(path) must call the guard")

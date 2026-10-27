@@ -136,31 +136,22 @@ enum DeviceMachineRunner {
         // **build を直列化するための一時的な先取り** —— 配分が確定したら local に配られるかどうかに
         // 関わらず必ず手放す(下)。全順序どおりの本取得は `DispatchPrelock` が local を含めて
         // 改めて行う(RR-18.10「全員が同じ順序でしか取らないなら、循環待ちは作れない」= local だけ順序の外に出さない)
-        var localLock: LocalDispatchLock.Holder?
-        do {
-            localLock = try LocalDispatchLock(
+        var localLock = try parentInterrupt.acquireLocalLock(log: { FleetRunner.log($0) }) {
+            try LocalDispatchLock(
                 runGroup: runGroup, waitLock: waitLock, forceLock: forceLock,
                 log: { FleetRunner.log($0) }).acquire(interruptCheck: parentInterrupt.isSet)
-        } catch where parentInterrupt.isSet() {
-            FleetRunner.log("==> \(error.localizedDescription)")
-            throw interruptedBeforeAnySubRun
         }
         defer { localLock?.release() }
 
         // 割り当てを決めるにはシナリオ一覧が要る(--split と同じ理由でローカルで1回ビルドする)。
-        // ビルド中の中断はビルドが終わってから拾う(端末の Ctrl-C でビルドが落ちた失敗も中断として抜ける)
-        let all: [ScenarioInfo]
-        do {
+        // ビルド中の中断はビルドが終わってから拾う
+        // 機械分担の run に dry-run は無い(dry-run は手元の run 経路で先に畳まれる)
+        // **コンパイルは起こさない**: 一覧は割り当てを決めるためだけで、機械ごとの run(手元の分を含む)が
+        // 自分の解決済みプロファイルで要否を決めて起こす
+        let all = try parentInterrupt.stage("the scenario build", log: { FleetRunner.log($0) }) {
             try ScenarioHost.build(project: project, log: { FleetRunner.log($0) })
-            // 機械分担の run に dry-run は無い(dry-run は手元の run 経路で先に畳まれる)
-            // **コンパイルは起こさない**: 一覧は割り当てを決めるためだけで、機械ごとの run(手元の分を含む)が
-            // 自分の解決済みプロファイルで要否を決めて起こす
-            all = try ScenarioHost.listForRun(project: project, dryRun: false, compilesOCR: false)
-        } catch where parentInterrupt.isSet() {
-            try parentInterrupt.exitIfSet(during: "the scenario build", log: { FleetRunner.log($0) })
-            throw error
+            return try ScenarioHost.listForRun(project: project, dryRun: false, compilesOCR: false)
         }
-        try parentInterrupt.exitIfSet(during: "the scenario build", log: { FleetRunner.log($0) })
         guard !all.isEmpty else {
             throw ValidationError(
                 "no scenarios (add a @TestClass under TestProjects/\(project.name)/scenarios/)")
@@ -258,7 +249,7 @@ enum DeviceMachineRunner {
                 project: project, profileName: profileName, setOverrides: setOverrides,
                 localDeviceNames: local.1.deviceNames,
                 localScenarios: selected.filter { ids.contains($0.id) }, broadcast: broadcast,
-                waitLock: waitLock, log: { FleetRunner.log($0) })
+                waitLock: waitLock, interruptCheck: parentInterrupt.isSet, log: { FleetRunner.log($0) })
         }
 
         let binary = FleetRunner.selfBinaryPath()
@@ -291,7 +282,7 @@ enum DeviceMachineRunner {
         let interruptRelay = dispatcher.map { dispatcher in InterruptRelay.observing(catchUp: true) { dispatcher.interrupt() } }
         defer { interruptRelay?.stop() }
         // 購読の登録より前(ロックの取得から登録まで)の中断は、子を起こす前にここで抜ける(後の中断は購読と各子の relay が受ける)
-        try parentInterrupt.exitIfSet(during: "the dispatch lock acquisition", log: { FleetRunner.log($0) })
+        try parentInterrupt.exitIfSet(noticedAt: "the dispatch lock acquisition", log: { FleetRunner.log($0) })
         let outcomes = await withTaskGroup(of: (Int, FleetEntryOutcome).self) { taskGroup in
             for (index, group, ids) in active {
                 taskGroup.addTask {
@@ -331,6 +322,9 @@ enum DeviceMachineRunner {
             }
             return active.compactMap { collected[$0.0] }
         }
+        // 子が全員終わった時点の値で仕分ける(後の走査の間に来た中断で、本物の欠落・配れなかった分を中断に読み替えない)。
+        // 配り手の印を立てるのも中断の購読だけなので、静的・動的とも同じ値
+        let interruptedWhileChildrenRan = parentInterrupt.isSet()
         // 各機械のロックは**その子が終わった時点で**上の `release(afterChildOf:)` が外し済み
         // (正常終了(0/1)は無条件、それ以外は生死を確かめてから。RemoteRunDispatcher.releaseDispatchLockAsParent
         // の宣言参照)。ここと末尾の bare `defer { prelock.releaseAll() }` は残り(子を起こさなかった
@@ -349,7 +343,7 @@ enum DeviceMachineRunner {
         if let dispatcher {
             let ids = dispatcher.unhandedIDs
             if !ids.isEmpty {
-                let interrupted = dispatcher.isInterrupted
+                let interrupted = interruptedWhileChildrenRan
                 interruptedWithWorkLeft = interrupted
                 FleetRunner.log(neverHandedLine(ids: ids, interrupted: interrupted))
                 if !interrupted {
@@ -370,8 +364,7 @@ enum DeviceMachineRunner {
                                                since: dispatchStart, active: assignedActive, outcomes: outcomes)
             // 渡したのに結果が無い分(子が受け取る前の中断など)。中断なら 130・それ以外は 1
             if missing > 0 {
-                // 静的な割り当て(FT_STATIC_SPLIT=1)には配り手が無いので入口の印も見る(api run は registry の取り消しで同じ判定)
-                if dispatcher?.isInterrupted ?? parentInterrupt.isSet() { interruptedWithWorkLeft = true } else { neverHandedFailure = true }
+                if interruptedWhileChildrenRan { interruptedWithWorkLeft = true } else { neverHandedFailure = true }
             }
         }
         // ディスパッチした(= --junit を渡した)ぶんだけ結合する。0本で見送ったホストを混ぜると
@@ -402,22 +395,78 @@ enum DeviceMachineRunner {
     /// マシンをまたぐ親(3経路)の入口で立てる中断の印。**チケットの発行・手元のロックの先取りより前に登録し、関数の終わりまで持つ** ——
     /// 先取りの `acquire()` は自前の購読を外すと既定動作へ戻すので、無いとビルド・一覧取得の間の SIGTERM(拡張の取り消し)で
     /// 親が後始末なしに死に、手元のロックが死んだ pid のまま残り build が孤児になる。印を立てるだけ(子へ送るのは各経路の relay)
+    /// 印はプロセスの受けた中断そのもの(`InterruptRelay.hasReceivedInterrupt`)を読む —— 自前の印にすると、`forwardToAll` が
+    /// 購読を呼ぶ順で、すでに受けた中断を catchUp の購読は知っているのにこちらは知らない隙間ができる
+    /// **親には2回目の中断で即座に終わる逃げ道を置かない**(子を起こす前の段の話。起こした後の2回目は各経路の relay が子へ送り、
+    /// 子は自分の規則で動く)—— 後始末を飛ばすので、手元のロックが死んだ pid のまま残り(回収できるのは同じ利用者の次の run だけ)、
+    /// ビルドも孤児になる = 拡張の強制終了(SIGKILL)と同じ結果で、足しても得るものが無い
     final class ParentInterrupt {
         let isSet: @Sendable () -> Bool
-        private let relay: InterruptRelay
+        private let relay: InterruptRelay?
+
+        /// 最初の中断で1回だけ言う(無言だと効いていないと見て強制終了される。RunInterruptState.runNotice と同じ理由)
+        static let notice = "⏹ Interrupt received — stopping (the current step, e.g. a scenario build, finishes first)"
 
         init() {
-            let flag = LockedValue(false)
-            relay = InterruptRelay.observing { flag.withLock { $0 = true } }
-            isSet = { flag.value }
+            isSet = { InterruptRelay.hasReceivedInterrupt }
+            let noticed = LockedValue(false)
+            relay = InterruptRelay.observing {
+                guard !noticed.withLock({ value -> Bool in defer { value = true }; return value }) else { return }
+                ConsoleOut.err(Self.notice)
+            }
         }
 
-        func stop() { relay.stop() }
+        /// テスト用: 印を差し替える(シグナルを撃たずに段の振る舞いを確かめる。購読は立てない)
+        init(isSetForTesting: @escaping @Sendable () -> Bool) {
+            isSet = isSetForTesting
+            relay = nil
+        }
+
+        func stop() { relay?.stop() }
+
+        /// 手元のロックの先取り。**取りに行く前・待ちの中・取れた直後**のどこで中断に気づいても1行言って 130 で抜ける
+        /// (取りに行く前に見ないと、中断済みでも列に並び、`--force-lock` なら生きた run のロックを奪ってから外す。
+        /// 取れた直後に見ないと、待ちの最後の周の間に来た中断を見ずにビルドへ進む)。取れた後に抜けるときは外してから抜ける
+        func acquireLocalLock(log: (String) -> Void,
+                              _ acquire: () throws -> LocalDispatchLock.Holder?) throws -> LocalDispatchLock.Holder? {
+            let stage = "the dispatch lock wait on this Mac"
+            try exitIfSet(noticedAt: stage, log: log)
+            let holder: LocalDispatchLock.Holder?
+            do {
+                holder = try acquire()
+            } catch where isSet() {
+                log("==> \(error.localizedDescription)")
+                try Self.exit(noticedAt: stage, log: log)
+            }
+            if isSet() {
+                holder?.release()
+                try Self.exit(noticedAt: stage, log: log)
+            }
+            return holder
+        }
+
+        /// 段(ビルド・一覧取得)を走らせ、中断なら1行言って 130 で抜ける。中断で落ちた誤り(端末の Ctrl-C でビルドが落ちた)も中断として抜ける
+        func stage<T>(_ name: String, log: (String) -> Void, _ body: () throws -> T) throws -> T {
+            let value: T
+            do {
+                value = try body()
+            } catch where isSet() {
+                try Self.exit(noticedAt: name, log: log)
+            }
+            try exitIfSet(noticedAt: name, log: log)
+            return value
+        }
 
         /// 段の境目。中断済みなら1行言って 130 で抜ける
-        func exitIfSet(during stage: String, log: (String) -> Void) throws {
+        func exitIfSet(noticedAt stage: String, log: (String) -> Void) throws {
             guard isSet() else { return }
-            log("==> interrupted during \(stage) — starting no sub-run")
+            try Self.exit(noticedAt: stage, log: log)
+        }
+
+        /// 子を起こす前の中断の1行と出口(段の境目と、印を `() -> Bool` で受ける待ちの中の両方が通る = 書式と 130 を1か所に)。
+        /// **言うのは「どの段で気づいたか」だけ** —— 中断が届いた段は分からない(前の段の間に届いて、ここで初めて見たのかもしれない)
+        static func exit(noticedAt stage: String, log: (String) -> Void) throws -> Never {
+            log("==> interrupt noticed at \(stage) — starting no sub-run")
             throw DeviceMachineRunner.interruptedBeforeAnySubRun
         }
     }

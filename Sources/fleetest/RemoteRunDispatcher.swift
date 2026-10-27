@@ -481,7 +481,8 @@ struct RemoteRunDispatcher {
         let (layout, session) = try resolveLayout()
         cacheHardwareUUID(project: project, session: session)
         let interruptFlag = DispatchInterruptFlag()
-        let relay = InterruptRelay.observing { interruptFlag.mark() }
+        // catchUp: 登録より前(上の resolveLayout の ssh の間)に来た中断も見て、待機列で待たずに抜ける
+        let relay = InterruptRelay.observing(catchUp: true) { interruptFlag.mark() }
         defer { relay.stop() }
         try acquireDispatchLock(layout: layout, runGroup: runGroup, interruptFlag: interruptFlag)
         return layout
