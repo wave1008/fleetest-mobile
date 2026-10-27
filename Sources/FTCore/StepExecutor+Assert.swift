@@ -105,10 +105,12 @@ extension StepExecutor {
 
     /// keyboardShown: 判定に使った木の `KeyboardWait.isShown`(絵を XCUITest で撮るかの材料。`JudgmentCapture`)
     func occlusionFlip(element: ElementInfo, expectedText: String, elements: [ElementInfo],
-                              screen: FTRect, keyboardShown: Bool, looseMatch: Bool, perStepGuard: Bool?,
+                              screen: FTRect, keyboardShown: Bool, keyboard: FTRect? = nil,
+                              looseMatch: Bool, perStepGuard: Bool?,
                               expectedIsUserText: Bool = false,
                               phase: inout PhaseAccumulator) async throws -> StepResult.Status? {
         guardFrameStaleThisEval = false
+        guardKeyboardFrame = keyboard
         guard visibilityGuardActive(perStepGuard: perStepGuard) else { return nil }
         let clock = ContinuousClock()
         // **ここより後ろに置かない** —— 足切り(型・ラベル・インク)で FM を呼ばずに
@@ -406,7 +408,8 @@ extension StepExecutor {
         return .failed("text visibility check failed (on screen): present in the tree but not visually visible [\(v.state)] \(v.reason)"
                        + " observed=\"\(v.observedText)\""
                        + emptyTranscriptOnInk
-                       + Self.blankAppAreaFact(screenshot: screenshot, elements: elements, screen: screen))
+                       + Self.undrawnScreenFact(screenshot: screenshot, elements: elements, screen: screen,
+                                                keyboard: guardKeyboardFrame, inkThreshold: occlusionInkThreshold))
     }
 
     /// 空の転写を確かめた OCR が「読めた」以外を返したときの事実(判定は変えない)。無いと、同じ絵を後から読むと
@@ -454,6 +457,21 @@ extension StepExecutor {
         else { return "" }
         return " — the whole app area of the screenshot is a single colour (nothing is drawn anywhere on screen,"
             + " not just at this element)"
+    }
+
+    /// 失敗文へ添える「画面全体が描かれていない」の事実。一色(`blankAppAreaFact`)でなければ、**枠は描けて文字だけが
+    /// 画面のどこにも描かれていない**形(描画崩壊の `RenderCollapse.noTextDrawn` と同じ基準 = 描画崩壊の判定と
+    /// 「描かれている」の定義を共有する)を確かめる。添えないと、1つの要素の問題か端末側の描画の崩れかを読み分けられない
+    /// (実測: Simulator の CMP で文字だけが画面ごと消え、要素ごとの「木にはあるが見えない」として赤になった)
+    static func undrawnScreenFact(screenshot: Data, elements: [ElementInfo], screen: FTRect,
+                                  keyboard: FTRect?, inkThreshold: Double) -> String {
+        let blank = blankAppAreaFact(screenshot: screenshot, elements: elements, screen: screen)
+        guard blank.isEmpty else { return blank }
+        guard case .noTextDrawn(let count) = RenderCollapse.judge(
+            pngData: screenshot, elements: elements, screen: screen, keyboard: keyboard,
+            inkThreshold: inkThreshold, minimumTextElements: RenderCollapse.minimumTextElements) else { return "" }
+        return " — none of the \(count) text element(s) the tree reports on screen is drawn in the screenshot"
+            + " (not just this element; shapes may be drawn, text is not)"
     }
 
     /// launch 直後の一度きりの門(上の occlusionFlip のコメント)。FM の判定と OCR だけの判定の両方が
@@ -526,7 +544,8 @@ extension StepExecutor {
             return .failed("text visibility check failed (on screen, \(judgedBy)):"
                            + " present in the tree but not visually visible [\(state.rawValue)]"
                            + " observed=\"\(ocrReading.map { $0.lines.joined(separator: " ") } ?? "")\""
-                           + Self.blankAppAreaFact(screenshot: screenshot, elements: elements, screen: screen))
+                           + Self.undrawnScreenFact(screenshot: screenshot, elements: elements, screen: screen,
+                                                    keyboard: guardKeyboardFrame, inkThreshold: occlusionInkThreshold))
         case .undetermined:
             if countsAsSkipped { noteCodesThisStep.insert(.visibilityGuardSkipped) }
             return nil
@@ -923,7 +942,7 @@ extension StepExecutor {
                 if let flip = try await occlusionFlip(
                     element: d.element, expectedText: d.element.label ?? step.locator?.label ?? "",
                     elements: snapshot.elements, screen: snapshot.screen,
-                    keyboardShown: KeyboardWait.isShown(snapshot),
+                    keyboardShown: KeyboardWait.isShown(snapshot), keyboard: snapshot.keyboardFrame,
                     looseMatch: d.quality == .substring, perStepGuard: step.occlusionGuard,
                     // #4: label セレクタ一致はユーザー期待値。結合ラベル `, ` 規則を当てず
                     // exist("Hello, World") でガードがスキップされる欠陥を防ぐ(textEquals と同契約)。
@@ -1137,7 +1156,7 @@ extension StepExecutor {
                     if let flip = try await occlusionFlip(
                         element: element, expectedText: expectedForGuard,
                         elements: snapshot.elements, screen: snapshot.screen,
-                        keyboardShown: KeyboardWait.isShown(snapshot),
+                        keyboardShown: KeyboardWait.isShown(snapshot), keyboard: snapshot.keyboardFrame,
                         looseMatch: loose, perStepGuard: step.occlusionGuard,
                         expectedIsUserText: true, phase: &phase) {
                         lastOcclusion = flip   // 覆われている: 可視化を待つ

@@ -226,6 +226,12 @@ public enum StepNote: String, Sendable, Codable, CaseIterable {
     /// **率が上がったら経路の不調**(ブリッジの生存・token・LAN)であってシナリオの問題ではない
     case systemAlertProbeFailed = "system-alert-probe-failed"
 
+    /// ステップが失敗した時点で画面が横向きで、**このシナリオは一度も rotateTo していない**(失敗時に1回だけ /status で
+    /// 見た事実。iOS のブリッジだけが向きを申告する)。前のセッション(MCP の ft_rotate・ライブ操作)が回したまま残した
+    /// 端末で、縦向き前提のシナリオが下のほうの要素を見つけられずに赤になる(実測: Simulator 1台で 19 本)。
+    /// run の冒頭の警告(ProfileWorkerFactory.warnOnNonPortraitIOS)は run のログにしか出ず、赤のレポートから辿れなかった
+    case landscapeWithoutRotate = "landscape-without-rotate"
+
     /// launch 直後の occlusion-guard 失敗が launch storyboard(crop が全画素同一)由来と
     /// 判定され、このステップの deadline を一度だけ延ばして待ち直した(`StepExecutor.firstFrameGatePending`。
     /// 一度きりの門なので同じ launch のぶんでは他のステップに重複しない)。
@@ -491,6 +497,9 @@ public enum StepNote: String, Sendable, Codable, CaseIterable {
         case .systemAlertPresent:
             return "a system alert was in front of the app with no iosAlertHandler registered for it,"
                 + " so the app behind it was operated anyway"
+        case .landscapeWithoutRotate:
+            return "the screen was in landscape and this scenario never rotated it — an earlier session"
+                + " (ft_rotate, live control) may have left the device rotated"
         case .systemAlertProbeFailed:
             return "the check for a system alert in front of the app failed, so the step went ahead"
                 + " without knowing whether one was there"

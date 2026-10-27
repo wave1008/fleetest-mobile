@@ -106,6 +106,7 @@ extension StepExecutor {
                 "\(action) is not executable as a step — run it with the \(action) DSL command"))
         }
         if action == "rotateTo" {
+            rotatedThisScenario = true
             return try await executeDirectRotateTo(step: step, phase: &phase)
         }
         if action == "scroll" {

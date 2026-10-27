@@ -280,6 +280,13 @@ public final class StepExecutor {
     /// このフェーズで SpringBoard に聞いた「アラートが前面にあるか」。nil = まだ聞いていない
     /// (`armUnregisteredSystemAlertProbe` が戻す)。画像判定の絵を XCUITest で撮るかを決める
     var judgmentAlertCovering: Bool?
+    /// このシナリオ(= この実行器)で rotateTo を撃ったか(`landscapeWithoutRotate` の判定)
+    var rotatedThisScenario = false
+    /// 可視性検証の失敗文の事実(`undrawnScreenFact`)に渡すキーボードの枠。occlusionFlip の入口で判定に使う木から立てる
+    /// (キーボードに覆われた文字の要素を「描かれていない」の母数に入れない)
+    var guardKeyboardFrame: FTRect?
+    /// 失敗時の向きの照会を済ませたか(1シナリオ1回 = 失敗はシナリオを打ち切るので実質1回)
+    var landscapeCheckedOnFailure = false
     /// システム許可アラートの登録台帳(DSL の `iosAlertHandler` が登録する)。
     /// 空 = 監視しない。**fallbackDriver がある(inapp-boost モード)ときだけ効く**。
     /// 登録の形・発火で外れる規則は `SystemAlertRule` / `SystemAlertWatchlist` の doc
@@ -354,6 +361,18 @@ public final class StepExecutor {
         guard SystemUIGate.isCovered(probe) else { return nil }
         noteCodesThisStep.insert(.systemAlertPresent)
         return probe
+    }
+
+    /// 失敗したステップに「横向きで、このシナリオは回していない」を注記する(`StepNote.landscapeWithoutRotate`)。
+    /// 1往復の /status だけ・答えない/向きを申告しないブリッジ(Android)では黙る。
+    /// **失敗の文言にも添える**(実行器の注記は結果 JSON にしか載らず、人が読むレポートは文言を出す =
+    /// annotatedWithSystemAlert と同じ見せ方)
+    func noteLandscapeWithoutRotate(onFailure status: StepResult.Status) async -> StepResult.Status {
+        guard case .failed(let message) = status, !rotatedThisScenario, !landscapeCheckedOnFailure else { return status }
+        landscapeCheckedOnFailure = true
+        guard (try? await driver.status())?.orientation == .landscape else { return status }
+        noteCodesThisStep.insert(.landscapeWithoutRotate)
+        return .failed(message + " (note: \(StepNote.landscapeWithoutRotate.text))")
     }
 
     /// 失敗ステータスに「前面のシステムアラート」を添える(登録が無いときだけ・1往復)。
@@ -835,7 +854,8 @@ public final class StepExecutor {
                     }
                 }
                 // 失敗したなら、登録の無いシステムアラートが前面に無いかを1回だけ聞いて文言に添える
-                let status = await annotatedWithSystemAlert(outcome.status, phase: &phase)
+                let status = await noteLandscapeWithoutRotate(
+                    onFailure: annotatedWithSystemAlert(outcome.status, phase: &phase))
                 noteHoldAlreadyReleased(onFailureOf: step, status: status)
                 return StepOutcome(status: status, healedStep: outcome.healedStep,
                                    healedByFingerprint: outcome.healedByFingerprint,
@@ -869,6 +889,7 @@ public final class StepExecutor {
                 if case .failed = status { markFailure(.assertion) }
                 // 時間切れの原因が前面のシステムアラートなら題名を添える(登録が無いときだけ・1往復)
                 status = await annotatedWithSystemAlert(status, phase: &phase)
+                status = await noteLandscapeWithoutRotate(onFailure: status)
                 noteHoldAlreadyReleased(onFailureOf: step, status: status)
                 noteAssertionForRenderCollapse(assert, step: step, status: status)
                 if renderCollapseEveryAssertion, Self.isSuccess(status) {

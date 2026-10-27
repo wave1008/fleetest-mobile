@@ -78,8 +78,11 @@ final class FakeAppDriver: AppDriver {
         return frames[min(systemAlertCallCount - 1, frames.count - 1)]
     }
 
+    /// /status が申告する向き(nil = 申告しないブリッジ)
+    var statusOrientation: FTOrientation?
+
     func status() async throws -> StatusResponse {
-        StatusResponse(ready: true, device: name, osVersion: "-", sessionBundleID: nil)
+        StatusResponse(ready: true, device: name, osVersion: "-", sessionBundleID: nil, orientation: statusOrientation)
     }
 
     func install(packagePath: String) async throws -> String? { nil }
