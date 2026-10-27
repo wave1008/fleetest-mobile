@@ -361,6 +361,42 @@
 - 揃えていない理由: `--fleet` は run の途中の中断でも 130 を返さない(子の終了コードの集計だけ)ので、ロックの取得中だけ 130 にすると
   `--fleet` の中で食い違う。直すなら `--fleet` の中断の終了コード全体を決めてから(利用者向けの docs は「複数のマシンにまたがる実行」を 130 と書いている)
 
+### OI-30 `api run` の機械分担は、リモートのロックの待ちより前に `runStarted` を出す
+- 状態: 経路確定
+- 確認: コミット未記録(2026-10-27)
+
+- `ApiRunMachineFanout.run` は `ApiRunStartedEvent` を書いてから `DispatchPrelock.acquireInOrder` で待つので、その待ちの中断
+  (`--wait-lock` で数分になりうる)は 130 で終わり `runFinished` を出さない = 拡張に終わりの無い run が残る。割り当てまでの中断は
+  `runStarted` の前に抜ける(`exitIfSet(noticedAt: "the scenario assignment")`)
+- 手がかり: `runStarted` を Prelock の後へ動かすと、待っている間の total が拡張に出ない。順序を変えるか、中断の出口で `runFinished` を出すか
+
+### OI-31 マシンをまたぐ run の `--wait-lock` の上限が、段ごと・対象ごとに払い直される
+- 状態: 経路確定
+- 確認: コミット未記録(2026-10-27)
+
+- 手元のロックの先取り・手元のデバイスの使用中の待ち(複数対象では対象ごとに `elapsed` が 0 から)・`DispatchPrelock` の機械ごとの待ちが、
+  それぞれ `--wait-lock N` を丸ごと持つ。remote.md の規律⑤(親が上限を2回払わない)は子へ渡さないことだけを守っていて、親の中の段の和は見ていない
+- 手がかり: 親の入口で期限(開始 + N)を1つ決めて各段へ残りを渡す
+
+### OI-32 `api run` の機械分担の、手元のデバイスの使用中の待ちが NDJSON に出ない
+- 状態: 経路確定
+- 確認: コミット未記録(2026-10-27)
+
+- `ProfileRunner.rejectIfLocalDevicesLeasedBeforeDispatch` の待ちは stderr にしか書かないので、拡張の実行ログビューは待ちの間ずっと無言(MN-62.4 と同じ型)
+- 既存の `dispatchWaiting` はロックの待機列の形(位置・総数・保持者)なので流用できない(流用すると「dispatch.lock を待っている」と出る)。
+  直すなら新しいイベントの種類と、拡張の受け口・日英の文言(`i18n/strings/lane.ts`)・`RUN_EVENT_KINDS`
+- 出番は少ない: dispatch.lock が空いているのに手元のデバイスの lease が他にある形だけ(1マシン1 run・MCP のデバイスは待つ前に避ける)
+
+### OI-33 マシンをまたぐ3つの親の前段(ロック・ビルド・待ち)が手書きの写し
+- 状態: 経路確定
+- 確認: コミット未記録(2026-10-27)
+
+- `DeviceMachineRunner.run` / `MultiTargetRunner.run` / `ApiRunMachineFanout.run` が、入口の印 → チケット → 手元のロックの先取り → ビルド →
+  手放す → 使用中の待ち → Prelock → 購読の登録 → 子、を別々に持つ。中断の直しは3回とも3か所に同じ形で入れ、写しのずれ(複数対象だけ
+  ロックを握ったまま使用中を待っていた)が実際に出た。今は `DynamicDispatcherTests` / `LocalLeaseRefusalBeforeDispatchTests` の
+  ソース走査(文字列の出現順)が3か所の並びを固定している
+- 手がかり: 前段を1つの部品へ寄せ、3経路は差分(NDJSON の出し口・複数対象のプロジェクトごとのビルド)だけを渡す
+
 ## 設計判断で据え置いているもの(直さないと決めた。症状が出たら見直す)
 
 ### OI-22 描画崩壊の判定は自前描画とフレームワーク不明のアプリだけ
