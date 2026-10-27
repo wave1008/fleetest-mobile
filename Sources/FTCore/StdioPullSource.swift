@@ -3,6 +3,34 @@
 // stdout の書き手はそこへ集約されていて、1回の write(2) で行が裂けない)。
 
 import Foundation
+import Synchronization
+
+/// `--work-queue` の子の stdin(親からの返事)を自分だけの fd へ移し、fd 0 を /dev/null にする。**run の入口で最初に呼ぶ**。
+/// stdin を指定せずに起こす子プロセス(`adb shell` など。Process を作る箇所は多数)が fd 0 を受け継いで読むと、親の返事を
+/// 横取りする = 親が渡したシナリオをレーンが受け取れず、そのレーンは中断まで止まる(2026-10-27 に2回: 渡した 28 本のうち
+/// 子が回したのは 24 本)。移した fd は close-on-exec(子へ渡さない)。何度呼んでも同じ fd を返す
+public enum WorkQueueStdin {
+    private static let claimed = Mutex<Int32?>(nil)
+
+    public static func claim() -> Int32 {
+        claimed.withLock { claimed in
+            if let claimed { return claimed }
+            let copy = dup(STDIN_FILENO)
+            guard copy >= 0 else {
+                claimed = STDIN_FILENO
+                return STDIN_FILENO
+            }
+            _ = fcntl(copy, F_SETFD, FD_CLOEXEC)
+            let null = open("/dev/null", O_RDONLY)
+            if null >= 0 {
+                _ = dup2(null, STDIN_FILENO)
+                close(null)
+            }
+            claimed = copy
+            return copy
+        }
+    }
+}
 
 public final class StdioPullSource: ScenarioPullSource {
     private struct State {
@@ -18,8 +46,8 @@ public final class StdioPullSource: ScenarioPullSource {
     private let inputFD: Int32
     private let write: @Sendable (String) -> Void
 
-    /// - inputFD / write: テスト用の差し替え口。本番は stdin と ConsoleOut.out
-    public init(inputFD: Int32 = STDIN_FILENO,
+    /// - inputFD / write: テスト用の差し替え口。本番は `WorkQueueStdin.claim()`(移した stdin)と ConsoleOut.out
+    public init(inputFD: Int32 = WorkQueueStdin.claim(),
                 write: @escaping @Sendable (String) -> Void = { ConsoleOut.out($0) }) {
         self.inputFD = inputFD
         self.write = write

@@ -493,6 +493,8 @@ struct RunScenarios: AsyncParsableCommand {
     }
 
     func run() async throws {
+        // 子プロセスを1本も起こす前に(供給の adb なども stdin を受け継ぐ)
+        if common.workQueue { _ = WorkQueueStdin.claim() }
         let targets = try multiTargets()
         if targets.count >= 2 {
             let exitCode = try await MultiTargetRunner.run(
