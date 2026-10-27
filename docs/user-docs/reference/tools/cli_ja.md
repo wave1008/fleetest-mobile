@@ -63,6 +63,7 @@ fleetest-mobile のクローン内で作業している場合は `swift run flee
 | `results response` | レスポンス計測の run の応答時間(最初のフレームまで・操作可能まで)をステップごとに集計し、同じマシン・同じ端末の前回との差を出す | `--since`・`--json` | [レスポンス計測](../running/response_measurement_ja.md) |
 | `results insights` | 注意すべき兆候(退行・連続失敗・アサーション以外の失敗・古くなったセレクタ)を検出する | `--since`・`--json` | [結果の分析](../running/results_analysis_ja.md) |
 | `results log <runID>` | run のシナリオごとの実行ログ(`events/*.ndjson`)を表示する。runID に `latest` も使える | `--scenario`・`--raw` | 同上 |
+| `results frames <runID>` | シナリオの録画からフレームを切り出し、録画時刻とそのとき実行中のステップを添えた PNG 1枚のコンタクトシートにする(既定は最初に失敗したステップと、その直前の5秒) | `--scenario`(必須)・`--device`・`--steps`・`--seconds-before`・`--every`・`--out`・`--json` | 同上 |
 | `clean` | 古い録画・実行ログ・レポート・ログ・Simulator の添付・xcresult を削除する。上限の 90% を超えたカテゴリを 90% まで掃除する | `--dry-run`・`--recordings`・`--event-logs`・`--reports`・`--logs` | [長く使うためのメンテナンス](../../in_action/maintenance_ja.md) |
 
 ## デバイスとブリッジ

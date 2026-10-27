@@ -63,6 +63,7 @@ The settings of a run profile are in [Run profile settings](../project/run_profi
 | `results response` | Aggregate response times (time to first frame and time until ready) of response-measurement runs per step, with the change from the previous run on the same host and device | `--since`, `--json` | [Response measurement](../running/response_measurement.md) |
 | `results insights` | Detect things worth attention: regressions, consecutive failures, failures with a non-assertion signature, and stale selectors | `--since`, `--json` | [Analyzing results (fleetest results, dashboard)](../running/results_analysis.md) |
 | `results log <run-id>` | Print a run's per-scenario execution log (`events/*.ndjson`). The run ID can also be `latest` | `--scenario`, `--raw` | Same as above |
+| `results frames <run-id>` | Cut frames out of a scenario's recording into one PNG contact sheet, each labelled with the recording time and the step running then (default: the first failed step and the 5 seconds before it) | `--scenario` (required), `--device`, `--steps`, `--seconds-before`, `--every`, `--out`, `--json` | Same as above |
 | `clean` | Delete old recordings, event logs, reports, logs, Simulator attachments and xcresult bundles. Any category above 90% of its limit is swept back down to 90% | `--dry-run`, `--recordings`, `--event-logs`, `--reports`, `--logs` | [Maintenance for long-term use](../../in_action/maintenance.md) |
 
 ## Devices and bridges

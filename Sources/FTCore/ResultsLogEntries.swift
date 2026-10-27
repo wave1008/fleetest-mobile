@@ -21,9 +21,10 @@ public enum ResultsLogReport {
         public let unreadablePath: String?
     }
 
-    /// `requestedRunID` は runID か "latest"。**見つからない・events/ が無い・該当が空は ResultsLogError**
-    public static func build(resultsDir: URL, projectName: String, requestedRunID: String,
-                             scenario: String?, raw: Bool) throws -> [Section] {
+    /// runID か "latest" を run フォルダへ解決する(`results log` と `results frames` が共有する唯一の解決)。
+    /// 見つからなければ ResultsLogError
+    public static func resolveRun(resultsDir: URL, projectName: String,
+                                  requestedRunID: String) throws -> (runID: String, runDir: URL) {
         let resolvedRunID: String
         if requestedRunID == "latest" {
             guard let latest = RunResultsStore.scanRuns(resultsDir: resultsDir).last else {
@@ -37,8 +38,18 @@ public enum ResultsLogReport {
             }
             resolvedRunID = requestedRunID
         }
-
         let runDir = RunResultsStore.runDir(resultsDir: resultsDir, runID: resolvedRunID)
+        guard RunResultsStore.meta(runDir: runDir) != nil else {
+            throw ResultsLogError(message: "run not found: \(resolvedRunID)")
+        }
+        return (resolvedRunID, runDir)
+    }
+
+    /// `requestedRunID` は runID か "latest"。**見つからない・events/ が無い・該当が空は ResultsLogError**
+    public static func build(resultsDir: URL, projectName: String, requestedRunID: String,
+                             scenario: String?, raw: Bool) throws -> [Section] {
+        let (resolvedRunID, runDir) = try resolveRun(
+            resultsDir: resultsDir, projectName: projectName, requestedRunID: requestedRunID)
         guard let meta = RunResultsStore.meta(runDir: runDir) else {
             throw ResultsLogError(message: "run not found: \(resolvedRunID)")
         }
