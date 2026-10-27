@@ -13,20 +13,15 @@ import FTCore
 public final class SystemUIDriver: AppDriver {
     private let client: BridgeClient
 
-    /// 主ドライバが**このブリッジのセッションでアプリを駆動しているか**(xcuitest モード = true)。
-    ///
-    /// true のときだけ版 79 の `/systemui/*`(セッションと ref を触らない)を使う。
-    /// **inapp-boost モードでは false のまま = 旧経路**: あちらの主ドライバは in-app で別プロセスなので
-    /// `/session springboard` の巻き添えが無く、**変える理由が無い**。困っていたのは
-    /// 共有している xcuitest だけなので、影響範囲をそこに閉じる。
-    ///
-    /// **ここに因果を書かないこと**(失敗の実例): 一度は「inapp-boost モードへ寄せたら `notExist` が
-    /// 0.30s → 0.07s に縮み、その 0.25s が担っていた暗黙の待ちが消えて横カルーセルが 3/3 で
-    /// 落ちた」と書いた。**誤り** —— 後の 2×2 で、赤は経路ではなく **FM の生死**に完全追随すると
-    /// 分かった(FM 死亡 7/7 赤 / 生存 8/8 緑。旧経路でも FM が死ねば落ちる)。
-    /// 最初の対照は両群で FM の生死が揃っておらず、交絡していた
-    /// (記憶 fm-alive-costs-notexist-4s の「生死を揃える」を踏んだ)。
-    private let sharesPrimarySession: Bool
+    // **どのモードでも版 79 の `/systemui/*`(セッションと ref を触らない)を先に使う**。旧経路の
+    // `/session springboard` はブリッジのセッションを SpringBoard へ移すので、同じ XCUITest ブリッジで
+    // アプリを駆動している側が巻き添えになる —— xcuitest モードの主ドライバだけでなく、**inapp-boost モードの
+    // AppAttachDriver(in-app で撃てない type・clearInput の行き先)も同じセッション**を使う。
+    // 一度アプリに付いたら付き直さない(`attached`)ので、inapp-boost の `notExist` の不在確認が SpringBoard を
+    // 読んだ後、ref なしの clearInput が SpringBoard の上で焦点を探して 422 になっていた(E2E-Flutter S0010、6/6)。
+    // 旧経路は `/systemui/snapshot` の無い旧ランナー(版 < 79)のときだけ。
+    // 「経路を寄せると notExist が速くなり、その待ちが消えて横カルーセルが落ちた」という因果は誤り
+    // (赤は FM の生死に完全追随した。記憶 fm-alive-costs-notexist-4s)
 
     /// host: **主ドライバと同じ宛先**(実機は LAN IP か iproxy のループバック)。既定を置かない ——
     /// 落とすと 127.0.0.1 へ行き、LAN 経由の実機では不在確認・遅延 exist・アラート操作だけが
@@ -35,10 +30,8 @@ public final class SystemUIDriver: AppDriver {
     /// 要求するため(establish の usb 分岐)、host だけでは BridgeClient が実機と判別できない。
     /// **host と同じく既定を置かない**: 渡し忘れると usb の実機だけで不在確認・遅延 exist・
     /// アラート操作・tapAppIcon が 401 になる(iPhone SE3 で E2E-iOS 15/35 赤。LAN では隠れる)
-    public init(port: UInt16, host: String, physicalUDID: String?,
-               sharesPrimarySession: Bool = false) {
+    public init(port: UInt16, host: String, physicalUDID: String?) {
         self.client = BridgeClient(port: port, host: host, physicalUDID: physicalUDID)
-        self.sharesPrimarySession = sharesPrimarySession
     }
 
     public func snapshot() async throws -> SnapshotResponse {
@@ -49,18 +42,14 @@ public final class SystemUIDriver: AppDriver {
     /// SnapshotCacheBypassForwardingTests がラッパー全体でこれを守る)。
     /// **張り直しは必ずこちらに置く** —— snapshot() を素通し側にすると片方だけ張り直しを飛ばす
     public func snapshot(bypassingCache: Bool) async throws -> SnapshotResponse {
-        // 版 79 以降・**共有しているときだけ**: セッションを触らない専用の口。
-        // xcuitest モードはこのブリッジを主ドライバと共有しているので、旧経路
-        // (`/session springboard`)を撃つとアプリのセッションと refFrames が巻き添えになり、
-        // 次のステップが SpringBoard の木を読む。inapp-boost モードで使わない理由は init の doc
-        if sharesPrimarySession, let scoped = try await client.systemUISnapshot() {
+        // 版 79 以降: セッションを触らない専用の口(旧経路の巻き添えは init の doc)
+        if let scoped = try await client.systemUISnapshot() {
             usedScopedSnapshot = true
             scopedFrames = Dictionary(scoped.elements.map { ($0.ref, $0.frame) },
                                       uniquingKeysWith: { first, _ in first })
             return scoped
         }
-        // inapp-boost モード(共有していない)と旧ランナー(版 < 79)。前者は巻き添えが無いので
-        // この経路で正しく、後者は新しい口が 404 で無い
+        // 旧ランナー(版 < 79)だけ: 新しい口が 404 で無い
         usedScopedSnapshot = false
         scopedFrames = [:]
         try await client.launch(bundleID: "com.apple.springboard")

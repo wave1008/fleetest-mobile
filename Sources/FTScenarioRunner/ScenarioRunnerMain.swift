@@ -477,8 +477,7 @@ struct RunScenario: AsyncParsableCommand {
                     // 「操作が効かない」だけが見える(E2E-iOS で踏んだ)
                     let systemUI = SystemUIDriver(port: port,
                                                   host: bridgeHost ?? BridgeEndpoint.loopbackHost,
-                                                  physicalUDID: physical ? udid : nil,
-                                                  sharesPrimarySession: true)
+                                                  physicalUDID: physical ? udid : nil)
                     homeScreenDriver = systemUI
                     fallbackDriver = systemUI
                     // xcuitest はブリッジの自己申告が無いので静的な材料だけ

@@ -116,7 +116,7 @@ final class SystemUIDriverScopedRoutingTests: XCTestCase {
         for (k, v) in extra { responses[k] = v }
         let stub = try RoutingStubServer(responses: responses)
         return (stub, SystemUIDriver(port: stub.port, host: BridgeEndpoint.loopbackHost,
-                              physicalUDID: nil, sharesPrimarySession: true))
+                              physicalUDID: nil))
     }
 
     /// **知らない ref の 404 を「旧ランナー」と読み替えない**。読み替えると同じ番号が
@@ -193,22 +193,22 @@ final class SystemUIDriverScopedRoutingTests: XCTestCase {
         XCTAssertFalse(stub.received("POST /clear"))
     }
 
-    /// **inapp-boost モード(ブリッジを共有していない)は従来どおり**: セッションを springboard へ移し、
-    /// ref もジェスチャもアプリ側のルートで撃つ。scoped の判定を広げていないことの対照
-    func testInappModeKeepsTheLegacySessionPath() async throws {
-        let stub = try RoutingStubServer()
-        defer { stub.stop() }
-        let driver = SystemUIDriver(port: stub.port, host: BridgeEndpoint.loopbackHost,
-                                    physicalUDID: nil, sharesPrimarySession: false)
+    /// **旧経路(`/session springboard`)へ落ちるのは `/systemui/snapshot` の無い旧ランナー(404)だけ**。
+    /// モードで分けない —— inapp-boost モードでも AppAttachDriver(type・clearInput の行き先)が同じブリッジの
+    /// セッションを使うので、SpringBoard へ移すと次の ref なしの clearInput が SpringBoard の上で焦点を探して 422 になった
+    func testOnlyAnOldRunnerFallsBackToTheSessionPath() async throws {
+        let current = try RoutingStubServer(responses: ["GET /systemui/snapshot": (200, Self.scopedSnapshotBody)])
+        defer { current.stop() }
+        _ = try await SystemUIDriver(port: current.port, host: BridgeEndpoint.loopbackHost, physicalUDID: nil).snapshot()
+        XCTAssertFalse(current.received("POST /session"), "専用の口があるのにセッションを SpringBoard へ移した")
 
+        let old = try RoutingStubServer(responses: ["GET /systemui/snapshot": (404, #"{"error":"not found"}"#)])
+        defer { old.stop() }
+        let driver = SystemUIDriver(port: old.port, host: BridgeEndpoint.loopbackHost, physicalUDID: nil)
         _ = try? await driver.snapshot()
         try await driver.tap(ref: 1)
-        try await driver.swipe(.left)
-
-        XCTAssertTrue(stub.received("POST /session"), "旧経路は springboard へ session を張る")
-        XCTAssertTrue(stub.received("POST /tap"))
-        XCTAssertTrue(stub.received("POST /swipe"))
-        XCTAssertFalse(stub.received("GET /systemui/snapshot"))
-        XCTAssertFalse(stub.received("POST /systemui/tap"))
+        XCTAssertTrue(old.received("POST /session"), "旧ランナーは springboard へ session を張る")
+        XCTAssertTrue(old.received("POST /tap"))
+        XCTAssertFalse(old.received("POST /systemui/tap"))
     }
 }
