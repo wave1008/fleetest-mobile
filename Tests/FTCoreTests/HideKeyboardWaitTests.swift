@@ -39,6 +39,20 @@ final class HideKeyboardWaitTests: XCTestCase {
         XCTAssertNil(executor.pendingHideKeyboardWait, "消費したら下りる")
     }
 
+    /// **スクロール探索も、木のキーボードが消えてから判断する**(探索はロケータ解決の段より先に走る)。待たないと、
+    /// 閉じかけのキーボードの下にあると読んで要らない送りを撃つ(type の後の待ち = TypeKeyboardSettleTests と同じ型)
+    func testScrollSearchAfterHideKeyboardWaitsForTheTreeToDropTheKeyboard() async throws {
+        let driver = FakeAppDriver(name: "primary", log: CallLog(), snapshotElements: [[title(), tab()]])
+        driver.keyboardFrames = Array(repeating: keyboard, count: 6) + [nil]
+        driver.bypassSupported = true
+        let executor = StepExecutor(driver: driver, isAndroid: true, tunables: RunTunables())
+        _ = await executor.execute(FlowStep(action: "hideKeyboard"))
+        _ = await executor.execute(FlowStep(action: "select", locator: FlowLocator(id: "tab_home"),
+                                            direction: "down", maxSwipes: 1))
+        let moves = driver.log.entries.filter { $0.contains(".swipe") || $0.contains(".drag") }
+        XCTAssertTrue(moves.isEmpty, "閉じかけのキーボードの木で判断して送った: \(driver.log.entries)")
+    }
+
     /// キーボードが既に消えていれば、読みの回数は tap 単独と同じ(追加の費用ゼロ)
     func testNoExtraReadsWhenTheKeyboardIsAlreadyGone() async throws {
         func reads(hideFirst: Bool) async -> Int {

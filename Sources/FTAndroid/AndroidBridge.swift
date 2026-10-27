@@ -15,7 +15,7 @@ extension AndroidDriver {
     /// デバイス側の listen ポート(全デバイス共通。デバイス毎に独立 loopback なので衝突しない)
     static let bridgeDevicePort: UInt16 = 8123
     /// AndroidRunner/build.sh の VERSION_CODE と同期(不一致なら自動で再インストール)
-    public static let expectedBridgeVersionCode = 113
+    public static let expectedBridgeVersionCode = 114
     /// am instrument の起動コマンド自身の stdout/stderr の逃がし先(デバイス側。shell が書ける
     /// /data/local/tmp)。起動失敗時だけホストへ pull する(persistInstrumentFailureLog)
     static let instrumentDeviceLogPath = "/data/local/tmp/ftbridge-instrument.log"
@@ -758,13 +758,13 @@ extension AndroidDriver {
 /// その bridge up も同じ門で断られる。文言は完成文(`errorDescription` をそのまま出す)
 public struct AndroidBridgeHeldByAnotherSession: Error, LocalizedError {
     public let serial: String
-    /// 探りに答えたブリッジの版(nil = 答えなかった)。**答えた版違いを「応答しない」と言わない**(実機 Pixel 4a: 別の
+    /// 探りに答えたブリッジの版(nil = 準備のできた状態で答えなかった = 応答しない・起動中・版を申告しない、を区別できない)。**答えた版違いを「応答しない」と言わない**(実機 Pixel 4a: 別の
     /// MCP セッションが使う v109 が答えているのに、v110 を期待する側が "is not answering" と出していた)
     public let runningVersion: Int?
     public var errorDescription: String? {
         let state = runningVersion.map {
             "is running another version (\($0); this build expects \(AndroidDriver.expectedBridgeVersionCode))"
-        } ?? "is not answering"
+        } ?? "did not answer as ready"
         return "the Android bridge on \(serial) \(state), and it was not restarted: another session"
             + " (a fleetest run or an MCP session) is using this device, and restarting it would take that"
             + " session's bridge down. Wait for that session to finish, or drive another device"

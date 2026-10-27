@@ -68,7 +68,7 @@ extension BridgeRouter {
         }
         let focusBefore = focusBeforeTappingNonInput(app, ref: req.ref)
         var tapped: CGPoint?
-        if let ref = req.ref, !alreadyFocusedInput(ref) {
+        if let ref = req.ref, alreadyFocusedInput(app, ref) == nil {
             // キーボードの出現は直後の typeText の前の待ち(上限つき)が待つ(keyboards クエリは
             // キーボードが別プロセス扱いのため常にタイムアウトし逆効果だった。2026-07-12実測)
             let point = try resolvePoint(ref: ref, x: nil, y: nil)
@@ -388,18 +388,18 @@ extension BridgeRouter {
         let req = try decode(ClearRequest.self, body)
         let app = try requireForegroundAppForInput()
         let focused: XCUIElement
+        // この要求で欄を押した時刻(右端の押し直しとの間隔を空けるため。下の周回)
+        var fieldTappedAt: Date?
         if let ref = req.ref {
             try requireExpectedRef(ref, expect: req.expect)
             try requireRefStillOnScreen(app, ref: ref)
-            // 押さずに済ませるのは、ライブの焦点の欄が ref の欄(枠が ref の中心を含む)だと確かめられたときだけ
-            if alreadyFocusedInput(ref), let target = refElements[ref],
-               case let live = Self.focusedInput(app), live.exists,
-               live.frame.contains(CGPoint(x: target.frame.centerX, y: target.frame.centerY)) {
+            if let live = alreadyFocusedInput(app, ref) {
                 focused = live
             } else {
                 let point = try resolvePoint(ref: ref, x: nil, y: nil)
                 let focusBefore = Self.focusMark(app)
                 Self.tapBeforeTyping(coordinate(app, point))
+                fieldTappedAt = Date()
                 let refIsTextInput = refElements[ref].map(TypeReadback.isTextInput) ?? false
                 focused = try Self.awaitClearFocusTarget(app, tapped: point, focusBefore: focusBefore,
                                                          refIsTextInput: refIsTextInput)
@@ -443,10 +443,17 @@ extension BridgeRouter {
             previous = text
             rounds += 1
             try Self.requirePresent(focused)
-            // **右端を押してカーソルを末尾へ寄せるのは2周目から**(1周目で残った = カーソルが末尾に無かったときだけ)。
+            // **右端を押してカーソルを末尾へ寄せるのは2周目の1回だけ**(1周目で残った = カーソルが末尾に無かったときだけ)。
             // 焦点のある欄を短い間隔で2回押すと iOS の編集メニュー(Paste / Select All)が出て画面に残り、次の操作が
-            // それに当たりうる(実機 SE3・CMP: 中心 → 右端の連打で再現・1 秒以上空ければ出ない)。カーソルが末尾なら1周目で空になる
-            if rounds > 1 { tapFieldEndIfHittable(app, focused) }
+            // それに当たりうる(実機 SE3・CMP: 中心 → 右端の連打で再現)。この要求で中心を押していたら間隔を空けてから押す。
+            // 3周目以降は押さない(右端の連打も同じ2回押し。カーソルは2周目で末尾にある)
+            if rounds == 2 {
+                if let tappedAt = fieldTappedAt {
+                    let wait = Self.editMenuRetapGapSeconds - Date().timeIntervalSince(tappedAt)
+                    if wait > 0 { Thread.sleep(forTimeInterval: wait) }
+                }
+                tapFieldEndIfHittable(app, focused)
+            }
             // 打鍵は app 全体へ(要素へ向けると、叩いた後に焦点が動いたとき要素スコープの失敗でランナーを落とし得る。
             // 入力先は叩いた欄 = 最前のレスポンダ。下の木で読み返す経路と同じ)
             ResponseMeasurement.noteInjection()
@@ -486,21 +493,30 @@ extension BridgeRouter {
         // **控えの値も空にする**: /type は「入力前の値」を直近スナップショットの控え(refElements)から
         // 取るので、clear → type を撮り直さずに続けると clear 前の値を期待に足して再送し、
         // 消したはずの文字列が戻る(実機 iPhone 13・2026-08-31: replace で `   モバイル   `)
-        if let ref = req.ref { refElements[ref]?.value = nil }
+        if let ref = req.ref {
+            refElements[ref]?.value = nil
+            // 消した欄は焦点を持ったまま = 撮り直さずに続く /type(MCP の replace)が押し直さないよう、次の POST へ渡す
+            lastReadFocusedRef = ref
+        }
+    }
+
+    /// 直前の読み(GET /snapshot)で ref の入力欄が焦点を持ち、キーボードが出ていて(`focusedRefForThisRequest`)、
+    /// **今もライブの焦点の欄が ref の欄(枠が ref の中心を含む)**なら、その焦点の要素を返す。
+    /// **そのときは打つ前・消す前に欄を押さない** —— 押し直すと短い間隔の2回押しになり、iOS の編集メニューが出て残る。
+    /// ライブの確認を省かない: 撮った後に焦点が移っていると、読み返しの無い欄(伏せ字・改行入り)では別の欄へ打って 200 になる
+    func alreadyFocusedInput(_ app: XCUIApplication, _ ref: Int) -> XCUIElement? {
+        guard focusedRefForThisRequest == ref, let target = refElements[ref], TypeReadback.isTextInput(target) else {
+            return nil
+        }
+        let live = Self.focusedInput(app)
+        guard live.exists, live.frame.contains(CGPoint(x: target.frame.centerX, y: target.frame.centerY)) else { return nil }
+        return live
     }
 
     /// 焦点の欄の右端を叩いてカーソルを末尾へ寄せる。**欄がそこで叩けない(他の部品の裏・画面の外)なら叩かない** ——
     /// 叩くと手前の部品を押す(実機 iPhone SE3 の CMP: キーボード表示中にパスワード欄が下のタブバーの裏へ回り、
     /// 枠の右端は「情報」タブの上だった)。叩かなくても削除キーは焦点の欄(最前のレスポンダ)へ届き、
     /// カーソルが末尾でなければ消し残りは読み返しのループが拾う(消せなければ 422)。isHittable は要素ごとに往復する(数十 ms)
-    /// 直前の読み(GET /snapshot)で ref の入力欄が焦点を持ち、キーボードが出ていた(`focusedRefForThisRequest`)。
-    /// **そのときは打つ前・消す前に欄を押さない** —— 押し直すと短い間隔の2回押しになり、iOS の編集メニューが出て残る。
-    /// 撮った後に焦点が移っていれば、type は読み返しが別の欄の変化として断り(otherInputThatChanged)、clear は呼び手がライブの焦点を確かめる
-    func alreadyFocusedInput(_ ref: Int) -> Bool {
-        guard focusedRefForThisRequest == ref, let target = refElements[ref] else { return false }
-        return TypeReadback.isTextInput(target)
-    }
-
     private func tapFieldEndIfHittable(_ app: XCUIApplication, _ field: XCUIElement) {
         guard field.isHittable else { return }
         let frame = field.frame
@@ -553,6 +569,9 @@ extension BridgeRouter {
     private static let clearBudgetSeconds: TimeInterval = 8
     /// 残り文字数が変わらない周回の許容数。1周まるごと打鍵が落ちることがあるので 1 では早すぎる
     private static let clearMaxStagnantRounds = 4
+    /// 焦点のある欄を2回押すとき、編集メニューを出さないために空ける間隔(秒)。実機 SE3・CMP の実測: 約 0.45 秒の間隔の
+    /// 中心 → 右端で出て、1 秒以上空ければ出なかった。払うのは「この要求で中心を押し、1周目で消し切れなかった」回だけ
+    private static let editMenuRetapGapSeconds: TimeInterval = 1.0
     /// 読めない(空白のみの)内容へ撃つ当て推量の delete 本数。長さが分からないので、人や
     /// ツールが誤って残しがちな空白の連続を覆う値として 8 を置く(2026-08-31 実機実測の根拠は
     /// 直前のコメント参照)

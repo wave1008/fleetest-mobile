@@ -22,10 +22,16 @@ private final class StraddlingDriver: AppDriver {
 
     /// 指の動きに対して内容が動く割合(1 = そのまま。WebView のように寄せが一部しか効かない形は 1 未満)
     private let dragScale: Double
+    /// ほかの行(他 01・他 02)もドラッグで動くか(false = 送りがどこにも効かなかった形)
+    private let othersMove: Bool
+    private var othersShift: Double = 0
+    /// ほかの行が1回の送りで動く量。**動いたことが分かれば足りる**(指の移動量どおりに動かすと容器の外へ出て、容器の推定ごと変わる)
+    private static let othersStep: Double = 10
 
     /// straddling: 縁をまたぐ(交差はする) / ghost: 完全に容器の外
-    init(straddling: Bool, ghost: Bool = false, dragScale: Double = 1) {
+    init(straddling: Bool, ghost: Bool = false, dragScale: Double = 1, othersMove: Bool = true) {
         self.dragScale = dragScale
+        self.othersMove = othersMove
         rowY = ghost ? Self.container.y - 200
             : (straddling ? Self.container.y - 30 : Self.container.y + 100)
     }
@@ -44,13 +50,19 @@ private final class StraddlingDriver: AppDriver {
     func tap(ref: Int) async throws { refTaps += 1 }
     func tap(x: Double, y: Double) async throws { taps.append((x, y)) }
     func press(ref: Int, duration: Double) async throws {}
-    func swipe(_ direction: FTSwipeDirection) async throws { swipes += 1 }
-    func swipe(_ direction: FTSwipeDirection, intent: FTSwipeIntent, path: FTSwipePath?) async throws { swipes += 1 }
+    func swipe(_ direction: FTSwipeDirection) async throws { swiped() }
+    func swipe(_ direction: FTSwipeDirection, intent: FTSwipeIntent, path: FTSwipePath?) async throws { swiped() }
+    /// 全画面スワイプは対象を動かさない(dragScale を持たない)。ほかの行は一覧と一緒に動く
+    private func swiped() {
+        swipes += 1
+        if othersMove { othersShift -= Self.othersStep }
+    }
 
     func drag(fromX: Double, fromY: Double, toX: Double, toY: Double,
               pressSeconds: Double, durationSeconds: Double) async throws {
         drags += 1
         rowY += (toY - fromY) * dragScale   // 指の動きぶん内容が動く(フリング無し)
+        if othersMove { othersShift += toY > fromY ? Self.othersStep : -Self.othersStep }
     }
 
     func snapshot() async throws -> SnapshotResponse {
@@ -62,11 +74,11 @@ private final class StraddlingDriver: AppDriver {
                             placeholder: nil, enabled: true, frame: Self.container, depth: 1),
                 ElementInfo(ref: 2, type: "clickable", identifier: "other_01", label: "他 01",
                             value: nil, placeholder: nil, enabled: true,
-                            frame: FTRect(x: 16, y: Self.container.y + 160, width: 370, height: 56),
+                            frame: FTRect(x: 16, y: Self.container.y + 160 + othersShift, width: 370, height: 56),
                             depth: 2),
                 ElementInfo(ref: 3, type: "clickable", identifier: "other_02", label: "他 02",
                             value: nil, placeholder: nil, enabled: true,
-                            frame: FTRect(x: 16, y: Self.container.y + 220, width: 370, height: 56),
+                            frame: FTRect(x: 16, y: Self.container.y + 220 + othersShift, width: 370, height: 56),
                             depth: 2),
                 ElementInfo(ref: 4, type: "clickable", identifier: "target", label: "対象",
                             value: nil, placeholder: nil, enabled: true,
@@ -102,9 +114,19 @@ final class StraddleNudgeTests: XCTestCase {
                       full.driverFallback ?? "-")
         let partial = await StepExecutor(driver: StraddlingDriver(straddling: true, dragScale: 0.3), isAndroid: false,
                                          tunables: RunTunables()).execute(tapStep())
-        XCTAssertTrue(partial.driverFallback?.contains("still straddles the edge") ?? false,
+        XCTAssertTrue(partial.driverFallback?.contains("is not fully inside") ?? false,
                       partial.driverFallback ?? "-")
-        XCTAssertFalse(partial.driverFallback?.contains("fully inside") ?? true, partial.driverFallback ?? "-")
+        XCTAssertFalse(partial.driverFallback?.contains("nudged the element fully inside") ?? true,
+                       partial.driverFallback ?? "-")
+    }
+
+    /// **行き過ぎて容器の外へ出たのを「fully inside」と言わない**(またぎの判定は交差しない要素に nil を返す =
+    /// 収まったのと区別できない。包含を直接見る)
+    func testOvershootOutOfTheContainerIsNotReportedAsInside() async throws {
+        let overshoot = await StepExecutor(driver: StraddlingDriver(straddling: true, dragScale: 20), isAndroid: false,
+                                           tunables: RunTunables()).execute(tapStep())
+        XCTAssertTrue(overshoot.driverFallback?.contains("is not fully inside") ?? false,
+                      overshoot.driverFallback ?? "-")
     }
 
     /// **送っても動かない ghost には送り続けない**(実機 Pixel 4a の引き伸ばせるシート: 本文の一覧の子に再配線された
@@ -118,6 +140,14 @@ final class StraddleNudgeTests: XCTestCase {
         let moving = StraddlingDriver(straddling: true, ghost: true)
         let moved = await StepExecutor(driver: moving, isAndroid: true, tunables: RunTunables()).execute(tapStep())
         XCTAssertFalse(moved.driverFallback?.contains("did not move") ?? false, moved.driverFallback ?? "-")
+    }
+
+    /// **何も動かなかった送り(容器が吸った・効かなかった)では止めない** —— 対象がスクロールの中身でない証拠にならない
+    func testReliefSwipeThatMovedNothingDoesNotStopTheRelief() async throws {
+        let absorbed = StraddlingDriver(straddling: true, ghost: true, dragScale: 0, othersMove: false)
+        let outcome = await StepExecutor(driver: absorbed, isAndroid: true, tunables: RunTunables()).execute(tapStep())
+        XCTAssertGreaterThan(absorbed.drags + absorbed.swipes, 1, outcome.driverFallback ?? "-")
+        XCTAssertFalse(outcome.driverFallback?.contains("did not move") ?? false, outcome.driverFallback ?? "-")
     }
 
     /// **容器の中に収まっているなら余計なドラッグを撃たない**(正常系のコストを増やさない)

@@ -98,7 +98,7 @@ bridge port; default 8123) and `--serial` (the Android device; optional when onl
 | `tap` | Tap an element or a coordinate | `--ref` (reference number from snapshot), `--x`, `--y` |
 | `type <text>` | Type text (with `--ref`, taps the element first) | `--ref` |
 | `swipe <direction>` | Swipe (direction: up / down / left / right) | — |
-| `press` | Long-press an element | `--ref` (required), `--hold-seconds` |
+| `press` | Long-press an element | `--ref` (required), `--hold-seconds` (up to 10 s), `--max-gesture-seconds` (allow up to 60 s for this press) |
 | `screenshot` | Save a screenshot | `-o` / `--output` (default `screenshot.png`) |
 
 `install`, `launch` and `terminate` take the same target options. `--ref` is the reference number shown by the latest `snapshot`.

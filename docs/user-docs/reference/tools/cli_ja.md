@@ -97,7 +97,7 @@ MCP の `ft_*` ツール([MCP サーバー](./mcp_server_ja.md))と同じ操作�
 | `tap` | 要素か座標をタップする | `--ref`(snapshot の参照番号)・`--x`・`--y` |
 | `type <テキスト>` | テキストを入力する(`--ref` を付けると先にその要素をタップする) | `--ref` |
 | `swipe <方向>` | スワイプする(方向は up / down / left / right) | — |
-| `press` | 要素を長押しする | `--ref`(必須)・`--hold-seconds` |
+| `press` | 要素を長押しする | `--ref`(必須)・`--hold-seconds`(10 秒まで)・`--max-gesture-seconds`(この1回だけ 60 秒まで延ばす) |
 | `screenshot` | スクリーンショットを保存する | `-o` / `--output`(既定 `screenshot.png`) |
 
 `install`・`launch`・`terminate` も同じ宛先オプションを取ります。`--ref` は直前の `snapshot` に出た参照番号です。

@@ -550,6 +550,8 @@ extension StepExecutor {
                 // キーボードの下へ対象が入る(E2EX-iOS xcuitest 入力の種類 S0040: 日本語キーボードは /type の後 約 1.3 秒で上がり、
                 // select(#txt_bottom_echo, scroll: .down) が送らずに止まって可視性検証で赤。この Mac で 5/5)
                 snapshot = try await consumePendingTypeKeyboardCheck(snapshot, phase: &phase)
+                // hideKeyboard の後も同じ(閉じかけのキーボードの木で判断すると、要らない送りや早すぎる停止になる)
+                snapshot = try await consumePendingHideKeyboardWait(snapshot, phase: &phase)
             } else {
                 let start = clock.now
                 // **スワイプ直後は必ずキャッシュを捨てて撮る**(Android のみ実費。iOS は素通し)。

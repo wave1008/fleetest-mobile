@@ -24,4 +24,15 @@ final class ManualDriveNumberBoundsTests: XCTestCase {
         }
         XCTAssertNoThrow(try Press.parse(["--ref", "1", "--hold-seconds", "\(BridgeAPI.defaultMaxGestureSeconds)"]))
     }
+
+    /// 既定の上限を超える押下は --max-gesture-seconds で通せる(MCP の maxGestureSeconds と同じ判定・天井は 60 秒)
+    func testPressHoldAboveTheDefaultNeedsTheOverride() {
+        let longer = "\(BridgeAPI.defaultMaxGestureSeconds + 5)"
+        XCTAssertThrowsError(try Press.parse(["--ref", "1", "--hold-seconds", longer])) { error in
+            XCTAssertTrue(Press.message(for: error).contains("pass --max-gesture-seconds"), Press.message(for: error))
+        }
+        XCTAssertNoThrow(try Press.parse(["--ref", "1", "--hold-seconds", longer, "--max-gesture-seconds", "20"]))
+        XCTAssertThrowsError(try Press.parse(["--ref", "1", "--hold-seconds", "1",
+                                              "--max-gesture-seconds", "\(BridgeAPI.gestureSecondsCeiling + 1)"]))
+    }
 }

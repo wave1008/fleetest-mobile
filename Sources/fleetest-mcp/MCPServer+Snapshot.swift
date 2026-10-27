@@ -1505,6 +1505,13 @@ extension MCPServer {
         let scrollFrameLabelNote = scrollFrameArg.note.isEmpty ? ""
             : "note: the scrollFrame ref was re-checked against the current tree\(scrollFrameArg.note).\n"
         let (isAndroid, uiFrameworkHint) = await resolveExecutorHints(scrollDriver, args: args)
+        // **直前の ft_type のキーボードが上がりきってから探索する**(新しい executor は type の印を持たない。
+        // 待たないと上がる前の木で「見えている」と判断して送らず、後から上がったキーボードの下に対象が入る =
+        // DSL の探索と同じ型。印が無ければ読みを足さない)
+        if pendingTypeKeyboardChecks[Self.sessionKey(args)] != nil {
+            _ = try await consumePendingTypeKeyboardCheck(try await freshSnapshot(scrollDriver, args: args),
+                                                          driver: scrollDriver, args: args)
+        }
         // **1回目だけ半開きシートの逆走査を後回しにする**(defersPartialSheetRecovery の宣言参照):
         // sheetCollapsed なら下でシートを展開して再試行し、その再試行が全画面高で同じ救済を
         // 持つので、畳まれた視界での逆走査(実測 7.8s)は丸損になる

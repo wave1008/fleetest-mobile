@@ -47,7 +47,7 @@ final class AndroidBridgeHeldByAnotherSessionMessageTests: XCTestCase {
         let text = AndroidBridgeHeldByAnotherSession(serial: "emulator-5556", runningVersion: nil).localizedDescription
         XCTAssertTrue(text.contains("emulator-5556"))
         XCTAssertTrue(text.contains("another session"))
-        XCTAssertTrue(text.contains("is not answering"))
+        XCTAssertTrue(text.contains("did not answer as ready"))
         XCTAssertFalse(text.contains("bridge up"), "同じ門で断られる bridge up を勧めている")
         XCTAssertFalse(text.contains("Cannot reach the driver"), "到達不能の決まり文句で包まれている")
     }

@@ -195,14 +195,25 @@ struct Press: AsyncParsableCommand {
     @Option(help: "Press duration in seconds")
     var holdSeconds: Double = 1.0
 
+    @Option(help: "Allow --hold-seconds above the default limit for this press (up to 60)")
+    var maxGestureSeconds: Double?
+
     @OptionGroup var driverOptions: DriverOptions
 
     func validate() throws {
         try driverOptions.rejectDeviceTargetMismatch()
-        // MCP の ft_long_press と同じ上限(長い押下はランナーを握る)。0 以下・無限大は撃たない
-        guard holdSeconds.isFinite, holdSeconds > 0, holdSeconds <= BridgeAPI.defaultMaxGestureSeconds else {
+        // 判定は MCP の ft_long_press と同じ(既定 10 秒・上書きは 60 秒まで = BridgeAPI)。文言は CLI のフラグ名で持つ。0 は撃たない
+        if let maxGestureSeconds, BridgeAPI.maxGestureSecondsViolation(maxGestureSeconds) != nil {
+            throw ValidationError("--max-gesture-seconds must be greater than 0 and at most"
+                + " \(FTSeconds.format(BridgeAPI.gestureSecondsCeiling))s (got \(maxGestureSeconds))")
+        }
+        let cap = maxGestureSeconds ?? BridgeAPI.defaultMaxGestureSeconds
+        guard holdSeconds > 0, BridgeAPI.gestureSecondsViolation(subject: "", seconds: holdSeconds, cap: cap) == nil else {
+            let raise = maxGestureSeconds == nil && cap < BridgeAPI.gestureSecondsCeiling
+                ? "; pass --max-gesture-seconds (up to \(FTSeconds.format(BridgeAPI.gestureSecondsCeiling))) to allow longer"
+                : ""
             throw ValidationError("--hold-seconds must be greater than 0 and at most"
-                + " \(FTSeconds.format(BridgeAPI.defaultMaxGestureSeconds))s (got \(holdSeconds))")
+                + " \(FTSeconds.format(cap))s (got \(holdSeconds))" + raise)
         }
     }
 

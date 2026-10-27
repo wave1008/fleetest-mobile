@@ -739,11 +739,10 @@ final class InputInjector {
             throw new BridgeRouter.BridgeException(409,
                     "no-input-focus: nothing has input focus (tap the field by ref first)");
         }
-        // **複数行の欄では撃たない**(ホストの keyevent 66 = 改行へ回す)。ACTION_IME_ENTER は複数行の RN / Compose で改行にも
-        // アクションにもならないのに true を返す(実機 Pixel 3a: 値が変わらず ime=0。keyevent 66 は改行が入った)。
-        // Compose は isMultiLine を申告しないので、IME の今の欄の inputType で見る(composeEditorIsMultiLine)。
+        // **Enter が改行になる欄では撃たない**(ホストの keyevent 66 = 改行へ回す)。ACTION_IME_ENTER は複数行の RN / Compose で
+        // 改行にもアクションにもならないのに true を返す(実機 Pixel 3a: 値が変わらず ime=0。keyevent 66 は改行が入った)。
         // **Compose を一律に keyevent へ回さない**: keyevent 66 は単一行の ImeAction.Next を起こさない(E2EX-CMP 入力の種類 S0020)
-        if (focus.isMultiLine() || (isComposeNode(focus) && composeEditorIsMultiLine(ua, focus))) {
+        if (enterMakesNewLine(ua, focus)) {
             throw new BridgeRouter.BridgeException(409, "multi-line field: Enter is sent as a key event (a new line)");
         }
         // ホストがキーイベント経路へフォールバックできるよう、失敗は 409 で返す(500 にしない)
@@ -763,31 +762,58 @@ final class InputInjector {
     private static final int IME_FLAG_NO_ENTER_ACTION = 0x40000000;
     private static final int IME_MASK_ACTION = 0xff;
     private static final int IME_ACTION_NONE = 1;
+    private static final java.util.regex.Pattern EDITOR_INPUT_TYPE = java.util.regex.Pattern.compile("inputType=0x([0-9a-fA-F]+)");
+    private static final java.util.regex.Pattern EDITOR_IME_OPTIONS = java.util.regex.Pattern.compile("imeOptions=0x([0-9a-fA-F]+)");
+    private static final java.util.regex.Pattern EDITOR_PACKAGE = java.util.regex.Pattern.compile("packageName=(\\S+)");
+    /** mInputEditorInfo の塊を探して読む行数の上限(IMMS の節は実機 Pixel 3a で約 700 行。この先は IME 自身の巨大な dump) */
+    private static final int EDITOR_INFO_SCAN_MAX_LINES = 3000;
 
     /**
-     * IME が今つないでいる欄(`dumpsys input_method` の `mInputEditorInfo`)で、ソフトキーボードの Enter が**改行**になるか。
-     * a11y に複数行が出ない Compose のためだけに読む。規則はキーボードの Enter と同じ: 複数行で、かつ Enter をアクションに
-     * しない(IME_FLAG_NO_ENTER_ACTION か、アクションが無い)ときだけ改行。複数行でもアクション(次へ等)を持つ欄はアクション
+     * 焦点の欄でソフトキーボードの Enter が**改行**になるか。規則はキーボードの Enter と同じ: 複数行で、かつ Enter をアクションに
+     * しない(IME_FLAG_NO_ENTER_ACTION か、アクションが無い)ときだけ改行。複数行でもアクション(送信・次へ等)を持つ欄はアクション
      * (Emulator の CMP: 複数行 inputType=0x28001 imeOptions=0x42000000 / 「姓」0x28001・0x2000005 = 次へ / 単一行 0x8001)。
-     * **読めない・形が違う・別のアプリなら false**(= 従来どおり ACTION_IME_ENTER を撃つ側に倒す)
+     * imeOptions は a11y に出ないので IME の今の欄(`dumpsys input_method` の mInputEditorInfo)で見る。**読むのは複数行を申告した欄と
+     * Compose の欄だけ**(Compose は isMultiLine を申告しない。View の単一行は読まない)。読めない・別のアプリなら a11y の申告に倒す
      */
-    private static boolean composeEditorIsMultiLine(UiAutomation ua, AccessibilityNodeInfo focus) {
+    private static boolean enterMakesNewLine(UiAutomation ua, AccessibilityNodeInfo focus) {
+        boolean multiLine = focus.isMultiLine();
+        if (!multiLine && !isComposeNode(focus)) return false;
+        Boolean byEditor = editorEnterIsNewLine(ua, focus);
+        return byEditor != null ? byEditor : multiLine;
+    }
+
+    /**
+     * IME が今つないでいる欄の EditorInfo から、Enter が改行になるか(null = 読めない・形が違う・別のアプリ)。
+     * **必要な塊を読んだら流れを閉じる** —— dump の大半は IME 自身の dump(実機 Pixel 3a の Gboard で約 1.1MB・全部読むと
+     * adb 越しで 0.4〜1 秒、塊の後で閉じると 0.15〜0.3 秒)。
+     * 同じアプリの直前の欄の EditorInfo が残っている瞬間は見分けられない(Compose の欄はどれも fieldId=-1)。焦点の移動と打鍵の
+     * 読み返しを待つ type の直後にはまず起きない(再現していない)
+     */
+    private static Boolean editorEnterIsNewLine(UiAutomation ua, AccessibilityNodeInfo focus) {
         CharSequence pkg = focus.getPackageName();
-        if (pkg == null) return false;
-        String dump;
-        try {
-            dump = BridgeRouter.rawShell(ua, "dumpsys input_method");
-        } catch (RuntimeException e) {
-            return false;
+        if (pkg == null) return null;
+        StringBuilder block = null;
+        try (java.io.BufferedReader reader = new java.io.BufferedReader(new java.io.InputStreamReader(
+                new android.os.ParcelFileDescriptor.AutoCloseInputStream(ua.executeShellCommand("dumpsys input_method")),
+                java.nio.charset.StandardCharsets.UTF_8))) {
+            String line;
+            int lines = 0;
+            while ((line = reader.readLine()) != null && ++lines <= EDITOR_INFO_SCAN_MAX_LINES) {
+                if (block == null) {
+                    if (line.contains("mInputEditorInfo:")) block = new StringBuilder();
+                    continue;
+                }
+                block.append(line).append('\n');
+                if (line.contains("hintLocales=")) break;
+            }
+        } catch (Exception e) {
+            return null;
         }
-        int at = dump.indexOf("mInputEditorInfo:");
-        if (at < 0) return false;
-        int end = dump.indexOf("hintLocales=", at);
-        String block = dump.substring(at, end < 0 ? Math.min(dump.length(), at + 600) : end);
-        java.util.regex.Matcher type = java.util.regex.Pattern.compile("inputType=0x([0-9a-fA-F]+)").matcher(block);
-        java.util.regex.Matcher options = java.util.regex.Pattern.compile("imeOptions=0x([0-9a-fA-F]+)").matcher(block);
-        java.util.regex.Matcher owner = java.util.regex.Pattern.compile("packageName=(\\S+)").matcher(block);
-        if (!type.find() || !options.find() || !owner.find() || !owner.group(1).equals(pkg.toString())) return false;
+        if (block == null) return null;
+        java.util.regex.Matcher type = EDITOR_INPUT_TYPE.matcher(block);
+        java.util.regex.Matcher options = EDITOR_IME_OPTIONS.matcher(block);
+        java.util.regex.Matcher owner = EDITOR_PACKAGE.matcher(block);
+        if (!type.find() || !options.find() || !owner.find() || !owner.group(1).equals(pkg.toString())) return null;
         try {
             int inputType = (int) Long.parseLong(type.group(1), 16);
             int imeOptions = (int) Long.parseLong(options.group(1), 16);
@@ -795,7 +821,7 @@ final class InputInjector {
             int action = imeOptions & IME_MASK_ACTION;
             return (imeOptions & IME_FLAG_NO_ENTER_ACTION) != 0 || action == 0 || action == IME_ACTION_NONE;
         } catch (NumberFormatException e) {
-            return false;
+            return null;
         }
     }
 

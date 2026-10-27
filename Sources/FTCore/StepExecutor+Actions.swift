@@ -267,12 +267,16 @@ extension StepExecutor {
         // (実機 Pixel 4a・E2EY-CMP の引き伸ばせるシート: 間引かれた入れ物のせいでシートの頭が本文の一覧の子に
         // 再配線され ghost と読まれ、tap が本文を2回送ってから押していた)。木だけでは Compose iOS の切り詰められた
         // 行の子(本物の ghost)と区別できないので、送った結果で止める
+        // **ほかの要素は動いたのに対象だけが動かなかったときだけ**止める。何も動かなかった送り(容器が吸った・効かなかった)は
+        // 対象がスクロールの中身でない証拠にならないので、従来どおり送り直す
         var ghostDidNotMove = false
         var frameBeforeGhostSwipe: FTRect?
+        // 送る前の木の全要素の矩形(対象が動いていなければ、食い違い = ほかの何かが動いた)
+        var framesBeforeGhostSwipe: [FTRect] = []
         func stillUnmovedGhost() -> Bool {
-            guard let before = frameBeforeGhostSwipe, grabbedGhost(resolved), let now = resolved?.0.frame else { return false }
-            return abs(now.x - before.x) <= 1 && abs(now.y - before.y) <= 1
-                && abs(now.width - before.width) <= 1 && abs(now.height - before.height) <= 1
+            guard let before = frameBeforeGhostSwipe, grabbedGhost(resolved), let now = resolved?.0.frame,
+                  snapshot.elements.map(\.frame) != framesBeforeGhostSwipe else { return false }
+            return ContainerGeometry.sameFrame(now, before)
         }
         if resolved == nil || grabbedGhost(resolved) {
             if let timeout = step.timeout {
@@ -315,6 +319,7 @@ extension StepExecutor {
                     if attempt > 0, grabbedGhost(resolved),
                        let element = resolved?.0 {
                         frameBeforeGhostSwipe = element.frame
+                        framesBeforeGhostSwipe = snapshot.elements.map(\.frame)
                         let finger = FTSwipeDirection(rawValue: step.direction ?? "") ?? .up
                         let container = ContainerGeometry.clippingContainer(
                             of: element, in: snapshot.elements,
@@ -585,11 +590,16 @@ extension StepExecutor {
                 element = moved
                 resolvedElementThisStep = element
                 // **収束を確かめてから「fully inside」と言う**(実機 Pixel 4a の WebView: 寄せは 131px しか動かず、
-                // 行はまだ枠の上端をまたいでいたのに「fully inside」と出た)。1回で収まらなければ見えている部分を撃つ
-                straddleNote = TapTargetGeometry.straddlingContainerEdge(moved, in: refreshed.elements) == nil
+                // 行はまだ枠の上端をまたいでいたのに「fully inside」と出た)。1回で収まらなければ見えている部分を撃つ。
+                // **包含を直接見る**(straddlingContainerEdge の nil は「収まった」だけでなく、行き過ぎて外へ出た・容器が引けない・
+                // 容器より高い、も含む)
+                let fullyInside = ContainerGeometry.clippingContainer(
+                    of: moved, in: refreshed.elements, inferring: true
+                ).map { TapTargetGeometry.contains($0, moved.frame) } ?? false
+                straddleNote = fullyInside
                     ? "nudged the element fully inside its container before touching it"
-                    : "nudged the element toward the inside of its container, but it still straddles the edge"
-                        + " — touched its visible part"
+                    : "nudged the element toward the inside of its container, but it is not fully inside"
+                        + " — touched it where it is"
             }
         }
 

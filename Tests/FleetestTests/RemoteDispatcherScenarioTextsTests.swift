@@ -121,7 +121,7 @@ final class RemoteDispatcherScenarioTextsTests: XCTestCase {
     func testReportsMissingNoteDoesNotCallAZeroExitAFailure() {
         XCTAssertEqual(
             RemoteRunDispatcher.reportsMissingNote(interrupted: false, exitCode: 0),
-            "note: the remote produced no reports (it exited 0 without running a scenario)")
+            "note: the remote produced no reports (it exited 0)")
     }
 
     func testReportsMissingNoteSaysInterruptedWhenWeStoppedIt() {

@@ -437,6 +437,8 @@ SwiftUI の pinch(SUT が枠で切り取っていなかった)・inputs S0030/40
 
 | 版・コミット | 内容 |
 |---|---|
+| iOS v219 | 押さずに済ませるのはライブの焦点の欄が ref の欄のときだけ(控えだけでは決めない)・`clearInput` の後の `type` も押し直さない・消去の右端の押下は2周目の1回だけで、中心を押した直後なら 1 秒空ける |
+| Android v114 | `pressEnter` の改行の判定を View/XML の複数行の欄にも同じ規則で当てる(複数行でも送信・次へ等のアクションを持つ欄はアクション)。IME の欄の情報は必要な塊を読んだところで読みを打ち切る(実機 Pixel 3a で 0.4〜1 秒 → 0.15〜0.3 秒) |
 | iOS v218 | XCUITest ランナーの `type` / `clearInput` は、直前の読みで焦点があった欄を押し直さない・消去の右端の押下は2周目から。焦点のある欄を短い間隔で2回押すと編集メニュー(Paste / Select All)が出て画面に残っていた(CMP で再現・SwiftUI では出ない。証人: E2E の各 SUT のテキスト入力の `notExist(".menuItem")`) |
 | Android v113 | 複数行の欄の `pressEnter` を keyevent 66(改行)へ回す(Compose は IME の今の欄の inputType で複数行を見る)。`ACTION_IME_ENTER` が複数行の RN / Compose で何もせずに成功を返していた(証人: E2EX の `入力の種類` S0010 場面4) |
 | — | React Native の XCUITest で、出てきたばかりのダイアログ・シートの中の要素を押す前だけ表示の切り替え(0.55 秒)を待つ(`PresentedOverlayTapWait`)。fade の最中の tap が捨てられていた |

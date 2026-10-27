@@ -237,19 +237,35 @@ final class StaleRefRunnerWiringTests: XCTestCase {
     func testTypeAndClearDoNotTapAFieldThatAlreadyHasFocus() throws {
         let input = try runnerSource("BridgeRouter+TextInput.swift")
         let type = try body(of: "private func typeAndReadBack(", in: input)
-        let skipAt = try XCTUnwrap(type.range(of: "!alreadyFocusedInput(ref)")?.lowerBound, "/type が焦点の有無を見ていない")
+        let skipAt = try XCTUnwrap(type.range(of: "alreadyFocusedInput(app, ref) == nil")?.lowerBound,
+                                   "/type が焦点の有無を見ていない")
         let typeTapAt = try XCTUnwrap(type.range(of: "tapBeforeTyping(")?.lowerBound)
         XCTAssertLessThan(skipAt, typeTapAt)
         let clear = try body(of: "private func clearFocusedInput(", in: input)
-        XCTAssertTrue(clear.contains("if alreadyFocusedInput(ref)"), "/clear が焦点の有無を見ていない")
+        XCTAssertTrue(clear.contains("if let live = alreadyFocusedInput(app, ref)"), "/clear が焦点の有無を見ていない")
+        // 撮った後に焦点が移っていれば押す側へ倒す(読み返しの無い伏せ字・改行入りの欄では別の欄へ打って 200 になる)
+        let check = try body(of: "func alreadyFocusedInput(", in: input)
+        XCTAssertTrue(check.contains("Self.focusedInput(app)") && check.contains("live.frame.contains("),
+                      "控えだけで押さずに済ませ、ライブの焦点を確かめていない")
     }
 
-    /// ② 消去の右端の押下は2周目から(1周目で空にならなかった = カーソルが末尾に無かったときだけ。同じ理由)
-    func testClearTapsTheFieldEndOnlyFromTheSecondRound() throws {
+    /// 消した欄は焦点を持ったまま = 撮り直さずに続く /type(MCP の replace)が押し直さないよう、次の POST へ渡す
+    func testClearHandsTheFocusedFieldToTheNextPost() throws {
+        let clear = try body(of: "private func clearFocusedInput(", in: try runnerSource("BridgeRouter+TextInput.swift"))
+        XCTAssertTrue(clear.contains("lastReadFocusedRef = ref"), "clear の後の /type が消した欄を押し直す")
+    }
+
+    /// ② 消去の右端の押下は2周目の1回だけ(1周目で空にならなかった = カーソルが末尾に無かったときだけ)。この要求で中心を
+    /// 押していたら間隔を空けてから押す(中心 → 右端も同じ2回押し。同じ理由)
+    func testClearTapsTheFieldEndOnlyOnceInTheSecondRound() throws {
         let clear = try body(of: "private func clearFocusedInput(", in: try runnerSource("BridgeRouter+TextInput.swift"))
         XCTAssertEqual(clear.components(separatedBy: "tapFieldEndIfHittable(").count - 1, 1,
                        "右端の押下が周回の外(1周目の前・空に見える欄の消去)にも残っている")
-        XCTAssertTrue(clear.contains("if rounds > 1 { tapFieldEndIfHittable(app, focused) }"), "右端の押下が1周目から撃たれる")
+        let round = try XCTUnwrap(clear.range(of: "if rounds == 2 {"), "右端の押下が2周目の1回に限られていない")
+        let tail = clear[round.upperBound...]
+        let gapAt = try XCTUnwrap(tail.range(of: "editMenuRetapGapSeconds")?.lowerBound, "中心を押した直後の右端の押下が間隔を空けない")
+        let tapAt = try XCTUnwrap(tail.range(of: "tapFieldEndIfHittable(")?.lowerBound)
+        XCTAssertLessThan(gapAt, tapAt)
     }
 
     /// ③ 焦点の控えは読みの直後の POST の1回だけ使う(撮った後に操作が挟まった焦点は信じない。同じ理由)
