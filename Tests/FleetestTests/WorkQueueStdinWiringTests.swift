@@ -31,6 +31,14 @@ final class WorkQueueStdinWiringTests: XCTestCase {
         }
     }
 
+    /// リモートへ中継する子は、移した fd を ssh へ渡す(fd 0 は /dev/null に差し替え済み)
+    func testRemoteRelayHandsTheClaimedDescriptorToSSH() throws {
+        let text = try source("Sources/fleetest/RemoteRunDispatcher.swift")
+        XCTAssertTrue(text.contains("? FileHandle(fileDescriptor: WorkQueueStdin.claim(), closeOnDealloc: false) : FileHandle.nullDevice"),
+                      "ssh へ渡す stdin が移した fd ではない")
+        XCTAssertFalse(text.contains("workQueue ? FileHandle.standardInput"), "fd 0(/dev/null)を ssh へ渡している")
+    }
+
     func testPullSourceReadsTheClaimedDescriptorByDefault() throws {
         let text = try source("Sources/FTCore/StdioPullSource.swift")
         XCTAssertTrue(text.contains("public init(inputFD: Int32 = WorkQueueStdin.claim(),"),

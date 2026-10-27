@@ -1485,8 +1485,11 @@ struct RemoteRunDispatcher {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
         process.arguments = argv
-        // --work-queue のときだけ自分の stdin(親の返事)を ssh へ渡す。`-tt` は変えない(中断の SIGHUP の役)
-        process.standardInput = workQueue ? FileHandle.standardInput : FileHandle.nullDevice
+        // --work-queue のときだけ親の返事を ssh へ渡す。`-tt` は変えない(中断の SIGHUP の役)。
+        // **fd 0 ではなく移した fd**(WorkQueueStdin.claim)を渡す —— run の入口で fd 0 は /dev/null に差し替え済み
+        // (渡すとリモートへ返事が1本も届かない)。差し替えは、結果の回収などで起こす別の ssh が stdin を読んで返事を横取りしないため
+        process.standardInput = workQueue
+            ? FileHandle(fileDescriptor: WorkQueueStdin.claim(), closeOnDealloc: false) : FileHandle.nullDevice
         let stdoutPipe = Pipe()
         process.standardOutput = stdoutPipe
         process.standardError = FileHandle.standardError
