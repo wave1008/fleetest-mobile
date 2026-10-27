@@ -47,9 +47,9 @@ The devices listed in a run profile's `devices` are where the run goes. Each dev
 
 - If every device is on one runner machine, the run is sent to that runner machine, and you normally do not need
   `--runner`.
-- If the devices are split between your Mac and runner machines (or several runner machines), scenarios are split
-  across machines by how many devices each has, and run at the same time. Each portion runs against its own devices
-  there.
+- If the devices are split between your Mac and runner machines (or several runner machines), all machines run at the
+  same time and each free device takes the next scenario. A scenario that a faster machine would finish sooner, even after
+  a short wait, is held for it instead of going to a slower machine (estimated from how long past runs took).
 - Physical devices work the same way. List a device with `"kind": "physical"` and its identifier, with the `machine`
   of the Mac it is connected to.
 - Write `"machine": "local"` for devices on your own Mac. Leaving it out is treated as your own Mac, but writing

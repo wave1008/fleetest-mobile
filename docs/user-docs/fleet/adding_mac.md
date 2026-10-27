@@ -329,8 +329,8 @@ Expected result:
 
 - **Write `"machine": "local"` for devices on your own Mac**. Devices added in the extension get
   it automatically.
-- You may mix devices on your Mac and on the runner in one run profile. The scenarios are divided
-  among the machines according to how many devices each has, and they run at the same time.
+- You may mix devices on your Mac and on the runner in one run profile. All machines run at the same
+  time, and each free device takes the next scenario.
 - **Build the app on your Mac**. The app that the app profile's `appPath` points to is sent from
   your Mac to the runner automatically on every run. You do not need to build the app on the runner.
 
