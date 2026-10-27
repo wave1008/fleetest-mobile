@@ -25,9 +25,14 @@ public enum ParentBoundCommand {
     /// `$1` = 見張る親の pid。`$$` はサブシェルの中でも包み自身の pid。
     /// **見張りの標準入出力は /dev/null** —— 継がせると、`kill $w` の後も見張りの `sleep` が出力の
     /// パイプを握り続け、読み手(ディスパッチャの中継)の EOF が毎回最大 2 秒遅れる(実測 2.04 秒)
+    /// **ssh の標準入力は退避して明示的に渡す**(fd 3)—— ジョブ制御の無い sh は `&` で起こしたコマンドの stdin を
+    /// /dev/null に付け替える(POSIX)。付け替わると、動的な割り振り(RR-8.1)で親が書く返事がリモートへ届かず、
+    /// リモートのデバイスが返事を待ったまま止まった。明示のリダイレクトは付け替えの後に効く
     static let script = """
         p=$1; shift
-        "$@" & c=$!
+        exec 3<&0
+        "$@" <&3 3<&- & c=$!
+        exec 3<&-
         ( while kill -0 $c 2>/dev/null; do
             sleep \(pollSeconds)
             [ "$(ps -o ppid= -p $$ | tr -d ' ')" = "$p" ] || { kill -TERM $c 2>/dev/null; exit 0; }

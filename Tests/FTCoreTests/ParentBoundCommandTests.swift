@@ -133,4 +133,24 @@ final class ParentBoundCommandTests: XCTestCase {
         survivors.forEach { kill($0, SIGKILL) }
         XCTAssertTrue(survivors.isEmpty, "terminate() on the wrapper must reach its child")
     }
+
+    /// **包んだコマンドへ標準入力が届く**(動的な割り振りの返事は ssh の stdin を通る。RR-8.1)。ジョブ制御の無い sh は
+    /// `&` のコマンドの stdin を /dev/null に付け替えるので、退避して渡さないと 1 行も届かない
+    func testStdinReachesTheWrappedCommand() throws {
+        let process = Process()
+        let argv = ParentBoundCommand.wrap(["/bin/sh", "-c", "read line; echo \"got:$line\""],
+                                           parentPID: ProcessInfo.processInfo.processIdentifier)
+        process.executableURL = URL(fileURLWithPath: argv[0])
+        process.arguments = Array(argv.dropFirst())
+        let input = Pipe(), output = Pipe()
+        process.standardInput = input
+        process.standardOutput = output
+        process.standardError = FileHandle.nullDevice
+        try process.run()
+        try input.fileHandleForWriting.write(contentsOf: Data("hello\n".utf8))
+        try input.fileHandleForWriting.close()
+        process.waitUntilExit()
+        let text = String(decoding: output.fileHandleForReading.availableData, as: UTF8.self)
+        XCTAssertEqual(text.trimmingCharacters(in: .whitespacesAndNewlines), "got:hello")
+    }
 }
