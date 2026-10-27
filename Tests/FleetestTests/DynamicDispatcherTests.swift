@@ -182,6 +182,21 @@ final class DynamicDispatcherTests: XCTestCase {
         XCTAssertEqual(DeviceMachineRunner.interruptedBeforeAnySubRun.rawValue, 130)
     }
 
+    /// **`--fleet` もほかの3経路と同じ規則で終了コードを決める**(中断なら 130。ロックの取得中の中断を使い方の誤り 64 にしない・
+    /// 途中の中断で子が返した 1 などに埋もれさせない)
+    func testFleetUsesTheSharedInterruptExitCode() throws {
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        let fleet = try String(contentsOf: root.appendingPathComponent("Sources/fleetest/FleetRunner.swift"), encoding: .utf8)
+        XCTAssertFalse(fleet.contains("ValidationError(\"interrupted while acquiring"),
+                       "--fleet がロックの取得中の中断を ValidationError(64)で投げている")
+        XCTAssertEqual(fleet.components(separatedBy: "throw DeviceMachineRunner.interruptedBeforeAnySubRun").count - 1, 2,
+                       "--fleet の2つのロックの取得が共有の出口(130)で抜けていない")
+        XCTAssertTrue(fleet.contains("interruptedWithWorkLeft: InterruptRelay.hasReceivedInterrupt"),
+                      "--fleet の終了コードが中断を見ていない")
+        XCTAssertFalse(fleet.contains("FleetProfile.aggregateExitCode("), "--fleet が子の終了コードだけで終了コードを決めている")
+    }
+
     /// 3経路(run の機械分担・api run の機械分担・複数対象)が同じ関数で終了コードを決める(ソース走査)
     func testAllParentPathsUseTheSharedExitCode() throws {
         let root = URL(fileURLWithPath: #filePath)
@@ -191,11 +206,14 @@ final class DynamicDispatcherTests: XCTestCase {
             let text = try String(contentsOf: root.appendingPathComponent(file), encoding: .utf8)
             XCTAssertTrue(text.contains("interruptedWithWorkLeft: interruptedWithWorkLeft)"),
                           "\(file) が中断で残った分を終了コードへ載せていない")
-            XCTAssertTrue(text.contains("throw interruptedBeforeAnySubRun") || text.contains("throw DeviceMachineRunner.interruptedBeforeAnySubRun"),
-                          "\(file) がロックの取得中の中断を共有の出口(130)で抜けていない")
             XCTAssertFalse(text.contains("ValidationError(\"interrupted while acquiring"),
                            "\(file) がロックの取得中の中断を ValidationError(64)で投げている")
         }
+        // ロックの取得中の中断は前段(MachineFanoutFrontHalf)の共有の出口(130)で抜ける
+        let front = try String(contentsOf: root.appendingPathComponent("Sources/fleetest/MachineFanoutFrontHalf.swift"),
+                               encoding: .utf8)
+        XCTAssertTrue(front.contains("throw DeviceMachineRunner.interruptedBeforeAnySubRun"),
+                      "前段がロックの取得中の中断を共有の出口(130)で抜けていない")
         // 渡したのに結果が無い分(子が受け取る前の中断など)も終了コードへ載せる
         for (file, marker) in [("Sources/fleetest/DeviceMachineRunner.swift", "if missing > 0 {"),
                                ("Sources/fleetest/MultiTargetRunner.swift", "if missing > 0 {"),
@@ -205,29 +223,38 @@ final class DynamicDispatcherTests: XCTestCase {
         }
     }
 
-    /// 3経路の親は入口の中断の印(ParentInterrupt)を手元のロックの先取りより前に立て、そのロックの待ちにも渡す。
-    /// 後ろにあると、先取りが自前の購読を外して既定動作へ戻した後、ビルドの間の SIGTERM で親が後始末なしに死ぬ(ソース走査)
-    func testParentPathsRegisterTheInterruptBeforeTheLocalLock() throws {
+    /// 前段(MachineFanoutFrontHalf。3経路の親が共有する1箇所)は入口の中断の印(ParentInterrupt)を手元のロックの先取りより前に立て、
+    /// そのロックの待ちにも渡す。後ろにあると、先取りが自前の購読を外して既定動作へ戻した後、ビルドの間の SIGTERM で親が
+    /// 後始末なしに死ぬ(ソース走査)。3経路は前段を通り、購読の登録の後に出口を見る
+    func testFrontHalfRegistersTheInterruptBeforeTheLocalLock() throws {
         let root = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        let text = try String(contentsOf: root.appendingPathComponent("Sources/fleetest/MachineFanoutFrontHalf.swift"),
+                              encoding: .utf8)
+        guard let watch = text.range(of: "ParentInterrupt()\n"),
+              let lock = text.range(of: "LocalDispatchLock(\n") else {
+            return XCTFail("前段に入口の印か手元のロックの先取りが無い")
+        }
+        XCTAssertLessThan(watch.lowerBound, lock.lowerBound, "入口の印をロックの先取りより後で立てている")
+        XCTAssertTrue(text.contains(".acquire(interruptCheck: parentInterrupt.isSet)"),
+                      "手元のロックの待ちに入口の印を渡していない")
+        XCTAssertTrue(text.contains("try parentInterrupt.acquireLocalLock("),
+                      "手元のロックの待ちの中断を 130 へ読み替えていない")
+        XCTAssertTrue(text.contains("interruptCheck: parentInterrupt.isSet,"),
+                      "手元のデバイスの使用中の待ちに入口の印を渡していない")
+        // 先取りのロックは使用中の待ちより前に手放す(握ったまま待つとこの Mac の他の run を待たせる)
+        let release = try XCTUnwrap(text.range(of: "localLock?.release()\n        localLock = nil"))
+        let leaseWait = try XCTUnwrap(text.range(of: "try ProfileRunner.rejectIfLocalDevicesLeasedBeforeDispatch("))
+        XCTAssertLessThan(release.lowerBound, leaseWait.lowerBound, "ロックを握ったまま使用中を待っている")
+        // 使用中の待ちは Prelock の取得より前(読み取りだけの先読み。取ってから降りると他人を待たせた挙句に何も走らない)
+        let prelock = try XCTUnwrap(text.range(of: "lock.acquireInOrder("))
+        XCTAssertLessThan(leaseWait.lowerBound, prelock.lowerBound)
         for file in ["Sources/fleetest/DeviceMachineRunner.swift", "Sources/fleetest/ApiRunMachineFanout.swift",
                      "Sources/fleetest/MultiTargetRunner.swift"] {
-            let text = try String(contentsOf: root.appendingPathComponent(file), encoding: .utf8)
-            guard let watch = text.range(of: "ParentInterrupt()\n"),
-                  let lock = text.range(of: "LocalDispatchLock(\n") else {
-                return XCTFail("\(file) に入口の印か手元のロックの先取りが無い")
-            }
-            XCTAssertLessThan(watch.lowerBound, lock.lowerBound, "\(file) が入口の印をロックの先取りより後で立てている")
-            XCTAssertTrue(text.contains(".acquire(interruptCheck: parentInterrupt.isSet)"),
-                          "\(file) が手元のロックの待ちに入口の印を渡していない")
-            XCTAssertTrue(text.contains("try parentInterrupt.acquireLocalLock("),
-                          "\(file) が手元のロックの待ちの中断を 130 へ読み替えていない")
-            XCTAssertTrue(text.contains("interruptCheck: parentInterrupt.isSet, log:"),
-                          "\(file) が手元のデバイスの使用中の待ちに入口の印を渡していない")
-            // 先取りのロックは使用中の待ちより前に手放す(握ったまま待つとこの Mac の他の run を待たせる)
-            let release = try XCTUnwrap(text.range(of: "localLock?.release()\n"), file)
-            let leaseWait = try XCTUnwrap(text.range(of: "try ProfileRunner.rejectIfLocalDevicesLeasedBeforeDispatch("), file)
-            XCTAssertLessThan(release.lowerBound, leaseWait.lowerBound, "\(file) がロックを握ったまま使用中を待っている")
+            let caller = try String(contentsOf: root.appendingPathComponent(file), encoding: .utf8)
+            let relay = try XCTUnwrap(caller.range(of: "InterruptRelay.observing(catchUp: true)"), file)
+            let exit = try XCTUnwrap(caller.range(of: "held.exitIfInterruptedBeforeLaunch("), file)
+            XCTAssertLessThan(relay.lowerBound, exit.lowerBound, "\(file): 購読の登録より前に出口を見ている")
         }
     }
 

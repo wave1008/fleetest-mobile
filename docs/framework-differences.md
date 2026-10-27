@@ -437,6 +437,8 @@ SwiftUI の pinch(SUT が枠で切り取っていなかった)・inputs S0030/40
 
 | 版・コミット | 内容 |
 |---|---|
+| iOS v220 | in-app ブリッジの `/tap` `/type` `/clear`(と ref 付きの `/doubleTap`)も、要求の `expect`(identifier・型)が自分の直近の `/snapshot` の控えと食い違えば、撃たずに 422 `stale-ref` で断る(XCUITest ランナーと同じ。`/press` は in-app では常に 501 で撃たない)。`expect` を送らない呼び手は従来どおり |
+| Android v115 | `/tap` `/press` `/type` `/clear` の ref 付き要求の `expect`(identifier・型)が直近の `/snapshot` の控えと食い違えば、撃たずに 422 `stale-ref` で断る(エラー JSON に `reason` を載せる)。ホストの `AndroidDriver` は `tap` / `press` を座標で送るので、効くのは ref を送る `type` / `clearInput` |
 | iOS v219 | 押さずに済ませるのはライブの焦点の欄が ref の欄のときだけ(控えだけでは決めない)・`clearInput` の後の `type` も押し直さない・消去の右端の押下は2周目の1回だけで、中心を押した直後なら 1 秒空ける |
 | Android v114 | `pressEnter` の改行の判定を View/XML の複数行の欄にも同じ規則で当てる(複数行でも送信・次へ等のアクションを持つ欄はアクション)。IME の欄の情報は必要な塊を読んだところで読みを打ち切る(実機 Pixel 3a で 0.4〜1 秒 → 0.15〜0.3 秒) |
 | iOS v218 | XCUITest ランナーの `type` / `clearInput` は、直前の読みで焦点があった欄を押し直さない・消去の右端の押下は2周目から。焦点のある欄を短い間隔で2回押すと編集メニュー(Paste / Select All)が出て画面に残っていた(CMP で再現・SwiftUI では出ない。証人: E2E の各 SUT のテキスト入力の `notExist(".menuItem")`) |

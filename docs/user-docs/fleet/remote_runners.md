@@ -138,7 +138,8 @@ fleetest run --runner M1Max --profile <run profile> --scenario <scenario ID> --w
 ```
 
 `--wait-lock <seconds>` is the longest it waits for the runner to become free. While you wait, the run log shows your
-position.
+position. For a run that spans several machines, the limit covers the whole wait (this Mac's lock, this Mac's devices
+and each runner together), and the run log also says when it is waiting for a device on this Mac to free up.
 
 </details>
 <br>

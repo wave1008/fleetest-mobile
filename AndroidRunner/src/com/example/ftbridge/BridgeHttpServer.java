@@ -84,9 +84,14 @@ final class BridgeHttpServer {
             return new Response(status, "application/json", json.getBytes(StandardCharsets.UTF_8));
         }
         static Response error(int status, String message) {
+            return error(status, message, null);
+        }
+        /** reason = 機械可読な断りの理由(Swift の ErrorResponse.reason)。null なら省略 */
+        static Response error(int status, String message, String reason) {
             org.json.JSONObject o = new org.json.JSONObject();
             try {
                 o.put("error", message);
+                if (reason != null) o.put("reason", reason);
             } catch (org.json.JSONException ignored) {
             }
             return Response.json(status, o.toString());

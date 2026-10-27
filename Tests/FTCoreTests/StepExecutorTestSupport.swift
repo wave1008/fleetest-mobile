@@ -442,6 +442,8 @@ final class FakeVisibilityDelegate: ReplayDelegate {
     /// 可視のときに返す state(TranscriptMatch.State の rawValue)。nil なら fullyVisible
     var visibleState: String?
     private(set) var visibleCalls = 0
+    /// この回数目の呼び出しから可視と答える(1 始まり。nil = `visible` のまま)。訊き直しで読めた形を作るテストが使う
+    var visibleFromCall: Int?
     init(visible: Bool) { self.visible = visible }
     func verifyScreen(expected: String, screenshotPNG: Data) async -> (pass: Bool, reason: String)? { nil }
     func verifyElementVisible(expectedText: String, frame: FTRect, screen: FTRect,
@@ -449,6 +451,7 @@ final class FakeVisibilityDelegate: ReplayDelegate {
         -> (visible: Bool, state: String, reason: String, observedText: String)? {
         visibleCalls += 1
         if answersNothing { return nil }
+        let visible = visibleFromCall.map { visibleCalls >= $0 } ?? self.visible
         return (visible, visible ? (visibleState ?? "fullyVisible") : "covered", "test", "")
     }
 }

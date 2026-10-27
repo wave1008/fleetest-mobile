@@ -75,6 +75,7 @@ export type RunEventKind =
   | "wipeStatus"
   | "scenarioRequeued"
   | "dispatchWaiting"
+  | "localDevicesWaiting"
   | "recordingFinalizing";
 
 const RUN_EVENT_KINDS: ReadonlySet<string> = new Set<RunEventKind>([
@@ -92,6 +93,7 @@ const RUN_EVENT_KINDS: ReadonlySet<string> = new Set<RunEventKind>([
   "wipeStatus",
   "scenarioRequeued",
   "dispatchWaiting",
+  "localDevicesWaiting",
   "recordingFinalizing",
 ]);
 
@@ -315,6 +317,19 @@ export interface DispatchWaitingEvent {
 }
 
 /**
+ * 機械分担の run が、**手元のデバイスが別の run に握られている間**待っている(どの機械へも配る前。
+ * `--wait-lock <秒>` を渡したときだけ届き、待っている間は進行と同じ刻みで繰り返し届く)。
+ * dispatch.lock の順番待ち(DispatchWaitingEvent)とは別物 —— 流用すると「順番待ち」と出る。
+ * 取得できた/諦めたときの終了イベントは無い。limitSeconds はフラグが無ければキーごと来ない。
+ * 契約の同期相手: Sources/fleetest/ApiRunEvents.swift ApiLocalDevicesWaitingEvent
+ */
+export interface LocalDevicesWaitingEvent {
+  kind: "localDevicesWaiting";
+  elapsedSeconds: number;
+  limitSeconds?: number;
+}
+
+/**
  * どのワーカーももうシナリオを実行しておらず、残りは録画のクリップ切り出しと後始末だけになった
  * (録画した run で1回だけ。複数機械の run では全機械が終えたとき)。モニターはここから録画タブへ
  * 移るまで「録画を編集中」を出す(monitorPanel.ts)。
@@ -340,6 +355,7 @@ export type RunEvent =
   | WipeStatusEvent
   | ScenarioRequeuedEvent
   | DispatchWaitingEvent
+  | LocalDevicesWaitingEvent
   | RecordingFinalizingEvent;
 
 /**

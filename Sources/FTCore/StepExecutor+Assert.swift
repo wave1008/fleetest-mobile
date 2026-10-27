@@ -388,6 +388,26 @@ extension StepExecutor {
                     return nil
                 }
                 ocrConfirmationFact = Self.emptyTranscriptOCRFact(confirmation)
+            } else if occlusionOCRMode == .off,
+                      reaskedEmptyTranscripts.insert(ReaskKey(imageHash: memoImageHash, key: memoKey)).inserted {
+                // **OCR の段がオフの構成では FM に1回だけ訊き直す**(OCR で確かめられない = 空振りがそのまま赤になる)。
+                // **同じ絵には1回だけ**(控えが空振りの答えを返す撮り直しの周ごとに訊き直さない = reaskedEmptyTranscripts)。
+                // 計測(.measure)は訊き直さない(採取した FM の判定と結果が食い違う)。
+                // 訊き直しで読めたら緑・控えも読めた答えに替える(空振りの答えを次の周へ持ち越さない)
+                let retryStart = clock.now
+                let retried = await delegate.verifyElementVisible(
+                    expectedText: expectedText, frame: element.frame, screen: screen, screenshotPNG: screenshot)
+                phase.guardMs += Self.ms(clock.now - retryStart)
+                if let retried, retried.visible {
+                    visibilityVerdictMemo.store(imageHash: memoImageHash, key: memoKey, verdict: retried)
+                    // 空の転写の注記も残す(マシンの健全性の「FM が読める文字を落とす率」を、救えた回で数え落とさない)
+                    noteCodesThisStep.insert(.fmEmptyTranscriptOnInk)
+                    noteCodesThisStep.insert(.fmReaskedEmptyTranscript)
+                    notePartialVisibility(TranscriptMatch.State(rawValue: retried.state))
+                    consumeFirstFrameGate(visible: true, sd: sd, screenshot: screenshot, element: element, screen: screen)
+                    pixelsShowedTextThisStep = true
+                    return nil
+                }
             }
             noteCodesThisStep.insert(.fmEmptyTranscriptOnInk)
             emptyTranscriptOnInk = " — FM transcribed nothing, but the element's area is not blank"

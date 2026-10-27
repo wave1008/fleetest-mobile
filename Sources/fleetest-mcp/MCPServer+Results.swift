@@ -57,6 +57,11 @@ struct MCPResultsRequest: Sendable, Equatable {
     /// CLI(`fleetest results <query>`)と同じ文面。**デバイス・ブリッジに触らない**。
     /// `memo` はサーバが持つ完了 run の解読結果(2回目以降は新しい run だけを読む)。中身は縮小記録なので
     /// trend だけは元ファイルを読み直す(`RunResultsStore.fullRecords`)
+    /// パックの鍵(`RunRecordPack` の executableKey)。**起動時に1回だけ決める**(main が最初に触る) —— 呼ぶたびに
+    /// ディスクの実行ファイルを stat すると、ビルドで差し替わった後も動き続ける古いプロセスが、新しいビルドの鍵で
+    /// 古い型の記録を書き、新しいプロセスがそれを有効と読んで欄を黙って落とす(鍵がそもそも防ぐはずの形)
+    static let packExecutableKey = ResultsOutputCache.executableFingerprint(executable: ExecutablePath.current)
+
     func render(project: TestProject, memo: RunRecordMemo? = nil, now: Date = Date()) throws -> String {
         let resultsDir = RunResultsStore.resultsDir(projectRoot: project.rootURL)
         if query == "log" {
@@ -73,8 +78,13 @@ struct MCPResultsRequest: Sendable, Equatable {
         guard let sinceDate = RunResultsQuery.parseSince(since, referenceDate: now) else {
             throw MCPError(TimeBoundParse.rejection(option: "since", raw: since))
         }
+        // **サーバで初めて引く回もディスクのパックを読む**(無いと起動のたびに 90 日ぶんの全ファイルを解読し直す。
+        // E2E-CMP の約 8.4 万ファイルで 1 回目 8.3 秒・2 回目以降はプロセス内の控え(memo)で 3.8 秒)。置き場所は CLI と分ける
+        let packCacheDir = RunRecordPack.cacheDir(stateDir: project.stateDir, program: .mcp)
+        let packExecutableKey = Self.packExecutableKey
         func scannedEntries() -> [RunResultsStore.ScannedRecord] {
-            RunResultsStore.scanRunsAndRecords(resultsDir: resultsDir, since: sinceDate, memo: memo).entries
+            RunResultsStore.scanRunsAndRecords(resultsDir: resultsDir, since: sinceDate, packCacheDir: packCacheDir,
+                                               executableKey: packExecutableKey, memo: memo).entries
         }
         switch query {
         case "list":
@@ -103,7 +113,9 @@ struct MCPResultsRequest: Sendable, Equatable {
             return ResultsRendering.slow(
                 RunResultsQuery.slowTests(records, limit: limit ?? ResultsRendering.defaultSlowLimit))
         case "insights":
-            let scanned = RunResultsStore.scanRunsAndRecords(resultsDir: resultsDir, since: sinceDate, memo: memo)
+            let scanned = RunResultsStore.scanRunsAndRecords(resultsDir: resultsDir, since: sinceDate,
+                                                             packCacheDir: packCacheDir,
+                                                             executableKey: packExecutableKey, memo: memo)
             let records = scanned.entries.map(\.record)
             let runs = scanned.runs
             // ソース走査だけ(ビルドしない)。走査できなければ空集合 = 供給なし扱い

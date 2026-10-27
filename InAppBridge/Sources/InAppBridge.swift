@@ -26,6 +26,8 @@ final class FTInAppBridge {
     // accept ループは1本ずつ処理するので単純プロパティで足りる(同時アクセスなし)。
     // nodes は弱参照テーブル(画面遷移後に旧ビュー階層を snapshot 更新まで抱え込まないため)。
     private var frames: [Int: CGRect] = [:]
+    /// 直近の `/snapshot` で ref が指していた要素(`StaleRefGuard.contradicts` の照合先)。frames と同じ時点で差し替える
+    private var refElements: [Int: ElementInfo] = [:]
     /// 直前の操作の控え(`InAppRenderCatchUp`)。自前描画のアプリの操作でだけ立ち、操作後の最初の
     /// `/screenshot` で消費する。メインでだけ読み書きする
     private var renderBefore: InAppRenderCatchUp.Before?
@@ -158,7 +160,7 @@ final class FTInAppBridge {
                 return .error("not found: \(req.method) \(req.path)", status: 404)
             }
         } catch let e as InAppError {
-            return .error(e.message, status: e.status)
+            return .error(e.message, status: e.status, reason: e.reason)
         } catch {
             return .error("\(error)", status: 500)
         }
@@ -253,6 +255,8 @@ final class FTInAppBridge {
         mainSync {
             self.treePrint = treePrint
             self.frames = merged.frames
+            // 重複した ref は最初の要素を採る(ホストの BridgeClient の refExpectations と同じ。食い違うと毎回 stale-ref で断る)
+            self.refElements = Dictionary(merged.elements.map { ($0.ref, $0) }, uniquingKeysWith: { first, _ in first })
             self.clips = merged.clips
             self.rescales = base.rescales
             self.textInputRefs = Set(merged.elements.filter(TypeReadback.isTextInput).map(\.ref))
@@ -511,6 +515,7 @@ final class FTInAppBridge {
     private func handleTap(_ body: Data) throws -> InAppHTTPServer.Response {
         let req = try decode(TapRequest.self, body)
         if let ref = req.ref {
+            try requireExpectedRef(ref, expect: req.expect)
             let (note, hitAreaMiss) = try tapByRef(ref, req: req)
             return ok(note, hitAreaMiss: hitAreaMiss)
         }
@@ -979,6 +984,7 @@ final class FTInAppBridge {
     private func handleType(_ body: Data) throws -> InAppHTTPServer.Response {
         let req = try decode(TypeRequest.self, body)
         if let ref = req.ref {
+            try requireExpectedRef(ref, expect: req.expect)
             var point = CGPoint.zero
             var before: ReceiverMark?
             try performWithSettle(operation: "the tap before typing") { window in
@@ -1035,6 +1041,7 @@ final class FTInAppBridge {
     private func handleClear(_ body: Data) throws -> InAppHTTPServer.Response {
         let req = try decode(ClearRequest.self, body)
         if let ref = req.ref {
+            try requireExpectedRef(ref, expect: req.expect)
             var point = CGPoint.zero
             var before: ReceiverMark?
             try performWithSettle { window in
@@ -1550,6 +1557,7 @@ final class FTInAppBridge {
     /// 間隔によらず double=0。2026-09-24 実測)。アプリ内で合成したタッチなら数える
     private func handleDoubleTap(_ body: Data) throws -> InAppHTTPServer.Response {
         let req = try decode(TapRequest.self, body)
+        if let ref = req.ref { try requireExpectedRef(ref, expect: req.expect) }
         try requireSelfRenderedFramework("doubleTap")
         try performWithSettle { window in
             // 座標は screen(snapshot と同じ)→ window(handleTap の topmostHitView と同じ変換)
@@ -1866,6 +1874,17 @@ final class FTInAppBridge {
         return CGPoint(x: point.x + (live.minX - snapshot.minX), y: point.y + (live.minY - snapshot.minY))
     }
 
+    /// ホストが添えた期待(identifier・型)が直近の `/snapshot` の控えと矛盾するなら、**何も撃たずに**断る
+    /// (422 + `BridgeAPI.staleRefReason`。ホストは木を撮り直して引き直してよい)。期待が無い・ref が表に無いときは何もしない。
+    /// 同期相手: Runner の `requireExpectedRef`(判定は共有の `StaleRefGuard.contradicts`)
+    private func requireExpectedRef(_ ref: Int, expect: RefExpectation?) throws {
+        guard let stored = refElements[ref], StaleRefGuard.contradicts(expect, stored: stored) else { return }
+        throw InAppError(422, "reference [\(ref)] no longer points at the element the last snapshot saw"
+            + " (the host expected \(expect?.identifier ?? "-") (\(expect?.type ?? "-")) but the bridge holds"
+            + " \(stored.identifier ?? "-") (\(stored.type))); nothing was sent — take a new snapshot and"
+            + " resolve the target again", reason: BridgeAPI.staleRefReason)
+    }
+
     private func resolvePoint(ref: Int?, x: Double?, y: Double?) throws -> CGPoint {
         if let ref {
             guard let frame = frames[ref] else {
@@ -1997,9 +2016,12 @@ final class FTInAppBridge {
 struct InAppError: Error {
     let status: Int
     let message: String
-    init(_ status: Int, _ message: String) {
+    /// 機械可読な断りの理由(`ErrorResponse.reason`)。**何も撃たずに断ったときだけ**付ける
+    let reason: String?
+    init(_ status: Int, _ message: String, reason: String? = nil) {
         self.status = status
         self.message = message
+        self.reason = reason
     }
 }
 

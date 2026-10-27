@@ -28,8 +28,7 @@ final class DispatchTicketPlumbingTests: XCTestCase {
 
     /// 親が子を起こす3経路(ここが「リモートへ出る子」を起こす全部)
     private static let fanoutSites = [
-        "Sources/fleetest/ApiRunMachineFanout.swift",
-        "Sources/fleetest/DeviceMachineRunner.swift",
+        "Sources/fleetest/MachineFanoutFrontHalf.swift",
         "Sources/fleetest/FleetRunner.swift",
     ]
 
@@ -146,7 +145,9 @@ final class DispatchTicketPlumbingTests: XCTestCase {
             let occurrences = text.components(separatedBy: "DispatchTicketIssuer.issue(").count - 1
             XCTAssertEqual(occurrences, 1, "\(path): チケットの発行は run ごとに1回だけ")
             let issue = try XCTUnwrap(text.range(of: "DispatchTicketIssuer.issue("), path)
-            let addTask = try XCTUnwrap(text.range(of: "addTask {"), "\(path): 子の起動が見つからない")
+            // 前段は子を起こさない(戻った後に呼び手が起こす)ので、呼び手へ渡す build の呼び出しの前で見る
+            let addTask = try XCTUnwrap(text.range(of: "addTask {") ?? text.range(of: "try build("),
+                                        "\(path): 子の起動が見つからない")
             XCTAssertLessThan(issue.lowerBound, addTask.lowerBound,
                               "\(path): チケットを子ごとの closure の中で採っている")
         }

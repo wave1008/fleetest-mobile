@@ -5,7 +5,10 @@
 // 1回読むだけにする —— 9万ファイル規模の opendir/open/JSON decode が所要の大半を占める
 // (実測は docs/results-json.md §出力キャッシュ)。
 //
-// 置き場所: <project>/.fleetest/results-cache/record-packs/<YYYY-MM>/<runID>.json
+// 置き場所: <project>/.fleetest/results-cache/record-packs/<実行ファイルの名前>/<YYYY-MM>/<runID>.json
+// **実行ファイルの名前ごとに分ける**: 鍵(executableKey)が実行ファイルの素性なので、CLI(`api results`)と MCP(`ft_results`)が
+// 同じ場所を使うと互いのパックを上書きし合い、交互に使うたびに全部を読み直す。素性(更新時刻)ごとに分けると
+// ビルドし直すたびに置き場所が増え続けるので、名前で分ける(ビルドし直したら同じ場所が上書きされる)
 // 有効条件(全部一致しないと直接読みへ倒す。どれも既定値を置かない):
 //   - formatVersion(このファイルの容器の形)
 //   - executableKey(ResultsOutputCache.executableFingerprint と同じ形式。ビルドし直せば必ず外れる。
@@ -55,8 +58,31 @@ public enum RunRecordPack {
         var schemaTooNewCount: Int
     }
 
-    public static func cacheDir(stateDir: URL) -> URL {
+    /// パックを書く側の実行ファイル(置き場所の名前)
+    public enum Program: String, Sendable {
+        case cli = "fleetest"
+        case mcp = "fleetest-mcp"
+    }
+
+    public static func cacheDir(stateDir: URL, program: Program) -> URL {
+        rootDir(stateDir: stateDir).appendingPathComponent(program.rawValue)
+    }
+
+    private static let unnamespacedSweptRoots = LockedValue<Set<String>>([])
+
+    static func rootDir(stateDir: URL) -> URL {
         ResultsOutputCache.dir(stateDir: stateDir).appendingPathComponent("record-packs")
+    }
+
+    /// 実行ファイルの名前で分ける前の置き場所(`record-packs/<YYYY-MM>/`)に残ったパックを消す。もう誰も読まない
+    /// (読み手は名前の下だけを見る)ので、残すとディスクを使い続けるだけ。月の形の名前のディレクトリだけを消す
+    static func removeUnnamespacedPacks(root: URL) {
+        // プロセスごとに1回だけ(消えた後の置き場所を、ft_results の呼び出しのたびに列挙し直さない)
+        guard unnamespacedSweptRoots.withLock({ $0.insert(root.path).inserted }) else { return }
+        guard let names = try? FileManager.default.contentsOfDirectory(atPath: root.path) else { return }
+        for name in names where name.range(of: #"^\d{4}-\d{2}$"#, options: .regularExpression) != nil {
+            try? FileManager.default.removeItem(at: root.appendingPathComponent(name))
+        }
     }
 
     static func url(cacheDir: URL, runDir: URL) -> URL {

@@ -80,11 +80,24 @@ final class BridgeRouter implements BridgeHttpServer.Handler {
 
     static final class BridgeException extends RuntimeException {
         final int status;
+        /** 機械可読な断りの理由(ErrorResponse.reason)。何も撃たずに断ったときだけ付ける。無ければ null */
+        final String reason;
         BridgeException(int status, String message) {
+            this(status, message, null);
+        }
+        BridgeException(int status, String message, String reason) {
             super(message);
             this.status = status;
+            this.reason = reason;
         }
     }
+
+    /**
+     * 古い ref を撃たずに断るときの reason。同期相手: Sources/FTCore/BridgeDTO.swift の
+     * BridgeAPI.staleRefReason(ホストの BridgeClient.check がこの値で DriverError.staleRef に写す。
+     * 片方だけ変えない)
+     */
+    static final String STALE_REF_REASON = "stale-ref";
 
     /**
      * handleSnapshot が「a11y 根が無い」で断るときの本文接頭辞(422)。
@@ -105,6 +118,8 @@ final class BridgeRouter implements BridgeHttpServer.Handler {
     /** 直近スナップショットの ref → 中心座標(iOS ランナーの refFrames と同じ役割) */
     private Map<Integer, double[]> refCenters = new HashMap<>();
     private Map<Integer, String> refIds = new HashMap<>();
+    /** 直近スナップショットの ref → 型名(生の綴り。requireExpectedRef の照合先) */
+    private Map<Integer, String> refTypes = new HashMap<>();
     private Rect lastScreen = new Rect();
     private String sessionBundleID;
     /** 自 APK の versionCode(/status で申告)。取得失敗時は 0 = 申告しない */
@@ -174,7 +189,7 @@ final class BridgeRouter implements BridgeHttpServer.Handler {
                             "not found: " + request.method + " " + request.path);
             }
         } catch (BridgeException e) {
-            return BridgeHttpServer.Response.error(e.status, e.getMessage());
+            return BridgeHttpServer.Response.error(e.status, e.getMessage(), e.reason);
         } catch (Exception e) {
             return BridgeHttpServer.Response.error(500, String.valueOf(e));
         }
@@ -337,6 +352,7 @@ final class BridgeRouter implements BridgeHttpServer.Handler {
         }
         refCenters = result.refCenters;
         refIds = result.refIds;
+        refTypes = result.refTypes;
         lastScreen = result.screen;
         return BridgeHttpServer.Response.json(200, result.json);
     }
@@ -361,7 +377,7 @@ final class BridgeRouter implements BridgeHttpServer.Handler {
         String text = body.optString("text");
         if (body.has("ref")) {
             int ref = body.optInt("ref");
-            double[] center = centerOf(ref);
+            double[] center = centerOf(ref, body);
             tapUnlessAlreadyFocused(center, refIds.get(ref));
             // 確認と注入を統合した経路(InputInjector.setTextAppendingAt のコメント参照)。
             // resource-id を渡す: キーボードの開閉で座標がズレても同じ要素を追跡し直すため
@@ -389,7 +405,7 @@ final class BridgeRouter implements BridgeHttpServer.Handler {
     private BridgeHttpServer.Response handleClear(JSONObject body) {
         if (body.has("ref")) {
             int ref = body.optInt("ref");
-            double[] center = centerOf(ref);
+            double[] center = centerOf(ref, body);
             tapUnlessAlreadyFocused(center, refIds.get(ref));
             InputInjector.clearTextAt(ua(), center[0], center[1], refIds.get(ref), TEXT_INPUT_CONFIRM_BUDGET_MS);
         } else {
@@ -1362,12 +1378,49 @@ final class BridgeRouter implements BridgeHttpServer.Handler {
 
     private double[] resolvePoint(JSONObject body) {
         if (body.has("ref")) {
-            return centerOf(body.optInt("ref"));
+            return centerOf(body.optInt("ref"), body);
         }
         if (body.has("x") && body.has("y")) {
             return new double[]{body.optDouble("x"), body.optDouble("y")};
         }
         throw new BridgeException(400, "ref or x/y is required");
+    }
+
+    /** centerOf + requireExpectedRef。/tap /press /type /clear の ref 解決は必ずここを通す(撃つ前に断るため) */
+    private double[] centerOf(int ref, JSONObject body) {
+        double[] center = centerOf(ref);
+        requireExpectedRef(ref, body.optJSONObject("expect"));
+        return center;
+    }
+
+    /**
+     * ホストが添えた期待({identifier?, type})が直近スナップショットの控えと矛盾するなら、**何も撃たずに**
+     * 422 + STALE_REF_REASON で断る。比べるのは identifier(双方にあるとき)と型だけ —— ラベル・位置は
+     * 値の表示やスクロールで変わる。期待が無ければ何もしない。
+     * 同期相手: Swift の StaleRefGuard.contradicts(判定の定義元)・Runner の requireExpectedRef
+     */
+    private void requireExpectedRef(int ref, JSONObject expect) {
+        if (expect == null) return;
+        String storedType = refTypes.get(ref);
+        if (storedType == null) return;
+        String expectedType = expect.optString("type", "");
+        String expectedId = expect.isNull("identifier") ? null : expect.optString("identifier", null);
+        String storedId = refIds.get(ref);
+        boolean typeDiffers = !normalizedType(expectedType).equals(normalizedType(storedType));
+        boolean idDiffers = expectedId != null && !expectedId.isEmpty()
+                && storedId != null && !storedId.isEmpty() && !expectedId.equals(storedId);
+        if (!typeDiffers && !idDiffers) return;
+        throw new BridgeException(422, "reference [" + ref + "] no longer points at the element the last"
+                + " snapshot saw (the host expected " + (expectedId == null ? "-" : expectedId)
+                + " (" + expectedType + ") but the bridge holds " + (storedId == null ? "-" : storedId)
+                + " (" + storedType + ")); nothing was sent — take a new snapshot and resolve the target again",
+                STALE_REF_REASON);
+    }
+
+    /** Swift の ElementInfo.normalizedType と同じ(先頭が大文字なら小文字にする) */
+    private static String normalizedType(String type) {
+        if (type.isEmpty() || !Character.isUpperCase(type.charAt(0))) return type;
+        return Character.toLowerCase(type.charAt(0)) + type.substring(1);
     }
 
     private double[] centerOf(int ref) {

@@ -16,7 +16,7 @@ final class RunRecordPackTests: XCTestCase {
             .appendingPathComponent("RunRecordPackTests-\(UUID().uuidString)")
         project = TestProject(name: "SampleApp", rootURL: repoRoot.appendingPathComponent("TestProjects/SampleApp"))
         resultsDir = RunResultsStore.resultsDir(projectRoot: project.rootURL)
-        packCacheDir = RunRecordPack.cacheDir(stateDir: project.stateDir)
+        packCacheDir = RunRecordPack.cacheDir(stateDir: project.stateDir, program: .cli)
         try FileManager.default.createDirectory(at: repoRoot, withIntermediateDirectories: true)
     }
 
@@ -188,6 +188,36 @@ final class RunRecordPackTests: XCTestCase {
         let readWithDifferentExecutable = scan(key: "exe=2000.0:200")
         XCTAssertEqual(readWithDifferentExecutable.first?.record.durationMs, 999,
                        "a different executable fingerprint must miss the old pack and re-decode")
+    }
+
+    /// **CLI と MCP のパックは置き場所が別**(鍵が実行ファイルの素性なので、同じ場所だと互いに上書きし合い、交互に使うたびに
+    /// 全部を読み直す)。MCP が別の鍵で読んだ後も、CLI の2回目は自分のパックから読む
+    func testCLIAndMCPPacksDoNotOverwriteEachOther() throws {
+        let runID = "20260101-000000Z-mach-0099"
+        let runDir = RunResultsStore.runDir(resultsDir: resultsDir, runID: runID)
+        RunResultsStore.writeMeta(makeMeta(runID: runID, startedAt: "2026-01-01T00:00:00Z"), runDir: runDir)
+        RunResultsStore.writeScenario(makeScenarioRecord(scenarioID: "Foo.a", runID: runID), runDir: runDir, fileName: "Foo.a")
+        try markRunCompleted(runDir)
+        _ = scan(key: "exe=cli")
+        _ = RunResultsStore.scanRunsAndRecords(
+            resultsDir: resultsDir, packCacheDir: RunRecordPack.cacheDir(stateDir: project.stateDir, program: .mcp),
+            executableKey: "exe=mcp")
+
+        let edited = try JSONEncoder().encode(makeScenarioRecord(scenarioID: "Foo.a", runID: runID, durationMs: 999))
+        try edited.write(to: runDir.appendingPathComponent("scenarios/Foo.a.json"))
+        XCTAssertEqual(scan(key: "exe=cli").first?.record.durationMs, 100,
+                       "MCP の走査が CLI のパックを上書きした(CLI の2回目が読み直しになった)")
+    }
+
+    /// 名前で分ける前の置き場所(`record-packs/<YYYY-MM>/`)に残ったパックは走査の入口で消える(誰も読まない)
+    func testUnnamespacedPacksAreRemoved() throws {
+        let root = packCacheDir.deletingLastPathComponent()
+        let legacy = root.appendingPathComponent("2026-01")
+        try FileManager.default.createDirectory(at: legacy, withIntermediateDirectories: true)
+        try Data("{}".utf8).write(to: legacy.appendingPathComponent("20260101-000000Z-mach-0001.json"))
+        _ = scan()
+        XCTAssertFalse(FileManager.default.fileExists(atPath: legacy.path), "名前で分ける前のパックが残った")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: root.path))
     }
 
     // MARK: - 掃除

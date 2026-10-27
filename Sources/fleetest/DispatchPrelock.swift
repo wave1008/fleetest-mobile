@@ -84,8 +84,7 @@ final class DispatchPrelock {
     /// (飛ばした機械は誰にとっても取れないか、取れた人だけが先へ進む)。
     ///
     /// **中断(SIGINT/SIGTERM)を受けたら、ここまでに握ったロックを逆順で外して `false` を返す**。
-    /// **戻り値 `false` = 中断された**(4つの呼び手はどれも、これを見たら子を1つも起こさずに抜ける。機械分担・複数対象・
-    /// api run は 130、`--fleet` は今は ValidationError = OI-29)。
+    /// **戻り値 `false` = 中断された**(4つの呼び手はどれも、これを見たら子を1つも起こさずに抜け、130 で終わる)。
     ///
     /// 見るのは①各機械へ進む直前 ②1台ぶんの取得が失敗した直後 ③全部取り終えた直後 の3箇所 —— ①だけだと、既に成功して
     /// いた取得の直後に来た中断は次の反復まで気づかない。③が無いと最後の1台の取得の最中に来た中断を見ないまま true を返し、
@@ -237,7 +236,11 @@ final class DispatchPrelock {
     /// 形が作れる(手元も全順序の1要素でなければ循環は消えない)。**local を「取得済み」扱いにして
     /// ここで取り直しを飛ばす口を作らない** —— 手元だけ全順序の外へ出す形そのものになり、
     /// 上と同じ循環待ちを合成できてしまう(RR-18.10)
-    static func live(project: TestProject, remoteDir: String?, forceLock: Bool, waitLock: Int?,
+    ///
+    /// `waitLockProvider` は**機械ごとの取得の直前**に呼ぶ(親の入口で決めた期限の残り =
+    /// `WaitLockDeadline.remaining`。機械ごとに `--wait-lock` を丸ごと払い直さない)
+    static func live(project: TestProject, remoteDir: String?, forceLock: Bool,
+                     waitLockProvider: @escaping () -> Int?,
                      runGroup: String?, mode: RemoteDispatchMode,
                      log: @escaping (String) -> Void) -> Actions {
         let entries = LocalConfig.load().remoteHosts ?? []
@@ -250,7 +253,7 @@ final class DispatchPrelock {
             return RemoteRunDispatcher(
                 host: resolved.hostSpec, remoteDirRaw: resolved.remoteDirRaw,
                 localRepoRoot: try RepoRoot.find(), mode: mode,
-                forceLock: forceLock, waitLock: waitLock, hostLabel: machine.machine)
+                forceLock: forceLock, waitLock: waitLockProvider(), hostLabel: machine.machine)
         }
         return Actions(
             keys: { labels in
@@ -275,7 +278,7 @@ final class DispatchPrelock {
             acquire: { machine in
                 guard !MachineDispatch.isExplicitLocal(machine.machine) else {
                     // 待機の NDJSON はリモート(`RemoteRunDispatcher.emitDispatchWaiting`)と同じく apiRun のときだけ
-                    let local = LocalDispatchLock(runGroup: runGroup, waitLock: waitLock,
+                    let local = LocalDispatchLock(runGroup: runGroup, waitLock: waitLockProvider(),
                                                   forceLock: forceLock, log: log,
                                                   emitWaiting: mode == .apiRun
                                                       ? LocalDispatchLock.apiRunWaitingEmitter() : nil)

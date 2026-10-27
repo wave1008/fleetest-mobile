@@ -91,7 +91,7 @@ struct ApiResultsCommand: AsyncParsableCommand {
 
         let (runs, entries) = RunResultsStore.scanRunsAndRecords(
             resultsDir: resultsDir, since: sinceDate,
-            packCacheDir: RunRecordPack.cacheDir(stateDir: stateDir),
+            packCacheDir: RunRecordPack.cacheDir(stateDir: stateDir, program: .cli),
             executableKey: ResultsOutputCache.executableFingerprint(executable: Bundle.main.executableURL))
         // パック経由の record は集計用に縮小済み(RunRecordPack.trimmedForStorage)。
         // 集計(summary/flaky/devices/slow/insights/performance/runStats)は
@@ -107,7 +107,7 @@ struct ApiResultsCommand: AsyncParsableCommand {
                 executable: Bundle.main.executableURL, readCache: !noCache) {
                 let scan = RunResultsStore.scanRunsAndRecords(
                     resultsDir: RunResultsStore.resultsDir(projectRoot: other.rootURL), since: sinceDate,
-                    packCacheDir: RunRecordPack.cacheDir(stateDir: other.stateDir),
+                    packCacheDir: RunRecordPack.cacheDir(stateDir: other.stateDir, program: .cli),
                     executableKey: ResultsOutputCache.executableFingerprint(executable: Bundle.main.executableURL))
                 return (scan.runs, scan.entries.map(\.record))
             }

@@ -43,6 +43,14 @@ export const laneStrings = {
     ja: "  ⏳ {machine} の順番待ち: {position}/{total}（実行中: {holder}）",
     en: "  ⏳ Queued on {machine}: {position} of {total} (running: {holder})",
   },
+  "lane.localDevicesWaiting": {
+    ja: "  ⏳ ローカルのデバイスが別の実行に使われています。空くのを待っています（{elapsed}秒経過）",
+    en: "  ⏳ Waiting for the local device(s) to free up — in use by another run ({elapsed}s elapsed)",
+  },
+  "lane.localDevicesWaitingLimit": {
+    ja: "  ⏳ ローカルのデバイスが別の実行に使われています。空くのを待っています（{elapsed}秒経過 / 上限 {limit}秒）",
+    en: "  ⏳ Waiting for the local device(s) to free up — in use by another run ({elapsed}s elapsed, up to {limit}s)",
+  },
   // 手元の run が待っているとき、CLI は machine に "local"(--device-machine・タイルと同じ
   // 語彙)を入れてくる。**呼び名は deviceOps.machineLocalLabel と同じ1つ** —— lane.ts は
   // vscode 非依存の別ランタイム(自前 dict のみに依存する契約)なので、あちらの辞書は
@@ -98,6 +106,16 @@ export function dispatchWaitingLine(event: {
   return event.holder == null
     ? tLane("lane.dispatchWaiting", common)
     : tLane("lane.dispatchWaitingHolder", { ...common, holder: event.holder });
+}
+
+/**
+ * 手元のデバイスが別の run に使われている間の待ちの1行(localDevicesWaiting)。dispatch.lock の順番待ち
+ * (dispatchWaitingLine)とは別の文言。runReducer.ts と runLaneModel.ts が同じ1行を出すためここに置く。
+ */
+export function localDevicesWaitingLine(event: { elapsedSeconds: number; limitSeconds?: number }): string {
+  return event.limitSeconds == null
+    ? tLane("lane.localDevicesWaiting", { elapsed: event.elapsedSeconds })
+    : tLane("lane.localDevicesWaitingLimit", { elapsed: event.elapsedSeconds, limit: event.limitSeconds });
 }
 
 /** 逐次実行(worker なし)をまとめる「全体」レーンの表示名(locale 依存のため関数)。 */

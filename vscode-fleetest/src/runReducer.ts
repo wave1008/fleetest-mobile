@@ -9,7 +9,7 @@
 // (✅ 成功 / ❌ 失敗 / ⚠️ スキップ / ❓ inconclusive / 🔧 自己修復 / 💡 修正提案 / ▶ 開始 / ⏸ 一時停止)。
 
 import { isRunEvent, type RunEvent, type WorkerInfo } from "./model";
-import { dispatchWaitingLine, tLane } from "./i18n/strings/lane";
+import { dispatchWaitingLine, localDevicesWaitingLine, tLane } from "./i18n/strings/lane";
 
 /** 出力・失敗メッセージに添えるソース位置。file はリポジトリルート相対、line は1起点。 */
 export interface RunLocation {
@@ -198,6 +198,10 @@ function actionsFor(state: RunReducerState, event: RunEvent, nowMs: number): Run
       // **worker を付けない** = 全体レーン(OVERALL_LANE_ID)へ出す。まだ1台も動いていない
       // (レーンが1本も無い)ので、付けられる worker が無い
       return [{ type: "output", text: dispatchWaitingLine(event) }];
+
+    case "localDevicesWaiting":
+      // dispatchWaiting と同じく worker を付けない = 全体レーン(まだ1台も動いていない)
+      return [{ type: "output", text: localDevicesWaitingLine(event) }];
 
     case "scenarioRequeued":
       return [

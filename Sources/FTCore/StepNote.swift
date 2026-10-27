@@ -209,6 +209,10 @@ public enum StepNote: String, Sendable, Codable, CaseIterable {
     /// FM の失敗の集計に出ない。立った回の赤は、読める文字への空振り(誤った赤)か、文字の無い装飾だけが描かれた回
     case fmEmptyTranscriptOnInk = "fm-empty-transcript-on-ink"
 
+    /// OCR の段がオフの構成で、FM が読める文字に空の転写を返したので、同じ絵を1回だけ訊き直したら読めた(緑)。
+    /// オフの構成は OCR で確かめられないので、1回の空振りがそのまま赤になっていた(手元の結果で可視性検証 155 万回中 190 回)
+    case fmReaskedEmptyTranscript = "fm-reasked-empty-transcript"
+
 
     /// **`iosAlertHandler` の登録が無い**のに、OS のシステムアラートがアプリの前面に出ていた
     /// (SpringBoard への1問 `GET /systemalert` で確認した事実)。in-app の操作は OS のイベント経路を
@@ -521,6 +525,8 @@ public enum StepNote: String, Sendable, Codable, CaseIterable {
         case .textEllipsized: return "the text is truncated with an ellipsis"
         case .ocrReadWhatFMMissed: return "FM judged the text not visible but OCR read it, so it passed"
         case .fmReadWhatOCRMissed: return "OCR judged the text not visible but FM read it, so it passed"
+        case .fmReaskedEmptyTranscript:
+            return "FM first transcribed nothing on text that is drawn; asked once more on the same screenshot, it read the text"
         case .fmEmptyTranscriptOnInk:
             return "FM transcribed nothing although the element's area is not blank (the verdict was not changed)"
         case .healUnwritable:

@@ -486,6 +486,26 @@ test("dispatchWaiting は保持者が読めなかったら「実行中」と断�
   );
 });
 
+test("localDevicesWaiting は worker 無しの出力になり、dispatch.lock の順番待ちとは別の文言で出る", () => {
+  const state = createRunReducerState();
+  const withLimit = reduceRunEvent(state, {
+    kind: "localDevicesWaiting", elapsedSeconds: 60, limitSeconds: 900,
+  }, 0);
+  assert.equal(withLimit.actions.length, 1);
+  assert.equal(withLimit.actions[0].type, "output");
+  assert.equal(withLimit.actions[0].worker, undefined);
+  assert.equal(
+    withLimit.actions[0].text,
+    "  ⏳ ローカルのデバイスが別の実行に使われています。空くのを待っています（60秒経過 / 上限 900秒）",
+  );
+  assert.ok(!withLimit.actions[0].text.includes("順番待ち"), withLimit.actions[0].text);
+  const noLimit = reduceRunEvent(state, { kind: "localDevicesWaiting", elapsedSeconds: 0 }, 0);
+  assert.equal(
+    noLimit.actions[0].text,
+    "  ⏳ ローカルのデバイスが別の実行に使われています。空くのを待っています（0秒経過）",
+  );
+});
+
 test("scenarioRequeued は出力行と requeued アクション(待機中へ戻す)を発生させる", () => {
   const state = createRunReducerState();
   const r = reduceRunEvent(state, {

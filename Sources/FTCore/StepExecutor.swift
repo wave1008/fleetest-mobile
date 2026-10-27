@@ -502,6 +502,12 @@ public final class StepExecutor {
     /// [occlusion-guard] FM 判定の控え(鍵は FM への入力そのもの。宣言は VisibilityVerdictMemo)。
     /// select→textIs のように同じ要素を続けて確かめる書き方で FM を2度呼ばないため
     var visibilityVerdictMemo = VisibilityVerdictMemo()
+    /// FM の空の転写を訊き直した絵(OCR オフの構成。同じ絵には1回だけ訊き直す = `StepExecutor+Assert` の訊き直しの節)
+    var reaskedEmptyTranscripts: Set<ReaskKey> = []
+    struct ReaskKey: Hashable {
+        let imageHash: Int
+        let key: VisibilityVerdictMemo.Key
+    }
     /// 白フレーム確定時に呼ぶ。FTDriveCore が凍結中断+deviceFrozen emit を行う
     public var onDeviceFrozen: (@Sendable () -> Void)?
     /// システム許可アラートを自動で押したときに呼ぶ(FTDriveCore が run ログへ流す)。

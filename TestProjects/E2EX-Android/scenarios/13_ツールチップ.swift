@@ -20,7 +20,8 @@ class ツールチップを出せること {
             }
             scene(2, "押している間は出ている") {
                 action {
-                    hold("#btn_tooltip_anchor", holdSeconds: 3) {
+                    // 押している間にブロックの検証が収まる長さ(負荷の下で exist が 3.3 秒かかり、3 秒では指が先に離れた)
+                    hold("#btn_tooltip_anchor", holdSeconds: 6) {
                         // 吹き出しは PopupWindow(フォーカスを取らない別ウィンドウ)で、文字は木に載らない。
                         // 出ていることは状態で確かめる
                         select("#txt_tooltip_state").textIs("tooltip=shown")

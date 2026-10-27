@@ -34,8 +34,9 @@ final class OCRModelCompileWiringTests: XCTestCase {
             if text.contains("ScenarioHost.listForRun(") { forRun.insert(name) }
             if text.contains("startOCRModelCompile(") && name != "ScenarioHost.swift" { direct.insert(name) }
         }
-        XCTAssertEqual(forRun, ["Fleetest.swift", "ApiRunCommand.swift", "DeviceMachineRunner.swift"],
-                       "listForRun の呼び出し元が run の3経路と一致しない(増減したらこの表と理由を更新する)")
+        // MultiTargetRunner(--target の繰り返し)は DeviceMachineRunner と同じ機械分担の親で、compilesOCR: false で一覧だけ取る
+        XCTAssertEqual(forRun, ["Fleetest.swift", "ApiRunCommand.swift", "DeviceMachineRunner.swift", "MultiTargetRunner.swift"],
+                       "listForRun の呼び出し元が run の経路と一致しない(増減したらこの表と理由を更新する)")
         XCTAssertEqual(direct, [], "コンパイルは listForRun 経由でだけ起こす(直接呼ぶと一覧だけの経路にも漏れる)")
         // listForRun 自身がコンパイルを起こしていること(呼び出し元の走査だけだと、本体から消しても緑)
         let host = try String(contentsOf: sources.appendingPathComponent("FTCore/ScenarioHost.swift"), encoding: .utf8)

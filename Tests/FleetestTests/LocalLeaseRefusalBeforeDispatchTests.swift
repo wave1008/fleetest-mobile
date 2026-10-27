@@ -131,18 +131,24 @@ final class LocalLeaseRefusalBeforeDispatchTests: XCTestCase {
         XCTAssertNoThrow(try check(scenarios: 0))
     }
 
-    /// 配線: 3 経路(run の機械分担・api run の機械分担・複数対象)とも**子の起動より前**に呼ぶ(型では守れないのでソースで固定する)
+    /// 配線: 前段(3経路が共有する MachineFanoutFrontHalf)が Prelock の取得より前に呼び、3経路は前段を**子の起動より前**に通す
+    /// (型では守れないのでソースで固定する)
     func testAllFanoutsCheckBeforeLaunchingChildren() throws {
         let root = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        let front = try String(contentsOf: root.appendingPathComponent("Sources/fleetest/MachineFanoutFrontHalf.swift"),
+                               encoding: .utf8)
+        let guardCall = try XCTUnwrap(front.range(of: "try ProfileRunner.rejectIfLocalDevicesLeasedBeforeDispatch("))
+        let prelock = try XCTUnwrap(front.range(of: "lock.acquireInOrder("))
+        XCTAssertLessThan(guardCall.lowerBound, prelock.lowerBound)
         for (path, launch) in [("Sources/fleetest/DeviceMachineRunner.swift", "FleetRunner.runEntry("),
-                               ("Sources/fleetest/ApiRunMachineFanout.swift", "ApiRunStartedEvent(total: selected"),
+                               ("Sources/fleetest/ApiRunMachineFanout.swift", "await runChild("),
                                ("Sources/fleetest/MultiTargetRunner.swift", "coordinator.start()")] {
             let text = try String(contentsOf: root.appendingPathComponent(path), encoding: .utf8)
-            let guardCall = try XCTUnwrap(text.range(of: "try ProfileRunner.rejectIfLocalDevicesLeasedBeforeDispatch("),
-                                          "\(path) must call the guard")
+            let frontCall = try XCTUnwrap(text.range(of: "MachineFanoutFrontHalf.run("), "\(path) must use the front half")
             let launchCall = try XCTUnwrap(text.range(of: launch), "\(path): \(launch) not found")
-            XCTAssertLessThan(guardCall.lowerBound, launchCall.lowerBound, path)
+            XCTAssertLessThan(frontCall.lowerBound, launchCall.lowerBound, path)
+            XCTAssertFalse(text.contains("rejectIfLocalDevicesLeasedBeforeDispatch("), "\(path): 前段の外で呼んでいる")
         }
     }
 }

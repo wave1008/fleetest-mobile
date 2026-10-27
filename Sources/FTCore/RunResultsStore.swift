@@ -595,8 +595,7 @@ public enum RunResultsStore {
     /// 別々に呼ばない** —— 両方を1回の run 単位走査に畳み、完了 run は run.json と
     /// scenarios/*.json をまとめて1つの `RunRecordPack` に書く(2パスに分けると片方が先に
     /// 書いたパックをもう片方が上書きし、後で書いたほうの分が消える)。
-    /// `packCacheDir`/`executableKey` を渡さない呼び手はいない想定(このプロジェクト内は
-    /// ApiResultsCommand だけが呼ぶ)が、nil の場合は常に直接デコードする。
+    /// 呼び手は ApiResultsCommand(CLI)と MCP の ft_results。`packCacheDir`/`executableKey` が nil なら常に直接デコードする。
     /// 返す `runs`/`entries` は scanRuns/scanRecords(キャップ無し)と同じ集合・同じ並び順・
     /// 同じ読み飛ばし警告(kind は "run.json" と "scenario record" の2本、従来と同じ文言)。
     /// **entries の record は、パック経由の完了 run では `RunRecordPack.trimmedForStorage` で
@@ -608,6 +607,7 @@ public enum RunResultsStore {
                                           executableKey: String? = nil,
                                           memo: RunRecordMemo? = nil) -> (runs: [RunMetaRecord], entries: [ScannedRecord]) {
         if let packCacheDir {
+            RunRecordPack.removeUnnamespacedPacks(root: packCacheDir.deletingLastPathComponent())
             RunRecordPack.sweepOrphans(cacheDir: packCacheDir, runsDir: resultsDir.appendingPathComponent("runs"))
         }
         var targetRunDirs: [URL] = []

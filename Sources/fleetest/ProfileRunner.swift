@@ -135,6 +135,7 @@ enum ProfileRunner {
         waitLock: Int? = nil, interruptCheck: () -> Bool,
         leaseStateDir: URL? = (try? RepoRoot.find())?.appendingPathComponent(".fleetest"),
         log: (String) -> Void = { _ in },
+        emitWaiting: ((_ elapsedSeconds: Int, _ limitSeconds: Int?) -> Void)? = nil,
         sleepSeconds: (Int) -> Void = { Thread.sleep(forTimeInterval: Double($0)) }
     ) throws {
         guard let leaseStateDir, !localScenarios.isEmpty,
@@ -167,7 +168,9 @@ enum ProfileRunner {
             }
             if WaitLockPolling.shouldLogProgress(elapsedSeconds: elapsed) {
                 log("==> waiting for the local device(s) to free up before dispatching to the"
-                    + " other machines of this profile (\(elapsed)s elapsed, --wait-lock \(waitLock!)s)...")
+                    + " other machines of this profile (\(elapsed)s elapsed, up to \(waitLock!)s)...")
+                // ログと NDJSON は同じ if を通す(刻みが食い違わない。`fleetest api run` だけが出し口を渡す)
+                emitWaiting?(elapsed, waitLock)
             }
             sleepSeconds(WaitLockPolling.pollIntervalSeconds)
             elapsed += WaitLockPolling.pollIntervalSeconds

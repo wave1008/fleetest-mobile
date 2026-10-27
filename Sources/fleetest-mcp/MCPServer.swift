@@ -18,6 +18,7 @@ import FTCore
 struct FleetestMCP {
     static func main() async {
         LedgerWriteRole.enableForProduction()
+        _ = MCPResultsRequest.packExecutableKey  // 起動時の実行ファイルで鍵を決める(宣言の doc)
         let server = MCPServer()
         await server.run()
     }

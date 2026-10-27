@@ -48,156 +48,124 @@ enum ApiRunMachineFanout {
         let machineList = groups.map { "\($0.machineLabel)(\($0.deviceNames.count))" }.joined(separator: " + ")
         logStderr("==> profile \"\(profileName)\" spans \(groups.count) machines: \(machineList)"
             + " — building \(project.name) locally to split the scenarios")
-        let parentInterrupt = DeviceMachineRunner.ParentInterrupt()
-        defer { parentInterrupt.stop() }
-
-        // 束ね鍵はここで1回だけ発行する(理由は下の DispatchTicketIssuer と同じ箇所)。
-        // ビルドより前に採る —— 待機列のチケット(下)にも使うので、build 分だけ epoch が
-        // 遅れないようにする
-        let runGroup = RunRecorder.makeRunGroupID()
-        // dispatch.lock の待機チケットも**ここで1回だけ**採る(DispatchTicketIssuer の宣言。
-        // 機械ごとに採り直すと前後関係が機械によって食い違い、2つの run が互いに相手の機械を
-        // 待つ)。**プロセス環境へも書く**(`FT_DISPATCH_TICKET`。子と同じ綴り・同じ資格で自分自身にも
-        // 効かせる)—— 下のローカル先取りと、あとで `DispatchPrelock` が local を取り直すときの
-        // 両方が、この早い epoch のチケットを引く。書かずに後で採り直すと、build 中に列へ並んだ
-        // 別 run のチケットのほうが早い epoch になり、build を終えて戻ってきた自分が FIFO で
-        // 追い越される
-        let ticket = DispatchTicketIssuer.issue(runGroup: runGroup)
-        setenv(DispatchTicket.environmentKey, ticket.environmentValue, 1)
+        // **中断で抜けるときに runFinished を補わない**: 拡張は runFinished の無いままプロセスが終わったら、その時点で
+        // 走っている表示を解き「取り消した」と出す(runHandler.ts の `!sawEnd`・runLaneModel.ts の forceEndRunLaneState)。
+        // 0 件の runFinished を補うと、取り消しを正常終了(0 passed, 0 failed)に見せてしまう
         // 自己修復の書き戻しは全機械の子が終わってから親が1回だけ(HealSourceWriteBack.Collection)
         let healCollection = HealSourceWriteBack.Collection()
-        // **この Mac のロックを、ビルド/一覧取得より前に取る**(DeviceMachineRunner.run と同じ
-        // 理由・同じ位置。ユーザー決定「1つのマシンで同時に複数の run は走らせない」)。
-        // **build を直列化するための一時的な先取り** —— 配分が確定したら local に配られるかどうかに
-        // 関わらず必ず手放す(下)。全順序どおりの本取得は `DispatchPrelock` が local を含めて
-        // 改めて行う(RR-18.10「全員が同じ順序でしか取らないなら、循環待ちは作れない」= local だけ順序の外に出さない)。
-        // api run に --force-lock は無い。**待っていることは NDJSON にも出す**(単機の api run と同じ出し口。
-        // 渡し忘れると、複数機械のプロファイルだけ実行ログビューが無言のまま止まって見える → MN-62.4)
-        var localLock = try parentInterrupt.acquireLocalLock(log: { logStderr($0) }) {
-            try LocalDispatchLock(
-                runGroup: runGroup, waitLock: options.waitLock, log: { logStderr($0) },
-                emitWaiting: LocalDispatchLock.apiRunWaitingEmitter()).acquire(interruptCheck: parentInterrupt.isSet)
-        }
-        defer { localLock?.release() }
+        // 前段(入口の印・チケット・手元のロックの先取り・ビルド・使用中の待ち・Prelock)は MachineFanoutFrontHalf の1箇所。
+        // ここが持つのは差分 = NDJSON の出し口・シナリオ一覧の取得と配分・runStarted。
+        // runStarted を Prelock の後へ動かさないのは、待っている間の total を拡張に出すため(runStarted は拡張のレーン状態を
+        // 作り直す合図なので、待ちの dispatchWaiting より前に要る)
+        typealias Active = [(index: Int, group: DeviceMachineRunner.Group, ids: [String])]
+        typealias DynamicPlan = (scenarios: [DynamicSplit.Scenario],
+                                 estimate: @Sendable (DynamicSplit.Scenario, Int) -> Double)
+        let totalScenarios = LockedValue(0)
+        guard let (held, built) = try MachineFanoutFrontHalf.run(
+            settings: .init(
+                mode: .apiRun, remoteDir: options.remoteDir, forceLock: false, waitLock: options.waitLock,
+                setOverrides: options.setOverrides, log: { logStderr($0) },
+                emitLocalLockWaiting: LocalDispatchLock.apiRunWaitingEmitter(),
+                emitLocalDevicesWaiting: { ApiLocalDevicesWaitingEvent.emit(elapsedSeconds: $0, limitSeconds: $1) }),
+            announceBeforePrelock: {
+                // total は対象外を除いた本数(単機の ApiRunCommand と同じ: スキップは runStarted に数えない)
+                writeLine(encode(ApiRunStartedEvent(total: totalScenarios.value)))
+            },
+            build: { parentInterrupt -> (built: (Active, DynamicPlan?), plan: MachineFanoutFrontHalf.Plan)? in
+                // 割り当てを決めるにはシナリオ一覧が要る(DeviceMachineRunner.run と同じ理由。ここで1回だけ
+                // ローカルビルドする。ローカルの子には --skip-build を渡す = 下の buildChildArgs 参照)
+                let all = try parentInterrupt.stage("the scenario build", log: { logStderr($0) }) {
+                    try ScenarioHost.build(project: project) { logStderr($0) }
+                    return try ScenarioHost.list(project: project)
+                }
+                guard !all.isEmpty else {
+                    throw ValidationError(
+                        "no scenarios (add a @TestClass under TestProjects/\(project.name)/scenarios/)")
+                }
+                let selected = try ScenarioSelection.resolve(scenarios, from: all)
+                guard !selected.isEmpty else {
+                    throw ValidationError("no scenarios to run after filtering")
+                }
 
-        // 割り当てを決めるにはシナリオ一覧が要る(DeviceMachineRunner.run と同じ理由。ここで1回だけ
-        // ローカルビルドする。ローカルの子には --skip-build を渡す = 下の buildChildArgs 参照)
-        let all = try parentInterrupt.stage("the scenario build", log: { logStderr($0) }) {
-            try ScenarioHost.build(project: project) { logStderr($0) }
-            return try ScenarioHost.list(project: project)
-        }
-        guard !all.isEmpty else {
-            throw ValidationError(
-                "no scenarios (add a @TestClass under TestProjects/\(project.name)/scenarios/)")
-        }
-        let selected = try ScenarioSelection.resolve(scenarios, from: all)
-        guard !selected.isEmpty else {
-            throw ValidationError("no scenarios to run after filtering")
-        }
+                // 動的な割り振り(RR-8.1。DeviceMachineRunner.run と同じ分岐。FT_STATIC_SPLIT=1 で静的へ戻る)
+                let notApplicable: [ScenarioInfo]
+                let active: [(index: Int, group: DeviceMachineRunner.Group, ids: [String])]
+                var dynamicPlan: (scenarios: [DynamicSplit.Scenario],
+                                  estimate: @Sendable (DynamicSplit.Scenario, Int) -> Double)?
+                if DeviceMachineRunner.dynamicSplitEnabled(
+                    broadcast: false,
+                    measuresResponse: ProfileResolver.declaresResponseMeasurement(
+                        project: project, runName: profileName, overrides: options.setOverrides)) {
+                    let split = DeviceMachineRunner.splitApplicable(selected: selected, groups: groups)
+                    notApplicable = split.notApplicable
+                    let resolved = DynamicDispatcher.resolve(
+                        split.runnable.map { (id: $0.id, platform: $0.platform) },
+                        defaultPlatform: DynamicDispatcher.undeclaredPlatform(groups: groups))
+                    active = groups.indices.compactMap { index in
+                        let ids = DynamicDispatcher.candidateIDs(for: groups[index], in: resolved)
+                        return ids.isEmpty ? nil : (index, groups[index], ids)
+                    }
+                    if !active.isEmpty {
+                        let inputs = DeviceMachineRunner.estimationInputs(
+                            project: project, groups: groups, lptHistoryRuns: options.lptHistoryRuns)
+                        dynamicPlan = (resolved, DeviceMachineRunner.dynamicEstimator(inputs: inputs, groups: groups))
+                    }
+                } else {
+                    let (buckets, basis, notApplicableStatic) = try DeviceMachineRunner.assign(
+                        project: project, groups: groups, selected: selected,
+                        lptHistoryRuns: options.lptHistoryRuns)
+                    notApplicable = notApplicableStatic
+                    active = groups.indices.compactMap { index in
+                        let ids = buckets[index].scenarioIDs
+                        return ids.isEmpty ? nil : (index, groups[index], ids)
+                    }
+                    // CLI と同じ「見積りの根拠」を拡張の OUTPUT にも出す(片方だけ見える情報を作らない)
+                    for (index, group, ids) in active {
+                        logStderr("    \(group.machineLabel): \(ids.count) scenario(s)"
+                            + " on \(group.deviceNames.count) device(s) [\(basis[index].summary)]")
+                    }
+                }
+                for line in DeviceMachineRunner.notApplicableLines(notApplicable, groups: groups) { logStderr(line) }
+                // 全部が宣言 platform の対象外なら単機の run と同じく 0/0 で終える(正しく緑)。
+                // それ以外で全滅(= 対象外でもないのに割り当て 0)は FleetSplit.partition が設定ミスとして
+                // throw 済みなので、ここへは来ない
+                guard !active.isEmpty else {
+                    writeLine(encode(ApiRunStartedEvent(total: 0)))
+                    writeLine(encode(ApiRunFinishedEvent(
+                        passed: 0, failed: 0, skipped: 0,
+                        testSeconds: nil, scenarioTotalSeconds: nil,
+                        runID: nil)))
+                    return nil
+                }
+                if let dynamicPlan {
+                    logStderr("==> dynamic split: \(dynamicPlan.scenarios.count) scenario(s) across \(active.count) machine(s)"
+                        + " — each free device takes the next scenario")
+                } else {
+                    for (_, group, ids) in active {
+                        logStderr("    \(group.machineLabel): \(ids.count) scenario(s) on \(group.deviceNames.count) device(s)")
+                    }
+                }
 
-        // 動的な割り振り(RR-8.1。DeviceMachineRunner.run と同じ分岐。FT_STATIC_SPLIT=1 で静的へ戻る)
-        let notApplicable: [ScenarioInfo]
-        let active: [(index: Int, group: DeviceMachineRunner.Group, ids: [String])]
-        var dynamicPlan: (scenarios: [DynamicSplit.Scenario],
-                          estimate: @Sendable (DynamicSplit.Scenario, Int) -> Double)?
-        if DeviceMachineRunner.dynamicSplitEnabled(
-            broadcast: false,
-            measuresResponse: ProfileResolver.declaresResponseMeasurement(
-                project: project, runName: profileName, overrides: options.setOverrides)) {
-            let split = DeviceMachineRunner.splitApplicable(selected: selected, groups: groups)
-            notApplicable = split.notApplicable
-            let resolved = DynamicDispatcher.resolve(
-                split.runnable.map { (id: $0.id, platform: $0.platform) },
-                defaultPlatform: DynamicDispatcher.undeclaredPlatform(groups: groups))
-            active = groups.indices.compactMap { index in
-                let ids = DynamicDispatcher.candidateIDs(for: groups[index], in: resolved)
-                return ids.isEmpty ? nil : (index, groups[index], ids)
-            }
-            if !active.isEmpty {
-                let inputs = DeviceMachineRunner.estimationInputs(
-                    project: project, groups: groups, lptHistoryRuns: options.lptHistoryRuns)
-                dynamicPlan = (resolved, DeviceMachineRunner.dynamicEstimator(inputs: inputs, groups: groups))
-            }
-        } else {
-            let (buckets, basis, notApplicableStatic) = try DeviceMachineRunner.assign(
-                project: project, groups: groups, selected: selected,
-                lptHistoryRuns: options.lptHistoryRuns)
-            notApplicable = notApplicableStatic
-            active = groups.indices.compactMap { index in
-                let ids = buckets[index].scenarioIDs
-                return ids.isEmpty ? nil : (index, groups[index], ids)
-            }
-            // CLI と同じ「見積りの根拠」を拡張の OUTPUT にも出す(片方だけ見える情報を作らない)
-            for (index, group, ids) in active {
-                logStderr("    \(group.machineLabel): \(ids.count) scenario(s)"
-                    + " on \(group.deviceNames.count) device(s) [\(basis[index].summary)]")
-            }
-        }
-        for line in DeviceMachineRunner.notApplicableLines(notApplicable, groups: groups) { logStderr(line) }
-        // 全部が宣言 platform の対象外なら単機の run と同じく 0/0 で終える(正しく緑)。
-        // それ以外で全滅(= 対象外でもないのに割り当て 0)は FleetSplit.partition が設定ミスとして
-        // throw 済みなので、ここへは来ない
-        guard !active.isEmpty else {
-            writeLine(encode(ApiRunStartedEvent(total: 0)))
-            writeLine(encode(ApiRunFinishedEvent(
-                passed: 0, failed: 0, skipped: 0,
-                testSeconds: nil, scenarioTotalSeconds: nil,
-                runID: nil)))
-            return 0
-        }
-        if let dynamicPlan {
-            logStderr("==> dynamic split: \(dynamicPlan.scenarios.count) scenario(s) across \(active.count) machine(s)"
-                + " — each free device takes the next scenario")
-        } else {
-            for (_, group, ids) in active {
-                logStderr("    \(group.machineLabel): \(ids.count) scenario(s) on \(group.deviceNames.count) device(s)")
-            }
-        }
-
-        // 配分が確定したら、build 直列化のために先取りしたロックは**local に配られたかどうかに
-        // 関わらず**必ず手放す(下の DispatchPrelock が local を含めて全順序どおり取り直すため。
-        // 手放さずに残すと local だけ順序の外に出た「取得済み」扱いになり、循環待ちを作れる形へ戻る)
-        localLock?.release()
-        localLock = nil
-
-        // 手元のデバイスの二重使用は runStarted と子の起動より前に断る(単機の api run の拒否と同じ形 =
-        // NDJSON を1行も出さず stderr + 非0。ProfileRunner.rejectIfLocalDevicesLeasedBeforeDispatch)。
-        // **dispatch.lock より手前なのは意図** —— 読み取りだけの先読みで、どのロックも取る前に
-        // 断るためにここに置く(取ってから降りると他人を待たせた挙句に何も走らない)。上の
-        // localLock は既に手放し済みなので、ここでは何も持っていない。取得そのものの上下は
-        // 「マシンの門(dispatch.lock)→ デバイスの門(run-lease)」= FTBridgeClient/RunLeaseGuard.swift の冒頭
-        if let local = active.first(where: { $0.group.machine == nil }) {
-            let ids = Set(local.ids)
-            try ProfileRunner.rejectIfLocalDevicesLeasedBeforeDispatch(
-                project: project, profileName: profileName, setOverrides: options.setOverrides,
-                localDeviceNames: local.group.deviceNames,
-                localScenarios: selected.filter { ids.contains($0.id) }, broadcast: false,
-                waitLock: options.waitLock, interruptCheck: parentInterrupt.isSet, log: { logStderr($0) })
-        }
-
-        // ここまでの中断で runStarted を出さない(出すと runFinished の無い run が拡張に残る)。下の DispatchPrelock の待ちの中断は
-        // runStarted の後に来るので、その形では runFinished の無い run が残る
-        try parentInterrupt.exitIfSet(noticedAt: "the scenario assignment", log: { logStderr($0) })
-        // total は対象外を除いた本数(単機の ApiRunCommand と同じ: スキップは runStarted に数えない)
-        writeLine(encode(ApiRunStartedEvent(total: selected.count - notApplicable.count)))
+                totalScenarios.withLock { $0 = selected.count - notApplicable.count }
+                var leaseChecks: [MachineFanoutFrontHalf.LeaseCheck] = []
+                if let local = active.first(where: { $0.group.machine == nil }) {
+                    let ids = Set(local.ids)
+                    leaseChecks.append(.init(
+                        project: project, profileName: profileName, localDeviceNames: local.group.deviceNames,
+                        localScenarios: selected.filter { ids.contains($0.id) }, broadcast: false))
+                }
+                return ((active, dynamicPlan), .init(
+                    leaseChecks: leaseChecks, machines: active.map { $0.group.machineLabel }, prelockProject: project))
+            }) else { return 0 }
+        defer { held.close() }
+        let (active, dynamicPlan) = built
+        let runGroup = held.runGroup
+        let ticket = held.ticket
+        let prelock = held.prelock
+        let parentInterrupt = held.parentInterrupt
 
         let binary = FleetRunner.selfBinaryPath()
-        // **親が機械の全順序どおりに1台ずつ取り切ってから子を起こす**(DispatchPrelock。local も
-        // 他の機械と同じ扱いで、上で発行し環境へ書いたチケットを引く。並列に取りに行くと、
-        // 2つの run が互いに相手の機械を待つ形を作れる)
-        let prelock = DispatchPrelock(actions: DispatchPrelock.live(
-            project: project, remoteDir: options.remoteDir, forceLock: false,
-            waitLock: options.waitLock, runGroup: runGroup, mode: .apiRun,
-            log: { logStderr($0) }))
-        defer { prelock.releaseAll() }
-        // 戻り値 false = 中断されて、ここまでに握った分は既に外し終えている(DispatchPrelock の
-        // 宣言)。**子を1つも起こさずに抜ける**(DeviceMachineRunner.run と同じ理由)
-        guard prelock.acquireInOrder(machines: DispatchPrelock.machinesToLock(
-            active.map { $0.group.machineLabel })) else {
-            throw DeviceMachineRunner.interruptedBeforeAnySubRun
-        }
-        // 子タスクへ渡すのは値のコピー(prelock 自身を @Sendable な closure へ持ち込まない)
-        let lockMarkers = prelock.markers
+        let lockMarkers = held.lockMarkers
         let (stream, continuation) = AsyncStream<ChildEvent>.makeStream()
         let groupMachines = active.map { $0.group.machine }
 
@@ -235,7 +203,7 @@ enum ApiRunMachineFanout {
         }
         defer { cancelRelay.stop() }
         // 購読の登録より前の中断は子を起こす前に抜ける(DeviceMachineRunner.run の同じ箇所)
-        try parentInterrupt.exitIfSet(noticedAt: "the dispatch lock acquisition", log: { logStderr($0) })
+        try held.exitIfInterruptedBeforeLaunch(log: { logStderr($0) })
 
         let isInterrupted = parentInterrupt.isSet
         let interruptedAtLastExit = LockedValue(false)

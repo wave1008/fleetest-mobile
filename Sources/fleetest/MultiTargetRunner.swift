@@ -106,8 +106,6 @@ enum MultiTargetRunner {
     ) async throws -> Int32 {
         let junitTempDir = try FleetRunner.makeJUnitTempDir(requested: junit)
         defer { if let junitTempDir { try? FileManager.default.removeItem(at: junitTempDir) } }
-        let parentInterrupt = DeviceMachineRunner.ParentInterrupt()
-        defer { parentInterrupt.stop() }
 
         // 1. 対象の解決(プロジェクト・グループ)。読むだけで、デバイスにもビルドにも触らない
         let disabled = MachineEnablement.disabledMachines(config: LocalConfig.load())
@@ -143,109 +141,100 @@ enum MultiTargetRunner {
             }
         }
 
-        let runGroup = RunRecorder.makeRunGroupID()
-        // チケットは1回だけ採って環境へ書く(DeviceMachineRunner.run の同じ箇所の宣言)
-        let ticket = DispatchTicketIssuer.issue(runGroup: runGroup)
-        setenv(DispatchTicket.environmentKey, ticket.environmentValue, 1)
         FleetRunner.log("==> \(resolvedTargets.count) target(s) on \(machineLabels.count) machine(s)"
             + " — each free machine takes the next target; the last targets are shared scenario by scenario")
 
-        // build を直列化するための先取り。配分が確定したら必ず手放し、本取得は DispatchPrelock が全順序で行う
-        var localLock = try parentInterrupt.acquireLocalLock(log: { FleetRunner.log($0) }) {
-            try LocalDispatchLock(
-                runGroup: runGroup, waitLock: waitLock, forceLock: forceLock,
-                log: { FleetRunner.log($0) }).acquire(interruptCheck: parentInterrupt.isSet)
-        }
-        defer { localLock?.release() }
-
-        // 2. 手元で1回ずつビルドして一覧を出す(プロジェクトごと)。中断はプロジェクトの境目で拾う
-        var built: Set<String> = []
-        var listed: [String: [ScenarioInfo]] = [:]
-        var healByProject: [String: HealSourceWriteBack.Collection] = [:]
-        for target in resolvedTargets where built.insert(target.project.name).inserted {
-            let found = try parentInterrupt.stage("the scenario build", log: { FleetRunner.log($0) }) {
-                if !skipBuild { try ScenarioHost.build(project: target.project, log: { FleetRunner.log($0) }) }
-                return try ScenarioHost.listForRun(project: target.project, dryRun: false, compilesOCR: false)
-            }
-            guard !found.isEmpty else {
-                throw ValidationError(
-                    "no scenarios (add a @TestClass under TestProjects/\(target.project.name)/scenarios/)")
-            }
-            // 通常の入口と同じ選択(`@Draft` / `@Deleted` を外す)。子へは完全一致の ID で渡すので、子の側では外れない。
-            // 外して空になった対象は飛ばす(通常の入口も外して空なら成功で終わる)= 下の「当てはまるシナリオが無い」で抜ける
-            listed[target.project.name] = try ScenarioSelection.resolve([], from: found)
-            healByProject[target.project.name] = HealSourceWriteBack.Collection()
-        }
-
-        // 3. 仕事ごとの配り手
         let clock = DynamicDispatcher.monotonicClock()
         let writers = LockedValue<[String: ChildStdinWriter]>([:])
-        var jobs: [Job] = []
-        for target in resolvedTargets {
-            let id = "\(target.project.name)/\(target.profile)"
-            let all = listed[target.project.name] ?? []
-            let (runnable, notApplicable) = DeviceMachineRunner.splitApplicable(selected: all, groups: target.groups)
-            if !notApplicable.isEmpty { FleetRunner.log("==> \(id)") }
-            for line in DeviceMachineRunner.notApplicableLines(notApplicable, groups: target.groups) {
-                FleetRunner.log(line)
-            }
-            let resolved = DynamicDispatcher.resolve(
-                runnable.map { (id: $0.id, platform: $0.platform) },
-                defaultPlatform: DynamicDispatcher.undeclaredPlatform(groups: target.groups))
-            guard !resolved.isEmpty else {
-                FleetRunner.log("==> \(id): no scenario applies to this profile's devices; skipping")
-                continue
-            }
-            var entryByMachine: [Int: Int] = [:]
-            for (index, group) in target.groups.enumerated() {
-                if let machine = machineLabels.firstIndex(of: group.machineLabel) { entryByMachine[machine] = index }
-            }
-            let inputs = DeviceMachineRunner.estimationInputs(
-                project: target.project, groups: target.groups, lptHistoryRuns: lptHistoryRuns)
-            let estimate = DeviceMachineRunner.dynamicEstimator(inputs: inputs, groups: target.groups)
-            let jobID = id
-            let dispatcher = DynamicDispatcher(
-                scenarios: resolved, estimateMs: estimate, nowMs: clock, lpt: !noLPT,
-                send: { entry, reply in
-                    writers.withLock { $0[MultiTargetRunner.writerKey(jobID, entry)] }?.write(line: WorkQueueProtocol.encode(reply))
-                })
-            jobs.append(Job(
-                id: id, project: target.project, profile: target.profile, groups: target.groups,
-                entryByMachine: entryByMachine, resolved: resolved, dispatcher: dispatcher, estimate: estimate,
-                healCollection: healByProject[target.project.name] ?? HealSourceWriteBack.Collection(),
-                infos: runnable))
-        }
-        guard !jobs.isEmpty else {
-            FleetRunner.log("==> no target has a scenario to run; nothing to run")
-            return 0
-        }
+        // 前段(入口の印・チケット・手元のロックの先取り・ビルド・使用中の待ち・全マシンの Prelock)は
+        // MachineFanoutFrontHalf の1箇所。ここが持つのは差分 = プロジェクトごとのビルドと仕事ごとの配り手
+        guard let (held, built) = try MachineFanoutFrontHalf.run(
+            settings: .init(
+                mode: .cliRun, remoteDir: remoteDir, forceLock: forceLock, waitLock: waitLock,
+                setOverrides: setOverrides, log: { FleetRunner.log($0) }, emitLocalLockWaiting: nil, emitLocalDevicesWaiting: nil),
+            build: { parentInterrupt -> (built: ([Job], [String: HealSourceWriteBack.Collection]), plan: MachineFanoutFrontHalf.Plan)? in
+                // 2. 手元で1回ずつビルドして一覧を出す(プロジェクトごと)。中断はプロジェクトの境目で拾う
+                var builtProjects: Set<String> = []
+                var listed: [String: [ScenarioInfo]] = [:]
+                var healByProject: [String: HealSourceWriteBack.Collection] = [:]
+                for target in resolvedTargets where builtProjects.insert(target.project.name).inserted {
+                    let found = try parentInterrupt.stage("the scenario build", log: { FleetRunner.log($0) }) {
+                        if !skipBuild { try ScenarioHost.build(project: target.project, log: { FleetRunner.log($0) }) }
+                        return try ScenarioHost.listForRun(project: target.project, dryRun: false, compilesOCR: false)
+                    }
+                    guard !found.isEmpty else {
+                        throw ValidationError(
+                            "no scenarios (add a @TestClass under TestProjects/\(target.project.name)/scenarios/)")
+                    }
+                    // 通常の入口と同じ選択(`@Draft` / `@Deleted` を外す)。子へは完全一致の ID で渡すので、子の側では外れない。
+                    // 外して空になった対象は飛ばす(通常の入口も外して空なら成功で終わる)= 下の「当てはまるシナリオが無い」で抜ける
+                    listed[target.project.name] = try ScenarioSelection.resolve([], from: found)
+                    healByProject[target.project.name] = HealSourceWriteBack.Collection()
+                }
 
-        // ビルドを直列化する先取りは、使用中の待ちより前に手放す(DeviceMachineRunner.run と同じ順序。握ったまま待つと、
-        // 断られて終わるかもしれない run がこの Mac の他の run を --wait-lock ぶん待たせる)
-        localLock?.release()
-        localLock = nil
-        // 手元のデバイスの二重使用はどの機械へも配る前に断る(DeviceMachineRunner.run と同じ位置・同じ理由)
-        for job in jobs {
-            guard let local = job.groups.first(where: { $0.machine == nil }) else { continue }
-            let ids = Set(DynamicDispatcher.candidateIDs(for: local, in: job.resolved))
-            try ProfileRunner.rejectIfLocalDevicesLeasedBeforeDispatch(
-                project: job.project, profileName: job.profile, setOverrides: setOverrides,
-                localDeviceNames: local.deviceNames,
-                localScenarios: job.infos.filter { ids.contains($0.id) }, broadcast: false,
-                waitLock: waitLock, interruptCheck: parentInterrupt.isSet, log: { FleetRunner.log($0) })
-        }
+                // 3. 仕事ごとの配り手
+                var jobs: [Job] = []
+                for target in resolvedTargets {
+                    let id = "\(target.project.name)/\(target.profile)"
+                    let all = listed[target.project.name] ?? []
+                    let (runnable, notApplicable) = DeviceMachineRunner.splitApplicable(selected: all, groups: target.groups)
+                    if !notApplicable.isEmpty { FleetRunner.log("==> \(id)") }
+                    for line in DeviceMachineRunner.notApplicableLines(notApplicable, groups: target.groups) {
+                        FleetRunner.log(line)
+                    }
+                    let resolved = DynamicDispatcher.resolve(
+                        runnable.map { (id: $0.id, platform: $0.platform) },
+                        defaultPlatform: DynamicDispatcher.undeclaredPlatform(groups: target.groups))
+                    guard !resolved.isEmpty else {
+                        FleetRunner.log("==> \(id): no scenario applies to this profile's devices; skipping")
+                        continue
+                    }
+                    var entryByMachine: [Int: Int] = [:]
+                    for (index, group) in target.groups.enumerated() {
+                        if let machine = machineLabels.firstIndex(of: group.machineLabel) { entryByMachine[machine] = index }
+                    }
+                    let inputs = DeviceMachineRunner.estimationInputs(
+                        project: target.project, groups: target.groups, lptHistoryRuns: lptHistoryRuns)
+                    let estimate = DeviceMachineRunner.dynamicEstimator(inputs: inputs, groups: target.groups)
+                    let jobID = id
+                    let dispatcher = DynamicDispatcher(
+                        scenarios: resolved, estimateMs: estimate, nowMs: clock, lpt: !noLPT,
+                        send: { entry, reply in
+                            writers.withLock { $0[MultiTargetRunner.writerKey(jobID, entry)] }?.write(line: WorkQueueProtocol.encode(reply))
+                        })
+                    jobs.append(Job(
+                        id: id, project: target.project, profile: target.profile, groups: target.groups,
+                        entryByMachine: entryByMachine, resolved: resolved, dispatcher: dispatcher, estimate: estimate,
+                        healCollection: healByProject[target.project.name] ?? HealSourceWriteBack.Collection(),
+                        infos: runnable))
+                }
+                guard !jobs.isEmpty else {
+                    FleetRunner.log("==> no target has a scenario to run; nothing to run")
+                    return nil
+                }
 
-        // 4. 使う全マシンの dispatch.lock を最初に取り、全部の仕事が終わるまで持つ
+                var leaseChecks: [MachineFanoutFrontHalf.LeaseCheck] = []
+                for job in jobs {
+                    guard let local = job.groups.first(where: { $0.machine == nil }) else { continue }
+                    let ids = Set(DynamicDispatcher.candidateIDs(for: local, in: job.resolved))
+                    leaseChecks.append(.init(
+                        project: job.project, profileName: job.profile, localDeviceNames: local.deviceNames,
+                        localScenarios: job.infos.filter { ids.contains($0.id) }, broadcast: false))
+                }
+                return ((jobs, healByProject), .init(
+                    leaseChecks: leaseChecks,
+                    machines: labelsInUse(machineLabels, entryMaps: jobs.map { Set($0.entryByMachine.keys) }),
+                    prelockProject: jobs[0].project))
+            }) else { return 0 }
+        defer { held.close() }
+        let (jobs, healByProject) = built
+        let runGroup = held.runGroup
+        let ticket = held.ticket
+        let prelock = held.prelock
+        let parentInterrupt = held.parentInterrupt
+
         let binary = FleetRunner.selfBinaryPath()
-        let prelock = DispatchPrelock(actions: DispatchPrelock.live(
-            project: jobs[0].project, remoteDir: remoteDir, forceLock: forceLock, waitLock: waitLock,
-            runGroup: runGroup, mode: .cliRun, log: { FleetRunner.log($0) }))
-        defer { prelock.releaseAll() }
-        guard prelock.acquireInOrder(machines: DispatchPrelock.machinesToLock(
-            labelsInUse(machineLabels, entryMaps: jobs.map { Set($0.entryByMachine.keys) }))) else {
-            throw DeviceMachineRunner.interruptedBeforeAnySubRun
-        }
-        let lockMarkers = prelock.markers
+        let lockMarkers = held.lockMarkers
         let dispatchStart = Date()
 
         // 5. 配り手
@@ -306,7 +295,7 @@ enum MultiTargetRunner {
         let relay = InterruptRelay.observing(catchUp: true) { coordinator.interrupt() }
         defer { relay.stop() }
         // 購読の登録より前の中断は子を起こす前に抜ける(DeviceMachineRunner.run の同じ箇所)
-        try parentInterrupt.exitIfSet(noticedAt: "the dispatch lock acquisition", log: { FleetRunner.log($0) })
+        try held.exitIfInterruptedBeforeLaunch(log: { FleetRunner.log($0) })
         let wallStart = clock()
         coordinator.start()
         await coordinator.waitUntilFinished()

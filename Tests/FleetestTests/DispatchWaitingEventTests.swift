@@ -125,17 +125,24 @@ final class DispatchWaitingEventTests: XCTestCase {
             let text = try Self.source("Sources/fleetest/\(file)")
             if text.contains("LocalDispatchLock(") { constructing.insert(file) }
         }
-        let apiRun: Set<String> = ["ApiRunCommand.swift", "ApiRunMachineFanout.swift"]
-        let cliRun: Set<String> = ["Fleetest.swift", "DeviceMachineRunner.swift", "MultiTargetRunner.swift"]
-        XCTAssertEqual(constructing, apiRun.union(cliRun).union(["DispatchPrelock.swift"]),
+        // 3つの fan-out の手元のロックは前段(MachineFanoutFrontHalf)が取る。出し口は fan-out が Settings で渡す
+        XCTAssertEqual(constructing, ["ApiRunCommand.swift", "Fleetest.swift", "MachineFanoutFrontHalf.swift",
+                                      "DispatchPrelock.swift"],
                        "手元のロックを取る経路が増えた/減った —— NDJSON の出し口を渡すかを決めて表へ載せる")
-        for file in apiRun {
-            XCTAssertTrue(try Self.source("Sources/fleetest/\(file)")
-                .contains("emitWaiting: LocalDispatchLock.apiRunWaitingEmitter()"), "\(file) が出し口を渡していない")
-        }
-        for file in cliRun {
+        XCTAssertTrue(try Self.source("Sources/fleetest/ApiRunCommand.swift")
+            .contains("emitWaiting: LocalDispatchLock.apiRunWaitingEmitter()"), "ApiRunCommand が出し口を渡していない")
+        XCTAssertTrue(try Self.source("Sources/fleetest/MachineFanoutFrontHalf.swift")
+            .contains("emitWaiting: settings.emitLocalLockWaiting"), "前段が呼び手の出し口を渡していない")
+        XCTAssertTrue(try Self.source("Sources/fleetest/ApiRunMachineFanout.swift")
+            .contains("emitLocalLockWaiting: LocalDispatchLock.apiRunWaitingEmitter()"),
+                      "api run の機械分担が出し口を渡していない")
+        for file in ["Fleetest.swift", "DeviceMachineRunner.swift", "MultiTargetRunner.swift"] {
             XCTAssertFalse(try Self.source("Sources/fleetest/\(file)").contains("emitWaiting:"),
                            "\(file) が人間向けの stdout に NDJSON を混ぜている")
+        }
+        for file in ["DeviceMachineRunner.swift", "MultiTargetRunner.swift"] {
+            XCTAssertTrue(try Self.source("Sources/fleetest/\(file)").contains("emitLocalLockWaiting: nil"),
+                          "\(file) が出し口を明示していない")
         }
         XCTAssertTrue(try Self.source("Sources/fleetest/DispatchPrelock.swift")
             .contains("emitWaiting: mode == .apiRun"), "DispatchPrelock が mode で出し分けていない")

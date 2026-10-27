@@ -19,10 +19,28 @@ import XCTest
 
 final class DispatchLockBeforeBuildOrderingTests: XCTestCase {
 
-    private static let sources = [
+    /// 前段は MachineFanoutFrontHalf の1箇所。順序はその `run` の中で固定され、build は呼び手の差分(`build` の呼び出し)
+    private static let sources = ["Sources/fleetest/MachineFanoutFrontHalf.swift"]
+    private static let fanouts = [
         "Sources/fleetest/DeviceMachineRunner.swift",
         "Sources/fleetest/ApiRunMachineFanout.swift",
+        "Sources/fleetest/MultiTargetRunner.swift",
     ]
+    private static let buildCall = "try build("
+
+    /// 3経路は前段の `run` に build を渡すだけ —— ロック・チケット・Prelock を自前で作らない(手書きの写しに戻さない)。
+    /// ビルドは前段の `run` の呼び出しの内側(= ロックを握った後)に書く
+    func testThreeFanoutsDelegateTheFrontHalf() throws {
+        for path in Self.fanouts {
+            let text = try Self.source(path)
+            let run = try XCTUnwrap(text.range(of: "MachineFanoutFrontHalf.run("), "\(path): 前段を通っていない")
+            let build = try XCTUnwrap(text.range(of: "ScenarioHost.build("), "\(path): ScenarioHost.build が無い")
+            XCTAssertLessThan(run.lowerBound, build.lowerBound, "\(path): ビルドが前段の外(ロックの前)にある")
+            for owned in ["LocalDispatchLock(", "DispatchTicketIssuer.issue(", "DispatchPrelock(", "RunRecorder.makeRunGroupID("] {
+                XCTAssertFalse(text.contains(owned), "\(path): 前段の持ち物 \(owned) を自前で作っている")
+            }
+        }
+    }
 
     func testTheLocalDispatchLockIsAcquiredBeforeTheLocalBuildAndScenarioList() throws {
         for path in Self.sources {
@@ -30,16 +48,10 @@ final class DispatchLockBeforeBuildOrderingTests: XCTestCase {
             guard let lockLine = lines.firstIndex(where: { $0.contains("LocalDispatchLock(") }) else {
                 return XCTFail("\(path): ローカルの dispatch.lock 取得が見当たらない")
             }
-            guard let buildLine = lines.firstIndex(where: { $0.contains("ScenarioHost.build(") }) else {
-                return XCTFail("\(path): ScenarioHost.build 呼び出しが見当たらない")
+            guard let buildLine = lines.firstIndex(where: { $0.contains(Self.buildCall) }) else {
+                return XCTFail("\(path): build 呼び出しが見当たらない")
             }
-            guard let listLine = lines.firstIndex(where: {
-                $0.contains("ScenarioHost.listForRun(") || $0.contains("ScenarioHost.list(")
-            }) else {
-                return XCTFail("\(path): シナリオ一覧の取得が見当たらない")
-            }
-            XCTAssertLessThan(lockLine, buildLine, "\(path): dispatch.lock がビルドの後に取られている")
-            XCTAssertLessThan(lockLine, listLine, "\(path): dispatch.lock が一覧取得の後に取られている")
+            XCTAssertLessThan(lockLine, buildLine, "\(path): dispatch.lock がビルド・一覧取得の後に取られている")
         }
     }
 
@@ -53,8 +65,8 @@ final class DispatchLockBeforeBuildOrderingTests: XCTestCase {
             else {
                 return XCTFail("\(path): DispatchTicketIssuer.issue 呼び出しが見当たらない")
             }
-            guard let buildLine = lines.firstIndex(where: { $0.contains("ScenarioHost.build(") }) else {
-                return XCTFail("\(path): ScenarioHost.build 呼び出しが見当たらない")
+            guard let buildLine = lines.firstIndex(where: { $0.contains(Self.buildCall) }) else {
+                return XCTFail("\(path): build 呼び出しが見当たらない")
             }
             XCTAssertLessThan(issueLine, buildLine,
                               "\(path): 待機チケットの発行がビルドの後(epoch が遅れて FIFO の公平性を失う)")

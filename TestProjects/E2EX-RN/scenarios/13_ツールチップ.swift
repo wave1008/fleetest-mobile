@@ -20,7 +20,8 @@ class ツールチップを出せること {
             }
             scene(2, "押している間は出て、離すと消える") {
                 action {
-                    hold("#btn_tooltip_anchor", holdSeconds: 3) {
+                    // 押している間にブロックの検証が収まる長さ(負荷の下で exist が 3.3 秒かかり、3 秒では指が先に離れた)
+                    hold("#btn_tooltip_anchor", holdSeconds: 6) {
                         select("#txt_tooltip").textIs("これはツールチップです")
                         select("#txt_tooltip_state").textIs("tooltip=shown")
                     }

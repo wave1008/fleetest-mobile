@@ -53,12 +53,16 @@ final class SnapshotBuilder {
         /// ref → 短縮 resource-id(無い要素はキー無し)。/type・/clear が**座標がズレても同じ要素を
         /// 追跡し直す**ために使う(キーボードの開閉で adjustResize が走ると座標は当てにならない)
         final Map<Integer, String> refIds;
+        /// ref → スナップショットが申告した型名(`mappedType`。**生の綴り**で、比較側が正規化する)。
+        /// BridgeRouter.requireExpectedRef がホストの期待との照合に使う
+        final Map<Integer, String> refTypes;
         final Rect screen;
         Result(String json, Map<Integer, double[]> refCenters, Map<Integer, String> refIds,
-               Rect screen) {
+               Map<Integer, String> refTypes, Rect screen) {
             this.json = json;
             this.refCenters = refCenters;
             this.refIds = refIds;
+            this.refTypes = refTypes;
             this.screen = screen;
         }
     }
@@ -274,11 +278,13 @@ final class SnapshotBuilder {
         JSONArray elements = new JSONArray();
         Map<Integer, double[]> centers = new HashMap<>();
         Map<Integer, String> ids = new HashMap<>();
+        Map<Integer, String> types = new HashMap<>();
         for (UINode node : kept) {
             int ref = elements.length() + 1;
             centers.put(ref, new double[]{node.bounds.exactCenterX(), node.bounds.exactCenterY()});
             String shortId = shortResourceId(node.resourceID);
             if (shortId != null) ids.put(ref, shortId);
+            types.put(ref, mappedType(node));
             elements.put(makeInfo(node, ref));
         }
 
@@ -315,7 +321,7 @@ final class SnapshotBuilder {
             for (Rect overlay : hidden.overlays) overlayFrames.put(rectJSON(overlay));
             response.put("overlayWindowFrames", overlayFrames);
         }
-        return new Result(response.toString(), centers, ids, screen);
+        return new Result(response.toString(), centers, ids, types, screen);
     }
 
     /**

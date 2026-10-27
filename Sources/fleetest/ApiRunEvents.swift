@@ -86,6 +86,30 @@ extension ApiDispatchWaitingEvent {
     }
 }
 
+/// 機械分担の run が、**手元のデバイスの lease が別の run に握られている間**待っている進行通知
+/// (`ProfileRunner.rejectIfLocalDevicesLeasedBeforeDispatch`。`--wait-lock` を渡したときだけ)。
+/// `dispatchWaiting` は dispatch.lock の待機列(位置・総数・保持者)の形なので流用しない —— 流用すると
+/// 「dispatch.lock を待っている」と出る。出すのは `fleetest api run` だけで、既存の進行ログと同じ刻み
+/// (初回 + `WaitLockPolling.shouldLogProgress`)。取得できた/諦めたときの終了イベントは無い。
+/// 契約の同期相手: vscode-fleetest/src/model.ts の LocalDevicesWaitingEvent
+struct ApiLocalDevicesWaitingEvent: Encodable {
+    let kind = "localDevicesWaiting"
+    let elapsedSeconds: Int
+    /// `--wait-lock <秒>`(親の入口で決めた期限の残り)。フラグが無ければキーごと省く
+    let limitSeconds: Int?
+
+    /// 1行の組み立てはここだけ。エンコード失敗は黙って捨てる(通知が出ないだけで run は続く)。
+    /// `out` はテストの受け口(本番は NDJSON の stdout)
+    static func emit(elapsedSeconds: Int, limitSeconds: Int?, out: (String) -> Void = { ConsoleOut.out($0) }) {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+        guard let data = try? encoder.encode(ApiLocalDevicesWaitingEvent(
+                  elapsedSeconds: elapsedSeconds, limitSeconds: limitSeconds)),
+              let line = String(data: data, encoding: .utf8) else { return }
+        out(line)
+    }
+}
+
 /// 振り直し通知(RunEvent.flowRequeued)。契約の同期相手: vscode-fleetest/src/model.ts ScenarioRequeuedEvent
 struct ApiScenarioRequeuedEvent: Encodable {
     let kind = "scenarioRequeued"

@@ -83,12 +83,15 @@ enum FleetRunner {
 
         // **親が機械の全順序どおりに1台ずつ取り切ってから子を起こす**(DispatchPrelock)
         let prelock = DispatchPrelock(actions: DispatchPrelock.live(
-            project: project, remoteDir: remoteDir, forceLock: forceLock, waitLock: waitLock,
+            project: project, remoteDir: remoteDir, forceLock: forceLock,
+            // 機械ごとに `--wait-lock` を払い直さない(期限は1つ = WaitLockDeadline。ほかのマシンをまたぐ経路と同じ)
+            waitLockProvider: { [deadline = WaitLockDeadline(limitSeconds: waitLock)] in deadline.remaining() },
             runGroup: nil, mode: .cliRun, log: { FleetRunner.log($0) }))
         defer { prelock.releaseAll() }
         // false = 中断済みで握った分は外し終えている。子を1つも起こさずに抜ける(DeviceMachineRunner と同じ)
         guard prelock.acquireInOrder(machines: DispatchPrelock.machinesToLock(fleet.runs.map(\.host))) else {
-            throw ValidationError("interrupted while acquiring dispatch locks — starting no fleet entry")
+            log("interrupted while acquiring dispatch locks — starting no fleet entry")
+            throw DeviceMachineRunner.interruptedBeforeAnySubRun
         }
         // 子タスクへ渡すのは値のコピー(prelock 自身を @Sendable な closure へ持ち込まない)
         let lockMarkers = prelock.markers
@@ -128,7 +131,7 @@ enum FleetRunner {
             mergeAndWriteJUnit(junit: junit, project: project.name, tempDir: junitTempDir,
                                 entries: fleet.runs.enumerated().map { (host: $0.element.host, index: $0.offset) })
         }
-        return FleetProfile.aggregateExitCode(outcomes.map(\.exitCode))
+        return fleetExitCode(outcomes)
     }
 
     // MARK: - split(RR-8)
@@ -235,12 +238,15 @@ enum FleetRunner {
         // ロックを取るのは**実際にディスパッチするエントリだけ**(0本割当のエントリの機械を
         // 握ると、走らせもしない run が他人のディスパッチを止める)
         let prelock = DispatchPrelock(actions: DispatchPrelock.live(
-            project: project, remoteDir: remoteDir, forceLock: forceLock, waitLock: waitLock,
+            project: project, remoteDir: remoteDir, forceLock: forceLock,
+            // 機械ごとに `--wait-lock` を払い直さない(期限は1つ = WaitLockDeadline。ほかのマシンをまたぐ経路と同じ)
+            waitLockProvider: { [deadline = WaitLockDeadline(limitSeconds: waitLock)] in deadline.remaining() },
             runGroup: nil, mode: .cliRun, log: { FleetRunner.log($0) }))
         defer { prelock.releaseAll() }
         // false = 中断済みで握った分は外し終えている。子を1つも起こさずに抜ける(DeviceMachineRunner と同じ)
         guard prelock.acquireInOrder(machines: DispatchPrelock.machinesToLock(active.map { $0.1.host })) else {
-            throw ValidationError("interrupted while acquiring dispatch locks — starting no fleet entry")
+            log("interrupted while acquiring dispatch locks — starting no fleet entry")
+            throw DeviceMachineRunner.interruptedBeforeAnySubRun
         }
         let lockMarkers = prelock.markers
 
@@ -281,7 +287,7 @@ enum FleetRunner {
             mergeAndWriteJUnit(junit: junit, project: project.name, tempDir: junitTempDir,
                                 entries: active.map { (host: $0.1.host, index: $0.0) })
         }
-        return FleetProfile.aggregateExitCode(outcomes.map(\.exitCode))
+        return fleetExitCode(outcomes)
     }
 
     /// エントリが走らせられる platform 集合を、実際の run と同じ規則(ProfileResolver.resolve)で
@@ -428,7 +434,7 @@ enum FleetRunner {
         let skipped = fleet.runs.count - outcomes.count
         lines.append("\(outcomes.count) entr\(outcomes.count == 1 ? "y" : "ies") dispatched: "
             + "\(outcomes.count - failed) passed, \(failed) failed, \(skipped) skipped "
-            + "(aggregate exit \(FleetProfile.aggregateExitCode(outcomes.map(\.exitCode))))")
+            + "(aggregate exit \(fleetExitCode(outcomes)))")
         log(lines.joined(separator: "\n"))
     }
 
@@ -657,7 +663,14 @@ enum FleetRunner {
         let failed = outcomes.filter { $0.exitCode != 0 }.count
         lines.append("\(outcomes.count) entr\(outcomes.count == 1 ? "y" : "ies"): "
             + "\(outcomes.count - failed) passed, \(failed) failed "
-            + "(aggregate exit \(FleetProfile.aggregateExitCode(outcomes.map(\.exitCode))))")
+            + "(aggregate exit \(fleetExitCode(outcomes)))")
         log(lines.joined(separator: "\n"))
+    }
+
+    /// `--fleet` の終了コード。**中断を受けたら 130 を混ぜる**(マシンをまたぐほかの3経路の `DeviceMachineRunner.parentExitCode` と
+    /// 同じ規則)—— 子の終了コードだけを集めると、中断で止められたシナリオの 1 などが残り、利用者向けの docs の「中断は 130」と食い違う
+    static func fleetExitCode(_ outcomes: [FleetEntryOutcome]) -> Int32 {
+        DeviceMachineRunner.parentExitCode(childCodes: outcomes.map(\.exitCode), neverHandedFailure: false,
+                                           interruptedWithWorkLeft: InterruptRelay.hasReceivedInterrupt)
     }
 }

@@ -106,6 +106,18 @@ test("dispatchWaiting は全体レーンに出る(保持者が読めたときだ
   assert.ok(lines[1].text.includes("issuer=taro pid=1234"));
 });
 
+test("localDevicesWaiting は全体レーンに出る(順番待ちとは別の文言)", () => {
+  const state = createRunLaneState();
+  const actions = feed(state, [
+    { kind: "localDevicesWaiting", elapsedSeconds: 0, limitSeconds: 900 },
+  ]);
+  const lines = actions.filter((a) => a.type === "line");
+  assert.equal(lines.length, 1);
+  assert.equal(lines[0].laneId, OVERALL_LANE_ID);
+  assert.ok(lines[0].text.includes("ローカルのデバイス"), lines[0].text);
+  assert.ok(!lines[0].text.includes("順番待ち"), lines[0].text);
+});
+
 test("手元のロックの順番待ち(machine: local)も全体レーンに既存の呼び方で出る", () => {
   const state = createRunLaneState();
   const actions = feed(state, [

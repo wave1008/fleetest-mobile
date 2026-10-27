@@ -63,20 +63,31 @@ final class DispatchLockHandoffWiringTests: XCTestCase {
         }
     }
 
-    /// 3つの fan-out すべてが、**子を起こす前に**取り切り、**必ず解放する**
+    /// 3つの fan-out すべてが、**子を起こす前に**取り切り、**必ず解放する**。
+    /// 機械分担の3経路は前段(MachineFanoutFrontHalf)が取り切り(失敗・中断では前段が解放する)、
+    /// 呼び手は戻った後 `defer { held.close() }` で解放する。`--fleet` は自前
     func testEveryFanoutPrelocksBeforeLaunchingChildrenAndReleasesOnEveryExit() throws {
+        let front = try source("Sources/fleetest/MachineFanoutFrontHalf.swift")
+        XCTAssertTrue(front.contains("prelock?.releaseAll()"), "前段が失敗・中断でロックを残す")
+        XCTAssertTrue(front.contains("lock.acquireInOrder("), "前段が取り切っていない")
         for path in ["Sources/fleetest/ApiRunMachineFanout.swift",
                      "Sources/fleetest/DeviceMachineRunner.swift",
-                     "Sources/fleetest/FleetRunner.swift"] {
+                     "Sources/fleetest/MultiTargetRunner.swift"] {
             let text = try source(path)
-            XCTAssertTrue(text.contains("defer { prelock.releaseAll() }"),
+            XCTAssertTrue(text.contains("defer { held.close() }"),
                           "\(path): 解放が defer に無い(失敗・中断でロックが残る)")
-            let acquire = try XCTUnwrap(text.range(of: "prelock.acquireInOrder("),
-                                        "\(path): 親が取り切っていない")
-            let addTask = try XCTUnwrap(text.range(of: "addTask {"), "\(path): 子の起動が見つからない")
-            XCTAssertLessThan(acquire.lowerBound, addTask.lowerBound,
+            let acquire = try XCTUnwrap(text.range(of: "MachineFanoutFrontHalf.run("),
+                                        "\(path): 前段(親が取り切る)を通っていない")
+            let launch = try XCTUnwrap(text.range(of: "addTask {") ?? text.range(of: "coordinator.start()"),
+                                       "\(path): 子の起動が見つからない")
+            XCTAssertLessThan(acquire.lowerBound, launch.lowerBound,
                               "\(path): 子を起こしてからロックを取っている(順序が意味を失う)")
         }
+        let fleet = try source("Sources/fleetest/FleetRunner.swift")
+        XCTAssertTrue(fleet.contains("defer { prelock.releaseAll() }"), "FleetRunner: 解放が defer に無い")
+        let acquire = try XCTUnwrap(fleet.range(of: "prelock.acquireInOrder("))
+        let addTask = try XCTUnwrap(fleet.range(of: "addTask {"))
+        XCTAssertLessThan(acquire.lowerBound, addTask.lowerBound)
     }
 
     /// `--fleet` は素の経路と `--split` の2つが子を起こすので、どちらも取り切ること
