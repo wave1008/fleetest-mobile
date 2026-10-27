@@ -1470,8 +1470,8 @@ struct RemoteRunDispatcher {
     /// ssh の stdout を Pipe で受け行単位に組み立て直し、各行を RemotePathRewrite にかけて
     /// ConsoleOut.out(stdout) する。stderr は継承のまま。パイプ 64KB 飽和で子がブロックする罠を避けるため
     /// 読み取りは別スレッドで行う。期限超過時は SIGTERM→2秒猶予→SIGKILL(Shell.runRaw の
-    /// timeout 経路と同じ規律)。stdin は /dev/null に固定する(`-tt` は TTY として stdin を
-    /// 要求するが、ディスパッチは対話しない)。**timeoutSeconds nil = 無期限**
+    /// timeout 経路と同じ規律)。stdin は /dev/null(`-tt` は TTY として stdin を要求するが、ディスパッチは
+    /// 対話しない)。**`--work-queue` だけは親の返事を渡す**(下の standardInput)。**timeoutSeconds nil = 無期限**
     /// (`.distantFuture` を渡す。欠陥2: RemoteTimeout.seconds がシナリオ数不明を表す nil)。
     /// **`interruptFlag` に既定値を置かない** —— 呼び出し元(runRemoteAndRelay)は
     /// ssh 起動の直前で一度確かめてから呼ぶが、コマンド組み立てや `process.run()` 自体の間にも

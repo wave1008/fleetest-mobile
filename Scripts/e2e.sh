@@ -51,8 +51,8 @@
 #                                   # --ios-xcuitest / --performance では付けても回さない(対照はモードを表で
 #                                   # 決めている・時間の比較を乱す)
 #   Scripts/e2e.sh --build-only    # SUT の鮮度を確かめて要ればビルドするだけ(run しない。Scripts/regress.py が最初に全機で撃つ)
-#   Scripts/e2e.sh --as-part       # 全体の一部として回す(Scripts/regress.py が撃つ)。検証済みの印・verification_watch の推奨・
-#                                   # 陽性対照はここでは扱わない(一部だけで「全部成功」と書かないため。まとめ役が最後に1回)
+#   Scripts/e2e.sh --as-part       # 全体の一部として回す(今は呼び手がいない。regress.py は fleetest run --target を撃つ)。
+#                                   # 検証済みの印・verification_watch の推奨・陽性対照はここでは扱わない(一部だけで「全部成功」と書かないため)
 #   Scripts/e2e.sh --record        # 各プロファイルの一時コピー(<名前>-record-tmp.json。実行後に削除)に
 #                                   # record:true を付けて実行し、録画パイプラインの整合を
 #                                   # Scripts/check-recordings.py で検証する(元のプロファイルは書き換えない)

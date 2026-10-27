@@ -5,7 +5,7 @@
 In fleetest, the set of devices (virtual devices and physical devices) that run your tests is called a **fleet**.
 You can grow your fleet by adding devices on your Mac and other Macs (runner machines).
 
-<img src="../images/fleet/en/concept.png" width="720" alt="When you ask for tests on your Mac (machine name local), scenarios, profiles and the app are sent over SSH to the runner machines M1Max and M2Ultra, and reports, recordings and logs are collected back to your Mac. The machine field of each device in the run profile decides which device on which machine runs the tests, and scenarios are split across machines by how many devices each has and run at the same time">
+<img src="../images/fleet/en/concept.png" width="720" alt="When you ask for tests on your Mac (machine name local), scenarios, profiles and the app are sent over SSH to the runner machines M1Max and M2Ultra, and reports, recordings and logs are collected back to your Mac. The machine field of each device in the run profile decides which device on which machine runs the tests, and scenarios are shared out and the machines run at the same time, each free device taking the next scenario">
 
 ## The pieces
 
@@ -66,7 +66,7 @@ The devices listed in a run profile's `devices` are where the run goes. Each dev
 To run the same scenarios on every machine, create a **fleet definition**, which lists which machine runs which run profile
 within the fleet (`TestProjects/<project>/profiles/fleets/<name>.json`) and run `fleetest run --fleet <name>` (`--split`
 splits the scenarios across the machines instead of running all of them everywhere; see "Run it" in [Remote Runners](remote_runners.md)).
-Running a fleet definition is available from the CLI only (not from the extension or MCP), and it is experimental.
+Running a fleet definition is available from the CLI only (not from the extension or MCP), and it is experimental. To run several projects or profiles in one run instead, see `--target` and a repeated `--profile` in [Running scenarios](../reference/running/running_scenarios.md).
 
 ## What happens automatically
 
@@ -108,6 +108,7 @@ fleetest-mobile elsewhere, it is never touched.
 | Run a single `fleetest` command on a runner (`remote exec`) | ✅ |
 | Run on several runners at the same time (a fleet, `run --fleet`) | ✅ |
 | Split one set of scenarios across several runners (`run --fleet <name> --split`) | ✅ |
+| Run several projects/profiles in one run, each free machine taking the next one (`run --target <project>:<profile>` repeated, or `--profile` repeated; CLI only) | ✅ |
 | Include remote results in `fleetest results` (flaky detection etc.) | ✅ (collected by default) |
 | See remote devices' state and video in the Device Monitor | ✅ |
 

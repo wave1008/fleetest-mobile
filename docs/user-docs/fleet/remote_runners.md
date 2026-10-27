@@ -178,21 +178,21 @@ runner" in [Adding a Mac](adding_mac.md).
 ### Runners on another network (across a router)
 
 A runner does not have to be on the same LAN as your Mac. Any Mac you can reach with
-`ssh <target> 'echo ok'` works. Only whole run jobs travel over the network, so remote runs stay
+`ssh <destination> 'echo ok'` works. Only whole run jobs travel over the network, so remote runs stay
 fairly stable even with network latency.
 
 - **The only connection you open is SSH from your Mac to the runner.** Your Mac does not need to
   accept incoming connections. File transfers, progress, artifact collection and live video all
   travel inside that one SSH connection.
-- **Put port numbers and jump hosts in `~/.ssh/config`.** A target cannot be written as
-  `host:2222` (targets containing `:` or whitespace are rejected). Define an alias in
+- **Put port numbers and jump hosts in `~/.ssh/config`.** An SSH destination cannot be written as
+  `host:2222` (destinations containing `:` or whitespace are rejected). Define an alias in
   `~/.ssh/config` with `Host mac2` / `HostName` / `Port` / `ProxyJump`, and use that alias as the
-  target.
+  destination.
 - **Do not expose the SSH port directly to the internet.** Connecting over a VPN (Tailscale or
   similar) is the intended setup. If you must forward a port, forward only one, restrict the
   source IP addresses, and disable password authentication in the runner's sshd.
 - **Do not open Screen Sharing (port 5900) on the router.** Instead, open a tunnel with
-  `ssh -L 5900:localhost:5900 <target>` and connect to `vnc://localhost:5900`.
+  `ssh -L 5900:localhost:5900 <destination>` and connect to `vnc://localhost:5900`.
 - **A slow link keeps working with reduced features instead of breaking.** When live video
   cannot be established, tiles switch to still images. While the connection is briefly down,
   a tile shows `unknown`. This means "the state could not be checked", not "free". Collecting

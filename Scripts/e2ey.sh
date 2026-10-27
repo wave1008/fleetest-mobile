@@ -18,7 +18,7 @@
 #   Scripts/e2ey.sh --ios           # OS を絞る(--android も同様)
 #   Scripts/e2ey.sh --rebuild       # SUT を必ず再ビルドしてから実行
 #   Scripts/e2ey.sh --build-only    # SUT の鮮度を確かめて要ればビルドするだけ(run しない。Scripts/regress.py が最初に全機で撃つ)
-#   Scripts/e2ey.sh --as-part       # 全体の一部として回す(Scripts/regress.py が撃つ)。検証済みの印はここでは書かない
+#   Scripts/e2ey.sh --as-part       # 全体の一部として回す(今は呼び手がいない)。検証済みの印はここでは書かない
 #   Scripts/e2ey.sh --record        # 録画する(既定は録画しない = `--set record=false`。回帰は録画しないのが既定)
 #   Scripts/e2ey.sh --on M1Ultra    # **丸ごとその機械で回す**(ssh でランナーのクローンに入り、そこで SUT をビルドして
 #                                   # そこのデバイスで実行する。残りの引数はそのまま向こうへ渡す)。向こうで動くのは

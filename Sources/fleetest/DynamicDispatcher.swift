@@ -94,7 +94,7 @@ final class DynamicDispatcher: Sendable {
     }
 
     /// 中断(SIGINT/SIGTERM)。保留中も以後の要求も全部 none で答える。
-    /// 保留中の子は返事待ちで中断フラグを見られないので、親が止める
+    /// 子も中断で自分の待ちを解く(`ScenarioPullSource.stopWaiting`)が、中断が子へ届かない経路もあるので親からも止める
     func interrupt() {
         let answers: [(Held, WorkQueueProtocol.Reply)] = state.withLock { s in
             s.interrupted = true

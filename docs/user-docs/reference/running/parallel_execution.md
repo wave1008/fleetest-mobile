@@ -17,7 +17,7 @@ A scenario declared with no `platform:` runs on the run's default OS (`ios` if t
 has any iOS device, otherwise `android`). **A scenario that declares
 `platform:` explicitly, and whose declared OS isn't among the run's devices, is skipped rather
 than queued** — the other OS's devices in the same profile just sit idle for it. If every selected scenario is skipped this way, the run ends as a success (exit code `0`) without running any. To run a
-platform-agnostic scenario on both OSes, list both run profiles: `--profile ios-run --profile android-run` (one invocation runs both; each free machine takes the next profile).
+platform-agnostic scenario on both OSes, list both run profiles: `--profile ios-run --profile android-run` (one invocation runs both; each free machine takes the next profile). On a single Mac the two profiles run one after the other (a machine runs one profile at a time); they run at the same time only when they use different machines.
 
 ## Without a run profile (manual `--port`)
 
@@ -113,7 +113,7 @@ not started. This is deliberate, not a limit to work around.
 
 You rarely need a second run anyway: parallelism lives *inside* one run. Put more devices in the
 run profile and the scenarios are shared out across them (the sections above), rather than
-starting `run` twice.
+starting `run` twice. To run another profile or project as well, add it to the same run (`--profile` repeated, or `--target <project>:<profile>`) instead of starting a second run.
 
 If you do start a second one:
 
@@ -132,7 +132,7 @@ the runner is busy for everyone until it finishes — see
 
 - The VSCode extension runs the same parallel execution through the `fleetest.profile` setting
   (see the Device Monitor section of
-  [VSCode extension](../tools/vscode_extension.md)).
+  [VSCode extension](../tools/vscode_extension.md)). The extension runs one profile per run; to combine several, use the CLI (`--profile` repeated / `--target`).
 - LPT ordering (longest-past-runtime-first dispatch) balances the queue across workers using
   recent run history; `--no-lpt`/`--lpt-history-runs` control it (see
   [running_scenarios.md](./running_scenarios.md)).

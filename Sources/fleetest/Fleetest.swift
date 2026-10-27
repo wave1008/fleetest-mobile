@@ -332,7 +332,8 @@ struct RunScenarios: AsyncParsableCommand {
             help: ArgumentHelp("Run several targets in one invocation: <project>:<profile>, repeatable. Each free "
                 + "machine takes the next target and the last targets are shared scenario by scenario. "
                 + "Cannot be combined with --project/--profile; with two or more targets, --broadcast/--fleet/"
-                + "--runner/--dry-run/--scenario/--folder/--failed/--port/--platform/--serial/--device are not accepted"))
+                + "--runner/--dry-run/--scenario/--folder/--failed/--port/--platform/--serial/--app-id/--device/"
+                + "--all-machines are not accepted (a repeated --profile counts as several targets too)"))
     var targetSpecs: [String] = []
 
     /// ブロードキャスト実行。warmup のように「全デバイスがそれぞれ準備される」

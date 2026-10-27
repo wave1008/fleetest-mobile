@@ -83,7 +83,7 @@ test('失敗があれば印を書かない', () => {
   assert.equal(readMarker('inapp-e2ex-verified'), null)
 })
 
-test('全体の一部(--as-part = Scripts/regress.py の仕事)なら全部成功でも印を書かない(一部だけで「検証済み」にしない)', () => {
+test('全体の一部(--as-part)なら全部成功でも印を書かない(一部だけで「検証済み」にしない)', () => {
   const { readMarker } = runGate({ profile: 'ios-inapp-boost', failed: 0, digest: 'abc', asPart: true })
   assert.equal(readMarker('inapp-e2ex-verified'), null)
 })

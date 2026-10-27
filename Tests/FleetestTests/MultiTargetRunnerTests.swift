@@ -165,6 +165,18 @@ final class MultiTargetRunnerTests: XCTestCase {
         XCTAssertEqual(h.launched.filter { $0.hasSuffix("@0") }, ["A@0"])
     }
 
+    /// 担当1台の子が落ちても、まだ誰にも渡していない残りはほかのマシンが始める(落ちたマシンには配らない)
+    func testUnhandedRestOfACrashedJobGoesToAnotherMachine() {
+        let h = Harness(machines: 2, lanes: ["A": [0, 1], "B": [0, 1]],
+                        scenarios: ["A": 10, "B": 10], order: ["A", "B"])
+        h.coordinator.start()
+        XCTAssertEqual(Set(h.launched), ["A@0", "B@1"])
+        h.finish("A", 0, code: 137, drain: false)
+        h.finish("B", 1)
+        XCTAssertEqual(h.launched, ["A@0", "B@1", "A@1"], "落ちた1台の残りを誰も取っていない: \(h.launched)")
+        XCTAssertEqual(h.coordinator.unstartedJobs, [], "一度起こした仕事を「一度も起こしていない」と数えている")
+    }
+
     func testExitCodeOneIsAScenarioFailureNotACrash() {
         let h = Harness(machines: 1, lanes: ["A": [0], "B": [0]],
                         scenarios: ["A": 1, "B": 1], order: ["A", "B"])

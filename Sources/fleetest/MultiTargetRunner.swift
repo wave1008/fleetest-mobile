@@ -497,7 +497,10 @@ final class MultiTargetCoordinator: Sendable {
     // MARK: - 読み出し
 
     var isInterrupted: Bool { state.withLock { $0.interrupted } }
-    var unstartedJobs: [String] { state.withLock { $0.unstarted } }
+    /// 一度もどのマシンでも起こさなかった仕事(担当が抜けて未着手へ戻った仕事は含めない = その残りは仕事ごとの「配られなかった」が言う)
+    var unstartedJobs: [String] {
+        state.withLock { s in s.unstarted.filter { id in !s.launched.contains { $0.job == id } } }
+    }
     var deadMachines: Set<Int> { state.withLock { $0.dead } }
     var statuses: [Status] { state.withLock { $0.status } }
 
@@ -505,10 +508,20 @@ final class MultiTargetCoordinator: Sendable {
 
     private func childFinished(job: String, machine: Int, exitCode: Int32) {
         if let spec = jobs[job], let lane = spec.lanes[machine] { spec.childExited(lane.entry) }
+        let pendingLeft = !(jobs[job]?.pending().isEmpty ?? true)
         state.withLock { s in
             s.active -= 1
             s.running[job]?.remove(machine)
-            if s.running[job]?.isEmpty == true { s.running.removeValue(forKey: job) }
+            if s.running[job]?.isEmpty == true {
+                s.running.removeValue(forKey: job)
+                // **担当が0台になっても誰にも渡していない分が残っていれば、未着手へ戻す**(ほかのマシンが始める)。
+                // 戻さないと「走っている」でも「未着手」でもなくなり、落ちた1台の残りが誰にも配られず赤で残った。
+                // 渡し済みは回し直さない(配り手が持たない)・抜けたマシンは同じ仕事を起こし直さない(launched)
+                if pendingLeft, !s.unstarted.contains(job) {
+                    s.unstarted.append(job)
+                    s.anchor[job] = nil   // 始め直す側の見込みで覚え直す(古い時刻のままだと始めた直後から期限切れに見える)
+                }
+            }
             // 0(全緑)と 1(シナリオの失敗)以外は子が異常終了した印。そのマシンには以後配らない
             if exitCode != 0 && exitCode != 1 {
                 s.dead.insert(machine)
