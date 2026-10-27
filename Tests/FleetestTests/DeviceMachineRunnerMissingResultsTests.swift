@@ -7,8 +7,8 @@ import XCTest
 import FTCore
 @testable import fleetest
 
-private func makeMeta(runID: String, startedAt: String, runGroup: String?) -> RunMetaRecord {
-    RunMetaRecord(runID: runID, project: "SampleApp", profile: "p", host: "testmachine",
+private func makeMeta(runID: String, startedAt: String, runGroup: String?, profile: String = "p") -> RunMetaRecord {
+    RunMetaRecord(runID: runID, project: "SampleApp", profile: profile, host: "testmachine",
                  trigger: "cli", startedAt: startedAt, runGroup: runGroup)
 }
 
@@ -134,6 +134,39 @@ final class DeviceMachineRunnerMissingResultsTests: XCTestCase {
             project: project, runGroup: group,
             since: ISO8601DateFormatter().date(from: "2026-01-01T00:00:00Z")!)
         XCTAssertEqual(recorded, ["A.s1", "B.s1", "B.s2"])
+    }
+
+    /// ランナー機の時計が窓(5分)より遅れて startedAt が窓の外でも、渡した ID の結果があれば欠落と読まない
+    /// (欠落は親の終了コードを 1 / 130 にする)。窓だけの走査では見えないことも確かめる
+    func testResultOfARunnerWhoseClockIsSixMinutesBehindIsNotMissing() {
+        let group = "20260101-000700Z-skew0001"
+        let runID = "20260101-005410Z-mach-0001"
+        let runDir = RunResultsStore.runDir(resultsDir: resultsDir, runID: runID)
+        RunResultsStore.writeMeta(makeMeta(runID: runID, startedAt: "2026-01-01T00:54:10Z", runGroup: group), runDir: runDir)
+        RunResultsStore.writeScenario(makeScenarioRecord(scenarioID: "A.s1", runID: runID), runDir: runDir, fileName: "A.s1")
+        let since = ISO8601DateFormatter().date(from: "2026-01-01T01:00:00Z")!
+        XCTAssertEqual(DeviceMachineRunner.scanRecordedScenarios(project: project, runGroup: group, since: since).all, [],
+                       "前提: 窓だけの走査では見えない")
+        let recorded = DeviceMachineRunner.scanRecordedScenarios(
+            project: project, runGroup: group, since: since, expected: ["A.s1"])
+        XCTAssertEqual(recorded.all, ["A.s1"], "時計の遅れたランナー機の正常な結果を欠落と読んだ")
+    }
+
+    /// profile を渡すと、同じ runGroup の別プロファイルの記録を混ぜない(複数対象の run)
+    func testProfileFilterKeepsOtherProfilesOut() {
+        let group = "20260101-000000Z-prof0001"
+        let mine = "20260101-000100Z-mach-0001", other = "20260101-000100Z-mach-0002"
+        for (runID, profile) in [(mine, "android"), (other, "ios")] {
+            let runDir = RunResultsStore.runDir(resultsDir: resultsDir, runID: runID)
+            RunResultsStore.writeMeta(makeMeta(runID: runID, startedAt: "2026-01-01T00:01:00Z", runGroup: group,
+                                               profile: profile), runDir: runDir)
+            RunResultsStore.writeScenario(makeScenarioRecord(scenarioID: "A.\(profile)", runID: runID),
+                                          runDir: runDir, fileName: "A.\(profile)")
+        }
+        let recorded = DeviceMachineRunner.scanRecordedScenarios(
+            project: project, runGroup: group, since: ISO8601DateFormatter().date(from: "2026-01-01T00:00:00Z")!,
+            profile: "android", expected: ["A.android", "A.ios"])
+        XCTAssertEqual(recorded.all, ["A.android"])
     }
 
     /// 別の runGroup(=別の実行)の記録は混ぜない

@@ -584,7 +584,8 @@ enum DeviceMachineRunner {
         active: [(Int, Group, [String])], outcomes: [FleetEntryOutcome]
     ) -> Int {
         var missingTotal = 0
-        let recorded = scanRecordedScenarios(project: project, runGroup: runGroup, since: since)
+        let recorded = scanRecordedScenarios(project: project, runGroup: runGroup, since: since,
+                                             expected: active.flatMap { $0.2 })
         // **順序ではなく machineLabel で引く**: outcomes は今は active と同じ順序で作られているが、
         // その保証は run() の集計の実装詳細なので、崩れたときに「別の機械の exit code」を
         // 名指しする形にしない(引けなければ exit code 不明として 0 以外を意味する -1)
@@ -619,7 +620,7 @@ enum DeviceMachineRunner {
     /// run.json が `since` 未満に見えて丸ごと除外され、その機械の全シナリオが「欠落」と
     /// 誤判定されかねない。**判定の実体は runGroup の一致**(ほぼ確実に一意な発番)なので、
     /// `since` は走査量を絞るための粗い窓でよく、NTP 未同期でも通常収まる範囲としてマージンを取る
-    /// (これを超えるズレは `FTAndroid.AndroidHealthProbe.issueClockSkew` が別途検知する領域)
+    /// (これを超えるズレは、欠落が出たときの窓なしの照合し直し = scanRecordedScenarios の expected が拾う)
     private static let clockSkewMargin: TimeInterval = 5 * 60
 
     /// この run(runGroup)に属する run ディレクトリの `scenarios/*.json` から集計した記録。
@@ -634,20 +635,28 @@ enum DeviceMachineRunner {
     /// **ファイル名でなく JSON の中身で照合する**(日本語ファイル名は NFD 保存で glob・文字列一致が
     /// 静かに外れる実害あり)。呼び手を増やしても scanRuns の走査を2回払わないよう、
     /// all/interrupted は1回の走査でまとめて集計する
-    static func scanRecordedScenarios(project: TestProject, runGroup: String, since: Date) -> RecordedScenarios {
+    /// - profile: 渡せばその実行プロファイルの記録だけ(複数対象の run = 同じプロジェクトの別プロファイルが同じ ID を書く)
+    /// - expected: 渡した ID。**時刻の窓で欠落が出たら窓なしで照合し直す** —— 窓は走査量を絞るだけで、欠落は終了コードを
+    ///   左右する(1 / 130)ので、ランナー機の時計が clockSkewMargin より遅れて startedAt が窓の外に出ても正常な結果を欠落と読まない
+    static func scanRecordedScenarios(project: TestProject, runGroup: String, since: Date,
+                                      profile: String? = nil, expected: [String] = []) -> RecordedScenarios {
         let resultsDir = RunResultsStore.resultsDir(projectRoot: project.rootURL)
-        let metas = RunResultsStore.scanRuns(resultsDir: resultsDir,
-                                             since: since.addingTimeInterval(-clockSkewMargin))
-            .filter { $0.runGroup == runGroup }
-        var result = RecordedScenarios()
-        for meta in metas {
-            let runDir = RunResultsStore.runDir(resultsDir: resultsDir, runID: meta.runID)
-            for record in RunResultsStore.records(runDir: runDir) {
-                result.all.insert(record.scenarioID)
-                if record.interrupted == true { result.interrupted.insert(record.scenarioID) }
+        func scan(since window: Date?) -> RecordedScenarios {
+            let metas = RunResultsStore.scanRuns(resultsDir: resultsDir, since: window)
+                .filter { $0.runGroup == runGroup && (profile == nil || $0.profile == profile) }
+            var result = RecordedScenarios()
+            for meta in metas {
+                let runDir = RunResultsStore.runDir(resultsDir: resultsDir, runID: meta.runID)
+                for record in RunResultsStore.records(runDir: runDir) {
+                    result.all.insert(record.scenarioID)
+                    if record.interrupted == true { result.interrupted.insert(record.scenarioID) }
+                }
             }
+            return result
         }
-        return result
+        let windowed = scan(since: since.addingTimeInterval(-clockSkewMargin))
+        guard expected.contains(where: { !windowed.all.contains($0) }) else { return windowed }
+        return scan(since: nil)
     }
 
     /// `all` だけでよい呼び手向け(unrecordedScenarioIDs の入力)

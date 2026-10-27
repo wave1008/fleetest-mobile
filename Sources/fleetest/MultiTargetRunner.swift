@@ -380,16 +380,9 @@ enum MultiTargetRunner {
     ) -> Int {
         guard assigned.contains(where: { !$0.2.isEmpty }) else { return 0 }
         var missingTotal = 0
-        let resultsDir = RunResultsStore.resultsDir(projectRoot: job.project.rootURL)
-        let metas = RunResultsStore.scanRuns(resultsDir: resultsDir, since: since.addingTimeInterval(-5 * 60))
-            .filter { $0.runGroup == runGroup && $0.profile == job.profile }
-        var recorded = DeviceMachineRunner.RecordedScenarios()
-        for meta in metas {
-            for record in RunResultsStore.records(runDir: RunResultsStore.runDir(resultsDir: resultsDir, runID: meta.runID)) {
-                recorded.all.insert(record.scenarioID)
-                if record.interrupted == true { recorded.interrupted.insert(record.scenarioID) }
-            }
-        }
+        let recorded = DeviceMachineRunner.scanRecordedScenarios(
+            project: job.project, runGroup: runGroup, since: since, profile: job.profile,
+            expected: assigned.flatMap { $0.2 })
         for (_, group, ids) in assigned {
             let machine = machineLabels.firstIndex(of: group.machineLabel)
             let exitCode = outcomes.last(where: { $0.job == job.id && $0.machine == machine })?.exitCode ?? -1
