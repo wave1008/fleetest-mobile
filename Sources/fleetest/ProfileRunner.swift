@@ -251,7 +251,8 @@ enum ProfileRunner {
             guard let pid = heldBy[device] else { return nil }
             let why = reason(for: device.platform,
                              scenarios: device.platform == "ios" ? iosScenarios : androidScenarios)
-            return "\(device.name) is being driven by an MCP session (pid \(pid)) — this run takes it over"
+            return "\(device.name) is being driven by an MCP session"
+                + " (pid \(pid)\(ProcessLiveness.orphanedLauncherClause(sessionPID: pid))) — this run takes it over"
                 + " (\(why)); the session will see the run's screens"
         }
         return (resolved, warnings)

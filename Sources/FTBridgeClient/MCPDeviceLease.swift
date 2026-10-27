@@ -174,7 +174,9 @@ public enum MCPDeviceLease {
         guard warnsAboutSessions else { return nil }
         let others = liveEntries(stateDir: stateDir, excluding: [pid]).filter { $0.key == key }
         if let otherSession = others.filter({ $0.role == .mcp }).map(\.pid).min() {
-            return "⚠️ another MCP session (pid \(otherSession)) is driving this device too — the two"
+            return "⚠️ another MCP session (pid \(otherSession)"
+                + ProcessLiveness.orphanedLauncherClause(sessionPID: otherSession)
+                + ") is driving this device too — the two"
                 + " sessions move each other's screens, so refs and snapshots go stale under you."
                 + " Drive another device, or finish one of the sessions."
         }

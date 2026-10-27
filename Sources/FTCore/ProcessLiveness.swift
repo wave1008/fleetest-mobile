@@ -102,4 +102,30 @@ public enum ProcessLiveness {
                         pStat: Int32(info.kp_proc.p_stat), flags: info.kp_proc.p_flag,
                         started: info.kp_proc.p_un.__p_starttime)
     }
+
+    /// 親の pid(sysctl KERN_PROC_PID の `e_ppid`)。居ない・読めないなら nil
+    public static func parentPID(_ pid: pid_t) -> pid_t? {
+        guard pid > 0 else { return nil }
+        var info = kinfo_proc()
+        var size = MemoryLayout<kinfo_proc>.stride
+        var mib: [Int32] = [CTL_KERN, KERN_PROC, KERN_PROC_PID, pid]
+        guard sysctl(&mib, 4, &info, &size, nil, 0) == 0, size > 0 else { return nil }
+        return info.kp_eproc.e_ppid
+    }
+
+    /// 対話セッション(MCP)の pid について、**それを起動したプロセスが自分の親を失っている**(launchd = pid 1 に
+    /// 付け替えられた)ときに文言へ添える事実(そうでなければ空文字)。実測: VSCode を再読み込みすると、古い窓の
+    /// claude が親を失ったまま生き残り、その子の MCP が端末の使用中の印を持ち続けて、新しいブリッジへの入れ替えを断られた。
+    /// 「使われていない」とは言わない(親の無い起動のしかたもある)—— 事実だけ言い、止めるかは人が決める
+    public static func orphanedLauncherClause(sessionPID: pid_t) -> String {
+        let launcher = parentPID(sessionPID)
+        return orphanedLauncherClause(launcher: launcher, launcherParent: launcher.flatMap(parentPID))
+    }
+
+    /// 上の判定の本体(純粋関数)。起動したプロセスが launchd 以外で、その親が launchd(pid 1)のときだけ
+    static func orphanedLauncherClause(launcher: pid_t?, launcherParent: pid_t?) -> String {
+        guard let launcher, launcher > 1, launcherParent == 1 else { return "" }
+        return "; the process that started it (pid \(launcher)) has lost its own parent (re-parented to launchd),"
+            + " so the window or terminal that launched it has exited"
+    }
 }

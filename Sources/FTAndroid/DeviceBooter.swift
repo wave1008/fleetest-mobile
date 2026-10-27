@@ -219,7 +219,8 @@ public enum DeviceBooter {
         deviceName: String, keys: [String], force: Bool, mcpHolderPID: (String) -> Int32?
     ) -> String? {
         guard !force, let pid = keys.lazy.compactMap(mcpHolderPID).first else { return nil }
-        return "refusing to stop: \(deviceName) is being driven by an MCP session (pid \(pid))."
+        return "refusing to stop: \(deviceName) is being driven by an MCP session"
+            + " (pid \(pid)\(ProcessLiveness.orphanedLauncherClause(sessionPID: pid)))."
             + " Finish that session or point it at another device" + forceClause
     }
 
