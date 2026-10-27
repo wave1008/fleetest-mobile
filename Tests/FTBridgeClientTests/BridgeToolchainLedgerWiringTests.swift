@@ -69,7 +69,7 @@ final class BridgeToolchainLedgerWiringTests: XCTestCase {
     /// 引き取る側は /status が答えた瞬間に見に来るので、必ずその窓に入りうる
     func testRecordHappensBeforeTheBridgeBecomesReachable() throws {
         let code = try Self.source
-        guard let recordRange = code.range(of: "BridgeToolchainLedger.record(stateDir: stateDir, port: port)")
+        guard let recordRange = code.range(of: "BridgeToolchainLedger.record(stateDir: stateDir, port: port,")
         else {
             return XCTFail("`.launch` が record していない(reuse/adopt の比較相手が永久に無い)")
         }
@@ -79,6 +79,24 @@ final class BridgeToolchainLedgerWiringTests: XCTestCase {
                       "record が `.launch` の待ちより後にある(引き取り側が空の控えを見る)")
         XCTAssertEqual(code.components(separatedBy: "BridgeToolchainLedger.record(").count - 1, 1,
                        "record は1箇所だけ(両モードの合流点)")
+    }
+
+    /// **ソースの digest も控え、`.reuse` と `.adopt` の両方で比べる**(版を上げずにソースだけ変えた試しの変更を、
+    /// 生きた旧ランナーのまま走らせない。2026-10-28 の A/B が旧ランナーで走った)
+    func testSourcesDigestIsRecordedAndCheckedOnReuseAndAdopt() throws {
+        let code = try Self.source
+        guard let record = code.range(of: "BridgeToolchainLedger.record(stateDir: stateDir, port: port,") else {
+            return XCTFail("`.launch` が record していない")
+        }
+        XCTAssertTrue(code[record.upperBound...].prefix(200).contains("sources: BridgeToolchainLedger.sourcesDigest("),
+                      "起動時にソースの digest を控えていない(比べる相手が無い)")
+        XCTAssertEqual(code.components(separatedBy: "BridgeToolchainLedger.sourcesMatch(").count - 1 >= 2, true,
+                       ".reuse と .adopt の両方がソースの digest を比べること")
+        guard let decide = code.range(of: "switch BridgeToolchainLedger.decide(") else {
+            return XCTFail("`.reuse` の仕分けが見つからない")
+        }
+        XCTAssertTrue(code[decide.upperBound...].prefix(200).contains("toolchainMatches: toolchainOK && sourcesOK"),
+                      "`.reuse` の仕分けにソースの一致が入っていない")
     }
 
 }

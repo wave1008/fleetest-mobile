@@ -169,10 +169,15 @@ public final class ProvisionLock: Sendable {
 /// DriverOptions.makeDriver(Sources/fleetest/Fleetest.swift)が古い宛先へ接続しに行く原因になる。
 extension BridgeProvisioner {
     /// 控えが無い(この変更を入れた直後・別経路が起こしたブリッジ)と、版が違うのは別の事実
-    static func toolchainMismatchReason(stateDir: URL, port: UInt16) -> String {
-        FileManager.default.fileExists(atPath: BridgeToolchainLedger.url(stateDir: stateDir, port: port).path)
-            ? "was built with a different Xcode toolchain"
-            : "has no record of which Xcode toolchain built it"
+    /// `toolchainMatches` = ツールチェーンは一致した(= 食い違ったのはソースの digest)
+    static func toolchainMismatchReason(stateDir: URL, port: UInt16, toolchainMatches: Bool) -> String {
+        guard FileManager.default.fileExists(atPath: BridgeToolchainLedger.url(stateDir: stateDir, port: port).path) else {
+            return "has no record of which Xcode toolchain built it"
+        }
+        guard toolchainMatches else { return "was built with a different Xcode toolchain" }
+        return BridgeToolchainLedger.recordedSources(stateDir: stateDir, port: port) == nil
+            ? "has no record of which bridge sources it was built from"
+            : "was built from different bridge sources than the ones in this checkout"
     }
 }
 
@@ -1503,21 +1508,25 @@ public struct BridgeProvisioner: Sendable {
             // **ツールチェーンが変わっていれば再利用しない**(BridgeToolchainLedger。起動時点の
             // 指紋と比べる。成果物の指紋と比べてはいけない理由は同ファイルの doc)
             // 仕分けは BridgeToolchainLedger.decide の1箇所(リースのあるデバイスに触らない理由も同 doc)
+            // **ソースの digest も同じ門で見る**(版を上げずにソースだけ変えた試しの変更を、生きた旧ランナーで走らせない)
+            let toolchainOK = BridgeToolchainLedger.matchesCurrent(stateDir: fleetestStateDir, port: port)
+            let sourcesOK = BridgeToolchainLedger.sourcesMatch(
+                stateDir: fleetestStateDir, port: port,
+                current: BridgeToolchainLedger.sourcesDigest(bridge: bridge, repoRoot: repoRoot))
             switch BridgeToolchainLedger.decide(
-                toolchainMatches: BridgeToolchainLedger.matchesCurrent(
-                    stateDir: fleetestStateDir, port: port),
+                toolchainMatches: toolchainOK && sourcesOK,
                 hasForeignLease: RunnerAccessibilityHealth.hasForeignLease(
                     udid: sim.udid, stateDir: fleetestStateDir)) {
             case .reuse:
                 break
             case .warnAndReuse:
                 log("⚠️ \(name): the running \(bridge) bridge"
-                    + " \(Self.toolchainMismatchReason(stateDir: fleetestStateDir, port: port)),"
+                    + " \(Self.toolchainMismatchReason(stateDir: fleetestStateDir, port: port, toolchainMatches: toolchainOK)),"
                     + " but another process holds this device — reusing it as is"
                     + " (restarting it would break that run)")
             case .restart:
                 log("→ \(name): the running \(bridge) bridge"
-                    + " \(Self.toolchainMismatchReason(stateDir: fleetestStateDir, port: port))"
+                    + " \(Self.toolchainMismatchReason(stateDir: fleetestStateDir, port: port, toolchainMatches: toolchainOK))"
                     + " — restarting it")
                 return try await executeBridge(
                     bridge: bridge,
@@ -1646,6 +1655,13 @@ public struct BridgeProvisioner: Sendable {
                     + " being built with this tool's Xcode toolchain — stopping and restarting it")
                 return try await stopAndRelaunch()
             }
+            if !BridgeToolchainLedger.sourcesMatch(
+                stateDir: fleetestStateDir, port: port,
+                current: BridgeToolchainLedger.sourcesDigest(bridge: bridge, repoRoot: repoRoot)) {
+                log("⚠️ \(name): the bridge that was starting on port \(port) has no confirmed record of"
+                    + " being built from the current bridge sources — stopping and restarting it")
+                return try await stopAndRelaunch()
+            }
             log("✅ \(name): took over the \(bridge) bridge that was starting (port \(port))")
             return port
         case .launch(let port, let needsInstall, let stopStalePort, let reclaimInApp):
@@ -1716,7 +1732,8 @@ public struct BridgeProvisioner: Sendable {
             // `.adopt` でこのブリッジを引き取るとき「控え無し」を見て**正常なブリッジを止めてしまう**
             // —— 引き取る側は /status が答えた瞬間に見に来るので、起動側が ready の後に書く形だと
             // 必ずその窓に入りうる。古いポートの停止はここまでに済んでいる
-            BridgeToolchainLedger.record(stateDir: stateDir, port: port)
+            BridgeToolchainLedger.record(stateDir: stateDir, port: port,
+                                         sources: BridgeToolchainLedger.sourcesDigest(bridge: bridge, repoRoot: repoRoot))
             if reclaimInApp {
                 try? FileManager.default.removeItem(
                     at: InAppBridgeState.url(stateDir: stateDir, port: port))

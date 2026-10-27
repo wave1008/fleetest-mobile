@@ -50,6 +50,21 @@ final class BridgeToolchainLedgerTests: XCTestCase {
         XCTAssertFalse(BridgeToolchainLedger.matchesCurrent(stateDir: stateDir, port: 8123, current: nil))
     }
 
+    /// **ソースの digest は2行目に控え、ツールチェーンの一致とは別に比べる**(版を上げずにソースだけ変えた試しの変更を
+    /// 生きた旧ランナーで走らせない)。ツールチェーンの比較は2行目に引きずられない
+    func testSourcesDigestIsComparedSeparatelyFromTheToolchain() {
+        BridgeToolchainLedger.record(stateDir: stateDir, port: 8123, toolchain: "Xcode 27.0", sources: "abc")
+        XCTAssertTrue(BridgeToolchainLedger.matchesCurrent(stateDir: stateDir, port: 8123, current: "Xcode 27.0"))
+        XCTAssertTrue(BridgeToolchainLedger.sourcesMatch(stateDir: stateDir, port: 8123, current: "abc"))
+        XCTAssertFalse(BridgeToolchainLedger.sourcesMatch(stateDir: stateDir, port: 8123, current: "abd"),
+                       "ソースが変わったのに一致と読んだ")
+        XCTAssertFalse(BridgeToolchainLedger.sourcesMatch(stateDir: stateDir, port: 8123, current: nil),
+                       "今の digest が取れないのに一致と読んだ(作り直す側へ倒す)")
+        // 控えに digest が無い(この変更より前に起動したブリッジ)も作り直す側
+        BridgeToolchainLedger.record(stateDir: stateDir, port: 8124, toolchain: "Xcode 27.0")
+        XCTAssertFalse(BridgeToolchainLedger.sourcesMatch(stateDir: stateDir, port: 8124, current: "abc"))
+    }
+
     /// 現在値が取れないときは書かない(空ファイルを残して誤って一致させない)
     func testRecordWithNilDoesNothing() {
         BridgeToolchainLedger.record(stateDir: stateDir, port: 8123, toolchain: nil)
