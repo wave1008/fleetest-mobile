@@ -89,6 +89,16 @@ struct RunCommonOptions: ParsableArguments {
                 visibility: .hidden))
     var runGroup: String?
 
+    /// **手で打つものではない**。マシンをまたぐ run の親がシナリオを1本ずつ配る口(RR-8.1)。
+    /// 子は全候補のシナリオを知った上で、空いたデバイスごとに stdout へ要求を1行出し、stdin の返事
+    /// (`FTCore.WorkQueueProtocol`)で配られた分だけ回す。ssh 越しの子へは `RemoteRunArgs` が中継する
+    @Flag(name: .customLong("work-queue"),
+          help: ArgumentHelp(
+            "Internal: take scenarios one at a time from the parent of a multi-machine run "
+            + "(requests on stdout, replies on stdin). Set by the parent; not for hand use",
+            visibility: .hidden))
+    var workQueue = false
+
     /// **手で打つものではない**。RemoteRunDispatcher がミラー後の絶対パスを渡す
     /// (Sources/FTRemote/RemoteDispatch.swift の RemoteRunArgs.build)。プロファイルの
     /// `remoteControl.workspace` を上書きし、appPath のインストール先(ステージ先。原本の解決基準は
@@ -148,6 +158,15 @@ extension RunCommonOptions {
             allMachines: allMachines, runner: runner, deviceMachine: deviceMachine) {
             throw ValidationError(message)
         }
+    }
+
+    /// `--work-queue` は実行プロファイルの経路(ProfileRunner / api run のワーカー構築)でだけ効く。
+    /// `broadcast` / `hasFleet` は run だけが持つフラグ(api run は false を渡す)
+    func validateWorkQueue(broadcast: Bool, hasFleet: Bool) throws {
+        guard workQueue else { return }
+        if profile == nil { throw ValidationError("--work-queue requires --profile") }
+        if broadcast { throw ValidationError("--work-queue cannot be combined with --broadcast") }
+        if hasFleet { throw ValidationError("--work-queue cannot be combined with --fleet") }
     }
 
     /// `--set` のパース → 専用フラグとの衝突 → `--profile` 無し(かつ dry-run でも fleet 経由でもない)ときの

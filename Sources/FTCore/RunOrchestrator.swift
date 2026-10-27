@@ -547,9 +547,55 @@ private actor JoinedLaneKeys {
 actor ScenarioQueue {
     private var items: [ScenarioRunItem]
     private var attempts: [URL: Int] = [:]
-    init(_ items: [ScenarioRunItem]) { self.items = items }
-    func next() -> ScenarioRunItem? { items.isEmpty ? nil : items.removeFirst() }
-    func hasItems() -> Bool { !items.isEmpty }
+    /// pulled(`ScenarioDispatch.pulled`)だけ。外の配り手から取る。shared / broadcast は nil
+    private let pull: PullState?
+    /// 配り手が nil を返した = この platform にはもう来ない(以後は聞き直さない)
+    private var pullExhausted = false
+
+    struct PullState: Sendable {
+        let source: any ScenarioPullSource
+        let platform: String
+        /// シナリオ ID → 配れる item(同じ ID が複数あれば先頭から。計測の繰り返し展開)
+        let catalog: LockedValue<[String: [ScenarioRunItem]]>
+        /// 配った1本ごと(total を増やす)
+        let onHandOut: @Sendable (ScenarioRunItem) async -> Void
+        /// カタログに無い ID が来た(ワーカーログへ出して聞き直す)
+        let onUnknownID: @Sendable (String) -> Void
+    }
+
+    init(_ items: [ScenarioRunItem]) { self.items = items; self.pull = nil }
+    init(pulled: PullState) { self.items = []; self.pull = pulled }
+
+    /// 再キューされたもの(pulled では常に先)→ 配り手。`lane` = `RunWorker.logicalName`(配り手が
+    /// どのデバイスが空いたかを知るための名前)。shared / broadcast では lane は使わない
+    func next(lane: String? = nil) async -> ScenarioRunItem? {
+        if !items.isEmpty { return items.removeFirst() }
+        guard let pull else { return nil }
+        while !pullExhausted {
+            guard let id = await pull.source.next(platform: pull.platform, lane: lane ?? "") else {
+                pullExhausted = true
+                return nil
+            }
+            let item = pull.catalog.withLock { catalog -> ScenarioRunItem? in
+                guard var list = catalog[id], !list.isEmpty else { return nil }
+                let first = list.removeFirst()
+                catalog[id] = list
+                return first
+            }
+            if let item {
+                await pull.onHandOut(item)
+                return item
+            }
+            pull.onUnknownID(id)
+        }
+        return nil
+    }
+
+    /// 配り手へ聞かず手元の残りだけ(ドレイン用。shared では `next()` と同じ)
+    func nextLocal() -> ScenarioRunItem? { items.isEmpty ? nil : items.removeFirst() }
+
+    /// shared / broadcast: 手元に残りがあるか。pulled: 手元に残りがある、または配り手からまだ来うる
+    func hasItems() -> Bool { !items.isEmpty || (pull != nil && !pullExhausted) }
 
     /// 凍結による再実行。上限(MAX_FREEZE_RETRIES)まで item を末尾へ戻し、
     /// 何回目の再実行かを返す。上限超過なら nil(=もう再実行しない)。
@@ -1206,7 +1252,8 @@ public final class RunOrchestrator: Sendable {
         return await probe(serial)
     }
 
-    /// - dispatch: `.shared`(既定。platform 別の共有キュー)/ `.broadcast`(レーン別キュー。
+    /// - dispatch: `.shared`(既定。platform 別の共有キュー)/ `.pulled`(キューは空で始まり、空いたワーカーが
+    ///   外の配り手から1本ずつもらう。total は配られた本数)/ `.broadcast`(レーン別キュー。
     ///   `fleetest run --broadcast`)。**違うのはキューの切り方と、ワーカーがどのキューを
     ///   取るかだけ** —— スタッガ・CPU 門・復帰・lease・録画・ドレインは同じ経路を通る
     public func run(items: [ScenarioRunItem], defaultPlatform: String,
@@ -1216,6 +1263,9 @@ public final class RunOrchestrator: Sendable {
         let visionHelper = debug == nil ? VisionHelperHost.acquire(project: project) : nil
         defer { visionHelper?.release() }
         var failed = 0
+        /// pulled で配られた本数(= この run の total)。shared / broadcast では使わない
+        let handedOut = LockedValue<Int>(0)
+        var isPulled = false
         /// キューの key(shared = platform / broadcast = レーン key)。ワーカーがどれを取るかは queueKey
         let queues: [String: ScenarioQueue]
         let total: Int
@@ -1251,6 +1301,30 @@ public final class RunOrchestrator: Sendable {
             runnableScenarios = runnable.flatMap { platform, list in
                 list.map { RunProgressEstimate.ScenarioKey(scenarioID: $0.info.id, platform: platform) }
             }
+        case .pulled(let source):
+            isPulled = true
+            let grouped = Dictionary(grouping: items) { $0.info.platform ?? defaultPlatform }
+            let workerPlatforms = Set(workers.map(\.platform)).union(lateWorkers?.platforms ?? [])
+            // shared と違い、担当ワーカーのない platform のシナリオを失敗にしない —— 配られていない
+            // シナリオはこの子のものではない(他のマシンが回す)。配り手はその platform を聞かれない
+            queues = grouped.filter { workerPlatforms.contains($0.key) }.reduce(into: [:]) { result, entry in
+                var catalog: [String: [ScenarioRunItem]] = [:]
+                for item in entry.value { catalog[item.info.id, default: []].append(item) }
+                result[entry.key] = ScenarioQueue(pulled: ScenarioQueue.PullState(
+                    source: source, platform: entry.key, catalog: LockedValue(catalog),
+                    onHandOut: { [weak self] _ in
+                        handedOut.withLock { $0 += 1 }
+                        await self?.progressState?.growTotal()
+                    },
+                    onUnknownID: { [weak self] id in
+                        self?.continuation.yield(.workerLog(
+                            worker: "run", message: "work queue handed out an unknown scenario id: \(id)"))
+                    }))
+            }
+            total = 0
+            queueKey = { $0.platform }
+            drainInfo = { platform, _ in (platform, nil, "no usable workers") }
+            // 残り見積もりは出さない(自分の持ち分が分からない)
         case .broadcast(let lanes):
             let plan = BroadcastPlan.make(items: items, lanes: lanes)
             for item in plan.unassigned {
@@ -1459,7 +1533,7 @@ public final class RunOrchestrator: Sendable {
             } else if interrupted {
                 drain.reason = RunRecorder.interruptedBeforeStartReason
             }
-            while let item = await queue.next() {
+            while let item = await queue.nextLocal() {
                 continuation.yield(.flowSkipped(flowURL: item.url, reason: drain.reason))
                 recorder?.recordSkipped(scenarioID: item.info.id, title: item.info.title,
                                         platform: drain.platform, worker: drain.worker,
@@ -1471,7 +1545,7 @@ public final class RunOrchestrator: Sendable {
 
         await progressState?.finish()
 
-        let summary = RunSummary(total: total, failed: failed, skipped: await runSkipped.snapshot(),
+        let summary = RunSummary(total: isPulled ? handedOut.value : total, failed: failed, skipped: await runSkipped.snapshot(),
                                  degradedWorkers: await degraded.snapshot(),
                                  freezeRetries: await retries.snapshot(),
                                  fmUnavailableScenarios: await fmUnavailable.snapshot(),
@@ -1706,7 +1780,7 @@ public final class RunOrchestrator: Sendable {
         // 中断要求後は新しいシナリオを配らない(既にキューから抜けた1件は最後まで走らせる ——
         // ここで打ち切ると in-flight の子プロセスと記録の整合が崩れる。子を止めるのは
         // registerChildProcess 経由の SIGTERM で、呼び出し側の責務)
-        while await !interruptRequested.isRequested(), let item = await queue.next() {
+        while await !interruptRequested.isRequested(), let item = await queue.next(lane: worker.logicalName) {
             // 録画の区間・進捗の開始より前に置く(消すのに掛かった時間をシナリオに数えない)。
             // 何をしたかは**そのシナリオのログ**に残す(結果のイベントログに載る = 権限を拒否で閉じた等が残る)
             let residualAlertNotice = await clearResidualSystemAlert?(worker)

@@ -680,6 +680,7 @@ public enum RemoteRunArgs {
                              noLPT: Bool, lptHistoryRuns: Int?,
                              performanceMode: Bool,
                              broadcast: Bool = false,
+                             workQueue: Bool = false,
                              remoteJUnitPath: String?,
                              reportDir: String?, workspace: String? = nil,
                              runGroup: String? = nil) -> [String] {
@@ -724,6 +725,8 @@ public enum RemoteRunArgs {
         if performanceMode { args.append("--performance") }
         // 中継しないとリモートは共有キューで走る = 「全台で1回ずつ」が黙って「分配」に化ける
         if broadcast { args.append("--broadcast") }
+        // 中継しないとリモートは自分の持ち分を静的に決めて走る(親の配りを待たない)。stdin の中継は RemoteRunDispatcher
+        if workQueue { args.append("--work-queue") }
         if let remoteJUnitPath { args += ["--junit", remoteJUnitPath] }
         // 束ね鍵は**中継しないと向こうの run.json に載らない** = リモートで撮った録画だけが
         // 束から外れる(RunMetaRecord.runGroup の宣言)
@@ -738,6 +741,7 @@ public enum RemoteRunArgs {
                                 setOverrides: [String: RunProfileSetValue] = [:], noLPT: Bool, lptHistoryRuns: Int?,
                                 performanceMode: Bool,
                                 defaultTimeout: Double?, scenarioTimeout: Double?,
+                                workQueue: Bool = false,
                                 reportDir: String?, workspace: String? = nil,
                                 runGroup: String? = nil) -> [String] {
         // --runner local の理由は build() のコメント(リモートでの再ディスパッチを止める)
@@ -760,6 +764,8 @@ public enum RemoteRunArgs {
         if performanceMode { args.append("--performance") }
         if let defaultTimeout { args += ["--default-timeout", formatTimeout(defaultTimeout)] }
         if let scenarioTimeout { args += ["--scenario-timeout", formatTimeout(scenarioTimeout)] }
+        // 理由は build() の --work-queue と同じ
+        if workQueue { args.append("--work-queue") }
         // 中継の理由は build() の --run-group と同じ
         if let runGroup { args += ["--run-group", runGroup] }
         return args

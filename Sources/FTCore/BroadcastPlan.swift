@@ -13,6 +13,17 @@ public enum ScenarioDispatch: Sendable {
     /// 各レーンが同じセットを1回ずつ回す(`fleetest run --broadcast`)。lanes = 回るべき
     /// デバイス。**レーンとワーカーの突き合わせは `BroadcastPlan.laneKey(of:)`**(論理名)
     case broadcast(lanes: [BroadcastLane])
+    /// 空いたワーカーが外の配り手(マシンをまたぐ run の親。`--work-queue`)から1本ずつもらう。
+    /// キューは空で始まり、カタログ(全候補)にある ID だけ配られる。配り手が platform ごとに nil を
+    /// 返したらその platform は終わり。件数は配られた分だけ(total は配るたびに増える)
+    case pulled(source: any ScenarioPullSource)
+}
+
+/// `ScenarioDispatch.pulled` の配り手。nil = その platform にはもう無い。
+/// **呼び出しは並行に来る**(同じ platform の複数ワーカー)・待たせる = 返事を遅らせる
+public protocol ScenarioPullSource: Sendable {
+    /// lane = `RunWorker.logicalName`(空いたデバイスの名前。無ければ空文字)
+    func next(platform: String, lane: String) async -> String?
 }
 
 /// ブロードキャストの1レーン = 実行プロファイルの1デバイス

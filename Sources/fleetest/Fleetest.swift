@@ -375,6 +375,7 @@ struct RunScenarios: AsyncParsableCommand {
         try common.validateTargeting(ports: ports)
         try common.validatePerformance(performanceMode: performanceMode, hasFleet: fleet != nil, acceptsFleet: true)
         try common.validateRunnerAndMachines(runner: runner, hasFleet: fleet != nil)
+        try common.validateWorkQueue(broadcast: broadcast, hasFleet: fleet != nil)
         if fleet != nil {
             if runner != nil { throw ValidationError("--fleet cannot be combined with --runner") }
             if common.profile != nil {
@@ -815,6 +816,7 @@ struct RunScenarios: AsyncParsableCommand {
                     workspaceOverride: common.workspace,
                     recorder: recorder,
                     broadcast: broadcast,
+                    workQueue: common.workQueue,
                     supplyProgress: supplyProgress,
                     interruptState: interruptState,
                     early: early.supply)
@@ -1061,7 +1063,7 @@ struct RunScenarios: AsyncParsableCommand {
             deviceNames: scopedDevices, deviceMachine: scopedDeviceHost,
             setOverrides: dispatchOverrides,
             noLPT: common.noLPT, lptHistoryRuns: common.lptHistoryRuns,
-            performanceMode: performanceMode, broadcast: broadcast,
+            performanceMode: performanceMode, broadcast: broadcast, workQueue: common.workQueue,
             localJUnitPath: junit, remoteTimeoutSeconds: common.remoteTimeout, runGroup: common.runGroup)
         if exitCode != 0 {
             throw ExitCode(exitCode)

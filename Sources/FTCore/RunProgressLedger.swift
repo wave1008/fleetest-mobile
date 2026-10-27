@@ -68,7 +68,7 @@ public struct RunProgressRecord: Codable, Equatable, Sendable {
     public let profile: String?
     /// ISO8601 UTC
     public let startedAt: String
-    /// **run 開始時に確定した本数**。再キュー・失敗で動かさない
+    /// **run 開始時に確定した本数**。再キュー・失敗で動かさない。pulled では配られた本数(配られるたびに増える)
     public let total: Int
     public let done: Int
     public let failed: Int

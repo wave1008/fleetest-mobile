@@ -207,69 +207,21 @@ public enum FleetSplit {
         let capacities = entryCapacities ?? [Double](repeating: 1, count: entryPlatforms.count)
         precondition(capacities.count == entryPlatforms.count,
                      "entryCapacities must line up with entryPlatforms")
-        let entryMachines = machineContext?.entryMachines
-            ?? [String?](repeating: nil, count: entryPlatforms.count)
         let entryOffsets = machineContext?.entryFixedOffsetsMs
             ?? [Double](repeating: 0, count: entryPlatforms.count)
-        let entryFallback = machineContext?.entryFallbackFactors
-            ?? [Double](repeating: 1.0, count: entryPlatforms.count)
-        precondition(entryMachines.count == entryPlatforms.count,
-                     "machineContext.entryMachines must line up with entryPlatforms")
         precondition(entryOffsets.count == entryPlatforms.count,
                      "machineContext.entryFixedOffsetsMs must line up with entryPlatforms")
-        precondition(entryFallback.count == entryPlatforms.count,
-                     "machineContext.entryFallbackFactors must line up with entryPlatforms")
-
-        // 実績の索引は platform を潰さずに持つ(潰すと「その機械が直近で回した platform」の値が
-        // 別 platform の run へ混ざる。ファイル冒頭の項)
-        let mixedByScenario = medianByPlatform(durations)
-        let sameByMachine = machineContext.map { medianByPlatformAndMachine($0.machineDurations) } ?? [:]
-        // 係数は「機械間の比」なので platform を跨いで集めてよい。ただし比の分子・分母は
-        // **同じ platform** で取る(speedFactors の項)。scope は fleet 全体が回す platform の和集合
-        let runScope = runPlatforms(entryPlatforms: entryPlatforms)
-        let factors = machineContext.map {
-            speedFactors(machineDurations: $0.machineDurations, durations: durations, scope: runScope)
-        } ?? [:]
-
-        /// そのエントリでそのシナリオが実際に走る platform。宣言があればそれ、
-        /// 未宣言ならそのエントリが回せる platform のどれか(= entryPlatforms)
-        func scope(_ scenario: (id: String, platform: String?), forEntry index: Int) -> Set<String> {
-            if let platform = scenario.platform { return [platform] }
-            return entryPlatforms[index]
-        }
-
-        /// 全機混合の見積り。**scope 内に実績が無ければ全 platform へ退化する**
-        /// (その platform をまだ1度も回していないプロジェクトで実績を捨てないため)。
-        /// 退化してもよいのは混合側だけ —— 同一機側で同じことをすると、他機が持っている
-        /// 正しい platform の実績より、その機械の別 platform の実績が勝ってしまう
-        func mixedMs(_ id: String, _ scope: Set<String>) -> (ms: Double, known: Bool) {
-            guard let byPlatform = mixedByScenario[id], !byPlatform.isEmpty else {
-                return (unknownDurationMs, false)
-            }
-            if let inScope = maxWithin(byPlatform, scope: scope) { return (inScope, true) }
-            return (byPlatform.values.max() ?? unknownDurationMs, true)
-        }
-
-        // エントリ別見積り優先順: ①同一機・同一 platform の実績 ②実測速度係数(factors)
-        // ③事前係数(entryFallbackFactors)。machine 不明(nil)でも fallback は使う ——
-        // ハードウェアの事前係数はプローブ由来で、レコード由来の machine 名が無くても得られる
-        func estimate(_ scenario: (id: String, platform: String?), forEntry index: Int)
-            -> (ms: Double, source: EstimateSource) {
-            let scope = scope(scenario, forEntry: index)
-            if let machine = entryMachines[index],
-               let ownMs = maxWithin(sameByMachine[machine]?[scenario.id], scope: scope) {
-                return (ownMs, .ownHistory)
-            }
-            let coefficient = entryMachines[index].flatMap { factors[$0] } ?? entryFallback[index]
-            let mixed = mixedMs(scenario.id, scope)
-            return (mixed.ms * coefficient, mixed.known ? .scaled : .unknown)
-        }
+        let estimator = Estimator(durations: durations, entryPlatforms: entryPlatforms,
+                                  unknownDurationMs: unknownDurationMs, machineContext: machineContext)
+        let entryMachines = estimator.entryMachines
+        let entryFallback = estimator.entryFallback
+        let factors = estimator.factors
 
         // 見積り降順、同着は scenario ID 昇順(決定的)。machine 非依存の混合見積りで決める
         // (scope は fleet 全体の和集合 = エントリを跨いでも同じ値になる)
         let ordered = scenarios.sorted { lhs, rhs in
-            let l = mixedMs(lhs.id, lhs.platform.map { [$0] } ?? runScope).ms
-            let r = mixedMs(rhs.id, rhs.platform.map { [$0] } ?? runScope).ms
+            let l = estimator.mixedMs(id: lhs.id, platform: lhs.platform)
+            let r = estimator.mixedMs(id: rhs.id, platform: rhs.platform)
             if l != r { return l > r }
             return lhs.id < rhs.id
         }
@@ -287,7 +239,7 @@ public enum FleetSplit {
             // 固定費は台数で割らない(デバイスが走り出す前の壁時計はデバイス数と無関係)
             func finishIfAssigned(_ index: Int) -> Double {
                 entryOffsets[index]
-                    + (totals[index] + estimate(scenario, forEntry: index).ms) / max(capacities[index], 1)
+                    + (totals[index] + estimator.estimate(id: scenario.id, platform: scenario.platform, entry: index).ms) / max(capacities[index], 1)
             }
             guard let target = fitting.min(by: {
                 (finishIfAssigned($0), $0) < (finishIfAssigned($1), $1)
@@ -295,7 +247,7 @@ public enum FleetSplit {
                 throw FleetSplitError.noFittingEntry(
                     scenarioID: scenario.id, platform: scenario.platform ?? "ios/android")
             }
-            let assigned = estimate(scenario, forEntry: target)
+            let assigned = estimator.estimate(id: scenario.id, platform: scenario.platform, entry: target)
             scenarioIDs[target].append(scenario.id)
             totals[target] += assigned.ms
             sources[target].append(assigned.source)
@@ -320,7 +272,7 @@ public enum FleetSplit {
     }
 
     /// 1シナリオ1エントリぶんの見積りがどこから来たか(EstimateBasis の集計元)
-    private enum EstimateSource { case ownHistory, scaled, unknown }
+    enum EstimateSource { case ownHistory, scaled, unknown }
 
     /// 呼び出し側の共通ガード: **実績が1件も無いときは entryFixedOffsetsMs を全 0 にした
     /// context を返す**。
@@ -390,14 +342,14 @@ public enum FleetSplit {
     /// scope 内で最大の中央値。**scope に1件も無ければ nil**(呼び出し側が退化するかどうかを
     /// 決める。同一機の実績で勝手に退化すると platform を跨いだ見積りが復活する)。
     /// scope が空集合なら platform を絞らない
-    private static func maxWithin(_ byPlatform: [String: Double]?, scope: Set<String>) -> Double? {
+    fileprivate static func maxWithin(_ byPlatform: [String: Double]?, scope: Set<String>) -> Double? {
         guard let byPlatform, !byPlatform.isEmpty else { return nil }
         guard !scope.isEmpty else { return byPlatform.values.max() }
         return byPlatform.filter { scope.contains($0.key) }.values.max()
     }
 
     /// scenarioID → platform → 中央値(platform を潰さない索引)
-    private static func medianByPlatform(
+    fileprivate static func medianByPlatform(
         _ durations: [LPTScheduler.Duration]
     ) -> [String: [String: Double]] {
         var result: [String: [String: Double]] = [:]
@@ -410,7 +362,7 @@ public enum FleetSplit {
     }
 
     /// machine → scenarioID → platform → 中央値
-    private static func medianByPlatformAndMachine(
+    fileprivate static func medianByPlatformAndMachine(
         _ machineDurations: [LPTScheduler.MachineDuration]
     ) -> [String: [String: [String: Double]]] {
         var result: [String: [String: [String: Double]]] = [:]
@@ -426,5 +378,92 @@ public enum FleetSplit {
         let sorted = values.sorted()
         let middle = sorted.count / 2
         return sorted.count % 2 == 0 ? (sorted[middle - 1] + sorted[middle]) / 2 : sorted[middle]
+    }
+}
+
+extension FleetSplit {
+    /// plan の見積りだけを取り出したもの(動的な割り振り DynamicSplit と共有する。RR-8.1)。
+    /// 優先順はエントリ別: ①同一機・同一 platform の実績 ②実測速度係数 ③事前係数(entryFallbackFactors)
+    public struct Estimator: Sendable {
+        let unknownDurationMs: Double
+        let entryPlatforms: [Set<String>]
+        let entryMachines: [String?]
+        let entryFallback: [Double]
+        let runScope: Set<String>
+        let factors: [String: Double]
+        // 実績の索引は platform を潰さずに持つ(潰すと「その機械が直近で回した platform」の値が
+        // 別 platform の run へ混ざる。ファイル冒頭の項)
+        let mixedByScenario: [String: [String: Double]]
+        let sameByMachine: [String: [String: [String: Double]]]
+
+        public init(durations: [LPTScheduler.Duration], entryPlatforms: [Set<String>],
+                    unknownDurationMs: Double, machineContext: MachineContext?) {
+            self.unknownDurationMs = unknownDurationMs
+            self.entryPlatforms = entryPlatforms
+            entryMachines = machineContext?.entryMachines
+                ?? [String?](repeating: nil, count: entryPlatforms.count)
+            entryFallback = machineContext?.entryFallbackFactors
+                ?? [Double](repeating: 1.0, count: entryPlatforms.count)
+            precondition(entryMachines.count == entryPlatforms.count,
+                         "machineContext.entryMachines must line up with entryPlatforms")
+            precondition(entryFallback.count == entryPlatforms.count,
+                         "machineContext.entryFallbackFactors must line up with entryPlatforms")
+            mixedByScenario = FleetSplit.medianByPlatform(durations)
+            sameByMachine = machineContext.map {
+                FleetSplit.medianByPlatformAndMachine($0.machineDurations)
+            } ?? [:]
+            // 係数は「機械間の比」なので platform を跨いで集めてよい。ただし比の分子・分母は
+            // **同じ platform** で取る(speedFactors の項)。scope は fleet 全体が回す platform の和集合
+            let runScope = FleetSplit.runPlatforms(entryPlatforms: entryPlatforms)
+            self.runScope = runScope
+            factors = machineContext.map {
+                FleetSplit.speedFactors(machineDurations: $0.machineDurations, durations: durations,
+                                        scope: runScope)
+            } ?? [:]
+        }
+
+        /// そのエントリでそのシナリオが実際に走る platform。宣言があればそれ、
+        /// 未宣言ならそのエントリが回せる platform のどれか(= entryPlatforms)
+        private func scopeFor(platform: String?, entry: Int) -> Set<String> {
+            if let platform { return [platform] }
+            return entryPlatforms[entry]
+        }
+
+        /// 全機混合の見積り。**scope 内に実績が無ければ全 platform へ退化する**
+        /// (その platform をまだ1度も回していないプロジェクトで実績を捨てないため)。
+        /// 退化してもよいのは混合側だけ —— 同一機側で同じことをすると、他機が持っている
+        /// 正しい platform の実績より、その機械の別 platform の実績が勝ってしまう
+        private func mixed(id: String, scope: Set<String>) -> (ms: Double, known: Bool) {
+            guard let byPlatform = mixedByScenario[id], !byPlatform.isEmpty else {
+                return (unknownDurationMs, false)
+            }
+            if let inScope = FleetSplit.maxWithin(byPlatform, scope: scope) { return (inScope, true) }
+            return (byPlatform.values.max() ?? unknownDurationMs, true)
+        }
+
+        /// machine 非依存の混合見積り(plan の投入順に使っている値)。
+        /// scope は宣言した platform、未宣言なら fleet 全体の和集合
+        public func mixedMs(id: String, platform: String?) -> Double {
+            mixed(id: id, scope: platform.map { [$0] } ?? runScope).ms
+        }
+
+        /// そのエントリでそのシナリオを回したときの見込み[ms](今の plan と同じ優先順)
+        public func estimateMs(id: String, platform: String?, entry: Int) -> Double {
+            estimate(id: id, platform: platform, entry: entry).ms
+        }
+
+        /// 見積りと、その根拠(EstimateBasis の集計元)。
+        /// machine 不明(nil)でも fallback は使う —— ハードウェアの事前係数はプローブ由来で、
+        /// レコード由来の machine 名が無くても得られる
+        func estimate(id: String, platform: String?, entry: Int) -> (ms: Double, source: EstimateSource) {
+            let scope = scopeFor(platform: platform, entry: entry)
+            if let machine = entryMachines[entry],
+               let ownMs = FleetSplit.maxWithin(sameByMachine[machine]?[id], scope: scope) {
+                return (ownMs, .ownHistory)
+            }
+            let coefficient = entryMachines[entry].flatMap { factors[$0] } ?? entryFallback[entry]
+            let m = mixed(id: id, scope: scope)
+            return (m.ms * coefficient, m.known ? .scaled : .unknown)
+        }
     }
 }

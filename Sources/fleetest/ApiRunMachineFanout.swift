@@ -89,19 +89,42 @@ enum ApiRunMachineFanout {
             throw ValidationError("no scenarios to run after filtering")
         }
 
-        let (buckets, basis, notApplicable) = try DeviceMachineRunner.assign(
-            project: project, groups: groups, selected: selected,
-            lptHistoryRuns: options.lptHistoryRuns)
+        // 動的な割り振り(RR-8.1。DeviceMachineRunner.run と同じ分岐。FT_STATIC_SPLIT=1 で静的へ戻る)
+        let notApplicable: [ScenarioInfo]
+        let active: [(index: Int, group: DeviceMachineRunner.Group, ids: [String])]
+        var dynamicPlan: (scenarios: [DynamicSplit.Scenario],
+                          estimate: @Sendable (DynamicSplit.Scenario, Int) -> Double)?
+        if DeviceMachineRunner.dynamicSplitEnabled(broadcast: false) {
+            let split = DeviceMachineRunner.splitApplicable(selected: selected, groups: groups)
+            notApplicable = split.notApplicable
+            let resolved = DynamicDispatcher.resolve(
+                split.runnable.map { (id: $0.id, platform: $0.platform) },
+                defaultPlatform: DynamicDispatcher.undeclaredPlatform(groups: groups))
+            active = groups.indices.compactMap { index in
+                let ids = DynamicDispatcher.candidateIDs(for: groups[index], in: resolved)
+                return ids.isEmpty ? nil : (index, groups[index], ids)
+            }
+            if !active.isEmpty {
+                let inputs = DeviceMachineRunner.estimationInputs(
+                    project: project, groups: groups, lptHistoryRuns: options.lptHistoryRuns)
+                dynamicPlan = (resolved, DeviceMachineRunner.dynamicEstimator(inputs: inputs, groups: groups))
+            }
+        } else {
+            let (buckets, basis, notApplicableStatic) = try DeviceMachineRunner.assign(
+                project: project, groups: groups, selected: selected,
+                lptHistoryRuns: options.lptHistoryRuns)
+            notApplicable = notApplicableStatic
+            active = groups.indices.compactMap { index in
+                let ids = buckets[index].scenarioIDs
+                return ids.isEmpty ? nil : (index, groups[index], ids)
+            }
+            // CLI と同じ「見積りの根拠」を拡張の OUTPUT にも出す(片方だけ見える情報を作らない)
+            for (index, group, ids) in active {
+                logStderr("    \(group.machineLabel): \(ids.count) scenario(s)"
+                    + " on \(group.deviceNames.count) device(s) [\(basis[index].summary)]")
+            }
+        }
         for line in DeviceMachineRunner.notApplicableLines(notApplicable, groups: groups) { logStderr(line) }
-        let active = groups.indices.compactMap { index -> (index: Int, group: DeviceMachineRunner.Group, ids: [String])? in
-            let ids = buckets[index].scenarioIDs
-            return ids.isEmpty ? nil : (index, groups[index], ids)
-        }
-        // CLI と同じ「見積りの根拠」を拡張の OUTPUT にも出す(片方だけ見える情報を作らない)
-        for (index, group, ids) in active {
-            logStderr("    \(group.machineLabel): \(ids.count) scenario(s)"
-                + " on \(group.deviceNames.count) device(s) [\(basis[index].summary)]")
-        }
         // 全部が宣言 platform の対象外なら単機の run と同じく 0/0 で終える(正しく緑)。
         // それ以外で全滅(= 対象外でもないのに割り当て 0)は FleetSplit.partition が設定ミスとして
         // throw 済みなので、ここへは来ない
@@ -113,8 +136,13 @@ enum ApiRunMachineFanout {
                 runID: nil)))
             return 0
         }
-        for (_, group, ids) in active {
-            logStderr("    \(group.machineLabel): \(ids.count) scenario(s) on \(group.deviceNames.count) device(s)")
+        if let dynamicPlan {
+            logStderr("==> dynamic split: \(dynamicPlan.scenarios.count) scenario(s) across \(active.count) machine(s)"
+                + " — each free device takes the next scenario")
+        } else {
+            for (_, group, ids) in active {
+                logStderr("    \(group.machineLabel): \(ids.count) scenario(s) on \(group.deviceNames.count) device(s)")
+            }
         }
 
         // 配分が確定したら、build 直列化のために先取りしたロックは**local に配られたかどうかに
@@ -169,6 +197,15 @@ enum ApiRunMachineFanout {
         // 増やした孫プロセス**を対象にする(既存の保護の外側)
         let registry = ChildProcessRegistry()
 
+        // 動的な割り振り: 子ごとの stdin 書き込み口(キーは groups の添字 = 配り手のエントリ番号)と配り手。
+        // 中断は親が受けて全要求へ none を返す(返事待ちの子は中断フラグを見られない)
+        let writers: [Int: ChildStdinWriter] = dynamicPlan == nil ? [:]
+            : Dictionary(uniqueKeysWithValues: active.map { ($0.index, ChildStdinWriter()) })
+        let dispatcher: DynamicDispatcher? = dynamicPlan.map { plan in
+            DynamicDispatcher(scenarios: plan.scenarios, estimateMs: plan.estimate,
+                              send: { entry, reply in writers[entry]?.write(line: WorkQueueProtocol.encode(reply)) })
+        }
+
         // assignedScenarioIDs は active と同じ並び(下の taskGroup が position をそのまま
         // childIndex として runChild へ渡すのと同じ基準)。isCancelled はキャンセル後の
         // 合成 failed を抑止する(キャンセルで子は非0終了するため、抑止しないと中断した
@@ -176,22 +213,28 @@ enum ApiRunMachineFanout {
         async let multiplexed = consume(
             stream: stream, groupMachines: groupMachines, assignedScenarioIDs: active.map { $0.ids },
             isCancelled: { registry.isCancelled })
-        let cancelSources = installCancellation(registry: registry)
+        let cancelSources = installCancellation(registry: registry, onInterrupt: { dispatcher?.interrupt() })
         defer { for source in cancelSources { source.cancel() } }
 
         let outcomes = await withTaskGroup(of: (Int, FleetEntryOutcome).self) { taskGroup in
             for (position, entry) in active.enumerated() {
-                let (_, group, ids) = entry
+                let (groupIndex, group, ids) = entry
                 taskGroup.addTask {
                     let args = buildArgs(
                         project: project.name, profileName: profileName, group: group,
-                        scenarioIDs: ids, options: options, runGroup: runGroup)
+                        scenarioIDs: ids, options: options, runGroup: runGroup,
+                        workQueue: dispatcher != nil)
+                    var childDispatch: (dispatcher: DynamicDispatcher, entry: Int, writer: ChildStdinWriter)?
+                    if let dispatcher, let writer = writers[groupIndex] {
+                        childDispatch = (dispatcher, groupIndex, writer)
+                    }
                     let start = Date()
                     let exitCode = await runChild(
                         index: position, binary: binary, args: args, machineLabel: group.machineLabel,
                         ticket: ticket, lockMarker: lockMarkers[group.machineLabel],
                         healCollection: healCollection,
-                        continuation: continuation, registry: registry)
+                        continuation: continuation, registry: registry,
+                        dispatch: childDispatch)
                     return (position, FleetEntryOutcome(
                         host: group.machineLabel, profile: profileName, exitCode: exitCode,
                         duration: Date().timeIntervalSince(start)))
@@ -207,6 +250,19 @@ enum ApiRunMachineFanout {
         // 残りの安全網(各機械は子の終了時に解放済み。理由は DeviceMachineRunner.run と同じ)
         prelock.releaseAll(exitCodes: Dictionary(
             outcomes.map { ($0.host, $0.exitCode) }, uniquingKeysWith: { first, _ in first }))
+        // 全部の子が終わっても誰にも渡せなかった分は失敗として報告する(中断なら失敗にしない)
+        var neverHandedFailure = false
+        if let dispatcher {
+            let ids = dispatcher.unhandedIDs
+            if !ids.isEmpty {
+                let interrupted = dispatcher.isInterrupted || registry.isCancelled
+                logStderr(DeviceMachineRunner.neverHandedLine(ids: ids, interrupted: interrupted))
+                if !interrupted {
+                    neverHandedFailure = true
+                    continuation.yield(.neverHanded(ids))
+                }
+            }
+        }
         // 全子が最後の .exited を継続へ渡し終えたあとでのみ finish してよい(withTaskGroup は
         // 各子タスクの return を待つので、この時点で runChild は必ず .exited を yield 済み)
         continuation.finish()
@@ -226,7 +282,7 @@ enum ApiRunMachineFanout {
             logStderr(String(format: "%@ %-20@ exit=%d  %.1fs", mark, outcome.host as NSString,
                              outcome.exitCode, outcome.duration))
         }
-        return FleetProfile.aggregateExitCode(outcomes.map(\.exitCode))
+        return FleetProfile.aggregateExitCode(outcomes.map(\.exitCode) + (neverHandedFailure ? [1] : []))
     }
 
     // MARK: - 子プロセスの引数
@@ -234,7 +290,7 @@ enum ApiRunMachineFanout {
     /// internal: 束ね鍵の中継を RunGroupPlumbingTests が等号で固定する
     static func buildArgs(
         project: String, profileName: String, group: DeviceMachineRunner.Group,
-        scenarioIDs: [String], options: Options, runGroup: String
+        scenarioIDs: [String], options: Options, runGroup: String, workQueue: Bool = false
     ) -> [String] {
         let machineLabel = group.machineLabel
         var args = ["api", "run", "--project", project, "--profile", profileName]
@@ -258,6 +314,8 @@ enum ApiRunMachineFanout {
         args += ["--device"] + group.deviceNames
         args += ["--device-machine", machineLabel]
         args += ["--scenario"] + scenarioIDs
+        // 動的な割り振り(RR-8.1)の子だけ。--scenario は全候補で、回すのは親が1本ずつ渡した分
+        if workQueue { args += ["--work-queue"] }
         // 中継しないと黙って無視される(子はプロファイルの既定で走る。FleetRunner.buildArgs と同じ理由)
         for key in options.setOverrides.keys.sorted() {
             args += ["--set", "\(key)=\(options.setOverrides[key]!.token)"]
@@ -275,7 +333,10 @@ enum ApiRunMachineFanout {
 
     private enum ChildEvent {
         case line(index: Int, text: String)
-        case exited(index: Int, status: Int32)
+        /// assigned = 動的な割り振りで実際に渡したシナリオ(静的は nil = 起動時の担当)
+        case exited(index: Int, status: Int32, assigned: [String]?)
+        /// 全部の子が終わっても誰にも渡せなかったシナリオ(失敗として合成する)
+        case neverHanded([String])
     }
 
     /// 子1体ぶん。stdout(NDJSON)は行単位で continuation へ、stderr(診断)はホスト名を前置して
@@ -286,7 +347,8 @@ enum ApiRunMachineFanout {
     private static func runChild(
         index: Int, binary: String, args: [String], machineLabel: String, ticket: DispatchTicket,
         lockMarker: String?, healCollection: HealSourceWriteBack.Collection,
-        continuation: AsyncStream<ChildEvent>.Continuation, registry: ChildProcessRegistry
+        continuation: AsyncStream<ChildEvent>.Continuation, registry: ChildProcessRegistry,
+        dispatch: (dispatcher: DynamicDispatcher, entry: Int, writer: ChildStdinWriter)? = nil
     ) async -> Int32 {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: binary)
@@ -294,7 +356,8 @@ enum ApiRunMachineFanout {
                                                                     lockHeldTarget: lockMarker,
                                                                     healCollection: healCollection)
         process.arguments = args
-        process.standardInput = FileHandle.nullDevice
+        let stdinPipe: Pipe? = dispatch == nil ? nil : Pipe()
+        process.standardInput = stdinPipe ?? FileHandle.nullDevice
         let stdoutPipe = Pipe()
         let stderrPipe = Pipe()
         process.standardOutput = stdoutPipe
@@ -304,12 +367,26 @@ enum ApiRunMachineFanout {
             try process.run()
         } catch {
             logStderr("[\(machineLabel)] error: failed to launch subprocess: \(error.localizedDescription)")
-            continuation.yield(.exited(index: index, status: 127))
+            dispatch?.dispatcher.childExited(entry: dispatch?.entry ?? index)
+            continuation.yield(.exited(index: index, status: 127,
+                                       assigned: dispatch.map { $0.dispatcher.assignedIDs(entry: $0.entry) }))
             return 127
         }
+        if let dispatch, let stdinPipe {
+            // 親側の読み端を閉じる(子が死んだら書き込みが EPIPE で返る)
+            try? stdinPipe.fileHandleForReading.close()
+            dispatch.writer.attach(stdinPipe.fileHandleForWriting)
+        }
+        defer { dispatch?.writer.close() }
         registry.register(process)
 
+        // `{"ftWork"` の行は NDJSON へ流さず、配り手が消費する(classify の前)
+        let consumed: @Sendable (String) -> Bool = { line in
+            guard let dispatch else { return false }
+            return dispatch.dispatcher.intercept(line: line, entry: dispatch.entry, writer: dispatch.writer)
+        }
         let stdoutPump = PipeLinePump(handle: stdoutPipe.fileHandleForReading) { line in
+            if consumed(line) { return }
             continuation.yield(.line(index: index, text: line))
         }
         let stderrPump = PipeLinePump(handle: stderrPipe.fileHandleForReading) { line in
@@ -319,9 +396,13 @@ enum ApiRunMachineFanout {
         stderrPump.start()
 
         for await _ in exitStream {}
-        if let remaining = await stdoutPump.drain() { continuation.yield(.line(index: index, text: remaining)) }
+        if let remaining = await stdoutPump.drain(), !consumed(remaining) {
+            continuation.yield(.line(index: index, text: remaining))
+        }
         if let remaining = await stderrPump.drain() { logStderr("[\(machineLabel)] \(remaining)") }
-        continuation.yield(.exited(index: index, status: process.terminationStatus))
+        dispatch?.dispatcher.childExited(entry: dispatch?.entry ?? index)
+        continuation.yield(.exited(index: index, status: process.terminationStatus,
+                                   assigned: dispatch.map { $0.dispatcher.assignedIDs(entry: $0.entry) }))
         return process.terminationStatus
     }
 
@@ -366,13 +447,18 @@ enum ApiRunMachineFanout {
     /// stdin を読まず、拡張は stdio[0] を "ignore"(= /dev/null)で起動する。EOF を見ると
     /// 起動と同時に全子プロセスを殺すことになる(実際にそうなり、拡張からの実行が
     /// 開始直後に exit=15 で全滅した)
-    private static func installCancellation(registry: ChildProcessRegistry) -> [DispatchSourceSignal] {
+    private static func installCancellation(
+        registry: ChildProcessRegistry, onInterrupt: @escaping @Sendable () -> Void = {}
+    ) -> [DispatchSourceSignal] {
         signal(SIGTERM, SIG_IGN)
         signal(SIGINT, SIG_IGN)
         let queue = DispatchQueue(label: "fleetest-api-run-fanout-signal")
         return [SIGTERM, SIGINT].map { sig in
             let source = DispatchSource.makeSignalSource(signal: sig, queue: queue)
-            source.setEventHandler { registry.terminateAll() }
+            source.setEventHandler {
+                registry.terminateAll()
+                onInterrupt()
+            }
             source.resume()
             return source
         }
@@ -389,10 +475,13 @@ enum ApiRunMachineFanout {
             switch event {
             case .line(let index, let text):
                 for line in multiplexer.ingest(childIndex: index, line: text) { writeLine(line) }
-            case .exited(let index, let status):
+            case .exited(let index, let status, let assigned):
                 // キャンセルで殺された子の未完了は合成しない(キャンセル≠失敗)
                 guard !isCancelled() else { continue }
-                for line in multiplexer.childExited(index, exitCode: status) { writeLine(line) }
+                for line in multiplexer.childExited(index, exitCode: status, assigned: assigned) { writeLine(line) }
+            case .neverHanded(let ids):
+                guard !isCancelled() else { continue }
+                for line in multiplexer.neverHanded(ids) { writeLine(line) }
             }
         }
         return (multiplexer.totalPassed, multiplexer.totalFailed, multiplexer.totalSkipped,
@@ -438,7 +527,7 @@ enum ApiRunMachineFanout {
 struct MachineFanoutMultiplexer {
     private let groupMachines: [String?]
     /// 子 index → 担当シナリオ ID(合成 failed の対象を知るため)
-    private let assignedScenarioIDs: [[String]]
+    private var assignedScenarioIDs: [[String]]
     private var workersByIndex: [[ApiWorkerInfo]]
     private var finishedByIndex: [Set<String>]
     private(set) var totalPassed = 0
@@ -508,8 +597,10 @@ struct MachineFanoutMultiplexer {
 
     /// 子プロセスの終了。担当していたが scenarioFinished が来ないまま終わったシナリオを
     /// failed として合成する(正常に全部完了していれば空配列)
-    mutating func childExited(_ index: Int, exitCode: Int32) -> [String] {
+    /// assigned = 動的な割り振りで実際に渡したシナリオ(渡した分だけが「担当」。nil は初期の担当のまま)
+    mutating func childExited(_ index: Int, exitCode: Int32, assigned: [String]? = nil) -> [String] {
         exitedIndices.insert(index)
+        if let assigned { assignedScenarioIDs[index] = assigned }
         let unfinished = assignedScenarioIDs[index].filter { !finishedByIndex[index].contains($0) }
         guard !unfinished.isEmpty else {
             return relayFinalizingIfAllDone(ScenarioEvent(kind: "recordingFinalizing").encodedLine())
@@ -534,6 +625,28 @@ struct MachineFanoutMultiplexer {
             lines.append(finished.encodedLine())
         }
         return lines + relayFinalizingIfAllDone(ScenarioEvent(kind: "recordingFinalizing").encodedLine())
+    }
+
+    /// 全部の子が終わっても誰にも渡せなかったシナリオ(動的な割り振り)を failed として合成する
+    mutating func neverHanded(_ ids: [String]) -> [String] {
+        guard !ids.isEmpty else { return [] }
+        totalFailed += ids.count
+        var log = ScenarioEvent(kind: "log")
+        log.message = "\(ids.count) scenario(s) were never handed to a device — marking them as failed"
+        var lines = [log.encodedLine()]
+        for scenario in ids {
+            var step = ScenarioEvent(kind: "step")
+            step.scenario = scenario
+            step.status = "failed"
+            step.description = "no device took this scenario before every sub-run exited"
+            lines.append(step.encodedLine())
+
+            var finished = ScenarioEvent(kind: "scenarioFinished")
+            finished.scenario = scenario
+            finished.passed = false
+            lines.append(finished.encodedLine())
+        }
+        return lines
     }
 
     /// 1つでも子が recordingFinalizing を出し、かつ全部の子が「出した or 終わった」なら1回だけ line を返す

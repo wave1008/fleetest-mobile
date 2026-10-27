@@ -287,6 +287,8 @@ enum ProfileRunner {
                     workspaceOverride: String? = nil,
                     recorder: RunRecorder? = nil,
                     broadcast: Bool = false,
+                    // `--work-queue`: 分配を親からの1本ずつ(`ScenarioDispatch.pulled`)に差し替える。broadcast とは併用不可(validate が断る)
+                    workQueue: Bool = false,
                     // 供給の段階の箱(入口の writeProgress の書き手が通知を持っている)。**既定値を置かない**
                     // (渡し忘れで準備中の段階が台帳に載らない)
                     supplyProgress: RunSupplyProgress,
@@ -469,9 +471,11 @@ enum ProfileRunner {
         PhaseLog.mark("orchestrator-setup")
         // レーン = 絞り込み後の全デバイス(供給に失敗して参加しなかったデバイスのぶんは、orchestrator が
         // 「never joined」でそのレーンの本数を失敗として残す = 準備できなかったデバイスが緑に紛れない)
+        let pullSource: StdioPullSource? = workQueue ? StdioPullSource() : nil
+        defer { pullSource?.restoreTerminal() }
         let dispatch: ScenarioDispatch = broadcast
             ? .broadcast(lanes: resolved.devices.map { BroadcastLane(key: $0.name, platform: $0.platform) })
-            : .shared
+            : (pullSource.map { ScenarioDispatch.pulled(source: $0) } ?? .shared)
         let itemsToRun = items  // async let は var を直接捕捉できない(Sendable 境界)
         // iOS 実機の計測だけ: 供給の後・配布の前から xctrace を録る(止めて結果へ入れるのは summary の後)
         let responseTrace = await ResponseTraceSession.startIfNeeded(resolved: resolved) { ConsoleOut.out($0) }

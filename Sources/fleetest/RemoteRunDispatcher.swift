@@ -101,6 +101,7 @@ struct RemoteRunDispatcher {
                   noLPT: Bool, lptHistoryRuns: Int?,
                   performanceMode: Bool,
                   broadcast: Bool = false,
+                  workQueue: Bool = false,
                   localJUnitPath: String?,
                   remoteTimeoutSeconds: Int?, runGroup: String? = nil) async throws -> Int32 {
         let setupStart = Date()
@@ -151,7 +152,7 @@ struct RemoteRunDispatcher {
             deviceNames: deviceNames, deviceMachine: deviceMachine,
             setOverrides: setOverrides,
             noLPT: noLPT, lptHistoryRuns: lptHistoryRuns,
-            performanceMode: performanceMode, broadcast: broadcast,
+            performanceMode: performanceMode, broadcast: broadcast, workQueue: workQueue,
             remoteJUnitPath: remoteJUnitPath, reportDir: remoteReportDir, workspace: remoteWorkspace,
             runGroup: runGroup)
         let timeoutSeconds = RemoteTimeout.seconds(
@@ -166,7 +167,7 @@ struct RemoteRunDispatcher {
             exitCode = try runRemoteAndRelay(
                 fleetestArgs: fleetestArgs, layout: layout, timeoutSeconds: timeoutSeconds,
                 stamp: stamp, project: project.name, developerDir: developerDir,
-                interruptFlag: interruptFlag)
+                interruptFlag: interruptFlag, workQueue: workQueue)
         } catch {
             // timeout (throws from runInheritedWithLineRewrite): the remote run may still be
             // alive — the ssh session was just signalled, but the runner's teardown is
@@ -215,6 +216,7 @@ struct RemoteRunDispatcher {
                      setOverrides: [String: RunProfileSetValue] = [:], noLPT: Bool, lptHistoryRuns: Int?,
                      performanceMode: Bool,
                      defaultTimeout: Double?, scenarioTimeout: Double?,
+                     workQueue: Bool = false,
                      remoteTimeoutSeconds: Int?, runGroup: String? = nil) async throws -> Int32 {
         let setupStart = Date()
         let (layout, session) = try resolveLayout()
@@ -245,8 +247,8 @@ struct RemoteRunDispatcher {
             deviceNames: deviceNames, deviceMachine: deviceMachine,
             setOverrides: setOverrides, noLPT: noLPT, lptHistoryRuns: lptHistoryRuns,
             performanceMode: performanceMode,
-            defaultTimeout: defaultTimeout, scenarioTimeout: scenarioTimeout, reportDir: remoteReportDir,
-            workspace: remoteWorkspace, runGroup: runGroup)
+            defaultTimeout: defaultTimeout, scenarioTimeout: scenarioTimeout, workQueue: workQueue,
+            reportDir: remoteReportDir, workspace: remoteWorkspace, runGroup: runGroup)
         let timeoutSeconds = RemoteTimeout.seconds(
             explicit: remoteTimeoutSeconds, scenarioCount: scenarios.count)
         announceTimeout(timeoutSeconds)
@@ -259,7 +261,7 @@ struct RemoteRunDispatcher {
             exitCode = try runRemoteAndRelay(
                 fleetestArgs: fleetestArgs, layout: layout, timeoutSeconds: timeoutSeconds,
                 stamp: stamp, project: project.name, developerDir: developerDir,
-                interruptFlag: interruptFlag)
+                interruptFlag: interruptFlag, workQueue: workQueue)
         } catch {
             // 理由は dispatch() の同じ catch 参照(timeout でも生きていれば外さない)
             lockReleasedEarly = releaseLockIfRunEnded(layout: layout, reportDir: remoteReportDir)
@@ -1007,7 +1009,7 @@ struct RemoteRunDispatcher {
     private func runRemoteAndRelay(fleetestArgs: [String], layout: RemoteLayout,
                                    timeoutSeconds: Int?, stamp: String, project: String,
                                    developerDir: String?,
-                                   interruptFlag: DispatchInterruptFlag) throws -> Int32 {
+                                   interruptFlag: DispatchInterruptFlag, workQueue: Bool) throws -> Int32 {
         log("==> running on \(host.sshTarget): fleetest \(fleetestArgs.joined(separator: " "))")
         let command = RemoteShell.remoteRunCommand(layout: layout, fleetestArgs: fleetestArgs,
                                                    issuer: LocalConfig.resolveIssuerId(),
@@ -1019,7 +1021,7 @@ struct RemoteRunDispatcher {
             ParentBoundCommand.wrap(sshRunBase + [host.sshTarget, command],
                                     parentPID: ProcessInfo.processInfo.processIdentifier),
             layout: layout, timeoutSeconds: timeoutSeconds, stamp: stamp, project: project,
-            interruptFlag: interruptFlag)
+            interruptFlag: interruptFlag, workQueue: workQueue)
         if status == 90 {
             log("==> the remote fleetest binary is missing — build it on the remote first"
                 + " (swift build --product fleetest)")
@@ -1478,11 +1480,13 @@ struct RemoteRunDispatcher {
     private func runInheritedWithLineRewrite(_ argv: [String], layout: RemoteLayout,
                                              timeoutSeconds: Int?, stamp: String,
                                              project: String,
-                                             interruptFlag: DispatchInterruptFlag) throws -> Int32 {
+                                             interruptFlag: DispatchInterruptFlag,
+                                             workQueue: Bool) throws -> Int32 {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
         process.arguments = argv
-        process.standardInput = FileHandle.nullDevice
+        // --work-queue のときだけ自分の stdin(親の返事)を ssh へ渡す。`-tt` は変えない(中断の SIGHUP の役)
+        process.standardInput = workQueue ? FileHandle.standardInput : FileHandle.nullDevice
         let stdoutPipe = Pipe()
         process.standardOutput = stdoutPipe
         process.standardError = FileHandle.standardError
@@ -1495,6 +1499,11 @@ struct RemoteRunDispatcher {
         let localRoot = localRepoRoot.path
         let mode = self.mode
         @Sendable func relayLine(_ line: String) {
+            // 親子の配りの行(WorkQueueProtocol)は書き換えず、そのまま stdout へ(api run の機械可読行でもある)
+            if WorkQueueProtocol.isWorkLine(line) {
+                ConsoleOut.out(line)
+                return
+            }
             // ディスパッチ単位の隔離先 → 回収先(reports/)を**先に**当てる(collectJUnit と
             // 同じ順序 — 理由は RemoteReportLink.rewriteDispatchReportPaths の宣言)
             let reportsRedirected = RemoteReportLink.rewriteDispatchReportPaths(

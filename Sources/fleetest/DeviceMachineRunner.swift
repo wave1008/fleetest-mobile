@@ -161,6 +161,8 @@ enum DeviceMachineRunner {
         }
 
         let active: [(Int, Group, [String])]
+        // 動的な割り振りのときだけ入る(RR-8.1)
+        var dynamicPlan: (scenarios: [DynamicSplit.Scenario], estimate: @Sendable (DynamicSplit.Scenario, Int) -> Double)?
         if broadcast {
             // ブロードキャストは分割しない —— 各機械の各デバイスが全件を回す(分けると「全台で1回ずつ」が
             // 機械ごとの部分集合に化ける)
@@ -170,6 +172,24 @@ enum DeviceMachineRunner {
                 FleetRunner.log("    \(group.machineLabel): \(ids.count) scenario(s)"
                     + " on each of \(group.deviceNames.count) device(s) (--broadcast)")
             }
+        } else if dynamicSplitEnabled(broadcast: broadcast) {
+            let (runnable, notApplicable) = splitApplicable(selected: selected, groups: groups)
+            for line in notApplicableLines(notApplicable, groups: groups) { FleetRunner.log(line) }
+            let resolved = DynamicDispatcher.resolve(
+                runnable.map { (id: $0.id, platform: $0.platform) },
+                defaultPlatform: DynamicDispatcher.undeclaredPlatform(groups: groups))
+            active = groups.indices.compactMap { index -> (Int, Group, [String])? in
+                let ids = DynamicDispatcher.candidateIDs(for: groups[index], in: resolved)
+                return ids.isEmpty ? nil : (index, groups[index], ids)
+            }
+            guard !active.isEmpty else {
+                FleetRunner.log("==> no machine was assigned a scenario; nothing to run")
+                return 0
+            }
+            let inputs = estimationInputs(project: project, groups: groups, lptHistoryRuns: lptHistoryRuns)
+            dynamicPlan = (resolved, dynamicEstimator(inputs: inputs, groups: groups))
+            FleetRunner.log("==> dynamic split: \(resolved.count) scenario(s) across \(active.count) machine(s)"
+                + " — each free device takes the next scenario")
         } else {
             let (buckets, basis, notApplicable) = try assign(
                 project: project, groups: groups, selected: selected, lptHistoryRuns: lptHistoryRuns)
@@ -230,6 +250,16 @@ enum DeviceMachineRunner {
         // サブ実行のクラッシュ検出(reportMissingResults)が「この run で書かれた記録」を
         // 走査の窓で絞るための開始時刻。子の起動より前に捕まえる(子の書き込みは必ずこの後)
         let dispatchStart = Date()
+        // 動的な割り振り: 子ごとの stdin 書き込み口と配り手。中断は親が受けて全要求へ none を返す
+        // (返事待ちの子は中断フラグを見られない)
+        let writers: [Int: ChildStdinWriter] = dynamicPlan == nil ? [:]
+            : Dictionary(uniqueKeysWithValues: active.map { ($0.0, ChildStdinWriter()) })
+        let dispatcher: DynamicDispatcher? = dynamicPlan.map { plan in
+            DynamicDispatcher(scenarios: plan.scenarios, estimateMs: plan.estimate,
+                              send: { entry, reply in writers[entry]?.write(line: WorkQueueProtocol.encode(reply)) })
+        }
+        let interruptRelay = dispatcher.map { dispatcher in InterruptRelay.observing { dispatcher.interrupt() } }
+        defer { interruptRelay?.stop() }
         let outcomes = await withTaskGroup(of: (Int, FleetEntryOutcome).self) { taskGroup in
             for (index, group, ids) in active {
                 taskGroup.addTask {
@@ -242,11 +272,21 @@ enum DeviceMachineRunner {
                         remoteDir: remoteDir, remoteTimeout: remoteTimeout,
                         quiet: quiet,
                         junitPath: FleetRunner.entryJUnitPath(tempDir: junitTempDir, index: index),
-                        broadcast: broadcast, runGroup: runGroup, reportDir: reportDir)
+                        broadcast: broadcast, runGroup: runGroup, reportDir: reportDir,
+                        workQueue: dispatcher != nil)
+                    let writer = writers[index]
+                    let interceptor: (@Sendable (String) -> Bool)?
+                    if let dispatcher, let writer {
+                        interceptor = { line in dispatcher.intercept(line: line, entry: index, writer: writer) }
+                    } else {
+                        interceptor = nil
+                    }
                     let start = Date()
                     let exitCode = await FleetRunner.runEntry(
                         binary: binary, args: args, hostLabel: group.machineLabel, ticket: ticket,
-                        lockMarker: lockMarkers[group.machineLabel], healCollection: healCollection)
+                        lockMarker: lockMarkers[group.machineLabel], healCollection: healCollection,
+                        stdin: writer, lineInterceptor: interceptor)
+                    dispatcher?.childExited(entry: index)
                     return (index, FleetEntryOutcome(
                         host: group.machineLabel, profile: profileName, exitCode: exitCode,
                         duration: Date().timeIntervalSince(start)))
@@ -266,13 +306,34 @@ enum DeviceMachineRunner {
         prelock.releaseAll(exitCodes: Dictionary(
             outcomes.map { ($0.host, $0.exitCode) }, uniquingKeysWith: { first, _ in first }))
 
-        printSummary(profileName: profileName, outcomes: outcomes)
+        // 動的なら「実際に配られた分」が各機械の担当(欠落の報告・集計の本数)
+        let assignedActive: [(Int, Group, [String])] = dispatcher == nil ? active
+            : active.map { ($0.0, $0.1, dispatcher?.assignedIDs(entry: $0.0) ?? []) }
+        let ranCounts: [String: Int]? = dispatcher == nil ? nil
+            : Dictionary(assignedActive.map { ($0.1.machineLabel, $0.2.count) }, uniquingKeysWith: { first, _ in first })
+        // 全部の子が終わっても誰にも渡せなかった分。中断なら失敗にしない(中断した事実が別に出る)
+        var neverHandedFailure = false
+        if let dispatcher {
+            let ids = dispatcher.unhandedIDs
+            if !ids.isEmpty {
+                let interrupted = dispatcher.isInterrupted
+                FleetRunner.log(neverHandedLine(ids: ids, interrupted: interrupted))
+                if !interrupted {
+                    neverHandedFailure = true
+                    for id in ids {
+                        LastResultsStore.record(project: project, scenarioID: id, passed: false, profile: profileName)
+                    }
+                }
+            }
+        }
+
+        printSummary(profileName: profileName, outcomes: outcomes, ran: ranCounts)
         healCollection.finish(project: project) { FleetRunner.log($0) }
         // **broadcast はここを呼ばない** —— 同じ ID を台数ぶん走らせるので、1台でも記録が
         // あれば「走った」であり「欠落」の意味が変わる(呼び手で分岐。実装を分けない)
         if !broadcast {
             reportMissingResults(project: project, profileName: profileName, runGroup: runGroup,
-                                 since: dispatchStart, active: active, outcomes: outcomes)
+                                 since: dispatchStart, active: assignedActive, outcomes: outcomes)
         }
         // ディスパッチした(= --junit を渡した)ぶんだけ結合する。0本で見送ったホストを混ぜると
         // 「出力が無い」合成失敗になり、走らせてもいないものが赤くなる(FleetRunner と同じ規律)
@@ -281,7 +342,25 @@ enum DeviceMachineRunner {
                 junit: junit, project: project.name, tempDir: junitTempDir,
                 entries: active.map { (host: $0.1.machineLabel, index: $0.0) })
         }
-        return FleetProfile.aggregateExitCode(outcomes.map(\.exitCode))
+        let exitCodes: [Int32] = outcomes.map { $0.exitCode } + (neverHandedFailure ? [1] : [])
+        return FleetProfile.aggregateExitCode(exitCodes)
+    }
+
+    /// 動的な割り振りを使うか。`FT_STATIC_SPLIT=1` は保守者の殺しスイッチ(静的な割り当てへ戻す・利用者向けの口ではない)
+    static func dynamicSplitEnabled(
+        broadcast: Bool, environment: [String: String] = ProcessInfo.processInfo.environment
+    ) -> Bool {
+        !broadcast && environment["FT_STATIC_SPLIT"] != "1"
+    }
+
+    /// 誰にも渡されなかったシナリオの1行(純粋関数。5件で切る = missingResultsLine と同じ)
+    static func neverHandedLine(ids: [String], interrupted: Bool) -> String {
+        let maxListed = 5
+        let listed = ids.prefix(maxListed).joined(separator: ", ")
+        let suffix = ids.count > maxListed ? ", …" : ""
+        return interrupted
+            ? "⚠️ interrupted: \(ids.count) scenario(s) were not handed to any device: \(listed)\(suffix)"
+            : "⚠️ \(ids.count) scenario(s) were never handed to a device: \(listed)\(suffix)"
     }
 
     /// マシン別サブ実行1本分の引数(純粋関数。単体テスト対象)。`FleetRunner.buildArgs`
@@ -301,7 +380,7 @@ enum DeviceMachineRunner {
         performanceMode: Bool,
         forceLock: Bool, remoteDir: String?, remoteTimeout: Int?,
         quiet: Bool, junitPath: String?, broadcast: Bool = false, runGroup: String? = nil,
-        reportDir: String? = nil
+        reportDir: String? = nil, workQueue: Bool = false
     ) -> [String] {
         var args = FleetRunner.buildArgs(
             project: project, host: host, profile: profile,
@@ -315,6 +394,8 @@ enum DeviceMachineRunner {
             args += ["--skip-build"]
             if let reportDir { args += ["--report-dir", reportDir] }
         }
+        // 動的な割り振り(RR-8.1)の子だけ。--scenario は全候補で、回すのは親が1本ずつ渡した分
+        if workQueue { args += ["--work-queue"] }
         return args
     }
 
@@ -332,12 +413,43 @@ enum DeviceMachineRunner {
                        selected: [ScenarioInfo], lptHistoryRuns: Int?)
         throws -> (buckets: [FleetSplit.Bucket], basis: [FleetSplit.EstimateBasis],
                    notApplicable: [ScenarioInfo]) {
+        let (runnable, notApplicable) = splitApplicable(selected: selected, groups: groups)
+        let inputs = estimationInputs(project: project, groups: groups, lptHistoryRuns: lptHistoryRuns)
+        do {
+            let plan = try FleetSplit.plan(
+                scenarios: runnable.map { (id: $0.id, platform: $0.platform) },
+                durations: inputs.durations,
+                entryPlatforms: groups.map(\.platforms),
+                unknownDurationMs: inputs.unknownDurationMs,
+                entryCapacities: groups.map { Double($0.deviceNames.count) },
+                machineContext: inputs.machineContext)
+            return (plan.buckets, plan.basis, notApplicable)
+        } catch let error as FleetSplit.FleetSplitError {
+            throw ValidationError("profile \"\(project.name)\": \(error.localizedDescription)")
+        }
+    }
+
+    /// 宣言 platform のデバイスがどのグループにも無いシナリオ(対象外)を外す。静的・動的の両方が通る
+    static func splitApplicable(selected: [ScenarioInfo], groups: [Group])
+        -> (runnable: [ScenarioInfo], notApplicable: [ScenarioInfo]) {
         let split = FleetSplit.applicability(
             scenarios: selected.map { (id: $0.id, platform: $0.platform) },
             entryPlatforms: groups.map(\.platforms))
         let runnableIDs = Set(split.runnable.map(\.id))
-        let runnable = selected.filter { runnableIDs.contains($0.id) }
-        let notApplicable = selected.filter { !runnableIDs.contains($0.id) }
+        return (selected.filter { runnableIDs.contains($0.id) },
+                selected.filter { !runnableIDs.contains($0.id) })
+    }
+
+    /// 見積りの入力(静的な割り当てと動的な割り振りが共有する。同じ材料でなければ両者の見込みが食い違う)。
+    /// `machineContext` は実績ゼロのとき固定費だけ 0 化済み(FleetSplit.machineContext(_:ifHistoryExists:))
+    struct EstimationInputs {
+        let durations: [LPTScheduler.Duration]
+        let unknownDurationMs: Double
+        let machineContext: FleetSplit.MachineContext
+    }
+
+    static func estimationInputs(project: TestProject, groups: [Group],
+                                 lptHistoryRuns: Int?) -> EstimationInputs {
         let historyRuns = max(1, lptHistoryRuns ?? LPTOrdering.defaultHistoryRuns)
         let resultsDir = RunResultsStore.resultsDir(projectRoot: project.rootURL)
         let since = RunResultsStore.lptHistorySince()
@@ -376,18 +488,21 @@ enum DeviceMachineRunner {
             entryMachines: entryMachines, entryFixedOffsetsMs: entryFixedOffsetsMs,
             machineDurations: LPTScheduler.machineDurations(from: records),
             entryFallbackFactors: entryFallbackFactors)
-        do {
-            let plan = try FleetSplit.plan(
-                scenarios: runnable.map { (id: $0.id, platform: $0.platform) },
-                durations: durations,
-                entryPlatforms: groups.map(\.platforms),
-                unknownDurationMs: unknown,
-                entryCapacities: groups.map { Double($0.deviceNames.count) },
-                // 実績ゼロ = unknown が単位重みのときは context を落とす(FleetRunner と同じ理由)
-                machineContext: FleetSplit.machineContext(machineContext, ifHistoryExists: durations))
-            return (plan.buckets, plan.basis, notApplicable)
-        } catch let error as FleetSplit.FleetSplitError {
-            throw ValidationError("profile \"\(project.name)\": \(error.localizedDescription)")
+        // 実績ゼロ = unknown が単位重みのときは固定費を落とす(FleetRunner と同じ理由)
+        return EstimationInputs(
+            durations: durations, unknownDurationMs: unknown,
+            machineContext: FleetSplit.machineContext(machineContext, ifHistoryExists: durations))
+    }
+
+    /// 動的な割り振りの見込み[ms]。静的な割り当てと同じ `FleetSplit.Estimator`(同じ入力)。
+    /// エントリ番号は `groups` の添字。固定費(entryFixedOffsetsMs)は足さない(送りの固定費は run の開始で払い済み)
+    static func dynamicEstimator(inputs: EstimationInputs, groups: [Group])
+        -> @Sendable (DynamicSplit.Scenario, Int) -> Double {
+        let estimator = FleetSplit.Estimator(
+            durations: inputs.durations, entryPlatforms: groups.map(\.platforms),
+            unknownDurationMs: inputs.unknownDurationMs, machineContext: inputs.machineContext)
+        return { scenario, entry in
+            estimator.estimateMs(id: scenario.id, platform: scenario.platform, entry: entry)
         }
     }
 
@@ -537,16 +652,17 @@ enum DeviceMachineRunner {
         return String(format: "est. %.0fs", perDevice)
     }
 
-    private static func printSummary(profileName: String, outcomes: [FleetEntryOutcome]) {
+    private static func printSummary(profileName: String, outcomes: [FleetEntryOutcome], ran: [String: Int]? = nil) {
         FleetRunner.log("")
         FleetRunner.log("=== profile \"\(profileName)\" across machines ===")
         // 静的割り当ての偏り(ストラグラー)を再配分機構を作る前に実測で貯める
         let maxDuration = outcomes.map(\.duration).max() ?? 0
         for outcome in outcomes {
             let mark = outcome.exitCode == 0 ? "✅" : "❌"
+            let count = ran.map { "  ran=\($0[outcome.host] ?? 0)" } ?? ""
             FleetRunner.log(String(format: "%@ %-20@ exit=%d  %.1fs idle=%.1fs", mark,
                                    outcome.host as NSString, outcome.exitCode, outcome.duration,
-                                   maxDuration - outcome.duration))
+                                   maxDuration - outcome.duration) + count)
         }
     }
 }

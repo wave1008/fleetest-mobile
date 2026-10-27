@@ -150,6 +150,7 @@ struct ApiRunCommand: AsyncParsableCommand {
         // 検査を片方だけに置かない)
 
         try common.validateRunnerAndMachines(runner: runner, hasFleet: false)
+        try common.validateWorkQueue(broadcast: false, hasFleet: false)
         // `--set` の検査(型・専用フラグとの衝突・--profile 無し時の profile-only キーと record)は run と共有。
         // この経路(runDirect)は RunOrchestrator を経由せず各シナリオを直接の接続で流すため録画セッションが無い
         // (FTCore.RunProfileDocument.recordNeedsRejecting 参照)
@@ -852,6 +853,7 @@ struct ApiRunCommand: AsyncParsableCommand {
             noLPT: common.noLPT, lptHistoryRuns: common.lptHistoryRuns,
             performanceMode: performanceMode,
             defaultTimeout: defaultTimeout, scenarioTimeout: scenarioTimeout.map(Double.init),
+            workQueue: common.workQueue,
             remoteTimeoutSeconds: common.remoteTimeout, runGroup: common.runGroup)
         if exitCode != 0 {
             throw ExitCode(exitCode)
@@ -1292,7 +1294,11 @@ struct ApiRunCommand: AsyncParsableCommand {
         // ここから先は RunOrchestrator.run() が必ず finish() まで進む(non-throwing)ので、
         // "preparing" の後始末は orchestrator 側の finish()/remove に委ねる
         progressHandedToOrchestrator = true
-        async let summary = orchestrator.run(items: items, defaultPlatform: defaultPlatform)
+        let pullSource: StdioPullSource? = common.workQueue ? StdioPullSource() : nil
+        defer { pullSource?.restoreTerminal() }
+        async let summary = orchestrator.run(
+            items: items, defaultPlatform: defaultPlatform,
+            dispatch: pullSource.map { ScenarioDispatch.pulled(source: $0) } ?? .shared)
 
         var timing = ScenarioTimingTracker()
         for await event in orchestrator.events {

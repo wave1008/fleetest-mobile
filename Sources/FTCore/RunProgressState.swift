@@ -16,7 +16,8 @@ actor RunProgressState {
     private let project: String
     private let profile: String?
     private let startedAt: String
-    private let total: Int
+    /// pulled(`ScenarioDispatch.pulled`)のときだけ `growTotal` で増える。それ以外は不変
+    private var total: Int
     private var done = 0
     private var failed = 0
     /// **詰まりの事実だけ**(DS-18.1 段6)。判定・閾値は作らない —— laneIdled/laneLeft
@@ -57,6 +58,12 @@ actor RunProgressState {
         self.pendingCounts = Dictionary(grouping: pendingScenarios, by: { $0 }).mapValues(\.count)
         self.write = write
         self.remove = remove
+    }
+
+    /// pulled で1本配られるたびに呼ぶ(RunOrchestrator)。total は配られた本数
+    func growTotal() {
+        total += 1
+        flush()
     }
 
     private func flush() {

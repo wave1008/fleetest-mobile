@@ -75,6 +75,11 @@ final class RunRejectionParityTests: XCTestCase {
         .init(label: "dry-run set record without profile",
               arguments: ["--dry-run", "--set", "record=true"], rejected: false),
 
+        // --work-queue(マシンをまたぐ run の親が配る口。--profile が前提。--broadcast / --fleet との併用不可は
+        // run にしか無いフラグなのでこの表では打てない)
+        .init(label: "work-queue without profile", arguments: ["--work-queue"], rejected: true),
+        .init(label: "work-queue with profile", arguments: ["--profile", "p", "--work-queue"], rejected: false),
+
         // 陰性対照。これが無いと「常に throw する実装」と区別できない
         .init(label: "profile alone", arguments: ["--profile", "p"], rejected: false),
         .init(label: "port alone", arguments: ["--port", "8200"], rejected: false),

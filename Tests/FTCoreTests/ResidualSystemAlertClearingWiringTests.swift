@@ -14,7 +14,7 @@ final class ResidualSystemAlertClearingWiringTests: XCTestCase {
     /// 各シナリオの直前・録画の区間と進捗の開始より前に呼ぶ
     func testCalledBeforeEachScenarioAndBeforeItsRecordingInterval() throws {
         let text = try source("Sources/FTCore/RunOrchestrator.swift")
-        let loop = try XCTUnwrap(text.range(of: "let item = await queue.next() {"))
+        let loop = try XCTUnwrap(text.range(of: "let item = await queue.next(lane: worker.logicalName) {"))
         let call = try XCTUnwrap(text.range(of: "await clearResidualSystemAlert?(worker)", range: loop.upperBound..<text.endIndex))
         let recording = try XCTUnwrap(text.range(of: "await videoRecording?.scenarioStarted(", range: loop.upperBound..<text.endIndex))
         XCTAssertLessThan(call.lowerBound, recording.lowerBound)

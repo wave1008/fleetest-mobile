@@ -565,16 +565,22 @@ enum FleetRunner {
     /// ここで採り直さない(DispatchTicketIssuer の宣言)。`lockMarker` は親がこの機械の
     /// ロックを取れたときだけ非 nil(DispatchPrelock)。**既定値を置かない** ——
     /// 呼び忘れた経路の子だけが自分で取りに行き、親の握っているロックを待って詰む
+    ///
+    /// `stdin` / `lineInterceptor` は動的な割り振り(RR-8.1。DeviceMachineRunner だけが渡す)用で、nil なら
+    /// 従来どおり stdin = /dev/null・全行を表示する。interceptor が true を返した行は表示しない
     static func runEntry(binary: String, args: [String], hostLabel: String,
                          ticket: DispatchTicket, lockMarker: String?,
-                         healCollection: HealSourceWriteBack.Collection) async -> Int32 {
+                         healCollection: HealSourceWriteBack.Collection,
+                         stdin: ChildStdinWriter? = nil,
+                         lineInterceptor: (@Sendable (String) -> Bool)? = nil) async -> Int32 {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: binary)
         process.environment = DispatchTicketIssuer.childEnvironment(ticket: ticket,
                                                                      lockHeldTarget: lockMarker,
                                                                      healCollection: healCollection)
         process.arguments = args
-        process.standardInput = FileHandle.nullDevice
+        let stdinPipe: Pipe? = stdin == nil ? nil : Pipe()
+        process.standardInput = stdinPipe ?? FileHandle.nullDevice
         let pipe = Pipe()
         process.standardOutput = pipe
         process.standardError = pipe
@@ -585,6 +591,12 @@ enum FleetRunner {
             log("[\(hostLabel)] error: failed to launch subprocess: \(error.localizedDescription)")
             return 127
         }
+        if let stdin, let stdinPipe {
+            // 親側の読み端を閉じる(子が死んだら書き込みが EPIPE で返る)
+            try? stdinPipe.fileHandleForReading.close()
+            stdin.attach(stdinPipe.fileHandleForWriting)
+        }
+        defer { stdin?.close() }
 
         // 中断はホスト別の子(それぞれが自分の ssh を持つ)へ伝える。ここを飛ばすと、
         // 親だけ落ちて子とリモートが走り続ける。**時間で SIGKILL しない**(escalateAfter: nil)
@@ -593,11 +605,14 @@ enum FleetRunner {
         defer { relay.stop() }
 
         let pump = PipeLinePump(handle: pipe.fileHandleForReading) { line in
+            if lineInterceptor?(line) == true { return }
             logLine(host: hostLabel, line: line)
         }
         pump.start()
         for await _ in exitStream {}
-        if let remaining = await pump.drain() { logLine(host: hostLabel, line: remaining) }
+        if let remaining = await pump.drain(), lineInterceptor?(remaining) != true {
+            logLine(host: hostLabel, line: remaining)
+        }
         return process.terminationStatus
     }
 
