@@ -67,6 +67,22 @@ final class MCPElapsedBreakdownTests: XCTestCase {
         XCTAssertEqual(phases, ["launching the app", "activating the app", "clearing the app's data"])
     }
 
+    /// **ft_batch の launch: の後の手順を起動の段に積まない**(実機 SE3: 起動 3.2 秒・手順 28 秒の batch が
+    /// 「launching the app 31.2s」と出た。ftLaunch が立てた段が戻されないまま手順が走っていた)
+    func testBatchStepsAfterLaunchAreNotChargedToTheLaunch() async throws {
+        let driver = FakeDriver()
+        var phaseAtTap: String?
+        driver.onTap = {
+            let previous = SlowCallWatchdog.mark("probe")
+            SlowCallWatchdog.restore(previous)
+            phaseAtTap = previous?.phase
+        }
+        let server = MCPServer(write: { _ in }, makeDriver: { _ in driver }, recordSnapshot: { _, _, _ in })
+        _ = try await server.call(tool: "ft_batch", args: ["steps": "tap '#login_btn'", "launch": "com.example.app"])
+        XCTAssertNotNil(phaseAtTap, "手順のタップが撃たれていない")
+        XCTAssertNotEqual(phaseAtTap, "launching the app")
+    }
+
     /// **操作の後の撮り直しは自分の段に積む**(「操作の後の読み」の中で、待ちと読みのどちらに時間を使ったか分からなかった)
     func testTheSettleReReadHasItsOwnPhase() async throws {
         let driver = FakeDriver()

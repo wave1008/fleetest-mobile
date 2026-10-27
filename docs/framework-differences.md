@@ -219,7 +219,11 @@ Flutter・React Native)によって、**木の見え方と操作の効き方が�
   in-app の `insertText("\n")` はフレームワークによって改行になったり、アクションになったり、握り潰されたりする)。
   **A**(結果を揃える)。tap の直後なら、先に焦点が立つのを待つ
 - **Android の Enter**: View/XML の EditText には、ソフトキーボードが出ていると `keyevent 66` が届かない(IME が
-  消費する)。Compose は届く → 既定を a11y の `ACTION_IME_ENTER` にして揃えている(A)
+  消費する)。Compose は届く → 既定を a11y の `ACTION_IME_ENTER` にして揃えている(A)。
+  **複数行を申告する欄(a11y の `isMultiLine`)だけは keyevent 66(改行)へ回す** —— `ACTION_IME_ENTER` は複数行の RN で改行にも
+  アクションにもならないのに成功を返していた(実機 Pixel 3a。Flutter は改行になっていた)。iOS の Return と揃える(A)。
+  **Compose の複数行は未解決**(複数行を申告しない。keyevent 66 なら改行になるが、単一行の ImeAction.Next を起こさないので
+  Compose の欄を一律に keyevent へは回せない = E2EX-CMP 入力の種類 S0020 で実測。docs/open-issues.md OI-34)
 - **Android の入力**: Flutter は `findFocus` が半分の確率で入れ物(FlutterView)を返す → 木から編集可能な欄を探し直す(A)。
   Compose は焦点の無い欄への `ACTION_SET_TEXT` が true を返して反映しない → 焦点が立つまで撃たない(A)
 
@@ -431,6 +435,7 @@ SwiftUI の pinch(SUT が枠で切り取っていなかった)・inputs S0030/40
 
 | 版・コミット | 内容 |
 |---|---|
+| Android v111 | 複数行を申告する欄の `pressEnter` を keyevent 66(改行)へ回す。`ACTION_IME_ENTER` が複数行の RN で何もせずに成功を返していた(証人: E2EX の `入力の種類` S0010 場面4。Compose は未解決 = OI-34) |
 | — | React Native の XCUITest で、出てきたばかりのダイアログ・シートの中の要素を押す前だけ表示の切り替え(0.55 秒)を待つ(`PresentedOverlayTapWait`)。fade の最中の tap が捨てられていた |
 | `9bbf17dd` | 入力系(`type` / `pressEnter` / `clearInput`)の 409 を、MCP・ライブ操作でも XCUITest へ回す(`DriverError.isTextInputFallback` / `isClearInputFallback`)。この表の「→ XCUITest へ」は DSL でしか成り立っておらず、**同じ構成の同じ操作が `ft_type`(`pressEnter: true` を含む) / `ft_clear_input` では落ちていた** |
 | v117 | in-app のスクリーンショットは、自前描画(Compose / Flutter)で木が絵より先に進んでいる間は撮らない(`InAppRenderCatchUp`。findImage / imageIs / 分類器 / occlusion-guard が別の画面の画素を切り出していた) |

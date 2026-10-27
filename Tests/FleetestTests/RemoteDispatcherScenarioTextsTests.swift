@@ -117,6 +117,13 @@ final class RemoteDispatcherScenarioTextsTests: XCTestCase {
             "note: the remote produced no reports (the run failed before writing any)")
     }
 
+    /// exit 0 で0件(終わり際の手伝いが1本も取れなかった)は失敗と言わない
+    func testReportsMissingNoteDoesNotCallAZeroExitAFailure() {
+        XCTAssertEqual(
+            RemoteRunDispatcher.reportsMissingNote(interrupted: false, exitCode: 0),
+            "note: the remote produced no reports (it exited 0 without running a scenario)")
+    }
+
     func testReportsMissingNoteSaysInterruptedWhenWeStoppedIt() {
         XCTAssertEqual(
             RemoteRunDispatcher.reportsMissingNote(interrupted: true, exitCode: 1),

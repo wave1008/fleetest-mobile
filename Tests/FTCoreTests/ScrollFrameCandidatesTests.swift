@@ -257,4 +257,32 @@ final class ScrollFrameCandidatesTests: XCTestCase {
         XCTAssertNil(ScrollFrameCandidates.selector(
             matching: FTRect(x: 0, y: 100, width: 400, height: 500), in: snap))
     }
+
+    // MARK: - キーボードの部品
+
+    /// 実機 SE3(Flutter の入力画面): 予測変換バーの scrollView / collectionView が「画面のスクロール領域」として
+    /// 勧められていた。キーボードが出ている木では候補にしない・キーボードが画面の外なら従来どおり
+    func testKeyboardAssistantScrollersAreNotCandidates() {
+        let page = element(1, type: "scrollView", id: "page", frame: FTRect(x: 0, y: 60, width: 400, height: 300),
+                           scrollable: true, depth: 2)
+        let list = element(2, type: "scrollView", id: "list", frame: FTRect(x: 0, y: 360, width: 400, height: 80),
+                           scrollable: true, depth: 2)
+        // 実機と同じく inputView(申告と交差する chrome)と、申告の直上に接する予測変換バーの兄弟
+        let inputView = element(6, id: "inputView", frame: FTRect(x: 0, y: 532, width: 400, height: 268), depth: 4)
+        let assistant = element(3, id: "SystemInputAssistantView", frame: FTRect(x: 0, y: 532, width: 400, height: 44),
+                                depth: 4)
+        let bar = element(4, type: "scrollView", frame: FTRect(x: 0, y: 532, width: 400, height: 44),
+                          scrollable: true, depth: 8)
+        let suggestions = element(5, type: "collectionView", frame: FTRect(x: 0, y: 532, width: 400, height: 54),
+                                  scrollable: true, depth: 12)
+        func snap(keyboardY: Double) -> SnapshotResponse {
+            var s = snapshot([page, list, inputView, assistant, bar, suggestions])
+            s.keyboardFrame = FTRect(x: 0, y: keyboardY, width: 400, height: 224)
+            return s
+        }
+        XCTAssertEqual(ScrollFrameCandidates.candidates(in: snap(keyboardY: 576)).map(\.ref), [1, 2])
+        XCTAssertNil(ScrollFrameCandidates.note(snap(keyboardY: 576))?.range(of: "SystemInputAssistantView"))
+        XCTAssertEqual(ScrollFrameCandidates.candidates(in: snap(keyboardY: 900)).map(\.ref), [1, 2, 4, 5],
+                       "画面の外の申告はキーボード無し = 除外しない")
+    }
 }

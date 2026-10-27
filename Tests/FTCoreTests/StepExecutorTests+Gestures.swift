@@ -633,6 +633,19 @@ extension StepExecutorTests {
         XCTAssertEqual(primary.lastDragArgs?.durationSeconds, FlowStep.defaultSwipeDurationSeconds)
     }
 
+    /// **Android で戻るジェスチャの帯幅を読めなかった回は言う**(帯を除かずに払う = 端の払いが「戻る」に取られうる。
+    /// E2EX-CMP android 不具合の回帰 S0050 で1回、払いの後にアプリが前の画面へ戻っていた)。iOS は帯が無いので言わない
+    func testSwipeByNotesAnUnreadBackGestureBandOnAndroid() async throws {
+        for isAndroid in [true, false] {
+            let primary = FakeAppDriver(name: "primary", log: CallLog(), snapshotElements: [[]])
+            let outcome = await StepExecutor(driver: primary, isAndroid: isAndroid, tunables: RunTunables())
+                .execute(FlowStep(action: "swipeBy", dxRatio: -0.9, dyRatio: 0))
+            guard case .passed = outcome.status else { XCTFail("\(outcome.status)"); return }
+            XCTAssertEqual(outcome.driverFallback?.contains("could not read the Android back-gesture band") ?? false, isAndroid,
+                           outcome.driverFallback ?? "-")
+        }
+    }
+
     /// **witness**: 比率の上限(0.9)を超えた指定は丸めて注記を残す(黙って丸めると、小さい要素で
     /// 「14 倍払った」つもりが数 pt しか動かず緑になる。E2EX-CMP のシートの見出しで実測)。逆向きも見る
     func testSwipeByNotesACappedRatio() async throws {

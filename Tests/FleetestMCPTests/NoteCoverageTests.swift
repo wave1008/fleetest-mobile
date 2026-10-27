@@ -189,7 +189,7 @@ final class NoteCoverageTests: XCTestCase {
         // (and-home)で、単純なキーだけの一致では別々の表の同名見出しに誤発火するため
         // y/x の幾何制約を必須にした(MCPServer.duplicateRegionNote の当該コメント参照)
         "duplicateRegionNote": Coverage(fixtures: ["ios-browser_jma_hscroll"], bytes: 391),
-        "scrollFrameCandidates": Coverage(fixtures: ["and-form_keyboard", "and-place_expanded", "and-results", "ios-browser_startpage", "ios-maps_route_options", "ios-maps_station", "ios-maps_suggest_guides", "ios-maps_suggest_keyboard", "ios-maps_transit_boarding_cards", "ios-maps_transit_steps", "ios-maps_transit_steps_expanded", "ios-messages_keyboard", "ios-news_feed", "ios-place_guides_scrolled"], bytes: 3194),
+        "scrollFrameCandidates": Coverage(fixtures: ["and-form_keyboard", "and-place_expanded", "and-results", "ios-browser_startpage", "ios-maps_route_options", "ios-maps_station", "ios-maps_transit_boarding_cards", "ios-maps_transit_steps", "ios-maps_transit_steps_expanded", "ios-messages_keyboard", "ios-news_feed", "ios-place_guides_scrolled"], bytes: 2733),
         // 2026-10-26: 3429 → 3194。スクロールする要素に id が無いとき、枠のぴったり同じ包みの id で名指しするようにした
         // (`ScrollFrameCandidates.sameFrameSelector`)。変わった 9 画面を1件ずつ見て、どれも同じ容器へ届く名前と確認
         // 2026-08-15 に J1順位表(両OS)を追加して +555 バイト。and-/ios- とも 120要素上限で
@@ -550,7 +550,9 @@ final class NoteCoverageTests: XCTestCase {
 
     /// 文脈の絞り込みが production の組み立てに効いていること(scrollTo は ft_snapshot より少ない)
     func testScrollToEmitsFewerNotesThanSnapshot() throws {
-        let snapshot = try Self.load("ios-maps_suggest_keyboard")
+        // scrollTo では出さない注記(scrollFrame 候補)が出る画面。ios-maps_suggest_keyboard はキーボードの部品を
+        // 候補から除いて出なくなった(候補が実アプリの1つだけ)ので差し替えた
+        let snapshot = try Self.load("ios-messages_keyboard")
         let input = NoteCatalog.Input(snapshot: snapshot)
         let onSnapshot = MCPServer(write: { _ in }, recordSnapshot: { _, _, _ in })
             .catalogNotes(input, context: .snapshot, disabled: [])

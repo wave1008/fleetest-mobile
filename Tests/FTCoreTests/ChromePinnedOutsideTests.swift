@@ -189,4 +189,46 @@ final class ChromePinnedOutsideTests: XCTestCase {
         XCTAssertTrue(ContainerGeometry.isOutsideContainer(stray, in: tree, screen: screen),
                       "含んでいる panel_a は祖先ではないので host にならず、迷子は ghost のまま")
     }
+    // MARK: - (i) 間引きで depth の揃わない上部バー(相棒の代わりに preorder の順で chrome と分かる)
+
+    /// witness(実機 Pixel 4a・E2EY-CMP 入れ子スクロール): 上部バーの入れ物が間引かれ、`#btn_back`(d10)と
+    /// 題名(d11)が一覧(d9)の部分木の**後ろ**に来て一覧の子に再配線される。題名と depth が揃わないので
+    /// (6) の相棒は居ない —— 内側の行(昇順)より後ろに並ぶ上帯の要素は、上へ押し出された行ではない
+    private func nestedScrollTree(backAt position: Int? = nil, rowYs: [Double] = [444, 521, 884, 961]) -> [ElementInfo] {
+        let list = el(2, "other", 9, 0, 422, 1080, 1852, id: "list_nested", scrollable: true)
+        let rows = rowYs.enumerated().map { i, y in el(10 + i, "staticText", 10, 44, y, 86, 66, id: "row_\(i)") }
+        let back = el(36, "clickable", 10, 11, 158, 132, 132, id: "btn_back")
+        let title = el(38, "staticText", 11, 154, 180, 480, 87, id: "txt_screen_title")
+        var tree = [el(1, "staticText", 9, 44, 334, 269, 66, id: "txt_nested_result"), list] + rows
+        if let position { tree.insert(back, at: position) } else { tree.append(back) }
+        return tree + [title]
+    }
+
+    func testTopBarAfterTheRowsInPreorderIsNotAGhost() {
+        let screen = FTRect(x: 0, y: 0, width: 1080, height: 2340)
+        let tree = nestedScrollTree()
+        let back = tree.first { $0.identifier == "btn_back" }!
+        XCTAssertEqual(ContainerGeometry.clippingContainer(of: back, in: tree, inferring: true),
+                       FTRect(x: 0, y: 422, width: 1080, height: 1852), "一覧の子に再配線される(実機と同じ形)")
+        XCTAssertFalse(ContainerGeometry.isOutsideContainer(back, in: tree, screen: screen),
+                       "見えている行より後ろに並ぶ上帯の要素は chrome")
+    }
+
+    /// 上へ押し出された本物の行は見えている行より**前**に並ぶ → ghost のまま
+    func testTopGhostBeforeTheVisibleRowsStaysAGhost() {
+        let screen = FTRect(x: 0, y: 0, width: 1080, height: 2340)
+        let tree = nestedScrollTree(backAt: 2)
+        let back = tree.first { $0.identifier == "btn_back" }!
+        XCTAssertTrue(ContainerGeometry.isOutsideContainer(back, in: tree, screen: screen),
+                      "見えている行より前に並ぶ = 上へ押し出された行と区別できない")
+    }
+
+    /// 反転した並び(チャット)では上へ押し出された行が後ろに並びうる → 順序を根拠にしない
+    func testTopElementAfterDescendingRowsStaysAGhost() {
+        let screen = FTRect(x: 0, y: 0, width: 1080, height: 2340)
+        let tree = nestedScrollTree(rowYs: [961, 884, 521, 444])
+        let back = tree.first { $0.identifier == "btn_back" }!
+        XCTAssertTrue(ContainerGeometry.isOutsideContainer(back, in: tree, screen: screen),
+                      "行が y の降順 = 反転した並びなので chrome と認めない")
+    }
 }

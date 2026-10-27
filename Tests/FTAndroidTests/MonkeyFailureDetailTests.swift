@@ -44,10 +44,18 @@ final class MonkeyFailureDetailTests: XCTestCase {
 /// 「使用中」の断りの文言(到達不能の決まり文句を含まない完成文)
 final class AndroidBridgeHeldByAnotherSessionMessageTests: XCTestCase {
     func testTheRefusalNamesTheFactAndDoesNotSuggestBridgeUp() {
-        let text = AndroidBridgeHeldByAnotherSession(serial: "emulator-5556").localizedDescription
+        let text = AndroidBridgeHeldByAnotherSession(serial: "emulator-5556", runningVersion: nil).localizedDescription
         XCTAssertTrue(text.contains("emulator-5556"))
         XCTAssertTrue(text.contains("another session"))
+        XCTAssertTrue(text.contains("is not answering"))
         XCTAssertFalse(text.contains("bridge up"), "同じ門で断られる bridge up を勧めている")
         XCTAssertFalse(text.contains("Cannot reach the driver"), "到達不能の決まり文句で包まれている")
+    }
+
+    /// **答えた版違いを「応答しない」と言わない**(実機 Pixel 4a: 別のセッションの v109 が答えているのに "is not answering")
+    func testARunningOlderBridgeIsNotCalledUnanswering() {
+        let text = AndroidBridgeHeldByAnotherSession(serial: "14141JEC204922", runningVersion: 109).localizedDescription
+        XCTAssertFalse(text.contains("not answering"), text)
+        XCTAssertTrue(text.contains("is running another version (109; this build expects \(AndroidDriver.expectedBridgeVersionCode))"), text)
     }
 }

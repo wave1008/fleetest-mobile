@@ -501,6 +501,10 @@ extension StepExecutor {
     /// 帯の中から始めると OS のホーム・アプリ切替に取られてアプリが離脱する)
     static let bottomBandNote = "start point moved above the Android bottom gesture band (home / app switch)"
 
+    /// swipeBy が Android の戻るジェスチャの帯幅を読めず、帯を除かずに払った回の注記
+    static let backGestureBandUnreadNote = "could not read the Android back-gesture band (dumpsys of SystemUI), so the drag"
+        + " was not kept out of it — a drag that starts or ends at a screen edge can be taken as back"
+
     /// 要素を押す点を下端のジェスチャ帯の外へ寄せたときの注記(タップ・長押し・ダブルタップ)
     static let bottomBandTapNote = "touched the part of the element above the Android bottom gesture band"
         + " (its centre is inside the band, where a touch can go to home / app switch)"

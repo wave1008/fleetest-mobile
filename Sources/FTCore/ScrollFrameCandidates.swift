@@ -39,7 +39,11 @@ public enum ScrollFrameCandidates {
     public static func candidates(in snapshot: SnapshotResponse) -> [Candidate] {
         var result: [Candidate] = []
         var seenFrames = Set<String>()
-        for element in snapshot.elements where element.scrollable == true {
+        // **キーボードの部品は候補にしない**(実機 SE3・Flutter の入力画面: 予測変換バー `#SystemInputAssistantView` と
+        // その中の無 id の collectionView が「画面のスクロール領域」として scrollFrame に勧められた)
+        let keyboard = KeyboardOcclusion.resolve(reported: snapshot.keyboardFrame, in: snapshot.elements,
+                                                 screen: snapshot.screen)
+        for element in snapshot.elements where element.scrollable == true && !keyboard.isKeyboardChrome(element) {
             guard let visible = ScrollGeometry.intersection(element.frame, snapshot.screen) else {
                 continue
             }

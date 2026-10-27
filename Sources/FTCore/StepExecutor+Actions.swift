@@ -263,6 +263,17 @@ extension StepExecutor {
         var ghostSwipes = 0
         // 救済の動きが慣性を残したか(下の空打ちの根拠。runScrollSearch の leftInertia と同じ規則)
         var ghostLeftInertia = false
+        // 送っても対象が動かなかった(送る前と同じ矩形のまま容器の外)= スクロールの中身ではない。以後は送らない
+        // (実機 Pixel 4a・E2EY-CMP の引き伸ばせるシート: 間引かれた入れ物のせいでシートの頭が本文の一覧の子に
+        // 再配線され ghost と読まれ、tap が本文を2回送ってから押していた)。木だけでは Compose iOS の切り詰められた
+        // 行の子(本物の ghost)と区別できないので、送った結果で止める
+        var ghostDidNotMove = false
+        var frameBeforeGhostSwipe: FTRect?
+        func stillUnmovedGhost() -> Bool {
+            guard let before = frameBeforeGhostSwipe, grabbedGhost(resolved), let now = resolved?.0.frame else { return false }
+            return abs(now.x - before.x) <= 1 && abs(now.y - before.y) <= 1
+                && abs(now.width - before.width) <= 1 && abs(now.height - before.height) <= 1
+        }
         if resolved == nil || grabbedGhost(resolved) {
             if let timeout = step.timeout {
                 // timeout == 0: リトライなし(初回スナップショットのみ。ifCanSelect/select の空振り短縮用)
@@ -303,6 +314,7 @@ extension StepExecutor {
                     // 「内側に居るとき」しか使われない)
                     if attempt > 0, grabbedGhost(resolved),
                        let element = resolved?.0 {
+                        frameBeforeGhostSwipe = element.frame
                         let finger = FTSwipeDirection(rawValue: step.direction ?? "") ?? .up
                         let container = ContainerGeometry.clippingContainer(
                             of: element, in: snapshot.elements,
@@ -325,6 +337,7 @@ extension StepExecutor {
                             resolved = LocatorResolver.resolve(step: step, in: snapshot)
                             if previous != nil { ghostRetries += 1 }
                             if resolved != nil, !grabbedGhost(resolved) { break }
+                            if stillUnmovedGhost() { ghostDidNotMove = true; break }
                             continue
                         }
                         // **行き過ぎた側なら逆へ送る**(recoveryDirection 参照)。同じ向きに
@@ -351,6 +364,7 @@ extension StepExecutor {
                     resolved = LocatorResolver.resolve(step: step, in: snapshot)
                     if previous != nil { ghostRetries += 1 }
                     if resolved != nil, !grabbedGhost(resolved) { break }
+                    if stillUnmovedGhost() { ghostDidNotMove = true; break }
                 }
             }
         }
@@ -407,8 +421,9 @@ extension StepExecutor {
         if grabbedGhost(resolved) {
             noteCodesThisStep.insert(.actedOutsideContainer)
             ghostNote = "the element is still reported outside its scroll container"
-                + " (\(ghostRetries) re-resolve(s), \(ghostSwipes) extra swipe(s));"
-                + " the interaction may be swallowed"
+                + " (\(ghostRetries) re-resolve(s), \(ghostSwipes) extra swipe(s))"
+                + (ghostDidNotMove ? " and did not move when the container was swiped, so no more swipes were sent" : "")
+                + "; the interaction may be swallowed"
         } else if ghostRetries > 0 {
             ghostNote = "re-resolved \(ghostRetries) time(s)"
                 + (ghostSwipes > 0 ? " with \(ghostSwipes) extra swipe(s)" : "")
@@ -538,8 +553,15 @@ extension StepExecutor {
         // セレクタが2件以上に一致していたら数を控える(1件目を撃った。ft_batch が行に添える)。
         // 序数・相対の指定は利用者が1つを選んでいるので数えない(candidates はそれらを見ない)
         if let locator = step.locator, locator.index == nil, locator.relative?.isEmpty ?? true,
-           let count = LocatorResolver.candidates(locator, elements: snapshot.elements)?.count, count > 1 {
-            ambiguousMatchCountThisStep = count
+           let candidates = LocatorResolver.candidates(locator, elements: snapshot.elements), candidates.count > 1 {
+            // **撃った要素と同じ鎖(祖先・子孫)の一致は1件に数える**: 行とその中のラベルはどちらを撃っても同じ
+            // (実機 Pixel 4a・SE3: tap 'メディア 12' / '行 40' に毎回「2件に一致」と出ていた)。鎖に操作できる要素が
+            // 2つ以上あるとき(画面規模の面と中の小さなボタン)は別の動作になりうるので従来どおり数える
+            let chain = TapTargetGeometry.lineage(of: element, in: snapshot.elements)
+            let inChain = candidates.filter { chain.contains($0.ref) }
+            let collapses = inChain.filter { TapTargetGeometry.interactiveTypes.contains($0.type) }.count <= 1
+            let count = collapses ? candidates.count - inChain.count + 1 : candidates.count
+            if count > 1 { ambiguousMatchCountThisStep = count }
         }
 
         // **容器の縁にまたがった要素はそのまま撃たない**。見えている部分を撃っても、
@@ -562,7 +584,12 @@ extension StepExecutor {
                 snapshot = refreshed
                 element = moved
                 resolvedElementThisStep = element
-                straddleNote = "nudged the element fully inside its container before touching it"
+                // **収束を確かめてから「fully inside」と言う**(実機 Pixel 4a の WebView: 寄せは 131px しか動かず、
+                // 行はまだ枠の上端をまたいでいたのに「fully inside」と出た)。1回で収まらなければ見えている部分を撃つ
+                straddleNote = TapTargetGeometry.straddlingContainerEdge(moved, in: refreshed.elements) == nil
+                    ? "nudged the element fully inside its container before touching it"
+                    : "nudged the element toward the inside of its container, but it still straddles the edge"
+                        + " — touched its visible part"
             }
         }
 
@@ -1164,7 +1191,12 @@ extension StepExecutor {
         case "swipeBy":
             // iOS/3ボタン navigation は nil → 除外なし(0, 0)。既定値を panPath 側に置かないのは
             // この分岐に確実に決めさせるため(ScrollGeometry.panPath の doc 参照)
-            let backGestureEdgeWidths = await driver.backGestureEdgeWidths() ?? (left: 0, right: 0, bottom: 0)
+            let readWidths = await driver.backGestureEdgeWidths()
+            let backGestureEdgeWidths = readWidths ?? (left: 0, right: 0, bottom: 0)
+            // **Android で帯を読めなかった事実は言う**: 除かずに払うので、端まで届く払いの始点・終点が帯に乗ると OS の
+            // 「戻る」として消費される(E2EX-CMP android 不具合の回帰 S0050 で1回: dx -0.9 の始点は帯を読めないと x 1026 =
+            // 右の帯 1002〜 の中、読めていれば 956)。原因の帰属はこの注記が出た回だけできる
+            if isAndroid, readWidths == nil { bandNote = Self.backGestureBandUnreadNote }
             guard let path = ScrollGeometry.panPath(container: target, viewport: viewport,
                                                     dxRatio: step.dxRatio ?? 0,
                                                     dyRatio: step.dyRatio ?? 0,

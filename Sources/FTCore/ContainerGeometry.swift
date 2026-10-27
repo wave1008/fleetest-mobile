@@ -286,6 +286,7 @@ public enum ContainerGeometry {
                 && ScrollGeometry.intersection(other.frame, container) != nil
         }
         guard !sameHeightInside else { return false }
+        if topBand && followsAscendingRows(element, container: container, in: elements) { return true }
         return elements.contains { other in
             other.ref != element.ref && other.depth == element.depth
                 && abs(other.frame.y - f.y) <= tol && abs(other.frame.height - f.height) <= tol
@@ -294,6 +295,24 @@ public enum ContainerGeometry {
                 && ScrollGeometry.intersection(other.frame, container) == nil
                 && TapTargetGeometry.contains(screen, other.frame)
         }
+    }
+
+    /// (6) の代わり(上帯だけ): 容器の内側の同じ depth の兄弟(2件以上・y の昇順 = 反転していない並び)より
+    /// **preorder で後ろ**に居る。上へ押し出された行は見えている行より前に並ぶので、後ろに来る上帯の要素は行ではない。
+    /// 実機 Pixel 4a(E2EY-CMP 入れ子スクロール): 上部バーの入れ物が間引かれ、`#btn_back`(d10)と題名(d11)が
+    /// 一覧(d9)の部分木の直後に来て一覧の子に再配線される。題名と depth が揃わず (6) の相棒が居ないので ghost と読まれ、
+    /// DSL の tap が一覧を2回送ってから押していた。**反転した並び(チャット)は除く** —— 上へ押し出された行が後ろに並びうる。
+    /// 下帯は対にしない(下部タブは中身の後ろに並ぶのが普通 = 順序が行と区別できない)
+    private static func followsAscendingRows(_ element: ElementInfo, container: FTRect,
+                                             in elements: [ElementInfo]) -> Bool {
+        guard let index = elements.firstIndex(where: { $0.ref == element.ref }) else { return false }
+        let inside = elements.enumerated().filter { _, other in
+            other.ref != element.ref && other.depth == element.depth
+                && ScrollGeometry.intersection(other.frame, container) != nil
+        }
+        guard inside.count >= 2, inside.allSatisfy({ $0.offset < index }) else { return false }
+        let ys = inside.map(\.element.frame.y)
+        return zip(ys, ys.dropFirst()).allSatisfy { $0 <= $1 }
     }
 
     /// chrome 判定の縁の丸め許容(pt/px)。`sameFrame`/`TapTargetGeometry.contains` と同じ

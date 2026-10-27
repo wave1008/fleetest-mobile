@@ -15,7 +15,7 @@ extension AndroidDriver {
     /// デバイス側の listen ポート(全デバイス共通。デバイス毎に独立 loopback なので衝突しない)
     static let bridgeDevicePort: UInt16 = 8123
     /// AndroidRunner/build.sh の VERSION_CODE と同期(不一致なら自動で再インストール)
-    public static let expectedBridgeVersionCode = 109
+    public static let expectedBridgeVersionCode = 111
     /// am instrument の起動コマンド自身の stdout/stderr の逃がし先(デバイス側。shell が書ける
     /// /data/local/tmp)。起動失敗時だけホストへ pull する(persistInstrumentFailureLog)
     static let instrumentDeviceLogPath = "/data/local/tmp/ftbridge-instrument.log"
@@ -267,7 +267,7 @@ extension AndroidDriver {
             if let (client, version, _) = probed, version == Self.expectedBridgeVersionCode {
                 return client
             }
-            throw AndroidBridgeHeldByAnotherSession(serial: serial)
+            throw AndroidBridgeHeldByAnotherSession(serial: serial, runningVersion: probed?.1)
         }
 
         // sys.boot_completed は起動直後でも既に 1 なのでゲートに使えない(ProfileWorkerFactory の
@@ -758,8 +758,14 @@ extension AndroidDriver {
 /// その bridge up も同じ門で断られる。文言は完成文(`errorDescription` をそのまま出す)
 public struct AndroidBridgeHeldByAnotherSession: Error, LocalizedError {
     public let serial: String
+    /// 探りに答えたブリッジの版(nil = 答えなかった)。**答えた版違いを「応答しない」と言わない**(実機 Pixel 4a: 別の
+    /// MCP セッションが使う v109 が答えているのに、v110 を期待する側が "is not answering" と出していた)
+    public let runningVersion: Int?
     public var errorDescription: String? {
-        "the Android bridge on \(serial) is not answering, and it was not restarted: another session"
+        let state = runningVersion.map {
+            "is running another version (\($0); this build expects \(AndroidDriver.expectedBridgeVersionCode))"
+        } ?? "is not answering"
+        return "the Android bridge on \(serial) \(state), and it was not restarted: another session"
             + " (a fleetest run or an MCP session) is using this device, and restarting it would take that"
             + " session's bridge down. Wait for that session to finish, or drive another device"
     }

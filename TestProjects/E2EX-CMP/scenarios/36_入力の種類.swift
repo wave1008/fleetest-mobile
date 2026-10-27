@@ -33,6 +33,18 @@ class 入力の種類ごとに入力できること {
                     select("#txt_multiline_echo").textIs("lines=3")
                 }
             }
+            scene(4, "複数行の欄では pressEnter が改行になる") {
+                action {
+                    // Android の Compose は未解決(複数行を申告しないので改行にならない = docs/open-issues.md OI-34)
+                    ios {
+                        type("#field_multiline", "d", replace: true)
+                        pressEnter()
+                        type("e")
+                    }
+                }.expectation {
+                    ios { select("#txt_multiline_echo").textIs("lines=2") }
+                }
+            }
         }
     }
 

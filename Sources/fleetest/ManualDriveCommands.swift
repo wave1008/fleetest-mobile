@@ -125,7 +125,13 @@ struct Tap: AsyncParsableCommand {
 
     @OptionGroup var driverOptions: DriverOptions
 
-    func validate() throws { try driverOptions.rejectDeviceTargetMismatch() }
+    func validate() throws {
+        try driverOptions.rejectDeviceTargetMismatch()
+        // 有限でない座標はブリッジへの JSON にできず、Swift の EncodingError がそのまま出ていた(CLI ファズ: --x 1e400)
+        for (name, value) in [("--x", x), ("--y", y)] {
+            if let value, !value.isFinite { throw ValidationError("\(name) must be a finite number (got \(value))") }
+        }
+    }
 
     func run() async throws {
         if let ref {
@@ -191,7 +197,14 @@ struct Press: AsyncParsableCommand {
 
     @OptionGroup var driverOptions: DriverOptions
 
-    func validate() throws { try driverOptions.rejectDeviceTargetMismatch() }
+    func validate() throws {
+        try driverOptions.rejectDeviceTargetMismatch()
+        // MCP の ft_long_press と同じ上限(長い押下はランナーを握る)。0 以下・無限大は撃たない
+        guard holdSeconds.isFinite, holdSeconds > 0, holdSeconds <= BridgeAPI.defaultMaxGestureSeconds else {
+            throw ValidationError("--hold-seconds must be greater than 0 and at most"
+                + " \(FTSeconds.format(BridgeAPI.defaultMaxGestureSeconds))s (got \(holdSeconds))")
+        }
+    }
 
     func run() async throws {
         try await driverOptions.makeDriver().press(ref: ref, duration: holdSeconds)

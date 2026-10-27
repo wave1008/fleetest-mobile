@@ -739,6 +739,13 @@ final class InputInjector {
             throw new BridgeRouter.BridgeException(409,
                     "no-input-focus: nothing has input focus (tap the field by ref first)");
         }
+        // **複数行の欄では撃たない**(ホストの keyevent 66 = 改行へ回す)。ACTION_IME_ENTER は複数行の RN で改行にも
+        // アクションにもならないのに true を返す(実機 Pixel 3a: 値が変わらず ime=0。keyevent 66 は改行が入った)。
+        // **Compose を keyevent へ回さない**: Compose は isMultiLine を申告しないが、keyevent 66 は単一行の ImeAction.Next を
+        // 起こさない(E2EX-CMP 入力の種類 S0020 で焦点が移らず赤)。Compose の複数行は未解決(open-issues OI-34)
+        if (focus.isMultiLine()) {
+            throw new BridgeRouter.BridgeException(409, "multi-line field: Enter is sent as a key event (a new line)");
+        }
         // ホストがキーイベント経路へフォールバックできるよう、失敗は 409 で返す(500 にしない)
         if (!focus.performAction(AccessibilityNodeInfo.AccessibilityAction.ACTION_IME_ENTER.getId())) {
             throw new BridgeRouter.BridgeException(409, "the IME Enter action could not be performed");

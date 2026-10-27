@@ -72,6 +72,19 @@
   止めても記録しなかったので、止めたときに1行残すようにした
 - 要る材料: 次に起きたときの、各プロセスのログの「stopped the USB tunnel (iproxy pid …) on port …」
 
+### OI-35 E2EX-iOS(xcuitest)入力の種類 S0040 で、キーボードの下の echo を送り出さずに可視性検証で赤
+- 状態: 再現済み
+- 確認: コミット未記録(2026-10-27)
+- 経緯: 2026-10-27 に2回(フル回帰の -01・負荷テスト中の確認の -03。修正前の HEAD と修正後の両方。それ以前の履歴はほぼ緑)
+
+- 症状: `type("#field_bottom", "xyz", scroll: .down)` の後の `select("#txt_bottom_echo", scroll: .down)` が「not visible」で空を返し、
+  `textIs` がテキストの可視性検証(notRendered・切り出しは灰色一色)で赤。失敗時の木: echo (16,549 91x20)・`#inputView` と予測変換バー
+  `#SystemInputAssistantView` が y 538 から = 実際にキーボードの下(判定は事実どおり)
+- 分かったこと: 探索はキーボードの実効矩形(予測変換バー込み)を差し引いて「見えていない」と数える直しが入っている(StepExecutor+ScrollSearch)。
+  それでも送り出さずに止まった
+- 未解決: 全画面の scrollView がもう送れない位置(中身の終わり)だったのか、キーボードが上がる途中の読みで判断したのか
+- 要る材料: 失敗した回の探索の注記(送った回数・端の判定)と、その時点の木の時系列
+
 ### OI-6 頻度の低い赤
 - 状態: 再現済み
 - 確認: コミット未記録(2026-10-22)
@@ -396,6 +409,18 @@
   ロックを握ったまま使用中を待っていた)が実際に出た。今は `DynamicDispatcherTests` / `LocalLeaseRefusalBeforeDispatchTests` の
   ソース走査(文字列の出現順)が3か所の並びを固定している
 - 手がかり: 前段を1つの部品へ寄せ、3経路は差分(NDJSON の出し口・複数対象のプロジェクトごとのビルド)だけを渡す
+
+### OI-34 Android の Compose の複数行の欄で pressEnter が何もせずに成功する
+- 状態: 経路確定
+- 確認: コミット未記録(2026-10-27)
+
+- ブリッジの pressEnter は a11y の `ACTION_IME_ENTER` を撃つ。複数行の欄では改行にもアクションにもならないのに true が返る。
+  `isMultiLine` を申告する欄(RN・View/XML・Flutter)は v111 から keyevent 66(改行)へ回したが、**Compose の欄は申告しない**ので残る
+  (実機 Pixel 3a・E2E-CMP: `type '#field_multiline' 'A'; pressEnter; type 'B'` → "AB")
+- **Compose の欄を一律に keyevent 66 へ回す案は退行**: keyevent 66 は複数行で改行・単一行の Done は起こすが、単一行の ImeAction.Next
+  (次の欄へ)を起こさない(E2EX-CMP android 入力の種類 S0020 が赤)。Compose の欄は `availableExtraData` の
+  `androidx.compose.ui.semantics.id` で見分けられるが、複数行か(isMultiLine・inputType)は a11y に出ない
+- 手がかり: 複数行かを知る別の印を実機で探す。証人は E2EX-CMP `入力の種類` S0010 場面4(今は `ios { }` に閉じてある)
 
 ## 設計判断で据え置いているもの(直さないと決めた。症状が出たら見直す)
 

@@ -652,7 +652,9 @@ extension MCPServer {
             launchArgs["bundleId"] = launchBundle
             let start = clock.now
             do {
-                _ = try await ftLaunch(launchArgs)
+                // 段を戻す: ftLaunch は自分の段(launching the app)を立てたまま返すので、包まないと
+                // 後の手順の時間まで起動に積まれる(実機 SE3: 起動 3.2 秒の batch が「launching the app 31.2s」)
+                _ = try await SlowCallWatchdog.marking("launch:") { try await ftLaunch(launchArgs) }
             } catch {
                 throw MCPError("launch \(launchBundle) failed — no step was run: \(error.localizedDescription)")
             }

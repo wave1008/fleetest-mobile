@@ -123,6 +123,23 @@ final class MCPWaitMissPromptNoteTests: XCTestCase {
         XCTAssertFalse(later.contains("Tap these by ref"), later)
     }
 
+    /// **brief は代替を列挙しないので「次のどれかを書け」と言わない**(実機 Pixel 4a の ft_launch snapshotAfter:
+    /// 一意な id を持つ「ホーム」×2 に、凡例付きの「Write one of these instead」の後に ref だけが並んだ)
+    func testBriefHeaderDoesNotPromiseAlternatives() {
+        let labels = tree([el(2, "button", "項目", id: "item_a", y: 100), el(3, "button", "項目", id: "item_b", y: 200)])
+        for abbreviated in [false, true] {
+            let brief = MCPServer.ambiguousLabelsNote(labels, abbreviated: abbreviated, brief: true)
+            XCTAssertTrue(brief.contains("\"項目\" ×2"), brief)
+            XCTAssertFalse(brief.lowercased().contains("write one of these instead"), brief)
+        }
+        XCTAssertTrue(MCPServer.ambiguousLabelsNote(labels, abbreviated: false, brief: false)
+            .contains("Write one of these instead"), "全形は代替を列挙するので言う")
+        let ids = tree([el(2, "button", "A", id: "dup", y: 100), el(3, "button", "B", id: "dup", y: 200)])
+        let briefIDs = MCPServer.duplicateIDsNote(ids, abbreviated: false, brief: true)
+        XCTAssertTrue(briefIDs.contains("#dup ×2"), briefIDs)
+        XCTAssertFalse(briefIDs.lowercased().contains("write one of these instead"), briefIDs)
+    }
+
     /// **金額の表記が待った語と違うときに言う**(`*円*` で待ったのに画面は `¥715`)。同じ表記・金額の無い画面では黙る
     func testCurrencyNotationIsNamedWhenTheWaitUsedAnotherMark() {
         let yen = tree([el(1, "staticText", "2, 番線, ¥715 IC料金"), el(2, "button", "経路")])

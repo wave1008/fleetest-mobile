@@ -131,7 +131,7 @@ final class ForeignLeaseAutoRestartGateTests: XCTestCase {
         }
         XCTAssertTrue(first.lowerBound < cache.lowerBound, "キャッシュする汎用の catch より後で拾っている")
         XCTAssertTrue(last.lowerBound < wrap.lowerBound, "到達不能で包む汎用の catch より後で拾っている")
-        XCTAssertTrue(compact(startRaw).contains("throwAndroidBridgeHeldByAnotherSession(serial:serial)"),
+        XCTAssertTrue(compact(startRaw).contains("throwAndroidBridgeHeldByAnotherSession(serial:serial,"),
                       "startBridge が使用中を専用の型で投げていない")
     }
 

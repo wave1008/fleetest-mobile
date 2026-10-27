@@ -1255,6 +1255,11 @@ struct RemoteRunDispatcher {
         if exitCode == sshConnectionFailureStatus {
             return "note: the remote produced no reports (ssh exited 255, so whether the run started at all is unknown)"
         }
+        // **exit 0 は失敗と言わない**: 終わり際にシナリオ単位で手伝いに入った子は、取る前に他のマシンが全部取り終えると
+        // 1本も回さずに 0 で抜ける(10/27 の回帰: M1Max の E2EY-CMP xcuitest が test time "-"・exit 0 なのに「failed」と出た)
+        if exitCode == 0 {
+            return "note: the remote produced no reports (it exited 0 without running a scenario)"
+        }
         return "note: the remote produced no reports (the run failed before writing any)"
     }
 

@@ -110,11 +110,13 @@ extension MCPServer {
     /// 短縮形にしても 2,894B にしか下がらない
     private static func renderGroups(_ sortedGroups: [(label: String, matches: [ElementInfo])],
                                      naming: SelectorNaming, in snapshot: SnapshotResponse,
-                                     fullHeader: String, shortHeader: String,
+                                     fullHeader: String, shortHeader: String, briefHeader: String,
                                      overflowNoun: String, abbreviated: Bool,
                                      brief: Bool = false) -> String {
         guard !sortedGroups.isEmpty else { return "" }
-        var lines: [String] = [abbreviated ? shortHeader : fullHeader]
+        // brief は代替セレクタを列挙しないので「Write one of these instead」と凡例を言わない(言うと列挙の無い一覧を
+        // 書けと読ませる。実機 Pixel 4a: 一意な id を持つ2件に「次のどれかを書け」→ ref だけが並んだ)
+        var lines: [String] = [brief ? briefHeader : abbreviated ? shortHeader : fullHeader]
         var anyStable = false
         if brief {
             // **既に畳まれている群には触らない**(実測で踏んだ): 全群が
@@ -146,8 +148,8 @@ extension MCPServer {
             }
             // **定型のフッターは初出(凡例と同じ回)だけ**(ref で打つ探索中は毎回読まない = 計測で指摘)
             if foldedAny, !abbreviated {
-                lines.append("  Tap these by ref. To get a selector for one of them,"
-                    + " ft_tap prints the selector it recommends for the element it hit.")
+                lines.append("  Tap these by ref. To get a selector for one of them, ft_snapshot lists the"
+                    + " alternatives, and ft_tap prints the selector it recommends for the element it hit.")
             }
             return Self.foldingSharedReasons(lines).joined(separator: "\n") + "\n"
         }
@@ -256,6 +258,8 @@ extension MCPServer {
                                 + " weakest of the three):",
                             shortHeader: "note: ambiguous labels — write one of these instead"
                                 + " (legend in the first snapshot's note):",
+                            briefHeader: "note: these labels match multiple elements, so a plain label"
+                                + " selector cannot pick one uniquely:",
                             overflowNoun: "ambiguous label", abbreviated: abbreviated, brief: brief)
     }
 
@@ -300,6 +304,8 @@ extension MCPServer {
                                 + " weakest of the three):",
                             shortHeader: "note: duplicate ids — write one of these instead"
                                 + " (legend in the first snapshot's note):",
+                            briefHeader: "note: these ids are shared by multiple elements, so a plain"
+                                + " #id selector cannot pick one uniquely:",
                             overflowNoun: "duplicate id", abbreviated: abbreviated, brief: brief)
     }
 

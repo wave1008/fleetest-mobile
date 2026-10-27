@@ -1203,4 +1203,7 @@ public struct KeyboardOcclusion: Sendable {
     }
 
     public func covers(_ element: ElementInfo) -> Bool { advisory(for: element) != nil }
+
+    /// キーボードの部品(chrome 自身とその部分木)か。アプリの要素として数えない呼び手が使う
+    public func isKeyboardChrome(_ element: ElementInfo) -> Bool { excluded.contains(element.ref) }
 }
