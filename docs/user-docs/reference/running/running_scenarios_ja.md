@@ -41,7 +41,7 @@ FM を呼ぶのは実行プロファイルの `fmTextVisibilityCheck` / `screenL
 | `--wait-lock <秒>` | この Mac で別の run が走っているとき、すぐ失敗せずに待機列に並んで待つ上限(秒) |
 | `--device <名>` | 実行プロファイルのそのデバイスだけで実行する(複数回指定可)。`--broadcast` の絞り込みにも使える |
 | `--all-machines` | `--device` の名前が複数のマシンのデバイスに当たるとき、断らずに当たった全マシンで実行する |
-| `--target <プロジェクト>:<プロファイル>` | 複数のプロジェクト・プロファイルを1回の実行で回す(繰り返して指定する。例: `--target AppA:ios-run --target AppB:android-run`)。空いたマシンは、実行プロファイルにそのマシンのデバイスがある対象を次に受け取る(速いマシンのほうが早く終わる見込みなら受け取らずに待つ)。始める対象が残っていなければ、走っている対象にシナリオ単位で加わる。各マシンが同時に回すのは1つの対象だけ。`--project`/`--profile` とは併用できず、対象が2つ以上のとき(`--profile` の繰り返しも同じ)は `--broadcast`・`--fleet`・`--runner`・`--dry-run`・`--scenario`・`--folder`・`--failed`・`--port`・`--platform`・`--serial`・`--app-id`・`--device`・`--all-machines` を併用できない。`fleetest api run` には無い |
+| `--target <プロジェクト>:<プロファイル>` | 複数のプロジェクト・プロファイルを1回の実行で回す(繰り返して指定する。例: `--target AppA:ios-run --target AppB:android-run`)。空いたマシンは、実行プロファイルにそのマシンのデバイスがある対象を次に受け取る(速いマシンのほうが早く終わる見込みなら受け取らずに待つ)。始める対象が残っていなければ、走っている対象にシナリオ単位で加わる。各マシンが同時に回すのは1つの対象だけ。`--project`/`--profile` とは併用できず、対象が2つ以上のとき(`--profile` の繰り返しも同じ)は `--broadcast`・`--fleet`・`--runner`・`--dry-run`・`--scenario`・`--folder`・`--failed`・`--port`・`--platform`・`--serial`・`--app-id`・`--device`・`--all-machines` を併用できない。レスポンス計測の実行プロファイルは複数の対象の1つにできない。`fleetest api run` には無い |
 | `--platform <ios\|android>` | `--profile` 無しでの対象プラットフォーム(既定 `ios`) |
 | `--app-id <bundleID>` | テスト対象のアプリの bundle ID。`--profile` 無しのときだけ必要(プロファイルがあれば実行プロファイルのアプリプロファイルから決まる)。`--set app=...` とは別物(実行プロファイルの `app` キーはアプリ**プロファイル名**を指す) |
 | `--serial <s>` | Android デバイスの serial(`--profile` 無しのとき) |

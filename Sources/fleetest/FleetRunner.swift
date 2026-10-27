@@ -603,6 +603,8 @@ enum FleetRunner {
         // —— 子は SIGTERM のあとに dispatch.lock の解放と終了スクリプトを走らせる
         let relay = InterruptRelay.forwarding(to: process, escalateAfter: nil)
         defer { relay.stop() }
+        // **登録の直前までに届いていた中断を閉じる**(RemoteRunDispatcher の ssh と同じ手当て)
+        if InterruptRelay.hasReceivedInterrupt { process.terminate() }
 
         let pump = PipeLinePump(handle: pipe.fileHandleForReading) { line in
             if lineInterceptor?(line) == true { return }

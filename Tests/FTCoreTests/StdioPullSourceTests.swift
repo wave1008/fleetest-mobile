@@ -96,6 +96,23 @@ final class StdioPullSourceTests: XCTestCase {
         XCTAssertEqual(written.withLock { $0.count }, 1, "中断後の要求は書かずに nil にする")
     }
 
+    /// stdin の移し替え: 移した先で親の返事を読め、元の fd は /dev/null(子プロセスが受け継いでも何も読めない)、移した先は子へ渡らない
+    func testMoveKeepsTheStreamOnAPrivateCloseOnExecDescriptorAndBlanksTheOriginal() {
+        let pipeFDs = makePipe()
+        let original = dup(pipeFDs.read)   // 「stdin」役(テストのプロセスの fd 0 は触らない)
+        XCTAssertGreaterThanOrEqual(original, 0)
+        defer { close(original) }
+        let moved = WorkQueueStdin.move(original)
+        defer { if moved != original { close(moved) } }
+        XCTAssertNotEqual(moved, original, "複製していない")
+        XCTAssertEqual(fcntl(moved, F_GETFD) & FD_CLOEXEC, FD_CLOEXEC, "移した fd が子へ受け継がれる")
+        send("reply", to: pipeFDs.write)
+        var buffer = [UInt8](repeating: 0, count: 16)
+        let n = read(moved, &buffer, buffer.count)
+        XCTAssertEqual(n > 0 ? String(decoding: buffer[0..<n], as: UTF8.self) : "", "reply\n", "移した先で読めない")
+        XCTAssertEqual(read(original, &buffer, buffer.count), 0, "元の fd が /dev/null になっていない(子プロセスが返事を読める)")
+    }
+
     /// 要求と無関係な行(他の JSON・壊れた行)は無視する
     func testUnrelatedInputLinesAreIgnored() async {
         let input = makePipe()

@@ -66,6 +66,11 @@ private final class FakeRunnerFleet: @unchecked Sendable {
 
 final class DispatchPrelockTests: XCTestCase {
 
+    override func tearDown() {
+        InterruptRelay.resetReceivedInterruptForTesting()   // 自分へ SIGINT を撃つテストがある
+        super.tearDown()
+    }
+
     private static let uuids = [
         "M1Ultra": "0A1B2C3D-0000-0000-0000-000000000000",
         "M1mini": "7FFFFFFF-0000-0000-0000-000000000000",

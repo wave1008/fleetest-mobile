@@ -45,6 +45,7 @@ final class InterruptRelay {
     private struct State {
         var targets: [ObjectIdentifier: Target] = [:]
         var sources: [DispatchSourceSignal] = []
+        var received = false
     }
     private static let state = Mutex(State())
 
@@ -106,6 +107,17 @@ final class InterruptRelay {
         }
     }
 
+    /// このプロセスが中断を1度でも受けたか。**登録より前に届いた中断は、登録した側が自分で閉じる**のに使う
+    /// (forwardToAll は届いた時点の登録簿にしか伝えない = 起動から登録までの間に来た中断を子が取りこぼす)
+    static var hasReceivedInterrupt: Bool {
+        state.withLock { $0.received }
+    }
+
+    /// テスト用: 自分へ SIGINT を撃つテストの後片付け(同じプロセスで後に走るテストの子を、起こした直後に止めさせない)
+    static func resetReceivedInterruptForTesting() {
+        state.withLock { $0.received = false }
+    }
+
     /// 現在登録されている子の数(テスト用)
     static var registeredCount: Int {
         state.withLock { $0.targets.count }
@@ -132,7 +144,10 @@ final class InterruptRelay {
     }
 
     private static func forwardToAll() {
-        let snapshot = state.withLock { Array($0.targets.values) }
+        let snapshot = state.withLock { s -> [Target] in
+            s.received = true
+            return Array(s.targets.values)
+        }
         for target in snapshot {
             switch target {
             case .process(let process, let escalateAfter):

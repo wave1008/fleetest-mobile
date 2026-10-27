@@ -119,6 +119,11 @@ enum MultiTargetRunner {
             guard !groups.isEmpty else {
                 throw ValidationError("run profile \"\(target.profile)\" of \(project.name) has no devices")
             }
+            // 計測の反復(responseRepeat)は子だけが展開し、親は同じ ID を1回しか配らない = 指定の回数を回さずに成功する
+            if ProfileResolver.declaresResponseMeasurement(project: project, runName: target.profile, overrides: setOverrides) {
+                throw ValidationError("run profile \"\(target.profile)\" of \(project.name) measures response times;"
+                    + " run it on its own (not together with other targets)")
+            }
             resolvedTargets.append(Resolved(project: project, profile: target.profile, groups: groups))
         }
         // マシン一覧(全対象のグループのラベル。初出の順)
@@ -148,7 +153,9 @@ enum MultiTargetRunner {
         var healByProject: [String: HealSourceWriteBack.Collection] = [:]
         for target in resolvedTargets where built.insert(target.project.name).inserted {
             if !skipBuild { try ScenarioHost.build(project: target.project, log: { FleetRunner.log($0) }) }
-            let all = try ScenarioHost.listForRun(project: target.project, dryRun: false, compilesOCR: false)
+            // 通常の入口と同じ選択(`@Draft` / `@Deleted` を外す)。子へは完全一致の ID で渡すので、子の側では外れない
+            let all = try ScenarioSelection.resolve(
+                [], from: ScenarioHost.listForRun(project: target.project, dryRun: false, compilesOCR: false))
             guard !all.isEmpty else {
                 throw ValidationError(
                     "no scenarios (add a @TestClass under TestProjects/\(target.project.name)/scenarios/)")
@@ -185,7 +192,7 @@ enum MultiTargetRunner {
             let estimate = DeviceMachineRunner.dynamicEstimator(inputs: inputs, groups: target.groups)
             let jobID = id
             let dispatcher = DynamicDispatcher(
-                scenarios: resolved, estimateMs: estimate, nowMs: clock,
+                scenarios: resolved, estimateMs: estimate, nowMs: clock, lpt: !noLPT,
                 send: { entry, reply in
                     writers.withLock { $0[MultiTargetRunner.writerKey(jobID, entry)] }?.write(line: WorkQueueProtocol.encode(reply))
                 })
@@ -278,7 +285,7 @@ enum MultiTargetRunner {
         }
         let coordinator = MultiTargetCoordinator(
             jobs: specs, machineCount: machineLabels.count, overheadMs: overheadByMachine,
-            nowMs: clock, launch: launch, log: { FleetRunner.log($0) })
+            nowMs: clock, lpt: !noLPT, launch: launch, log: { FleetRunner.log($0) })
         let relay = InterruptRelay.observing { coordinator.interrupt() }
         defer { relay.stop() }
         let wallStart = clock()
@@ -460,11 +467,15 @@ final class MultiTargetCoordinator: Sendable {
     private let timer: DynamicDispatcher.Timer
     private let launch: Launch
     private let log: @Sendable (String) -> Void
+    /// false = `--no-lpt`(未着手の仕事を宣言の順に試す)
+    private let lpt: Bool
 
     init(jobs: [Job], machineCount: Int, overheadMs: [Double],
          nowMs: @escaping @Sendable () -> Double = DynamicDispatcher.monotonicClock(),
          timer: @escaping DynamicDispatcher.Timer = DynamicDispatcher.dispatchTimer,
+         lpt: Bool = true,
          launch: @escaping Launch, log: @escaping @Sendable (String) -> Void = { _ in }) {
+        self.lpt = lpt
         self.jobs = Dictionary(jobs.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         self.overheadMs = overheadMs
         self.nowMs = nowMs
@@ -593,6 +604,20 @@ final class MultiTargetCoordinator: Sendable {
             return out
         }
         for (job, machine) in starts {
+            // **予約したあとに中断が来ていたら起こさない**(予約はロックの中・起動は外なので、その間の中断を見落とすと
+            // 中断のあとに子が起きる)。予約を戻して終わりの判定をし直す
+            let cancelled = state.withLock { s -> Bool in
+                guard s.interrupted else { return false }
+                s.active -= 1
+                s.running[job]?.remove(machine)
+                if s.running[job]?.isEmpty == true { s.running.removeValue(forKey: job) }
+                s.status[machine] = .finished
+                return true
+            }
+            if cancelled {
+                reconsider()
+                continue
+            }
             launch(job, machine) { [self] code in childFinished(job: job, machine: machine, exitCode: code) }
         }
     }
@@ -611,7 +636,7 @@ final class MultiTargetCoordinator: Sendable {
             hasPending: { id in !(jobs[id]?.pending().isEmpty ?? true) },
             machines: states,
             aloneMs: { id, m in aloneMs(job: id, machine: m, state: snapshot) },
-            overheadMs: { m in m < overheadMs.count ? overheadMs[m] : 0 })
+            overheadMs: { m in m < overheadMs.count ? overheadMs[m] : 0 }, lpt: lpt)
     }
 
     /// その仕事を、このマシンのこの仕事のデバイスだけで、まだ配っていない分を全部回す時間[ms]。

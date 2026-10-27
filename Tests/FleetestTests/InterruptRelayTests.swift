@@ -9,6 +9,36 @@ import XCTest
 /// 落ちる(= 検出)。壊れていない限り無害
 final class InterruptRelayTests: XCTestCase {
 
+    override func tearDown() {
+        InterruptRelay.resetReceivedInterruptForTesting()
+        super.tearDown()
+    }
+
+    /// 中断を受けた印が立つ(起動から登録までの間に来た中断を、登録した側が閉じるのに使う。FleetRunner.runEntry)
+    func testSignalMarksTheProcessAsInterrupted() throws {
+        let p = try sleeper()
+        defer { if p.isRunning { p.terminate() } }
+        let relay = InterruptRelay.forwarding(to: p, escalateAfter: nil)
+        defer { relay.stop() }
+        XCTAssertFalse(InterruptRelay.hasReceivedInterrupt)
+        kill(getpid(), SIGINT)
+        let deadline = Date().addingTimeInterval(5)
+        while !InterruptRelay.hasReceivedInterrupt, Date() < deadline { Thread.sleep(forTimeInterval: 0.05) }
+        XCTAssertTrue(InterruptRelay.hasReceivedInterrupt)
+    }
+
+    /// runEntry は登録の直後に、それより前に届いていた中断を閉じる(ソース走査)
+    func testRunEntryClosesAnInterruptThatArrivedBeforeRegistration() throws {
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        let source = try String(contentsOf: root.appendingPathComponent("Sources/fleetest/FleetRunner.swift"), encoding: .utf8)
+        let expected = "let relay = InterruptRelay.forwarding(to: process, escalateAfter: nil)\n"
+            + "        defer { relay.stop() }\n"
+            + "        // **登録の直前までに届いていた中断を閉じる**(RemoteRunDispatcher の ssh と同じ手当て)\n"
+            + "        if InterruptRelay.hasReceivedInterrupt { process.terminate() }\n"
+        XCTAssertTrue(source.contains(expected), "runEntry が登録より前に届いた中断を閉じていない")
+    }
+
     private func sleeper() throws -> Process {
         let p = Process()
         p.executableURL = URL(fileURLWithPath: "/bin/sleep")

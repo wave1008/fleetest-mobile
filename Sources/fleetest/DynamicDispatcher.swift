@@ -42,6 +42,8 @@ final class DynamicDispatcher: Sendable {
     private let nowMs: @Sendable () -> Double
     private let timer: Timer
     private let send: @Sendable (Int, WorkQueueProtocol.Reply) -> Void
+    /// false = `--no-lpt`(候補を ID 順に試す)。子のカタログの並びは配る順に効かないので、ここで決める
+    private let lpt: Bool
 
     /// - scenarios: 走らせるシナリオ。platform は解決済み(`resolve`)
     /// - estimateMs: (シナリオ, エントリ番号) → 見込み[ms]。エントリ番号は DynamicSplit.Lane.entry と同じ
@@ -50,7 +52,9 @@ final class DynamicDispatcher: Sendable {
          estimateMs: @escaping @Sendable (DynamicSplit.Scenario, Int) -> Double,
          nowMs: @escaping @Sendable () -> Double = DynamicDispatcher.monotonicClock(),
          timer: @escaping Timer = DynamicDispatcher.dispatchTimer,
+         lpt: Bool,
          send: @escaping @Sendable (Int, WorkQueueProtocol.Reply) -> Void) {
+        self.lpt = lpt
         state = LockedValue(State(pending: scenarios))
         self.estimateMs = estimateMs
         self.nowMs = nowMs
@@ -145,7 +149,7 @@ final class DynamicDispatcher: Sendable {
                     laneStates.append(DynamicSplit.LaneState(lane: lane, busy: info))
                 }
                 let decision = DynamicSplit.decide(
-                    for: held.lane, now: now, pending: s.pending, lanes: laneStates, estimateMs: estimateMs)
+                    for: held.lane, now: now, pending: s.pending, lanes: laneStates, estimateMs: estimateMs, lpt: lpt)
                 switch decision {
                 case .assign(let id):
                     guard let index = s.pending.firstIndex(where: { $0.id == id }) else { continue }

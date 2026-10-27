@@ -19,7 +19,7 @@ final class DynamicDispatcherTests: XCTestCase {
         let fires: LockedValue<[@Sendable () -> Void]>
     }
 
-    private func harness(scenarios: [Scenario], base: [String: Double], factors: [Double]) -> Harness {
+    private func harness(scenarios: [Scenario], base: [String: Double], factors: [Double], lpt: Bool = true) -> Harness {
         let clock = LockedValue<Double>(0)
         let sent = LockedValue<[String]>([])
         let timers = LockedValue<[Double]>([])
@@ -33,6 +33,7 @@ final class DynamicDispatcherTests: XCTestCase {
                 fires.withLock { $0.append(fire) }
                 return {}
             },
+            lpt: lpt,
             send: { entry, reply in sent.withLock { $0.append("\(entry):\(WorkQueueProtocol.encode(reply))") } })
         return Harness(dispatcher: dispatcher, clock: clock, sent: sent, timers: timers, fires: fires)
     }
@@ -63,6 +64,13 @@ final class DynamicDispatcherTests: XCTestCase {
         XCTAssertEqual(h.dispatcher.handle(want(1, lane: "a"), fromEntry: 0), .init(req: 1, id: "L"))
         XCTAssertEqual(h.dispatcher.handle(want(1, lane: "b"), fromEntry: 1), .init(req: 1, id: "T"))
         XCTAssertEqual(h.dispatcher.unhandedIDs, ["S"])
+    }
+
+    /// `--no-lpt` は親の配る順に効く(子のカタログの並びでは変わらない)
+    func testNoLPTHandsOutInIDOrder() {
+        let h = harness(scenarios: [ios("Z.long"), ios("A.short")], base: ["Z.long": 10_000, "A.short": 1_000],
+                        factors: [1], lpt: false)
+        XCTAssertEqual(h.dispatcher.handle(want(1, lane: "a"), fromEntry: 0), .init(req: 1, id: "A.short"))
     }
 
     /// 要求を出していないレーン(供給中)は空きと数えない

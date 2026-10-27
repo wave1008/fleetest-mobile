@@ -19,6 +19,8 @@ final class MultiTargetRunnerTests: XCTestCase {
         let pending = LockedValue<[String: [DynamicSplit.Scenario]]>([:])
         let exited = LockedValue<[(job: String, entry: Int)]>([])
         let interrupted = LockedValue<[String]>([])
+        /// 起動の口が呼ばれた直後に呼ぶ(起動の合間に中断が来る順序を作る)
+        let onLaunch = LockedValue<(@Sendable () -> Void)?>(nil)
         var coordinator: MultiTargetCoordinator!
 
         static func key(_ job: String, _ machine: Int) -> String { "\(job)#\(machine)" }
@@ -54,6 +56,7 @@ final class MultiTargetRunnerTests: XCTestCase {
                 launch: { [self] job, machine, finished in
                     launches.withLock { $0.append((job, machine)) }
                     finishers.withLock { $0[Self.key(job, machine)] = finished }
+                    onLaunch.withLock { $0 }?()
                 })
         }
 
@@ -152,6 +155,19 @@ final class MultiTargetRunnerTests: XCTestCase {
         await h.coordinator.waitUntilFinished()
         XCTAssertEqual(h.launched, ["A@0"], "中断後は子を起こさない")
         XCTAssertEqual(h.coordinator.unstartedJobs, ["B"])
+        XCTAssertTrue(h.coordinator.isInterrupted)
+    }
+
+    /// 1回の判定で2台ぶん予約し、1台目を起こした直後に中断が来たら、2台目は起こさずに終わる
+    func testInterruptBetweenReservedLaunchesStartsNoMoreChildren() async {
+        let h = Harness(machines: 2, lanes: ["A": [0, 1], "B": [0, 1]],
+                        scenarios: ["A": 10, "B": 10], order: ["A", "B"])
+        h.onLaunch.withLock { $0 = { [h] in h.coordinator.interrupt() } }
+        h.coordinator.start()
+        XCTAssertEqual(h.launched.count, 1, "中断のあとに予約済みの子を起こした: \(h.launched)")
+        // 起こされた子は全部終わらせてから待つ(変異で2台目が起きても待ちが詰まらない)
+        for launched in h.launches.withLock({ $0 }) { h.finish(launched.job, launched.machine, drain: false) }
+        await h.coordinator.waitUntilFinished()
         XCTAssertTrue(h.coordinator.isInterrupted)
     }
 

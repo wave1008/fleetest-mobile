@@ -54,11 +54,12 @@ public enum DynamicSplit {
 
     public static func decide(
         for requester: Lane, now: Double, pending: [Scenario], lanes: [LaneState],
-        estimateMs: (Scenario, Int) -> Double
+        estimateMs: (Scenario, Int) -> Double, lpt: Bool = true
     ) -> Decision {
+        // lpt false(`--no-lpt`)= 候補を ID 順に試す。待つかどうかの比べ方は変えない
         let candidates = pending.filter { $0.platform == requester.platform }
             .map { (scenario: $0, here: estimateMs($0, requester.entry)) }
-            .sorted { $0.here != $1.here ? $0.here > $1.here : $0.scenario.id < $1.scenario.id }
+            .sorted { lpt && $0.here != $1.here ? $0.here > $1.here : $0.scenario.id < $1.scenario.id }
         if candidates.isEmpty { return .none }
 
         let others = lanes.filter { $0.lane.platform == requester.platform && $0.lane != requester }
@@ -85,7 +86,8 @@ public enum DynamicSplit {
         for state in others {
             guard let busy = state.busy else { continue }
             let expected = busy.since + estimateMs(busy.scenario, state.lane.entry)
-            if expected >= now {
+            // ちょうど今は超過の側で解く(> now の時刻しか採らないので、見込みの側だと時刻が作られずタイマーが消える。JobSchedule と同じ)
+            if expected > now {
                 consider(expected)
             } else {
                 // 超過中は alt も here も時刻に 1:1 で伸びるので、t + (t - expected) + estL >= t + estHere を解く

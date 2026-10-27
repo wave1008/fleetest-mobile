@@ -16,12 +16,19 @@ final class JobScheduleTests: XCTestCase {
     private func decide(
         _ machine: Int, now: Double = 1000, unstarted: [String] = [], running: [String: Set<Int>] = [:],
         pending: Set<String>? = nil, machines: [State], alone: [String: [Int: Double]],
-        overhead: [Int: Double] = [:]
+        overhead: [Int: Double] = [:], lpt: Bool = true
     ) -> JobSchedule.Decision {
         JobSchedule.decide(
             for: machine, now: now, unstarted: unstarted, running: running,
             hasPending: { pending?.contains($0) ?? true }, machines: machines,
-            aloneMs: { alone[$0]?[$1] }, overheadMs: { overhead[$0] ?? 0 })
+            aloneMs: { alone[$0]?[$1] }, overheadMs: { overhead[$0] ?? 0 }, lpt: lpt)
+    }
+
+    /// `--no-lpt`: 見込みの長さではなく宣言の順に試す
+    func testNoLPTTriesJobsInDeclarationOrder() {
+        let alone: [String: [Int: Double]] = ["a": [0: 100, 1: 100], "b": [0: 300, 1: 300]]
+        XCTAssertEqual(
+            decide(0, unstarted: ["a", "b"], machines: [idle(0), idle(1)], alone: alone, lpt: false), .start("a"))
     }
 
     func testEqualIdleMachinesStartLongest() {

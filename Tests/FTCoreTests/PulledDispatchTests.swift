@@ -72,6 +72,30 @@ final class PulledDispatchTests: XCTestCase {
         XCTAssertEqual(source.asked.value.count, 1, "終わった後に聞き直している")
     }
 
+    /// 返事を待つ間に入った再キューは、返事が none でも拾う(拾わずに nil だと健全なレーンが終わり、ドレインで失敗になる)
+    func testRequeueWhileWaitingForTheSourceIsPickedUp() async {
+        final class GatedSource: ScenarioPullSource, @unchecked Sendable {
+            // @unchecked の根拠: 可変状態は LockedValue の中
+            let waiter = LockedValue<CheckedContinuation<String?, Never>?>(nil)
+            func next(platform: String, lane: String) async -> String? {
+                await withCheckedContinuation { continuation in waiter.withLock { $0 = continuation } }
+            }
+            func stopWaiting() {}
+            func answer(_ id: String?) { waiter.withLock { $0?.resume(returning: id); $0 = nil } }
+        }
+        let source = GatedSource()
+        let a = item("A")
+        let queue = ScenarioQueue(pulled: ScenarioQueue.PullState(
+            source: source, platform: "ios", catalog: LockedValue(["A": [a]]),
+            onHandOut: { _ in }, onUnknownID: { _ in }))
+        async let got = queue.next(lane: "healthy")
+        for _ in 0..<200 where source.waiter.withLock({ $0 == nil }) { try? await Task.sleep(for: .milliseconds(10)) }
+        _ = await queue.requeue(a)
+        source.answer(nil)
+        let result = await got
+        XCTAssertEqual(result?.info.id, "A", "待っている間の再キューを拾っていない")
+    }
+
     func testRequeueAfterExhaustionStillRunsLocally() async {
         let source = FakeSource([nil])
         let queue = makeQueue([item("A")], source: source)

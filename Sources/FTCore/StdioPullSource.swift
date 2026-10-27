@@ -15,20 +15,23 @@ public enum WorkQueueStdin {
     public static func claim() -> Int32 {
         claimed.withLock { claimed in
             if let claimed { return claimed }
-            let copy = dup(STDIN_FILENO)
-            guard copy >= 0 else {
-                claimed = STDIN_FILENO
-                return STDIN_FILENO
-            }
-            _ = fcntl(copy, F_SETFD, FD_CLOEXEC)
-            let null = open("/dev/null", O_RDONLY)
-            if null >= 0 {
-                _ = dup2(null, STDIN_FILENO)
-                close(null)
-            }
-            claimed = copy
-            return copy
+            let moved = move(STDIN_FILENO)
+            claimed = moved
+            return moved
         }
+    }
+
+    /// fd の中身を close-on-exec の新しい fd へ移し、元の fd を /dev/null にする。複製できなければ元の fd を返す(テストはパイプで呼ぶ)
+    static func move(_ fd: Int32) -> Int32 {
+        let copy = dup(fd)
+        guard copy >= 0 else { return fd }
+        _ = fcntl(copy, F_SETFD, FD_CLOEXEC)
+        let null = open("/dev/null", O_RDONLY)
+        if null >= 0 {
+            _ = dup2(null, fd)
+            close(null)
+        }
+        return copy
     }
 }
 

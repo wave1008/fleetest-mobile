@@ -574,7 +574,9 @@ actor ScenarioQueue {
         while !pullExhausted {
             guard let id = await pull.source.next(platform: pull.platform, lane: lane ?? "") else {
                 pullExhausted = true
-                return nil
+                // 返事を待つ間に別のレーンが離脱して再キューした分を拾う(拾わずに終わると、回せる健全なレーンが居たのに
+                // ドレインで未実行の失敗になる)
+                return items.isEmpty ? nil : items.removeFirst()
             }
             let item = pull.catalog.withLock { catalog -> ScenarioRunItem? in
                 guard var list = catalog[id], !list.isEmpty else { return nil }

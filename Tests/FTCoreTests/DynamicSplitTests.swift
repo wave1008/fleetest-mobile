@@ -59,6 +59,28 @@ final class DynamicSplitTests: XCTestCase {
         XCTAssertEqual(decision, .assign("s"))
     }
 
+    /// 相手の見込みの時刻ちょうどでも、次に判定し直す時刻を作る(作らないとタイマーが消えて待ちが続く)
+    func testReconsiderTimeIsKeptWhenNowEqualsTheExpectedFreeTime() {
+        let fast = lane(0, "a"), slow = lane(1, "b")
+        // fast は 0 に渡した run(60s)を回していて now = 60s = 見込み。s は fast なら 60 + 60 = 120s・slow なら 60 + 120 = 180s → 待つ。
+        // 反転は t + (t - 60) + 60 >= t + 120 → t >= 120s
+        let decision = DynamicSplit.decide(
+            for: slow, now: 60_000, pending: [scenario("s")],
+            lanes: [State(lane: fast, busy: (scenario("run"), 0)), State(lane: slow, busy: nil)],
+            estimateMs: table(["s": [60_000, 120_000], "run": [60_000, 120_000]]))
+        XCTAssertEqual(decision, .hold(reconsiderAt: 120_000))
+    }
+
+    /// `--no-lpt`: 候補を ID 順に試す(見込みの長さで並べ替えない)
+    func testNoLPTTriesCandidatesInIDOrder() {
+        let fast = lane(0, "a"), other = lane(1, "b")
+        let decision = DynamicSplit.decide(
+            for: fast, now: 0, pending: [scenario("Z.long"), scenario("A.short")],
+            lanes: [State(lane: fast, busy: nil), State(lane: other, busy: nil)],
+            estimateMs: table(["A.short": [10_000, 10_000], "Z.long": [60_000, 60_000]]), lpt: false)
+        XCTAssertEqual(decision, .assign("A.short"))
+    }
+
     func testOverdueLaneEventuallyLetsSlowLaneTake() {
         let fast = lane(0, "a"), slow = lane(1, "b")
         let lanes = [State(lane: fast, busy: (scenario("run"), 0)), State(lane: slow, busy: nil)]

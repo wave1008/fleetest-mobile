@@ -266,7 +266,7 @@ enum DeviceMachineRunner {
         let writers: [Int: ChildStdinWriter] = dynamicPlan == nil ? [:]
             : Dictionary(uniqueKeysWithValues: active.map { ($0.0, ChildStdinWriter()) })
         let dispatcher: DynamicDispatcher? = dynamicPlan.map { plan in
-            DynamicDispatcher(scenarios: plan.scenarios, estimateMs: plan.estimate,
+            DynamicDispatcher(scenarios: plan.scenarios, estimateMs: plan.estimate, lpt: !noLPT,
                               send: { entry, reply in writers[entry]?.write(line: WorkQueueProtocol.encode(reply)) })
         }
         let interruptRelay = dispatcher.map { dispatcher in InterruptRelay.observing { dispatcher.interrupt() } }

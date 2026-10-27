@@ -45,12 +45,15 @@ public enum JobSchedule {
         hasPending: (String) -> Bool,
         machines: [MachineState],
         aloneMs: (String, Int) -> Double?,
-        overheadMs: (Int) -> Double
+        overheadMs: (Int) -> Double,
+        lpt: Bool = true
     ) -> Decision {
         let overhead = overheadMs(machine)
-        let candidates: [(job: String, alone: Double)] = unstarted
+        // lpt false(`--no-lpt`)= unstarted の並び(宣言の順)のまま試す
+        let fitting: [(job: String, alone: Double)] = unstarted
             .compactMap { job in aloneMs(job, machine).map { (job: job, alone: $0) } }
-            .sorted { $0.alone != $1.alone ? $0.alone > $1.alone : $0.job < $1.job }
+        let candidates = lpt
+            ? fitting.sorted { $0.alone != $1.alone ? $0.alone > $1.alone : $0.job < $1.job } : fitting
         let others = machines.filter { $0.machine != machine }
 
         /// 他マシンが空く見込みの時刻。超過中は超過した分だけ後ろへ倒す(安全弁)・見込み無しの busy は無限遠

@@ -198,11 +198,11 @@ enum ApiRunMachineFanout {
         let registry = ChildProcessRegistry()
 
         // 動的な割り振り: 子ごとの stdin 書き込み口(キーは groups の添字 = 配り手のエントリ番号)と配り手。
-        // 中断は親が受けて全要求へ none を返す(返事待ちの子は中断フラグを見られない)
+        // 中断は親が受けて全要求へ none を返す(子も自分の待ちを解く = ScenarioPullSource.stopWaiting)
         let writers: [Int: ChildStdinWriter] = dynamicPlan == nil ? [:]
             : Dictionary(uniqueKeysWithValues: active.map { ($0.index, ChildStdinWriter()) })
         let dispatcher: DynamicDispatcher? = dynamicPlan.map { plan in
-            DynamicDispatcher(scenarios: plan.scenarios, estimateMs: plan.estimate,
+            DynamicDispatcher(scenarios: plan.scenarios, estimateMs: plan.estimate, lpt: !options.noLPT,
                               send: { entry, reply in writers[entry]?.write(line: WorkQueueProtocol.encode(reply)) })
         }
 
