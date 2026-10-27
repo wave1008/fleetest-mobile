@@ -58,7 +58,7 @@ FM を呼ぶのは実行プロファイルの `fmTextVisibilityCheck` / `screenL
 
 ## exit code と失敗セマンティクス
 
-`fleetest run` は全て成功なら `0`、1つでも失敗すれば `1` を返します。シナリオ内では、コマンドが
+`fleetest run` は全て成功なら `0`、1つでも失敗すれば `1` を返します。複数のマシンにまたがる実行や複数の対象をまとめた実行を中断(Ctrl-C)して、回していないシナリオや対象が残ったときは `130` を返します。シナリオ内では、コマンドが
 失敗すると**そのシナリオの以降のステップは全て中断**されます(残る scene・ステップは全て
 スキップ)。`afterEach()` だけは失敗後も実行されます。失敗モデルの詳細は
 [testcode_structure_ja.md](../testclass/testcode_structure_ja.md) を参照してください。

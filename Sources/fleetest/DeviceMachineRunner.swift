@@ -327,10 +327,12 @@ enum DeviceMachineRunner {
             : Dictionary(assignedActive.map { ($0.1.machineLabel, $0.2.count) }, uniquingKeysWith: { first, _ in first })
         // 全部の子が終わっても誰にも渡せなかった分。中断なら失敗にしない(中断した事実が別に出る)
         var neverHandedFailure = false
+        var interruptedWithWorkLeft = false
         if let dispatcher {
             let ids = dispatcher.unhandedIDs
             if !ids.isEmpty {
                 let interrupted = dispatcher.isInterrupted
+                interruptedWithWorkLeft = interrupted
                 FleetRunner.log(neverHandedLine(ids: ids, interrupted: interrupted))
                 if !interrupted {
                     neverHandedFailure = true
@@ -356,11 +358,19 @@ enum DeviceMachineRunner {
                 junit: junit, project: project.name, tempDir: junitTempDir,
                 entries: active.map { (host: $0.1.machineLabel, index: $0.0) })
         }
-        let exitCodes: [Int32] = outcomes.map { $0.exitCode } + (neverHandedFailure ? [1] : [])
-        return FleetProfile.aggregateExitCode(exitCodes)
+        return parentExitCode(childCodes: outcomes.map { $0.exitCode }, neverHandedFailure: neverHandedFailure,
+                              interruptedWithWorkLeft: interruptedWithWorkLeft)
     }
 
     /// 動的な割り振りを使うか。`FT_STATIC_SPLIT=1` は保守者の殺しスイッチ(静的な割り当てへ戻す・利用者向けの口ではない)
+    /// マシンをまたぐ親の終了コード(run の機械分担・api run の機械分担・複数対象の3経路が共有する)。
+    /// - neverHandedFailure: 中断していないのに配れなかったシナリオがある = 1
+    /// - interruptedWithWorkLeft: 中断で配らなかったシナリオ・始めなかった対象が残った = 130。**失敗としては記録しない**が、
+    ///   終了コードを子だけで決めると子が全員 0 のとき 0 になり、未実行を含む回帰を検証済みにできた(regress.py は 0 で印を書く)
+    static func parentExitCode(childCodes: [Int32], neverHandedFailure: Bool, interruptedWithWorkLeft: Bool) -> Int32 {
+        FleetProfile.aggregateExitCode(childCodes + (neverHandedFailure ? [1] : []) + (interruptedWithWorkLeft ? [130] : []))
+    }
+
     /// measuresResponse: レスポンス計測の run は動的にしない —— 反復(responseRepeat)は子だけが展開し、親は同じ ID を1回しか
     /// 配らないので、指定の回数を回さずに成功する(`--device` でリモートの1台に絞ると1グループでもここへ来る)
     static func dynamicSplitEnabled(

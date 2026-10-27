@@ -167,6 +167,30 @@ final class DynamicDispatcherTests: XCTestCase {
         XCTAssertFalse(DeviceMachineRunner.dynamicSplitEnabled(broadcast: true, measuresResponse: false, environment: [:]))
     }
 
+    /// マシンをまたぐ親の終了コード: 子が全員 0 でも、中断で残りがあれば 0 にしない(未実行を含む回帰を検証済みにさせない)
+    func testParentExitCodeIsNonZeroWhenAnInterruptLeftWork() {
+        XCTAssertEqual(DeviceMachineRunner.parentExitCode(childCodes: [0, 0], neverHandedFailure: false,
+                                                          interruptedWithWorkLeft: false), 0)
+        XCTAssertEqual(DeviceMachineRunner.parentExitCode(childCodes: [0, 0], neverHandedFailure: false,
+                                                          interruptedWithWorkLeft: true), 130)
+        XCTAssertEqual(DeviceMachineRunner.parentExitCode(childCodes: [0], neverHandedFailure: true,
+                                                          interruptedWithWorkLeft: false), 1)
+        XCTAssertEqual(DeviceMachineRunner.parentExitCode(childCodes: [143, 0], neverHandedFailure: false,
+                                                          interruptedWithWorkLeft: true), 143)
+    }
+
+    /// 3経路(run の機械分担・api run の機械分担・複数対象)が同じ関数で終了コードを決める(ソース走査)
+    func testAllParentPathsUseTheSharedExitCode() throws {
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        for file in ["Sources/fleetest/DeviceMachineRunner.swift", "Sources/fleetest/ApiRunMachineFanout.swift",
+                     "Sources/fleetest/MultiTargetRunner.swift"] {
+            let text = try String(contentsOf: root.appendingPathComponent(file), encoding: .utf8)
+            XCTAssertTrue(text.contains("interruptedWithWorkLeft: interruptedWithWorkLeft)"),
+                          "\(file) が中断で残った分を終了コードへ載せていない")
+        }
+    }
+
     /// レスポンス計測の run は動的にしない(反復は子だけが展開し、親は同じ ID を1回しか配らない)
     func testResponseMeasurementNeverUsesDynamicSplit() {
         XCTAssertFalse(DeviceMachineRunner.dynamicSplitEnabled(broadcast: false, measuresResponse: true, environment: [:]))

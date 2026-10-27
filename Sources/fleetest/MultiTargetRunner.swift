@@ -308,12 +308,14 @@ enum MultiTargetRunner {
         prelock.releaseAll(exitCodes: lastExit)
 
         var neverHandedFailure = false
+        var interruptedWithWorkLeft = false
         let interrupted = coordinator.isInterrupted
         for job in jobs {
             let ids = job.dispatcher.unhandedIDs
             guard !ids.isEmpty else { continue }
             FleetRunner.log("[\(job.id)] " + DeviceMachineRunner.neverHandedLine(
                 ids: ids, interrupted: job.dispatcher.isInterrupted))
+            if job.dispatcher.isInterrupted { interruptedWithWorkLeft = true }
             if !job.dispatcher.isInterrupted {
                 neverHandedFailure = true
                 for id in ids {
@@ -324,7 +326,7 @@ enum MultiTargetRunner {
         let neverStarted = coordinator.unstartedJobs
         for id in neverStarted {
             FleetRunner.log("⚠️ \(interrupted ? "interrupted: " : "")\(id) was never started on any machine")
-            if !interrupted { neverHandedFailure = true }
+            if !interrupted { neverHandedFailure = true } else { interruptedWithWorkLeft = true }
         }
 
         printSummary(jobs: jobs, machineLabels: machineLabels, outcomes: results, wallSeconds: wallMs / 1000)
@@ -345,7 +347,9 @@ enum MultiTargetRunner {
             FleetRunner.mergeAndWriteJUnit(
                 junit: junit, project: names, tempDir: junitTempDir, entries: childHosts.withLock { $0 })
         }
-        return FleetProfile.aggregateExitCode(results.map(\.exitCode) + (neverHandedFailure ? [1] : []))
+        return DeviceMachineRunner.parentExitCode(
+            childCodes: results.map(\.exitCode), neverHandedFailure: neverHandedFailure,
+            interruptedWithWorkLeft: interruptedWithWorkLeft)
     }
 
     /// 全マシンの送りの固定費[ms]。リモートは facts の dispatchOverheadSeconds(DeviceMachineRunner.assign と同じ出どころ)、手元は 0

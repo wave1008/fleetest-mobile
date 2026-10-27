@@ -59,7 +59,7 @@ in `Package.swift` (profiles, reports and self-healing are borrowed from an exis
 
 ## Exit code and failure semantics
 
-`fleetest run` exits `0` when everything passed, `1` if anything failed. Inside a scenario, a
+`fleetest run` exits `0` when everything passed, `1` if anything failed. When a run that spans several machines or several targets is interrupted (Ctrl-C) and scenarios or targets are left unrun, it exits `130`. Inside a scenario, a
 failing command aborts the rest of that scenario (all remaining scenes and steps are skipped) —
 `afterEach()` still runs. See [testcode_structure.md](../testclass/testcode_structure.md) for the
 full failure model.

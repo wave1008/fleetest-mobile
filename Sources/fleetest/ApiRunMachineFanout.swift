@@ -255,10 +255,12 @@ enum ApiRunMachineFanout {
             outcomes.map { ($0.host, $0.exitCode) }, uniquingKeysWith: { first, _ in first }))
         // 全部の子が終わっても誰にも渡せなかった分は失敗として報告する(中断なら失敗にしない)
         var neverHandedFailure = false
+        var interruptedWithWorkLeft = false
         if let dispatcher {
             let ids = dispatcher.unhandedIDs
             if !ids.isEmpty {
                 let interrupted = dispatcher.isInterrupted || registry.isCancelled
+                interruptedWithWorkLeft = interrupted
                 logStderr(DeviceMachineRunner.neverHandedLine(ids: ids, interrupted: interrupted))
                 if !interrupted {
                     neverHandedFailure = true
@@ -285,7 +287,9 @@ enum ApiRunMachineFanout {
             logStderr(String(format: "%@ %-20@ exit=%d  %.1fs", mark, outcome.host as NSString,
                              outcome.exitCode, outcome.duration))
         }
-        return FleetProfile.aggregateExitCode(outcomes.map(\.exitCode) + (neverHandedFailure ? [1] : []))
+        return DeviceMachineRunner.parentExitCode(
+            childCodes: outcomes.map(\.exitCode), neverHandedFailure: neverHandedFailure,
+            interruptedWithWorkLeft: interruptedWithWorkLeft)
     }
 
     // MARK: - 子プロセスの引数
