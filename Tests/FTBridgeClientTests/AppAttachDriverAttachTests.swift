@@ -169,4 +169,25 @@ final class AppAttachDriverAttachTests: XCTestCase {
         XCTAssertEqual(stub.paths, ["GET /snapshot"],
                        "activate を打たず、素の /snapshot だけを撃つこと: \(stub.paths)")
     }
+
+    /// **付いた後でも、ランナーのセッションが別のアプリ(SpringBoard)へ移っていたら付き直す**。SpringBoard は動いているので
+    /// 409/503 にならず、焦点を使う ref なしの clearInput が SpringBoard の上で空振りした(E2E-Flutter S0010)。
+    /// 自分のアプリを指したままなら付き直さない(activate は refFrames をクリアする)
+    func testReattachesWhenTheSessionWasMovedToAnotherApp() async throws {
+        func sessions(afterSecondSwipeWithSession session: String) async throws -> Int {
+            let stub = try RecordingStubServer()
+            defer { stub.stop() }
+            let driver = AppAttachDriver(port: stub.port, host: BridgeEndpoint.loopbackHost,
+                                          bundleID: "com.example.target", physicalUDID: nil)
+            try await driver.swipe(.up)
+            // OKResponse と StatusResponse の両方として読める本文(/status だけが sessionBundleID を使う)
+            stub.setBody(#"{"ok":true,"ready":true,"device":"d","osVersion":"o","sessionBundleID":"\#(session)"}"#)
+            try await driver.clearInput(ref: nil)
+            return stub.paths.filter { $0 == "POST /session" }.count
+        }
+        let moved = try await sessions(afterSecondSwipeWithSession: "com.apple.springboard")
+        XCTAssertEqual(moved, 2, "セッションが SpringBoard へ移ったのに付き直していない")
+        let kept = try await sessions(afterSecondSwipeWithSession: "com.example.target")
+        XCTAssertEqual(kept, 1, "自分のアプリを指しているのに付き直した")
+    }
 }

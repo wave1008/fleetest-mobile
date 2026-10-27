@@ -33,7 +33,16 @@ public final class AppAttachDriver: AppDriver {
     /// ref を使わない操作の前に呼ぶ。ref を使う操作からは呼ばない(直前 snapshot で
     /// attached=true になっており、ここで activate すると refFrames が消えて別要素を指す)
     private func ensureAttached() async throws {
-        guard !attached else { return }
+        // **付いた後も、ランナーのセッションが今も自分のアプリを指しているかを確かめる**。同じ XCUITest ブリッジを
+        // 別の役(SpringBoard・別アプリを開く foreignApp、旧ランナーの SystemUIDriver)が黙って移すことがあり、
+        // SpringBoard は動いているので 409/503 にならず、焦点を使う操作(ref なしの type・clearInput)が別の木の上で
+        // 空振りする(E2E-Flutter S0010 の ref なしの clearInput が 422)。答えが無ければ従来どおり付いたものとみなす
+        if attached {
+            // 待ちは短い「1回だけ引く」上限(答えない = 判定材料なし)。駆動中の XCUITest は /status に答えないことがある
+            guard let session = (try? await client.status(
+                    timeout: BridgeLauncher.quickProbeTimeoutSeconds))?.sessionBundleID,
+                  session != bundleID else { return }
+        }
         try await client.activate(bundleID: bundleID)
         attached = true
     }
