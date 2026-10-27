@@ -94,7 +94,10 @@ enum ApiRunMachineFanout {
         let active: [(index: Int, group: DeviceMachineRunner.Group, ids: [String])]
         var dynamicPlan: (scenarios: [DynamicSplit.Scenario],
                           estimate: @Sendable (DynamicSplit.Scenario, Int) -> Double)?
-        if DeviceMachineRunner.dynamicSplitEnabled(broadcast: false) {
+        if DeviceMachineRunner.dynamicSplitEnabled(
+            broadcast: false,
+            measuresResponse: ProfileResolver.declaresResponseMeasurement(
+                project: project, runName: profileName, overrides: options.setOverrides)) {
             let split = DeviceMachineRunner.splitApplicable(selected: selected, groups: groups)
             notApplicable = split.notApplicable
             let resolved = DynamicDispatcher.resolve(

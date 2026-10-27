@@ -71,13 +71,19 @@ final class InterruptRelay {
     ///     2 秒で殺すと実際にロックが残る(実測: 子の exit=9)。
     ///     片付けの所要は利用者のスクリプト次第で上限を決められないので、待つ側に倒す
     ///     (刺さった場合は人が kill -9 する)
-    static func forwarding(to process: Process, escalateAfter: TimeInterval? = 2) -> InterruptRelay {
+    /// - catchUp: true なら、**登録より前にこのプロセスが中断を受けていた**ときだけ、登録の直後にこの子へ同じ合図を送る
+    ///   (起動から登録までの間に来た中断を子が取りこぼさない)。判定は登録と同じ臨界区間で行う —— 登録の後で印を見ると、
+    ///   登録と中断が前後したとき forwardToAll と二重に送り、子の2回目の中断は後始末を飛ばして即終了する
+    static func forwarding(to process: Process, escalateAfter: TimeInterval? = 2,
+                           catchUp: Bool = false) -> InterruptRelay {
         let id = ObjectIdentifier(process)
-        state.withLock { state in
+        let missed = state.withLock { state -> Bool in
             let wasEmpty = state.targets.isEmpty
             state.targets[id] = .process(process, escalateAfter: escalateAfter)
             if wasEmpty { installSources(&state) }
+            return catchUp && state.received
         }
+        if missed { deliver(to: process, escalateAfter: escalateAfter) }
         return InterruptRelay(id: id)
     }
 
@@ -105,12 +111,6 @@ final class InterruptRelay {
             state.targets.removeValue(forKey: id)
             if state.targets.isEmpty { Self.uninstallSources(&state) }
         }
-    }
-
-    /// このプロセスが中断を1度でも受けたか。**登録より前に届いた中断は、登録した側が自分で閉じる**のに使う
-    /// (forwardToAll は届いた時点の登録簿にしか伝えない = 起動から登録までの間に来た中断を子が取りこぼす)
-    static var hasReceivedInterrupt: Bool {
-        state.withLock { $0.received }
     }
 
     /// テスト用: 自分へ SIGINT を撃つテストの後片付け(同じプロセスで後に走るテストの子を、起こした直後に止めさせない)
@@ -143,6 +143,15 @@ final class InterruptRelay {
         for sig in signals { signal(sig, SIG_DFL) }
     }
 
+    private static func deliver(to process: Process, escalateAfter: TimeInterval?) {
+        guard process.isRunning else { return }
+        process.terminate()
+        guard let escalateAfter else { return }
+        queue.asyncAfter(deadline: .now() + escalateAfter) {
+            if process.isRunning { kill(process.processIdentifier, SIGKILL) }
+        }
+    }
+
     private static func forwardToAll() {
         let snapshot = state.withLock { s -> [Target] in
             s.received = true
@@ -151,12 +160,7 @@ final class InterruptRelay {
         for target in snapshot {
             switch target {
             case .process(let process, let escalateAfter):
-                guard process.isRunning else { continue }
-                process.terminate()
-                guard let escalateAfter else { continue }
-                queue.asyncAfter(deadline: .now() + escalateAfter) {
-                    if process.isRunning { kill(process.processIdentifier, SIGKILL) }
-                }
+                deliver(to: process, escalateAfter: escalateAfter)
             case .observer(let onInterrupt):
                 onInterrupt()
             }

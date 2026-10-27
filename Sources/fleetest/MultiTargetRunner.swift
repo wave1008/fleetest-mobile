@@ -153,14 +153,14 @@ enum MultiTargetRunner {
         var healByProject: [String: HealSourceWriteBack.Collection] = [:]
         for target in resolvedTargets where built.insert(target.project.name).inserted {
             if !skipBuild { try ScenarioHost.build(project: target.project, log: { FleetRunner.log($0) }) }
-            // 通常の入口と同じ選択(`@Draft` / `@Deleted` を外す)。子へは完全一致の ID で渡すので、子の側では外れない
-            let all = try ScenarioSelection.resolve(
-                [], from: ScenarioHost.listForRun(project: target.project, dryRun: false, compilesOCR: false))
-            guard !all.isEmpty else {
+            let found = try ScenarioHost.listForRun(project: target.project, dryRun: false, compilesOCR: false)
+            guard !found.isEmpty else {
                 throw ValidationError(
                     "no scenarios (add a @TestClass under TestProjects/\(target.project.name)/scenarios/)")
             }
-            listed[target.project.name] = all
+            // 通常の入口と同じ選択(`@Draft` / `@Deleted` を外す)。子へは完全一致の ID で渡すので、子の側では外れない。
+            // 外して空になった対象は飛ばす(通常の入口も外して空なら成功で終わる)= 下の「当てはまるシナリオが無い」で抜ける
+            listed[target.project.name] = try ScenarioSelection.resolve([], from: found)
             healByProject[target.project.name] = HealSourceWriteBack.Collection()
         }
 

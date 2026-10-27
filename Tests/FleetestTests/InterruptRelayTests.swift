@@ -14,29 +14,64 @@ final class InterruptRelayTests: XCTestCase {
         super.tearDown()
     }
 
-    /// 中断を受けた印が立つ(起動から登録までの間に来た中断を、登録した側が閉じるのに使う。FleetRunner.runEntry)
-    func testSignalMarksTheProcessAsInterrupted() throws {
-        let p = try sleeper()
-        defer { if p.isRunning { p.terminate() } }
-        let relay = InterruptRelay.forwarding(to: p, escalateAfter: nil)
-        defer { relay.stop() }
-        XCTAssertFalse(InterruptRelay.hasReceivedInterrupt)
-        kill(getpid(), SIGINT)
-        let deadline = Date().addingTimeInterval(5)
-        while !InterruptRelay.hasReceivedInterrupt, Date() < deadline { Thread.sleep(forTimeInterval: 0.05) }
-        XCTAssertTrue(InterruptRelay.hasReceivedInterrupt)
+    /// SIGTERM を受けた回数をファイルに書き続ける子(TERM では終わらない。後片付けで SIGKILL)
+    private func termCounter() throws -> (process: Process, count: () -> Int) {
+        let file = FileManager.default.temporaryDirectory.appendingPathComponent("term-\(UUID().uuidString)")
+        let p = Process()
+        p.executableURL = URL(fileURLWithPath: "/bin/sh")
+        p.arguments = ["-c", "n=0; trap 'n=$((n+1)); echo $n > \"$0\"' TERM; while :; do sleep 0.05; done", file.path]
+        try p.run()
+        addTeardownBlock {
+            kill(p.processIdentifier, SIGKILL)
+            try? FileManager.default.removeItem(at: file)
+        }
+        Thread.sleep(forTimeInterval: 0.2)   // trap を張り終えるまで
+        return (p, { Int((try? String(contentsOf: file, encoding: .utf8))?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? "") ?? 0 })
     }
 
-    /// runEntry は登録の直後に、それより前に届いていた中断を閉じる(ソース走査)
-    func testRunEntryClosesAnInterruptThatArrivedBeforeRegistration() throws {
+    /// 登録より前に届いた中断は、catchUp の子へ登録の直後に1回だけ伝える
+    func testCatchUpDeliversAnInterruptThatArrivedBeforeRegistrationOnce() throws {
+        let keep = InterruptRelay.observing {}   // シグナルソースを張っておく(無いと SIGINT でテストごと落ちる)
+        defer { keep.stop() }
+        kill(getpid(), SIGINT)
+        Thread.sleep(forTimeInterval: 0.3)
+        let child = try termCounter()
+        let relay = InterruptRelay.forwarding(to: child.process, escalateAfter: nil, catchUp: true)
+        defer { relay.stop() }
+        let deadline = Date().addingTimeInterval(5)
+        while child.count() == 0, Date() < deadline { Thread.sleep(forTimeInterval: 0.05) }
+        Thread.sleep(forTimeInterval: 0.5)
+        XCTAssertEqual(child.count(), 1, "登録より前の中断を1回だけ伝えていない")
+    }
+
+    /// 登録の後に届いた中断は forwardToAll だけが伝える(catchUp が二重に送らない = 子の2回目の中断は後始末を飛ばす)
+    func testCatchUpDoesNotDoubleAnInterruptThatArrivesAfterRegistration() throws {
+        let child = try termCounter()
+        let relay = InterruptRelay.forwarding(to: child.process, escalateAfter: nil, catchUp: true)
+        defer { relay.stop() }
+        // 誤って登録の時点で送っていれば、ここまでに1回数えられる(続けて撃つと同じ合図が1つに重なって数え分けられない)
+        Thread.sleep(forTimeInterval: 0.5)
+        XCTAssertEqual(child.count(), 0, "中断の前の登録で合図を送った")
+        kill(getpid(), SIGINT)
+        let deadline = Date().addingTimeInterval(5)
+        while child.count() == 0, Date() < deadline { Thread.sleep(forTimeInterval: 0.05) }
+        Thread.sleep(forTimeInterval: 0.5)
+        XCTAssertEqual(child.count(), 1)
+        let late = try termCounter()
+        let lateRelay = InterruptRelay.forwarding(to: late.process, escalateAfter: nil, catchUp: false)
+        defer { lateRelay.stop() }
+        Thread.sleep(forTimeInterval: 0.5)
+        XCTAssertEqual(late.count(), 0, "catchUp: false の登録へ過去の中断を伝えた")
+    }
+
+    /// runEntry は catchUp で登録する(ソース走査)
+    func testRunEntryRegistersWithCatchUp() throws {
         let root = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
         let source = try String(contentsOf: root.appendingPathComponent("Sources/fleetest/FleetRunner.swift"), encoding: .utf8)
-        let expected = "let relay = InterruptRelay.forwarding(to: process, escalateAfter: nil)\n"
-            + "        defer { relay.stop() }\n"
-            + "        // **登録の直前までに届いていた中断を閉じる**(RemoteRunDispatcher の ssh と同じ手当て)\n"
-            + "        if InterruptRelay.hasReceivedInterrupt { process.terminate() }\n"
-        XCTAssertTrue(source.contains(expected), "runEntry が登録より前に届いた中断を閉じていない")
+        XCTAssertTrue(source.contains("InterruptRelay.forwarding(to: process, escalateAfter: nil, catchUp: true)"),
+                      "runEntry が登録より前に届いた中断を子へ伝えない")
     }
 
     private func sleeper() throws -> Process {

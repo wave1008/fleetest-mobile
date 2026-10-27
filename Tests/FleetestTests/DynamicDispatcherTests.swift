@@ -161,9 +161,15 @@ final class DynamicDispatcherTests: XCTestCase {
     }
 
     func testDynamicSplitSwitch() {
-        XCTAssertTrue(DeviceMachineRunner.dynamicSplitEnabled(broadcast: false, environment: [:]))
-        XCTAssertFalse(DeviceMachineRunner.dynamicSplitEnabled(broadcast: false, environment: ["FT_STATIC_SPLIT": "1"]))
-        XCTAssertFalse(DeviceMachineRunner.dynamicSplitEnabled(broadcast: true, environment: [:]))
+        XCTAssertTrue(DeviceMachineRunner.dynamicSplitEnabled(broadcast: false, measuresResponse: false, environment: [:]))
+        XCTAssertFalse(DeviceMachineRunner.dynamicSplitEnabled(
+            broadcast: false, measuresResponse: false, environment: ["FT_STATIC_SPLIT": "1"]))
+        XCTAssertFalse(DeviceMachineRunner.dynamicSplitEnabled(broadcast: true, measuresResponse: false, environment: [:]))
+    }
+
+    /// レスポンス計測の run は動的にしない(反復は子だけが展開し、親は同じ ID を1回しか配らない)
+    func testResponseMeasurementNeverUsesDynamicSplit() {
+        XCTAssertFalse(DeviceMachineRunner.dynamicSplitEnabled(broadcast: false, measuresResponse: true, environment: [:]))
     }
 
     func testNeverHandedLineWording() {

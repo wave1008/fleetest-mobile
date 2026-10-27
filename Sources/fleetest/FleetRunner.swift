@@ -601,10 +601,9 @@ enum FleetRunner {
         // 中断はホスト別の子(それぞれが自分の ssh を持つ)へ伝える。ここを飛ばすと、
         // 親だけ落ちて子とリモートが走り続ける。**時間で SIGKILL しない**(escalateAfter: nil)
         // —— 子は SIGTERM のあとに dispatch.lock の解放と終了スクリプトを走らせる
-        let relay = InterruptRelay.forwarding(to: process, escalateAfter: nil)
+        // catchUp: 起動から登録までの間に来た中断もこの子へ1回だけ伝える(登録と同じ臨界区間で判定 = 二重に送らない)
+        let relay = InterruptRelay.forwarding(to: process, escalateAfter: nil, catchUp: true)
         defer { relay.stop() }
-        // **登録の直前までに届いていた中断を閉じる**(RemoteRunDispatcher の ssh と同じ手当て)
-        if InterruptRelay.hasReceivedInterrupt { process.terminate() }
 
         let pump = PipeLinePump(handle: pipe.fileHandleForReading) { line in
             if lineInterceptor?(line) == true { return }

@@ -183,7 +183,10 @@ enum DeviceMachineRunner {
                 FleetRunner.log("    \(group.machineLabel): \(ids.count) scenario(s)"
                     + " on each of \(group.deviceNames.count) device(s) (--broadcast)")
             }
-        } else if dynamicSplitEnabled(broadcast: broadcast) {
+        } else if dynamicSplitEnabled(
+            broadcast: broadcast,
+            measuresResponse: ProfileResolver.declaresResponseMeasurement(
+                project: project, runName: profileName, overrides: setOverrides)) {
             let (runnable, notApplicable) = splitApplicable(selected: selected, groups: groups)
             for line in notApplicableLines(notApplicable, groups: groups) { FleetRunner.log(line) }
             let resolved = DynamicDispatcher.resolve(
@@ -358,10 +361,12 @@ enum DeviceMachineRunner {
     }
 
     /// 動的な割り振りを使うか。`FT_STATIC_SPLIT=1` は保守者の殺しスイッチ(静的な割り当てへ戻す・利用者向けの口ではない)
+    /// measuresResponse: レスポンス計測の run は動的にしない —— 反復(responseRepeat)は子だけが展開し、親は同じ ID を1回しか
+    /// 配らないので、指定の回数を回さずに成功する(`--device` でリモートの1台に絞ると1グループでもここへ来る)
     static func dynamicSplitEnabled(
-        broadcast: Bool, environment: [String: String] = ProcessInfo.processInfo.environment
+        broadcast: Bool, measuresResponse: Bool, environment: [String: String] = ProcessInfo.processInfo.environment
     ) -> Bool {
-        !broadcast && environment["FT_STATIC_SPLIT"] != "1"
+        !broadcast && !measuresResponse && environment["FT_STATIC_SPLIT"] != "1"
     }
 
     /// 誰にも渡されなかったシナリオの1行(純粋関数。5件で切る = missingResultsLine と同じ)
