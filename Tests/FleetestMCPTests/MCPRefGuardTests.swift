@@ -142,6 +142,28 @@ final class MCPRefGuardTests: XCTestCase {
         XCTAssertFalse(text.contains("had moved"), text)
     }
 
+    /// **採った後にこのセッションが操作し、ラベルも変わっていたら撃たない**(画面が替わり同じ id の別の要素に付け替わった形。
+    /// Simulator の E2EX: 入力画面の題名の ref を、戻った後のホームの題名へ付け替えて押した)。tap と double_tap の両方の経路
+    func testRetargetWithAChangedLabelAfterOwnActionIsRefused() async throws {
+        for tool in ["ft_tap", "ft_double_tap"] {
+            try await setUp()
+            driver.snapshotResponse = screen([element(ref: 1, id: "txt_screen_title", label: "入力の種類", x: 10, y: 100),
+                                              element(ref: 2, id: "btn_back", label: "戻る", x: 10, y: 40)])
+            _ = try await server.call(tool: "ft_snapshot", args: [:])
+            _ = try await server.call(tool: "ft_tap", args: ["ref": 2])
+            driver.snapshotResponse = screen([element(ref: 1, id: "txt_screen_title", label: "E2EX ホーム", x: 10, y: 130)])
+            let tapsBefore = actions.filter { $0.hasPrefix("tap(") || $0.hasPrefix("doubleTap") }.count
+            do {
+                _ = try await server.call(tool: tool, args: ["ref": 1])
+                XCTFail("\(tool): ラベルの変わった別の要素へ撃った")
+            } catch {
+                XCTAssertTrue("\(error)".contains("refusing [1]"), "\(tool): \(error)")
+            }
+            XCTAssertEqual(actions.filter { $0.hasPrefix("tap(") || $0.hasPrefix("doubleTap") }.count, tapsBefore,
+                           "\(tool): 断ったのに撃った")
+        }
+    }
+
     /// **同型の掃討**: double_tap/pinch/drag(fromRef) も再ターゲットして実際に操作を撃つ経路
     /// なので、同じ警告が要る(verifiedElement 経由)
     func testDoubleTapWarnsWhenTheRetargetedElementHasADifferentLabel() async throws {

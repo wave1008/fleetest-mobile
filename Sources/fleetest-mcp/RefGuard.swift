@@ -368,6 +368,15 @@ enum RefGuard {
             + " verify the outcome"
     }
 
+    /// 古い ref が、このセッションの操作の後でラベルの違う要素に付け替わったときの断り(撃っていない)
+    static func labelChangedAfterOwnActionRefusal(ref: Int, old: ElementInfo, new: ElementInfo) -> String {
+        "refusing [\(ref)]: it was taken before your own later actions, and the element it now matches,"
+            + " \(describe(new)), reads \"\(SnapshotRenderer.truncate(new.label ?? "", SnapshotRenderer.labelDisplayLimit))\""
+            + " instead of \"\(SnapshotRenderer.truncate(old.label ?? "", SnapshotRenderer.labelDisplayLimit))\""
+            + " — the screen likely changed, so this is probably a different element. Nothing was sent."
+            + " Take a fresh ft_snapshot and use its ref"
+    }
+
     /// **原因は断定できないが、範囲は言える**: 同じ分だけ動いた要素が他にもあるなら
     /// スクロール等の画面全体の移動、その要素だけならレイアウト変化。
     /// 「なぜ動いたか」の手掛かりが欲しいという要望への、嘘をつかない答え

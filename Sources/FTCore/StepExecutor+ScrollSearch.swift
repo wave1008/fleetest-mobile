@@ -82,6 +82,9 @@ extension StepExecutor {
         /// (前者は maxSwipes を上げても無駄、後者はそもそもこの画面に無い)ので
         /// 文言を分ける必要があり、同じ Bool には畳めない
         var reverseSweepMoved: Bool = false
+        /// 逆走査が**反対の端まで戻った**(もう動かなくなった)か。false = 回数の上限(`reverseSweepMaxSwipes`)で止まった。
+        /// 「この画面には無い」と言えるのは端まで戻ったときだけ(上限で止まった回は、もっと先にあるかもしれない)
+        var reverseSweepReachedEnd: Bool = false
         /// 端まで来ても見つからず、**逆向きの細刻みで拾い直した**回数(0 か 1。注記に載せる)
         var reverseSweeps: Int = 0
         /// 拾い直しに使った容器を**そのまま書けるセレクタ**にしたもの(nil = 名指しできない)。
@@ -229,9 +232,14 @@ extension StepExecutor {
             if result?.contentEverMoved == true {
                 stopped = " (the scroll area reached its end — the content stopped moving,"
                     + " so raising maxSwipes will not help)"
-            } else if result?.reverseSweepMoved == true {
+            } else if result?.reverseSweepMoved == true, result?.reverseSweepReachedEnd == true {
                 stopped = " (the scroll area was already at its end when the search started"
-                    + " — sweeping back did not find it either, so this element is not on this screen)"
+                    + " — sweeping back to the other end did not find it either, so this element is not on this screen)"
+            } else if result?.reverseSweepMoved == true {
+                // 逆走査は回数の上限で止まった(反対の端まで届いていない)= 「この画面に無い」とは言えない
+                stopped = " (the scroll area was already at its end in this direction when the search started"
+                    + " — sweeping back \(Self.reverseSweepMaxSwipes) slow steps did not reach the other end, so it may be"
+                    + " farther that way: search in the opposite direction)"
             } else {
                 stopped = " (nothing moved at all during the search — the swipes are not reaching a"
                     + " scrolling area, so raising maxSwipes will not help)"
@@ -899,6 +907,7 @@ extension StepExecutor {
                             let after = try await freshSnapshot(.afterOwnMove)
                             result.reverseSweepMoved = Self.contentSignature(after.elements)
                                 != Self.contentSignature(snapshot.elements)
+                            result.reverseSweepReachedEnd = reverseSweepReachedEnd
                         }
                         return result
                     }

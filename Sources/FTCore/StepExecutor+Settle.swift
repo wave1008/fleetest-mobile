@@ -121,6 +121,7 @@ extension StepExecutor {
         // 救済されず 4/10 で失敗した実測が動機
 
         var previous: String?
+        reverseSweepReachedEnd = false
         for _ in 0..<Self.reverseSweepMaxSwipes {
             guard await slowDrag(jump: jump, container: container, vertical: vertical,
                                  phase: &phase) else { return nil }
@@ -148,7 +149,10 @@ extension StepExecutor {
             }
             // 反対の端まで戻った(もう動かない)なら、この画面には無い
             let signature = Self.contentSignature(snapshot.elements)
-            if signature == previous { return nil }
+            if signature == previous {
+                reverseSweepReachedEnd = true
+                return nil
+            }
             previous = signature
         }
         return nil

@@ -1671,4 +1671,6 @@ public final class StepExecutor {
     /// PT-3.16 / PT-3.18)。ステップごとに 1.0 へ戻す。
     /// **読むのは `scrollPath` の1箇所だけ** = `scrollFrame` を書いた経路でしか効かない
     var spanScale: Double = 1
+    /// 直前の `reverseSweep` が反対の端まで戻ったか(上限で止まったなら false。ScrollSearchResult.reverseSweepReachedEnd へ写す)
+    var reverseSweepReachedEnd = false
 }

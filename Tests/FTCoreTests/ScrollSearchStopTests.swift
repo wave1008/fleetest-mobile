@@ -177,7 +177,8 @@ final class ScrollSearchStopTests: XCTestCase {
                                                               viaXCUITest: false, hintJumps: 0,
                                                               swipes: 3, stoppedUnmoving: true,
                                                               contentEverMoved: false,
-                                                              reverseSweepMoved: true)
+                                                              reverseSweepMoved: true,
+                                                              reverseSweepReachedEnd: true)
         let message = StepExecutor.scrollNotFoundMessage(step, sweptButMissed, defaultMaxSwipes: 8)
         XCTAssertTrue(message.contains("this element is not on this screen"), message)
         XCTAssertFalse(message.contains("nothing moved at all"),
@@ -449,5 +450,20 @@ final class ScrollSearchStopTests: XCTestCase {
                                   depth: 2, scrollable: true)
         XCTAssertNil(StepExecutor.directionMatchedScrollFrameCandidate(
             in: snapshot([unnamed]), vertical: false))
+    }
+
+    /// **逆走査が回数の上限で止まった(反対の端まで届いていない)なら「この画面に無い」と言わない**
+    /// (Emulator の E2EY 反転チャット: 古い #msg_1 は上にあるのに、下向きの探索の後の逆走査が途中で止まり「この画面に無い」と言い切った)
+    func testReverseSweepThatStoppedAtItsLimitDoesNotClaimTheElementIsAbsent() {
+        let step = scrollTo("missing", maxSwipes: 8)
+        let stoppedShort = StepExecutor.ScrollSearchResult(found: false, fallback: nil,
+                                                            viaXCUITest: false, hintJumps: 0,
+                                                            swipes: 2, stoppedUnmoving: true,
+                                                            contentEverMoved: false,
+                                                            reverseSweepMoved: true,
+                                                            reverseSweepReachedEnd: false)
+        let message = StepExecutor.scrollNotFoundMessage(step, stoppedShort, defaultMaxSwipes: 8)
+        XCTAssertFalse(message.contains("not on this screen"), "端まで戻っていないのに無いと言い切った: \(message)")
+        XCTAssertTrue(message.contains("search in the opposite direction"), message)
     }
 }

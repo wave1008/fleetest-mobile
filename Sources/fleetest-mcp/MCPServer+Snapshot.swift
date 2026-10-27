@@ -1239,6 +1239,12 @@ extension MCPServer {
             // **ラベルが変わっていないかも見る**。moved の大小とは無関係に出す ——
             // 動かずにラベルだけ変わった行も同じ危険(RefGuard.labelChangeNote 参照)
             let labelNote = RefGuard.labelChangeNote(old: target.label, new: found.label) ?? ""
+            // **採った後にこのセッションが操作していて、ラベルも変わっていたら撃たない**: 画面が替わり、同じ id の別の要素に
+            // 付け替わった形(Simulator の E2EX: 入力画面の題名の ref を、戻った後のホームの題名へ付け替えて押した)。
+            // 撃った後の注意では、別の要素を押した後になる。操作を挟まずにラベルだけ変わる(時計・件数)形は従来どおり注意だけ
+            if actedSinceTakenFrom, !labelNote.isEmpty {
+                throw MCPError(RefGuard.labelChangedAfterOwnActionRefusal(ref: ref, old: target, new: found))
+            }
             // **ghost でなくても別の物に当たり得る**2形(上に描かれた overlay / 同一矩形への
             // 積み重なり)。どちらも容器の内側なので RefGuard.relocate では .found になる
             let overlap = originNote

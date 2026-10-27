@@ -171,6 +171,22 @@ final class TypeAfterTapFocusTests: XCTestCase {
         XCTAssertFalse(outcome.notes.contains(.typeFocusRecovered))
     }
 
+    /// **欄を名指しした type の後は、数手前のタップをもとに救済しない**(ロケータなしの type はその欄の続き。
+    /// 残すと、遷移のタップ → 名指しの type → ロケータなしの type が、叩いた容器の中の別の欄へ打った)
+    func testForgetsTheTapAfterATypeWithALocator() async throws {
+        let other = field(ref: 10, id: "other", y: 900)
+        let driver = RecordingDriver(elements: [container(ref: 8, id: "txtMailAddress"), field(ref: 9), other])
+        let executor = StepExecutor(driver: driver, isAndroid: false, tunables: RunTunables())
+        _ = await executor.execute(FlowStep(action: "tap",
+                                            locator: FlowLocator(id: "txtMailAddress"), timeout: 1))
+        _ = await executor.execute(FlowStep(action: "type", locator: FlowLocator(id: "other"), text: "a"))
+
+        let outcome = await executor.execute(FlowStep(action: "type", text: "b"))
+
+        XCTAssertEqual(driver.typedRefs, [10, nil], "名指しした欄の後の type を、前のタップの容器の欄へ回した: \(driver.typedRefs)")
+        XCTAssertFalse(outcome.notes.contains(.typeFocusRecovered))
+    }
+
     // MARK: - 選び方(純関数)
 
     func testPicksTheOnlyFieldInsideTheTappedContainer() {

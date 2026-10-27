@@ -174,8 +174,10 @@ extension MCPServer {
                            duration: Double? = nil, maxGestureSeconds: Double? = nil,
                            scale: Double? = nil, degrees: Double? = nil,
                            replace: Bool = false) {
-        // tap → type の間に別の操作が入ったら「叩いた欄へ入れる」意図ではない(DSL と同じ規律)
-        if action != "tap", action != "type" { lastTapTargets[Self.sessionKey(args)] = nil }
+        // tap → type の間に別の操作が入ったら「叩いた欄へ入れる」意図ではない(DSL と同じ規律)。
+        // **ref を渡した type も捨てる**: 欄を名指しした後の ref なし type は、その欄の続きであって数手前のタップの続きではない
+        // (残すと、画面遷移のタップ → ref つき type → ref なし type が、遷移先の別の欄へ打った。Emulator の E2EX で 2/2)
+        if action != "tap", action != "type" || resolvedRef != nil { lastTapTargets[Self.sessionKey(args)] = nil }
         // type の後のキーボードの出現待ち(pendingTypeKeyboardCheck)は、間に別の操作を挟んだら捨てる —— 打つ前の木が古くなり、
         // Android では「出ていない → 出るはず」と読んで、閉じた後の ref 操作でも上限(1.5 秒)まで待つ
         if action != "type" { pendingTypeKeyboardChecks[Self.sessionKey(args)] = nil }

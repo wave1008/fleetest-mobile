@@ -67,8 +67,9 @@ extension StepExecutor {
             tapAwaitingNextTree = nil
             unchangedEarlierTaps = []
         }
-        // 焦点救済の「直前」は tap → type の並びだけ(select は掴むだけで焦点を動かさない)
-        if !grabsOnly, action != "type" { lastTapTarget = nil }
+        // 焦点救済の「直前」は tap → type の並びだけ(select は掴むだけで焦点を動かさない)。
+        // **ロケータを持つ type も捨てる**(欄を名指しした後のロケータなし type は、その欄の続き = MCP の recordInteraction と同じ)
+        if !grabsOnly, action != "type" || step.locator != nil { lastTapTarget = nil }
         pendingScrollFrameNote = nil
         spanScale = 1
         // **OS のシステム UI が被さっている間は、どのアクションも撃たない**(SystemUIGate)。

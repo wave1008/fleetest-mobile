@@ -231,4 +231,39 @@ final class ChromePinnedOutsideTests: XCTestCase {
         XCTAssertTrue(ContainerGeometry.isOutsideContainer(back, in: tree, screen: screen),
                       "行が y の降順 = 反転した並びなので chrome と認めない")
     }
+
+    // MARK: - 同じバーに並ぶ背の低い題名(Emulator の E2EX 入力画面。screen 1080x2424)
+
+    /// 実際の木: 申告された一覧 (0,785 1080x1576)・d9 の中に欄(d10)とラベル(d11)。上部バーの入れ物が間引かれ、
+    /// 戻るボタン(d10・y=164 h=126)と題名(d11・y=185 h=82)が一覧の部分木の後ろに来る。題名は背が低く縦に
+    /// 中央寄せなので、単独では「上端に固定」の条件(隙間が高さの2倍以内)に収まらない
+    private func inputsScreenTree(titleY: Double = 185) -> [ElementInfo] {
+        var tree = [el(1, "staticText", 9, 42, 331, 175, 63, id: "txt_number_echo"),
+                    el(7, "scrollView", 9, 0, 785, 1080, 1576, scrollable: true)]
+        for (i, y) in [825.0, 1025, 1225, 1425].enumerated() {
+            tree.append(el(10 + 2 * i, "textField", 10, 42, y, 996, 168, id: "field_\(i)"))
+            tree.append(el(11 + 2 * i, "staticText", 11, 84, y + 63, 87, 63, label: "L\(i)"))
+        }
+        tree.append(el(22, "clickable", 10, 12, 164, 126, 126, id: "btn_back"))
+        tree.append(el(23, "staticText", 11, 53, 195, 43, 63, label: "戻る"))
+        tree.append(el(24, "staticText", 11, 148, titleY, 285, 82, id: "txt_screen_title"))
+        return tree
+    }
+
+    func testShortTitleSharingTheBarWithTheBackButtonIsNotAGhost() {
+        let screen = FTRect(x: 0, y: 0, width: 1080, height: 2424)
+        let tree = inputsScreenTree()
+        let title = tree.first { $0.identifier == "txt_screen_title" }!
+        XCTAssertNil(TapTargetGeometry.outsideDeclaredScroller(title, in: tree, screen: screen),
+                     "戻るボタンと同じ段の題名を、一覧から抜けた行と読んだ")
+    }
+
+    /// バーの一員と縦の範囲が重ならない上帯の要素は、従来どおり ghost のまま(並ぶ相手が居ない)
+    func testShortTopElementBelowTheBarStaysAGhost() {
+        let screen = FTRect(x: 0, y: 0, width: 1080, height: 2424)
+        let tree = inputsScreenTree(titleY: 560)
+        let title = tree.first { $0.identifier == "txt_screen_title" }!
+        XCTAssertNotNil(TapTargetGeometry.outsideDeclaredScroller(title, in: tree, screen: screen),
+                        "バーと並ばない要素まで chrome と読んだ")
+    }
 }

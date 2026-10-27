@@ -268,13 +268,24 @@ public enum ContainerGeometry {
     /// 保守的に ghost 側へ残る。`hasClampedCoordinates`・`stackedRefs`・`isOriginClamped`
     /// (クランプ系)とは無関係 —— `.stacked` が優先されるチェーンの順序は変えない
     private static func chromeBarMember(_ element: ElementInfo, container: FTRect,
-                                        in elements: [ElementInfo], screen: FTRect) -> Bool {
+                                        in elements: [ElementInfo], screen: FTRect,
+                                        joiningBars: Bool = true) -> Bool {
         let tol = chromePinnedEdgeTolerance
         let f = element.frame
         let bottomBand = f.y >= container.y + container.height - tol
         let topBand = f.y + f.height <= container.y + tol
         guard bottomBand || topBand else { return false }
         guard TapTargetGeometry.contains(screen, f) else { return false }
+        // **同じバーに並ぶ背の低い要素**(上帯だけ): バーの一員と判定された要素の縦の範囲に中心が収まるなら同じバー。
+        // 戻るボタンと同じ段の題名は、背が低く縦に中央寄せされるので (4) の「上端からの隙間が自分の高さの2倍以内」に
+        // 収まらない(Emulator の E2EX 入力画面: 戻る y=164 h=126 は通り、題名 y=185 h=82 は隙間 185 > 164 で ghost と読まれ、
+        // 毎回 ⚠️scroll-leftover が付いていた)。判定の連鎖は1段だけ(joiningBars: false で呼ぶ)
+        if topBand, joiningBars, elements.contains(where: { other in
+            other.ref != element.ref
+                && other.frame.y - tol <= f.y + f.height / 2 && f.y + f.height / 2 <= other.frame.y + other.frame.height + tol
+                && ScrollGeometry.intersection(other.frame, container) == nil
+                && chromeBarMember(other, container: container, in: elements, screen: screen, joiningBars: false)
+        }) { return true }
         let gap = bottomBand
             ? (screen.y + screen.height) - (f.y + f.height)
             : f.y - screen.y

@@ -101,7 +101,13 @@ extension MCPServer {
         case .ghost(let found):
             return (found, gateNote)
         case .found(let found, _):
-            return (found, gateNote + (RefGuard.labelChangeNote(old: target.label, new: found.label) ?? ""))
+            let labelNote = RefGuard.labelChangeNote(old: target.label, new: found.label) ?? ""
+            // verifiedRef と同じ断り(採った後にこのセッションが操作し、ラベルも変わった = 別の要素に付け替わった疑い)
+            if !labelNote.isEmpty,
+               (sessionActionCounts[key] ?? 0) > (generationActionCount(containing: ref, args: args) ?? 0) {
+                throw MCPError(RefGuard.labelChangedAfterOwnActionRefusal(ref: ref, old: target, new: found))
+            }
+            return (found, gateNote + labelNote)
         }
     }
 

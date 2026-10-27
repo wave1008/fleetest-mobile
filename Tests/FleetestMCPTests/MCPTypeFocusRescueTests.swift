@@ -69,6 +69,19 @@ final class MCPTypeFocusRescueTests: XCTestCase {
         XCTAssertTrue(body.contains("sent to the input field inside it"), body)
     }
 
+    /// **ref つきの ft_type の後は、数手前の ft_tap をもとに救済しない**(ref なしの ft_type はその欄の続き。
+    /// 残すと、遷移のタップ → ref つき type → ref なし type が、遷移先の別の欄へ打った。Emulator の E2EX で 2/2)
+    func testTypeWithARefForgetsTheEarlierTap() async throws {
+        driver.snapshotResponse = screen(focusOn: 1)
+        _ = try await server.call(tool: "ft_snapshot", args: [:])
+        _ = try await server.call(tool: "ft_tap", args: ["ref": 2])
+        _ = try await server.call(tool: "ft_type", args: ["ref": 1, "text": "a"])
+
+        _ = try await server.call(tool: "ft_type", args: ["text": "b"])
+
+        XCTAssertEqual(typeCalls().last, "type(ref:nil,text:b)", "名指しした欄の後の type を、前の ft_tap の容器の欄へ回した: \(driver.calls)")
+    }
+
     /// ③焦点が叩いた容器の中身に立っている → 従来どおり焦点任せ(ref なし)で撃ち、救済の文言は出ない
     func testFocusInsideTheTappedElementTypesAsBefore() async throws {
         driver.snapshotResponse = screen(focusOn: 1)
