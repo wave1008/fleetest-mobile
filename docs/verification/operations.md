@@ -256,8 +256,8 @@ Flutter と RN の実機用は **Release 構成**(Flutter の Debug は flutter 
   `--local`(各 run に `--runner local` = この Mac のデバイスだけ。E2EX を M1Ultra で同時に回すときの形) /
   `--performance`(性能計測モード。上記「モニターと E2E」) / `--negative`(最後に陽性対照スイートも回す) /
   `--retrain-classifiers`(各 SUT の画像分類器のキャッシュを消してから回す) /
-  `--align`(下記) / `--build-only`(SUT の鮮度確認とビルドだけ) / `--as-part`(全体の一部として回す = 検証済みの印・
-  `verification_watch` の推奨・陽性対照を扱わない。今は呼び手がいない)。`--build-only` は `Scripts/regress.py` が撃つ口(`e2ex.sh` / `e2ey.sh` にもある)
+  `--align`(下記) / `--build-only`(SUT の鮮度確認とビルドだけ)。
+  `--build-only` は `Scripts/regress.py` が撃つ口(`e2ex.sh` / `e2ey.sh` にもある)
 - **回帰は録画しない**(2026-10-27 ユーザー決定)。4本のスクリプト(e2e / e2ex / e2ey / e2e-devices)は既定で
   `--set record=false` を渡し、`--record` のときだけ録画する。録画の切り出しが run ごとの後始末の大半だった(PT-8.1)
 - **全マシンで回すときは `Scripts/regress.py`**: 回帰の対象(スイート × SUT × OS/モード = `<プロジェクト>:<プロファイル>`)を

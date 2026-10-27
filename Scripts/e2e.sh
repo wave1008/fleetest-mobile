@@ -51,8 +51,6 @@
 #                                   # --ios-xcuitest / --performance では付けても回さない(対照はモードを表で
 #                                   # 決めている・時間の比較を乱す)
 #   Scripts/e2e.sh --build-only    # SUT の鮮度を確かめて要ればビルドするだけ(run しない。Scripts/regress.py が最初に全機で撃つ)
-#   Scripts/e2e.sh --as-part       # 全体の一部として回す(今は呼び手がいない。regress.py は fleetest run --target を撃つ)。
-#                                   # 検証済みの印・verification_watch の推奨・陽性対照はここでは扱わない(一部だけで「全部成功」と書かないため)
 #   Scripts/e2e.sh --record        # 各プロファイルの一時コピー(<名前>-record-tmp.json。実行後に削除)に
 #                                   # record:true を付けて実行し、録画パイプラインの整合を
 #                                   # Scripts/check-recordings.py で検証する(元のプロファイルは書き換えない)
@@ -96,7 +94,6 @@ NEGATIVE=0
 RETRAIN_CLASSIFIERS=0
 RETRAINED_PROJECTS=""
 BUILD_ONLY=0
-AS_PART=0
 
 for arg in "$@"; do
   case "$arg" in
@@ -112,7 +109,6 @@ for arg in "$@"; do
     --negative) NEGATIVE=1 ;;
     --retrain-classifiers) RETRAIN_CLASSIFIERS=1 ;;
     --build-only) BUILD_ONLY=1 ;;
-    --as-part) AS_PART=1 ;;
     --cmp|--ios-native|--android-native|--flutter|--rn) SUTS="$SUTS ${arg#--}" ;;
     *) echo "不明な引数: $arg" >&2; exit 2 ;;
   esac
@@ -482,7 +478,7 @@ fi
 # 陽性対照は本体と別に数える: 印(bridge_marker)は「ブリッジの入力が緑の E2E を通った」記録なので
 # 本体の FAILED だけで決める。exit には両方を載せる
 NEG_FAILED=0
-if [ "$NEGATIVE" = 1 ] && [ "$AS_PART" = 0 ] && [ "$PERFORMANCE" = 0 ] && [ "$IOS_PROFILE" != "ios-xcuitest" ]; then
+if [ "$NEGATIVE" = 1 ] && [ "$PERFORMANCE" = 0 ] && [ "$IOS_PROFILE" != "ios-xcuitest" ]; then
   NEG_ARGS=()
   [ "$RUN_IOS" = 0 ] && NEG_ARGS+=(--android)
   [ "$RUN_ANDROID" = 0 ] && NEG_ARGS+=(--ios)
@@ -510,10 +506,7 @@ if [ "$NEG_FAILED" = 1 ]; then
   echo "❌ 陽性対照に期待と違うものがあります(上の「陽性対照の判定」)"
 fi
 # 緑の run では通らない経路の検証は既定で回さない。見ている部分が前回 ✅ から変わったものだけ推奨する(合否に入れない)
-STALE_VERIFICATIONS=""
-if [ "$AS_PART" = 0 ]; then
-  STALE_VERIFICATIONS="$(python3 "$ROOT/Scripts/verification_watch.py" stale 2>/dev/null || true)"
-fi
+STALE_VERIFICATIONS="$(python3 "$ROOT/Scripts/verification_watch.py" stale 2>/dev/null || true)"
 if [ -n "$STALE_VERIFICATIONS" ]; then
   echo "💡 見ている部分が前回 ✅ のときから変わった検証があります(回すのはユーザーの指示があるときだけ):"
   printf '%s\n' "$STALE_VERIFICATIONS" | while IFS=$'\t' read -r unit why; do
@@ -529,7 +522,7 @@ fi
 
 # **通した状態を覚えるのは全部成功したときだけ** —— 失敗したまま印を更新すると、
 # 次回から「検証済み」と言い張る装置になる
-if [ "$FAILED" = 0 ] && [ "$RUN_IOS" = 1 ] && [ "${AS_PART:-0}" = 0 ]; then
+if [ "$FAILED" = 0 ] && [ "$RUN_IOS" = 1 ]; then
   MARKER="$(bridge_marker "$RUN_MODE")"
   mkdir -p "$(dirname "$MARKER")"
   bridge_digest "$RUN_MODE" > "$MARKER"

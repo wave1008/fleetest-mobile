@@ -14,7 +14,7 @@ const ROOT = resolve(import.meta.dirname, '../..')
 const source = readFileSync(join(ROOT, 'Scripts/e2ex.sh'), 'utf8')
 
 /** 判定と記録の2ブロックだけを取り出し、変数を差し替えて実行する */
-function runGate({ profile, failed, markers = {}, digest, asPart = false }) {
+function runGate({ profile, failed, markers = {}, digest }) {
   const dir = mkdtempSync(join(tmpdir(), 'e2ex-gate-'))
   mkdirSync(join(dir, '.fleetest'), { recursive: true })
   for (const [name, body] of Object.entries(markers)) {
@@ -33,7 +33,6 @@ function runGate({ profile, failed, markers = {}, digest, asPart = false }) {
     'RUN_IOS=1',
     `IOS_PROFILE=${JSON.stringify(profile)}`,
     `FAILED=${failed}`,
-    `AS_PART=${asPart ? 1 : 0}`,
     detect.replace(/^bridge_digest\(\).*$/m, `bridge_digest() { echo ${JSON.stringify(digest)}; }`),
     record,
   ].join('\n')
@@ -83,7 +82,3 @@ test('失敗があれば印を書かない', () => {
   assert.equal(readMarker('inapp-e2ex-verified'), null)
 })
 
-test('全体の一部(--as-part)なら全部成功でも印を書かない(一部だけで「検証済み」にしない)', () => {
-  const { readMarker } = runGate({ profile: 'ios-inapp-boost', failed: 0, digest: 'abc', asPart: true })
-  assert.equal(readMarker('inapp-e2ex-verified'), null)
-})

@@ -18,7 +18,6 @@
 #   Scripts/e2ey.sh --ios           # OS を絞る(--android も同様)
 #   Scripts/e2ey.sh --rebuild       # SUT を必ず再ビルドしてから実行
 #   Scripts/e2ey.sh --build-only    # SUT の鮮度を確かめて要ればビルドするだけ(run しない。Scripts/regress.py が最初に全機で撃つ)
-#   Scripts/e2ey.sh --as-part       # 全体の一部として回す(今は呼び手がいない)。検証済みの印はここでは書かない
 #   Scripts/e2ey.sh --record        # 録画する(既定は録画しない = `--set record=false`。回帰は録画しないのが既定)
 #   Scripts/e2ey.sh --on M1Ultra    # **丸ごとその機械で回す**(ssh でランナーのクローンに入り、そこで SUT をビルドして
 #                                   # そこのデバイスで実行する。残りの引数はそのまま向こうへ渡す)。向こうで動くのは
@@ -66,13 +65,11 @@ fi
 
 RECORD_FLAG="--set record=false"
 BUILD_ONLY=0
-AS_PART=0
 for arg in "$@"; do
   case "$arg" in
     --rebuild) FORCE_REBUILD=1 ;;
     --record) RECORD_FLAG="" ;;
     --build-only) BUILD_ONLY=1 ;;
-    --as-part) AS_PART=1 ;;
     --ios) RUN_ANDROID=0 ;;
     --android) RUN_IOS=0 ;;
     --ios-inapp-boost) IOS_PROFILE="ios-inapp-boost"; IOS_MODE_ONLY=1 ;;
@@ -200,7 +197,7 @@ else
 fi
 # **印を更新するのは全部成功したときだけ**(失敗したまま更新すると「検証済み」と言い張る装置になる)。
 # `[ … ] && { … }` の形にしない(偽のとき終了ステータス 1 を残す。Scripts/e2e.sh の末尾と同じ理由)
-if [ "$FAILED" = 0 ] && [ "$RUN_IOS" = 1 ] && [ "${AS_PART:-0}" = 0 ]; then
+if [ "$FAILED" = 0 ] && [ "$RUN_IOS" = 1 ]; then
   MARKER="$(bridge_marker "$RUN_MODE")"
   mkdir -p "$(dirname "$MARKER")"
   bridge_digest "$RUN_MODE" > "$MARKER"
