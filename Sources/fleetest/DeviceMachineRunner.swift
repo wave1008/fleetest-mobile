@@ -348,8 +348,12 @@ enum DeviceMachineRunner {
         // **broadcast はここを呼ばない** —— 同じ ID を台数ぶん走らせるので、1台でも記録が
         // あれば「走った」であり「欠落」の意味が変わる(呼び手で分岐。実装を分けない)
         if !broadcast {
-            reportMissingResults(project: project, profileName: profileName, runGroup: runGroup,
-                                 since: dispatchStart, active: assignedActive, outcomes: outcomes)
+            let missing = reportMissingResults(project: project, profileName: profileName, runGroup: runGroup,
+                                               since: dispatchStart, active: assignedActive, outcomes: outcomes)
+            // 渡したのに結果が無い分(子が受け取る前の中断など)。中断なら 130・それ以外は 1
+            if missing > 0 {
+                if dispatcher?.isInterrupted ?? false { interruptedWithWorkLeft = true } else { neverHandedFailure = true }
+            }
         }
         // ディスパッチした(= --junit を渡した)ぶんだけ結合する。0本で見送ったホストを混ぜると
         // 「出力が無い」合成失敗になり、走らせてもいないものが赤くなる(FleetRunner と同じ規律)
@@ -573,10 +577,13 @@ enum DeviceMachineRunner {
     /// からしか書かれない**(`RemoteRunDispatcher.writeLastResults` と同じ口)ので、結果の無い分は
     /// 前回(緑)の記録のまま残り、黙って再実行の対象から外れる。ここで欠落を1行で知らせた上で
     /// `LastResultsStore` へ失敗として記録し、次回の `--failed` が拾えるようにする
+    /// 戻り値 = 結果の無いシナリオの数(親の終了コードに載せる。子が 0 で終わっても 0 にしない)
+    @discardableResult
     private static func reportMissingResults(
         project: TestProject, profileName: String, runGroup: String, since: Date,
         active: [(Int, Group, [String])], outcomes: [FleetEntryOutcome]
-    ) {
+    ) -> Int {
+        var missingTotal = 0
         let recorded = scanRecordedScenarios(project: project, runGroup: runGroup, since: since)
         // **順序ではなく machineLabel で引く**: outcomes は今は active と同じ順序で作られているが、
         // その保証は run() の集計の実装詳細なので、崩れたときに「別の機械の exit code」を
@@ -585,6 +592,7 @@ enum DeviceMachineRunner {
         for (_, group, ids) in active {
             let exitCode = exitCodes[group.machineLabel] ?? -1
             let missing = unrecordedScenarioIDs(assigned: ids, recorded: recorded.all)
+            missingTotal += missing.count
             if !missing.isEmpty {
                 FleetRunner.log(missingResultsLine(
                     machineLabel: group.machineLabel, exitCode: exitCode, ids: missing))
@@ -603,6 +611,7 @@ enum DeviceMachineRunner {
             FleetRunner.log(interruptedResultsLine(
                 machineLabel: group.machineLabel, exitCode: exitCode, ids: interrupted))
         }
+        return missingTotal
     }
 
     /// scanRuns の `since` はその run の `startedAt`(その機械自身の時計)と直接比較される。

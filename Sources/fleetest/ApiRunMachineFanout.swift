@@ -272,7 +272,15 @@ enum ApiRunMachineFanout {
         // 各子タスクの return を待つので、この時点で runChild は必ず .exited を yield 済み)
         continuation.finish()
 
-        let (totalPassed, totalFailed, totalSkipped, runID, testSeconds) = await multiplexed
+        let (totalPassed, totalFailed, totalSkipped, runID, testSeconds, unfinishedTotal) = await multiplexed
+        // 配ったのに子が終わりを知らせなかった分(子が受け取る前の中断など)。中断なら 130・それ以外は 1
+        if unfinishedTotal > 0 {
+            if (dispatcher?.isInterrupted ?? false) || registry.isCancelled {
+                interruptedWithWorkLeft = true
+            } else {
+                neverHandedFailure = true
+            }
+        }
         // finished の前(単機の api run と同じ。拡張は finished で通知を出す)
         healCollection.finish(project: project) { logStderr($0) }
         writeLine(encode(ApiRunFinishedEvent(
@@ -476,15 +484,18 @@ enum ApiRunMachineFanout {
     private static func consume(
         stream: AsyncStream<ChildEvent>, groupMachines: [String?], assignedScenarioIDs: [[String]],
         isCancelled: @escaping @Sendable () -> Bool
-    ) async -> (passed: Int, failed: Int, skipped: Int, runID: String?, testSeconds: Double?) {
+    ) async -> (passed: Int, failed: Int, skipped: Int, runID: String?, testSeconds: Double?, unfinished: Int) {
         var multiplexer = MachineFanoutMultiplexer(groupMachines: groupMachines, assignedScenarioIDs: assignedScenarioIDs)
         for await event in stream {
             switch event {
             case .line(let index, let text):
                 for line in multiplexer.ingest(childIndex: index, line: text) { writeLine(line) }
             case .exited(let index, let status, let assigned):
-                // キャンセルで殺された子の未完了は合成しない(キャンセル≠失敗)
-                guard !isCancelled() else { continue }
+                // キャンセルで殺された子の未完了は合成しない(キャンセル≠失敗)。数だけは控える(終了コードに載せる)
+                guard !isCancelled() else {
+                    _ = multiplexer.noteExit(index, assigned: assigned)
+                    continue
+                }
                 for line in multiplexer.childExited(index, exitCode: status, assigned: assigned) { writeLine(line) }
             case .neverHanded(let ids):
                 guard !isCancelled() else { continue }
@@ -492,7 +503,7 @@ enum ApiRunMachineFanout {
             }
         }
         return (multiplexer.totalPassed, multiplexer.totalFailed, multiplexer.totalSkipped,
-                multiplexer.runID, multiplexer.testSeconds)
+                multiplexer.runID, multiplexer.testSeconds, multiplexer.unfinishedTotal)
     }
 
     // MARK: - 出力(FleetRunner.log/logLine と同じ規律。stdout は NDJSON 専用・行単位で lock)
@@ -540,6 +551,9 @@ struct MachineFanoutMultiplexer {
     private(set) var totalPassed = 0
     private(set) var totalFailed = 0
     private(set) var totalSkipped = 0
+    /// 担当していたのに終わりの知らせが来ないまま子が終わったシナリオの数(キャンセルで合成しなかった分も数える)。
+    /// 親の終了コードに載せる(子が 0 で終わっても 0 にしない = 配ったのに子が受け取らなかった分を成功に化けさせない)
+    private(set) var unfinishedTotal = 0
     /// 子の runFinished が運んだ runID のうち最初の1つ。子は同じ runGroup を共有するので
     /// どれでも束ねたセッション全体に届く(ApiRunFinishedEvent.runID の宣言参照)
     private(set) var runID: String?
@@ -606,9 +620,7 @@ struct MachineFanoutMultiplexer {
     /// failed として合成する(正常に全部完了していれば空配列)
     /// assigned = 動的な割り振りで実際に渡したシナリオ(渡した分だけが「担当」。nil は初期の担当のまま)
     mutating func childExited(_ index: Int, exitCode: Int32, assigned: [String]? = nil) -> [String] {
-        exitedIndices.insert(index)
-        if let assigned { assignedScenarioIDs[index] = assigned }
-        let unfinished = assignedScenarioIDs[index].filter { !finishedByIndex[index].contains($0) }
+        let unfinished = noteExit(index, assigned: assigned)
         guard !unfinished.isEmpty else {
             return relayFinalizingIfAllDone(ScenarioEvent(kind: "recordingFinalizing").encodedLine())
         }
@@ -632,6 +644,15 @@ struct MachineFanoutMultiplexer {
             lines.append(finished.encodedLine())
         }
         return lines + relayFinalizingIfAllDone(ScenarioEvent(kind: "recordingFinalizing").encodedLine())
+    }
+
+    /// 子の終了を控え、終わりの知らせが来なかった担当を返す(数は unfinishedTotal へ)。キャンセルで合成しないときもこれだけは呼ぶ
+    mutating func noteExit(_ index: Int, assigned: [String]? = nil) -> [String] {
+        exitedIndices.insert(index)
+        if let assigned { assignedScenarioIDs[index] = assigned }
+        let unfinished = assignedScenarioIDs[index].filter { !finishedByIndex[index].contains($0) }
+        unfinishedTotal += unfinished.count
+        return unfinished
     }
 
     /// 全部の子が終わっても誰にも渡せなかったシナリオ(動的な割り振り)を failed として合成する

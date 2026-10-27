@@ -250,4 +250,16 @@ final class ApiRunMachineFanoutMultiplexerTests: XCTestCase {
         XCTAssertEqual(mux.childExited(0, exitCode: 0), [])
         XCTAssertEqual(mux.totalFailed, 0)
     }
+
+    /// 渡したのに終わりの知らせが来なかった担当を数える(失敗を合成しないキャンセルのときも数える = 親の終了コードに載せる)。
+    /// 子が受け取る前の中断で 0 のまま終わった子を、親が成功と読まないため
+    func testUnfinishedAssignmentsAreCountedEvenWhenNotSynthesized() {
+        var mux = MachineFanoutMultiplexer(groupMachines: [nil, "M1Max"], assignedScenarioIDs: [["A.S1"], ["B.S1"]])
+        _ = mux.ingest(childIndex: 0, line: #"{"kind":"scenarioFinished","scenario":"A.S1","passed":true}"#)
+        _ = mux.noteExit(0, assigned: ["A.S1", "A.S2"])   // A.S2 は配ったが子が受け取らなかった
+        XCTAssertEqual(mux.unfinishedTotal, 1)
+        XCTAssertEqual(mux.totalFailed, 0, "キャンセルの経路では失敗を合成しない")
+        _ = mux.childExited(1, exitCode: 0)
+        XCTAssertEqual(mux.unfinishedTotal, 2, "合成する経路でも数える")
+    }
 }

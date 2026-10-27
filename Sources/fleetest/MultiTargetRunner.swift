@@ -339,8 +339,12 @@ enum MultiTargetRunner {
             let assigned: [(Int, DeviceMachineRunner.Group, [String])] = job.entryByMachine
                 .sorted(by: { $0.key < $1.key })
                 .map { ($0.value, job.groups[$0.value], job.dispatcher.assignedIDs(entry: $0.value)) }
-            reportMissingResults(job: job, runGroup: runGroup, since: dispatchStart, assigned: assigned,
-                                 outcomes: results, machineLabels: machineLabels)
+            let missing = reportMissingResults(job: job, runGroup: runGroup, since: dispatchStart, assigned: assigned,
+                                               outcomes: results, machineLabels: machineLabels)
+            // 渡したのに結果が無い分(子が受け取る前の中断など)。中断なら 130・それ以外は 1
+            if missing > 0 {
+                if job.dispatcher.isInterrupted { interruptedWithWorkLeft = true } else { neverHandedFailure = true }
+            }
         }
         if let junit, let junitTempDir {
             let names = Array(Set(jobs.map(\.project.name))).sorted().joined(separator: "+")
@@ -368,11 +372,14 @@ enum MultiTargetRunner {
 
     /// 仕事ごとの「結果の無いシナリオ」。DeviceMachineRunner.reportMissingResults と同じ文言・同じ記録で、
     /// 走査を **profile でも絞る**(同じプロジェクトの別プロファイルが同じシナリオ ID を記録して欠落を隠さない)
+    /// 戻り値 = 結果の無いシナリオの数(親の終了コードに載せる)
+    @discardableResult
     private static func reportMissingResults(
         job: Job, runGroup: String, since: Date, assigned: [(Int, DeviceMachineRunner.Group, [String])],
         outcomes: [ChildOutcome], machineLabels: [String]
-    ) {
-        guard assigned.contains(where: { !$0.2.isEmpty }) else { return }
+    ) -> Int {
+        guard assigned.contains(where: { !$0.2.isEmpty }) else { return 0 }
+        var missingTotal = 0
         let resultsDir = RunResultsStore.resultsDir(projectRoot: job.project.rootURL)
         let metas = RunResultsStore.scanRuns(resultsDir: resultsDir, since: since.addingTimeInterval(-5 * 60))
             .filter { $0.runGroup == runGroup && $0.profile == job.profile }
@@ -388,6 +395,7 @@ enum MultiTargetRunner {
             let exitCode = outcomes.last(where: { $0.job == job.id && $0.machine == machine })?.exitCode ?? -1
             let label = "\(group.machineLabel):\(job.id)"
             let missing = DeviceMachineRunner.unrecordedScenarioIDs(assigned: ids, recorded: recorded.all)
+            missingTotal += missing.count
             if !missing.isEmpty {
                 FleetRunner.log(DeviceMachineRunner.missingResultsLine(machineLabel: label, exitCode: exitCode, ids: missing))
                 for id in missing {
@@ -401,6 +409,7 @@ enum MultiTargetRunner {
                     machineLabel: label, exitCode: exitCode, ids: interruptedIDs))
             }
         }
+        return missingTotal
     }
 
     private static func printSummary(jobs: [Job], machineLabels: [String], outcomes: [ChildOutcome], wallSeconds: Double) {

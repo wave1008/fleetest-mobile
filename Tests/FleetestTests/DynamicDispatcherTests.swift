@@ -189,6 +189,13 @@ final class DynamicDispatcherTests: XCTestCase {
             XCTAssertTrue(text.contains("interruptedWithWorkLeft: interruptedWithWorkLeft)"),
                           "\(file) が中断で残った分を終了コードへ載せていない")
         }
+        // 渡したのに結果が無い分(子が受け取る前の中断など)も終了コードへ載せる
+        for (file, marker) in [("Sources/fleetest/DeviceMachineRunner.swift", "if missing > 0 {"),
+                               ("Sources/fleetest/MultiTargetRunner.swift", "if missing > 0 {"),
+                               ("Sources/fleetest/ApiRunMachineFanout.swift", "if unfinishedTotal > 0 {")] {
+            let text = try String(contentsOf: root.appendingPathComponent(file), encoding: .utf8)
+            XCTAssertTrue(text.contains(marker), "\(file) が結果の無いシナリオを終了コードへ載せていない")
+        }
     }
 
     /// レスポンス計測の run は動的にしない(反復は子だけが展開し、親は同じ ID を1回しか配らない)
