@@ -328,4 +328,22 @@ final class TypeKeyboardSettleTests: XCTestCase {
             FlowStep(action: "tap", locator: FlowLocator(id: "btn_send")))
         XCTAssertFalse(after.notes.contains(.keyboardAppearedLate), "1回だけ")
     }
+
+    /// **type の後のスクロール探索は、キーボードが上がってから判断する**(探索はロケータ解決の段より先に走る)。
+    /// E2EX-iOS xcuitest 入力の種類 S0040: 打った直後はキーボードが画面の外(上がる前)と申告され、echo は「見えている」位置。
+    /// 待たずに探索すると送らずに止まり、後で上がったキーボードの下に echo が入って可視性検証で赤になった
+    func testScrollSearchAfterTypeWaitsForTheKeyboardBeforeJudging() async throws {
+        let echo = ElementInfo(ref: 3, type: "staticText", identifier: "txt_echo", label: "echo=x", value: nil,
+                               placeholder: nil, enabled: true, frame: FTRect(x: 20, y: 650, width: 100, height: 20), depth: 1)
+        let driver = FakeAppDriver(name: "primary", log: CallLog(), snapshotElements: [[inputField(value: nil), echo]])
+        // #1 type の解決(無し)→ 上がる前(画面の外)が続き → 上がる(y 600〜 = echo の上)
+        driver.keyboardFrames = [nil, hidden, hidden, hidden, shown]
+        driver.verifiesTypedText = true
+        let executor = StepExecutor(driver: driver, isAndroid: false, tunables: RunTunables())
+        _ = await executor.execute(FlowStep(action: "type", locator: FlowLocator(id: "wv_input"), text: "x"))
+        _ = await executor.execute(FlowStep(action: "select", locator: FlowLocator(id: "txt_echo"), direction: "down", maxSwipes: 1))
+        let moves = driver.log.entries.filter { $0.contains(".swipe") || $0.contains(".drag") }
+        XCTAssertFalse(moves.isEmpty, "上がったキーボードの下の echo を送らずに「見えている」で止まった: \(driver.log.entries)")
+    }
 }
+

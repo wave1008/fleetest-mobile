@@ -545,6 +545,11 @@ extension StepExecutor {
             var snapshot: SnapshotResponse
             if attempt == 0 {
                 snapshot = try await settledSignature(phase: &phase).snapshot
+                // **直前の type のキーボードを、探索が判断する前に待つ**(ロケータ解決の段より先に探索が走るため)。
+                // 待たないと、上がる前のキーボード(画面の外の申告)の木で「見えている」と判断して送らず、その後に上がった
+                // キーボードの下へ対象が入る(E2EX-iOS xcuitest 入力の種類 S0040: 日本語キーボードは /type の後 約 1.3 秒で上がり、
+                // select(#txt_bottom_echo, scroll: .down) が送らずに止まって可視性検証で赤。この Mac で 5/5)
+                snapshot = try await consumePendingTypeKeyboardCheck(snapshot, phase: &phase)
             } else {
                 let start = clock.now
                 // **スワイプ直後は必ずキャッシュを捨てて撮る**(Android のみ実費。iOS は素通し)。

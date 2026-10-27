@@ -739,16 +739,63 @@ final class InputInjector {
             throw new BridgeRouter.BridgeException(409,
                     "no-input-focus: nothing has input focus (tap the field by ref first)");
         }
-        // **複数行の欄では撃たない**(ホストの keyevent 66 = 改行へ回す)。ACTION_IME_ENTER は複数行の RN で改行にも
+        // **複数行の欄では撃たない**(ホストの keyevent 66 = 改行へ回す)。ACTION_IME_ENTER は複数行の RN / Compose で改行にも
         // アクションにもならないのに true を返す(実機 Pixel 3a: 値が変わらず ime=0。keyevent 66 は改行が入った)。
-        // **Compose を keyevent へ回さない**: Compose は isMultiLine を申告しないが、keyevent 66 は単一行の ImeAction.Next を
-        // 起こさない(E2EX-CMP 入力の種類 S0020 で焦点が移らず赤)。Compose の複数行は未解決(open-issues OI-34)
-        if (focus.isMultiLine()) {
+        // Compose は isMultiLine を申告しないので、IME の今の欄の inputType で見る(composeEditorIsMultiLine)。
+        // **Compose を一律に keyevent へ回さない**: keyevent 66 は単一行の ImeAction.Next を起こさない(E2EX-CMP 入力の種類 S0020)
+        if (focus.isMultiLine() || (isComposeNode(focus) && composeEditorIsMultiLine(ua, focus))) {
             throw new BridgeRouter.BridgeException(409, "multi-line field: Enter is sent as a key event (a new line)");
         }
         // ホストがキーイベント経路へフォールバックできるよう、失敗は 409 で返す(500 にしない)
         if (!focus.performAction(AccessibilityNodeInfo.AccessibilityAction.ACTION_IME_ENTER.getId())) {
             throw new BridgeRouter.BridgeException(409, "the IME Enter action could not be performed");
+        }
+    }
+
+    /** Compose のセマンティクスノードか(Compose は追加データの鍵に自分の semantics id を出す。実機 Pixel 3a の CMP で確認) */
+    private static boolean isComposeNode(AccessibilityNodeInfo node) {
+        java.util.List<String> keys = node.getAvailableExtraData();
+        return keys != null && keys.contains("androidx.compose.ui.semantics.id");
+    }
+
+    /** EditorInfo.TYPE_TEXT_FLAG_MULTI_LINE / IME_FLAG_NO_ENTER_ACTION / IME_MASK_ACTION / IME_ACTION_NONE */
+    private static final int TYPE_TEXT_FLAG_MULTI_LINE = 0x20000;
+    private static final int IME_FLAG_NO_ENTER_ACTION = 0x40000000;
+    private static final int IME_MASK_ACTION = 0xff;
+    private static final int IME_ACTION_NONE = 1;
+
+    /**
+     * IME が今つないでいる欄(`dumpsys input_method` の `mInputEditorInfo`)で、ソフトキーボードの Enter が**改行**になるか。
+     * a11y に複数行が出ない Compose のためだけに読む。規則はキーボードの Enter と同じ: 複数行で、かつ Enter をアクションに
+     * しない(IME_FLAG_NO_ENTER_ACTION か、アクションが無い)ときだけ改行。複数行でもアクション(次へ等)を持つ欄はアクション
+     * (Emulator の CMP: 複数行 inputType=0x28001 imeOptions=0x42000000 / 「姓」0x28001・0x2000005 = 次へ / 単一行 0x8001)。
+     * **読めない・形が違う・別のアプリなら false**(= 従来どおり ACTION_IME_ENTER を撃つ側に倒す)
+     */
+    private static boolean composeEditorIsMultiLine(UiAutomation ua, AccessibilityNodeInfo focus) {
+        CharSequence pkg = focus.getPackageName();
+        if (pkg == null) return false;
+        String dump;
+        try {
+            dump = BridgeRouter.rawShell(ua, "dumpsys input_method");
+        } catch (RuntimeException e) {
+            return false;
+        }
+        int at = dump.indexOf("mInputEditorInfo:");
+        if (at < 0) return false;
+        int end = dump.indexOf("hintLocales=", at);
+        String block = dump.substring(at, end < 0 ? Math.min(dump.length(), at + 600) : end);
+        java.util.regex.Matcher type = java.util.regex.Pattern.compile("inputType=0x([0-9a-fA-F]+)").matcher(block);
+        java.util.regex.Matcher options = java.util.regex.Pattern.compile("imeOptions=0x([0-9a-fA-F]+)").matcher(block);
+        java.util.regex.Matcher owner = java.util.regex.Pattern.compile("packageName=(\\S+)").matcher(block);
+        if (!type.find() || !options.find() || !owner.find() || !owner.group(1).equals(pkg.toString())) return false;
+        try {
+            int inputType = (int) Long.parseLong(type.group(1), 16);
+            int imeOptions = (int) Long.parseLong(options.group(1), 16);
+            if ((inputType & TYPE_TEXT_FLAG_MULTI_LINE) == 0) return false;
+            int action = imeOptions & IME_MASK_ACTION;
+            return (imeOptions & IME_FLAG_NO_ENTER_ACTION) != 0 || action == 0 || action == IME_ACTION_NONE;
+        } catch (NumberFormatException e) {
+            return false;
         }
     }
 
