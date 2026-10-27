@@ -90,8 +90,7 @@ enum FleetRunner {
         defer { prelock.releaseAll() }
         // false = 中断済みで握った分は外し終えている。子を1つも起こさずに抜ける(DeviceMachineRunner と同じ)
         guard prelock.acquireInOrder(machines: DispatchPrelock.machinesToLock(fleet.runs.map(\.host))) else {
-            log("interrupted while acquiring dispatch locks — starting no fleet entry")
-            throw DeviceMachineRunner.interruptedBeforeAnySubRun
+            throw DeviceMachineRunner.interruptedBeforeAnySubRun  // 何が起きたかの1行は DispatchPrelock が出す
         }
         // 子タスクへ渡すのは値のコピー(prelock 自身を @Sendable な closure へ持ち込まない)
         let lockMarkers = prelock.markers
@@ -245,8 +244,7 @@ enum FleetRunner {
         defer { prelock.releaseAll() }
         // false = 中断済みで握った分は外し終えている。子を1つも起こさずに抜ける(DeviceMachineRunner と同じ)
         guard prelock.acquireInOrder(machines: DispatchPrelock.machinesToLock(active.map { $0.1.host })) else {
-            log("interrupted while acquiring dispatch locks — starting no fleet entry")
-            throw DeviceMachineRunner.interruptedBeforeAnySubRun
+            throw DeviceMachineRunner.interruptedBeforeAnySubRun  // 何が起きたかの1行は DispatchPrelock が出す
         }
         let lockMarkers = prelock.markers
 
