@@ -357,7 +357,7 @@
 - 確認: コミット未記録(2026-10-27)
 
 - `FleetRunner` の2箇所(`acquireInOrder` が false のとき)は `ValidationError` で投げるので、ロックの取得中の中断が使い方の誤り(64)と
-  help の案内になる。機械分担・複数対象・`api run` の機械分担の3経路は `DeviceMachineRunner.interruptedWhileLocking`(130)へ寄せた
+  help の案内になる。機械分担・複数対象・`api run` の機械分担の3経路は `DeviceMachineRunner.interruptedBeforeAnySubRun`(130)へ寄せた
 - 揃えていない理由: `--fleet` は run の途中の中断でも 130 を返さない(子の終了コードの集計だけ)ので、ロックの取得中だけ 130 にすると
   `--fleet` の中で食い違う。直すなら `--fleet` の中断の終了コード全体を決めてから(利用者向けの docs は「複数のマシンにまたがる実行」を 130 と書いている)
 

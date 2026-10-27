@@ -106,6 +106,8 @@ enum MultiTargetRunner {
     ) async throws -> Int32 {
         let junitTempDir = try FleetRunner.makeJUnitTempDir(requested: junit)
         defer { if let junitTempDir { try? FileManager.default.removeItem(at: junitTempDir) } }
+        let parentInterrupt = DeviceMachineRunner.ParentInterrupt()
+        defer { parentInterrupt.stop() }
 
         // 1. 対象の解決(プロジェクト・グループ)。読むだけで、デバイスにもビルドにも触らない
         let disabled = MachineEnablement.disabledMachines(config: LocalConfig.load())
@@ -149,18 +151,31 @@ enum MultiTargetRunner {
             + " — each free machine takes the next target; the last targets are shared scenario by scenario")
 
         // build を直列化するための先取り。配分が確定したら必ず手放し、本取得は DispatchPrelock が全順序で行う
-        var localLock = try LocalDispatchLock(
-            runGroup: runGroup, waitLock: waitLock, forceLock: forceLock,
-            log: { FleetRunner.log($0) }).acquire()
+        var localLock: LocalDispatchLock.Holder?
+        do {
+            localLock = try LocalDispatchLock(
+                runGroup: runGroup, waitLock: waitLock, forceLock: forceLock,
+                log: { FleetRunner.log($0) }).acquire(interruptCheck: parentInterrupt.isSet)
+        } catch where parentInterrupt.isSet() {
+            FleetRunner.log("==> \(error.localizedDescription)")
+            throw DeviceMachineRunner.interruptedBeforeAnySubRun
+        }
         defer { localLock?.release() }
 
-        // 2. 手元で1回ずつビルドして一覧を出す(プロジェクトごと)
+        // 2. 手元で1回ずつビルドして一覧を出す(プロジェクトごと)。中断はプロジェクトの境目で拾う
         var built: Set<String> = []
         var listed: [String: [ScenarioInfo]] = [:]
         var healByProject: [String: HealSourceWriteBack.Collection] = [:]
         for target in resolvedTargets where built.insert(target.project.name).inserted {
-            if !skipBuild { try ScenarioHost.build(project: target.project, log: { FleetRunner.log($0) }) }
-            let found = try ScenarioHost.listForRun(project: target.project, dryRun: false, compilesOCR: false)
+            let found: [ScenarioInfo]
+            do {
+                if !skipBuild { try ScenarioHost.build(project: target.project, log: { FleetRunner.log($0) }) }
+                found = try ScenarioHost.listForRun(project: target.project, dryRun: false, compilesOCR: false)
+            } catch where parentInterrupt.isSet() {
+                try parentInterrupt.exitIfSet(during: "the scenario build", log: { FleetRunner.log($0) })
+                throw error
+            }
+            try parentInterrupt.exitIfSet(during: "the scenario build", log: { FleetRunner.log($0) })
             guard !found.isEmpty else {
                 throw ValidationError(
                     "no scenarios (add a @TestClass under TestProjects/\(target.project.name)/scenarios/)")
@@ -235,7 +250,7 @@ enum MultiTargetRunner {
         defer { prelock.releaseAll() }
         guard prelock.acquireInOrder(machines: DispatchPrelock.machinesToLock(
             labelsInUse(machineLabels, entryMaps: jobs.map { Set($0.entryByMachine.keys) }))) else {
-            throw DeviceMachineRunner.interruptedWhileLocking
+            throw DeviceMachineRunner.interruptedBeforeAnySubRun
         }
         let lockMarkers = prelock.markers
         let dispatchStart = Date()
@@ -297,6 +312,8 @@ enum MultiTargetRunner {
         // catchUp: ロックの取得中(DispatchPrelock の購読が受けた)の中断も、ここで配り手へ伝える
         let relay = InterruptRelay.observing(catchUp: true) { coordinator.interrupt() }
         defer { relay.stop() }
+        // 購読の登録より前の中断は子を起こす前に抜ける(DeviceMachineRunner.run の同じ箇所)
+        try parentInterrupt.exitIfSet(during: "the dispatch lock acquisition", log: { FleetRunner.log($0) })
         let wallStart = clock()
         coordinator.start()
         await coordinator.waitUntilFinished()

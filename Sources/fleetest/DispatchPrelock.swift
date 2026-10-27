@@ -91,9 +91,9 @@ final class DispatchPrelock {
     /// 既存呼び出しごとコンパイルが壊れるので、`@discardableResult` で無視しても壊れない形にし、
     /// 中断を待たずに子を起こす退行は残しても**ビルドは壊さない**側を選ぶ。
     ///
-    /// 見るのは①各機械へ進む直前 ②1台ぶんの取得が失敗した直後 の2箇所 —— ①だけだと、既に成功して
-    /// いた取得の直後に来た中断は次の反復まで気づかない(最後の1台の途中で来た中断は次の反復が
-    /// 無いので一生気づかない)
+    /// 見るのは①各機械へ進む直前 ②1台ぶんの取得が失敗した直後 ③全部取り終えた直後 の3箇所 —— ①だけだと、既に成功して
+    /// いた取得の直後に来た中断は次の反復まで気づかない。③が無いと最後の1台の取得の最中に来た中断を見ないまま true を返し、
+    /// 呼び手が子を起こしてから止めた(陽性対照で exit 15 の子が3本)
     @discardableResult
     func acquireInOrder(machines: [String]) -> Bool {
         let ordered = DispatchOrder.sorted(fillMissingUUIDs(actions.keys(machines)))
@@ -101,7 +101,8 @@ final class DispatchPrelock {
         warnIfOrderUndetermined(ordered)
         if interruptRelay == nil {
             let flag = interruptFlag
-            interruptRelay = InterruptRelay.observing { flag.mark() }
+            // catchUp: 呼び手の入口の印(ParentInterrupt)が先に受けた中断も、1台目を取る前に見る
+            interruptRelay = InterruptRelay.observing(catchUp: true) { flag.mark() }
         }
         // 同じ Mac を指す別名が2つ並んだとき、2度目の取得は**自分が握っているロック**を待って
         // 詰む。控えを共有して1回だけ取る
@@ -131,7 +132,7 @@ final class DispatchPrelock {
                     + " and fails with the reason if it is still held")
             }
         }
-        return true
+        return !abortIfInterrupted()
     }
 
     /// 中断済みなら、ここまでに握ったロックを逆順で外して true を返す

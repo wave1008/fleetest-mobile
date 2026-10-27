@@ -114,6 +114,8 @@ enum DeviceMachineRunner {
             .joined(separator: " + ")
         FleetRunner.log("==> profile \"\(profileName)\" spans \(groups.count) machines:"
             + " \(machineList) — building \(project.name) locally to split the scenarios")
+        let parentInterrupt = ParentInterrupt()
+        defer { parentInterrupt.stop() }
 
         // 機械ごとに別々の run になるので、ここで1回だけ束ね鍵を発行して全員へ配る
         // (FTCore.RunMetaRecord.runGroup。子が自分で作ると束にならない)。ビルドより前に採る ——
@@ -134,17 +136,31 @@ enum DeviceMachineRunner {
         // **build を直列化するための一時的な先取り** —— 配分が確定したら local に配られるかどうかに
         // 関わらず必ず手放す(下)。全順序どおりの本取得は `DispatchPrelock` が local を含めて
         // 改めて行う(RR-18.10「全員が同じ順序でしか取らないなら、循環待ちは作れない」= local だけ順序の外に出さない)
-        var localLock = try LocalDispatchLock(
-            runGroup: runGroup, waitLock: waitLock, forceLock: forceLock,
-            log: { FleetRunner.log($0) }).acquire()
+        var localLock: LocalDispatchLock.Holder?
+        do {
+            localLock = try LocalDispatchLock(
+                runGroup: runGroup, waitLock: waitLock, forceLock: forceLock,
+                log: { FleetRunner.log($0) }).acquire(interruptCheck: parentInterrupt.isSet)
+        } catch where parentInterrupt.isSet() {
+            FleetRunner.log("==> \(error.localizedDescription)")
+            throw interruptedBeforeAnySubRun
+        }
         defer { localLock?.release() }
 
-        // 割り当てを決めるにはシナリオ一覧が要る(--split と同じ理由でローカルで1回ビルドする)
-        try ScenarioHost.build(project: project, log: { FleetRunner.log($0) })
-        // 機械分担の run に dry-run は無い(dry-run は手元の run 経路で先に畳まれる)
-        // **コンパイルは起こさない**: 一覧は割り当てを決めるためだけで、機械ごとの run(手元の分を含む)が
-        // 自分の解決済みプロファイルで要否を決めて起こす
-        let all = try ScenarioHost.listForRun(project: project, dryRun: false, compilesOCR: false)
+        // 割り当てを決めるにはシナリオ一覧が要る(--split と同じ理由でローカルで1回ビルドする)。
+        // ビルド中の中断はビルドが終わってから拾う(端末の Ctrl-C でビルドが落ちた失敗も中断として抜ける)
+        let all: [ScenarioInfo]
+        do {
+            try ScenarioHost.build(project: project, log: { FleetRunner.log($0) })
+            // 機械分担の run に dry-run は無い(dry-run は手元の run 経路で先に畳まれる)
+            // **コンパイルは起こさない**: 一覧は割り当てを決めるためだけで、機械ごとの run(手元の分を含む)が
+            // 自分の解決済みプロファイルで要否を決めて起こす
+            all = try ScenarioHost.listForRun(project: project, dryRun: false, compilesOCR: false)
+        } catch where parentInterrupt.isSet() {
+            try parentInterrupt.exitIfSet(during: "the scenario build", log: { FleetRunner.log($0) })
+            throw error
+        }
+        try parentInterrupt.exitIfSet(during: "the scenario build", log: { FleetRunner.log($0) })
         guard !all.isEmpty else {
             throw ValidationError(
                 "no scenarios (add a @TestClass under TestProjects/\(project.name)/scenarios/)")
@@ -257,7 +273,7 @@ enum DeviceMachineRunner {
         // 中断済みなのに複数機械へ run を撃つと、届いていた分の二重実行になりうる)
         guard prelock.acquireInOrder(machines: DispatchPrelock.machinesToLock(
             active.map { $0.1.machineLabel })) else {
-            throw interruptedWhileLocking
+            throw interruptedBeforeAnySubRun
         }
         // 子タスクへ渡すのは値のコピー(prelock 自身を @Sendable な closure へ持ち込まない)
         let lockMarkers = prelock.markers
@@ -274,6 +290,8 @@ enum DeviceMachineRunner {
         }
         let interruptRelay = dispatcher.map { dispatcher in InterruptRelay.observing(catchUp: true) { dispatcher.interrupt() } }
         defer { interruptRelay?.stop() }
+        // 購読の登録より前(ロックの取得から登録まで)の中断は、子を起こす前にここで抜ける(後の中断は購読と各子の relay が受ける)
+        try parentInterrupt.exitIfSet(during: "the dispatch lock acquisition", log: { FleetRunner.log($0) })
         let outcomes = await withTaskGroup(of: (Int, FleetEntryOutcome).self) { taskGroup in
             for (index, group, ids) in active {
                 taskGroup.addTask {
@@ -352,7 +370,8 @@ enum DeviceMachineRunner {
                                                since: dispatchStart, active: assignedActive, outcomes: outcomes)
             // 渡したのに結果が無い分(子が受け取る前の中断など)。中断なら 130・それ以外は 1
             if missing > 0 {
-                if dispatcher?.isInterrupted ?? false { interruptedWithWorkLeft = true } else { neverHandedFailure = true }
+                // 静的な割り当て(FT_STATIC_SPLIT=1)には配り手が無いので入口の印も見る(api run は registry の取り消しで同じ判定)
+                if dispatcher?.isInterrupted ?? parentInterrupt.isSet() { interruptedWithWorkLeft = true } else { neverHandedFailure = true }
             }
         }
         // ディスパッチした(= --junit を渡した)ぶんだけ結合する。0本で見送ったホストを混ぜると
@@ -374,10 +393,33 @@ enum DeviceMachineRunner {
         FleetProfile.aggregateExitCode(childCodes + (neverHandedFailure ? [1] : []) + (interruptedWithWorkLeft ? [130] : []))
     }
 
-    /// ロックの取得中の中断(子を1つも起こしていない = 全部が残った)の出口。3経路で共有する。
-    /// `ValidationError` で投げると使い方の誤り(64)と help の案内になる。何が起きたかの1行は DispatchPrelock が出し済み
-    static var interruptedWhileLocking: ExitCode {
+    /// 子を1つも起こす前の中断(ロックの待ち・ビルド・一覧取得の間 = 全部が残った)の出口。3経路で共有する。
+    /// `ValidationError` で投げると使い方の誤り(64)と help の案内になる。何が起きたかの1行は呼び手か DispatchPrelock が出す
+    static var interruptedBeforeAnySubRun: ExitCode {
         ExitCode(parentExitCode(childCodes: [], neverHandedFailure: false, interruptedWithWorkLeft: true))
+    }
+
+    /// マシンをまたぐ親(3経路)の入口で立てる中断の印。**チケットの発行・手元のロックの先取りより前に登録し、関数の終わりまで持つ** ——
+    /// 先取りの `acquire()` は自前の購読を外すと既定動作へ戻すので、無いとビルド・一覧取得の間の SIGTERM(拡張の取り消し)で
+    /// 親が後始末なしに死に、手元のロックが死んだ pid のまま残り build が孤児になる。印を立てるだけ(子へ送るのは各経路の relay)
+    final class ParentInterrupt {
+        let isSet: @Sendable () -> Bool
+        private let relay: InterruptRelay
+
+        init() {
+            let flag = LockedValue(false)
+            relay = InterruptRelay.observing { flag.withLock { $0 = true } }
+            isSet = { flag.value }
+        }
+
+        func stop() { relay.stop() }
+
+        /// 段の境目。中断済みなら1行言って 130 で抜ける
+        func exitIfSet(during stage: String, log: (String) -> Void) throws {
+            guard isSet() else { return }
+            log("==> interrupted during \(stage) — starting no sub-run")
+            throw DeviceMachineRunner.interruptedBeforeAnySubRun
+        }
     }
 
     /// 動的な割り振りを使うか。`FT_STATIC_SPLIT=1` は保守者の殺しスイッチ(静的な割り当てへ戻す・利用者向けの口ではない)

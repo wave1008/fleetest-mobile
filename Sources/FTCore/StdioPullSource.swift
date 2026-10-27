@@ -7,7 +7,7 @@ import Synchronization
 
 /// `--work-queue` の子の stdin(親からの返事)を自分だけの fd へ移し、fd 0 を /dev/null にする。**run の入口で最初に呼ぶ**。
 /// stdin を指定せずに起こす子プロセス(`adb shell` など。Process を作る箇所は多数)が fd 0 を受け継いで読むと、親の返事を
-/// 横取りする = 親が渡したシナリオをレーンが受け取れず、そのレーンは中断まで止まる(2026-10-27 に2回: 渡した 28 本のうち
+/// 横取りする = 親が渡したシナリオをレーンが受け取れず、そのレーンは中断まで止まる(実測2回: 渡した 28 本のうち
 /// 子が回したのは 24 本)。移した fd は close-on-exec(子へ渡さない)。何度呼んでも同じ fd を返す
 public enum WorkQueueStdin {
     private static let claimed = Mutex<Int32?>(nil)

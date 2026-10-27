@@ -449,6 +449,34 @@ final class DispatchPrelockTests: XCTestCase {
         XCTAssertEqual(recorder.entries, ["acquire:M1Ultra", "release:M1Ultra"], "二重解放している")
     }
 
+    /// **最後の1台の取得が成功している最中**に来た中断も false にする(次の反復が無いので「進む直前」の確認に当たらない。
+    /// true を返すと呼び手が子を起こしてから止める)
+    func testInterruptDuringTheLastSuccessfulAcquireStillStops() {
+        let recorder = Recorder()
+        let witness = Recorder()
+        let witnessRelay = InterruptRelay.observing { witness.append("x") }
+        defer { witnessRelay.stop() }
+        let prelock = DispatchPrelock(actions: DispatchPrelock.Actions(
+            keys: { Self.keys($0) },
+            probeHardwareUUID: Self.noProbe,
+            acquire: { machine in
+                recorder.append("acquire:\(machine.machine)")
+                kill(getpid(), SIGINT)
+                let deadline = Date().addingTimeInterval(5)
+                while witness.entries.isEmpty, Date() < deadline {
+                    Thread.sleep(forTimeInterval: 0.02)
+                }
+                return (machine.host, { _ in recorder.append("release:\(machine.machine)") })
+            },
+            log: { _ in }))
+
+        let acquired = prelock.acquireInOrder(machines: ["M1Ultra"])
+
+        XCTAssertFalse(acquired, "最後の1台の取得中の中断を見ないまま成功を返している")
+        XCTAssertEqual(recorder.entries, ["acquire:M1Ultra", "release:M1Ultra"])
+        XCTAssertTrue(prelock.markers.isEmpty)
+    }
+
     // MARK: - releaseAll の終了コードの伝搬
 
     /// `releaseAll(exitCodes:)` は machine ラベルで引いた終了コードをその機械の release

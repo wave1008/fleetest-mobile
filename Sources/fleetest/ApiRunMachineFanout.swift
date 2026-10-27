@@ -48,6 +48,8 @@ enum ApiRunMachineFanout {
         let machineList = groups.map { "\($0.machineLabel)(\($0.deviceNames.count))" }.joined(separator: " + ")
         logStderr("==> profile \"\(profileName)\" spans \(groups.count) machines: \(machineList)"
             + " — building \(project.name) locally to split the scenarios")
+        let parentInterrupt = DeviceMachineRunner.ParentInterrupt()
+        defer { parentInterrupt.stop() }
 
         // 束ね鍵はここで1回だけ発行する(理由は下の DispatchTicketIssuer と同じ箇所)。
         // ビルドより前に採る —— 待機列のチケット(下)にも使うので、build 分だけ epoch が
@@ -71,15 +73,28 @@ enum ApiRunMachineFanout {
         // 改めて行う(RR-18.10「全員が同じ順序でしか取らないなら、循環待ちは作れない」= local だけ順序の外に出さない)。
         // api run に --force-lock は無い。**待っていることは NDJSON にも出す**(単機の api run と同じ出し口。
         // 渡し忘れると、複数機械のプロファイルだけ実行ログビューが無言のまま止まって見える → MN-62.4)
-        var localLock = try LocalDispatchLock(
-            runGroup: runGroup, waitLock: options.waitLock, log: { logStderr($0) },
-            emitWaiting: LocalDispatchLock.apiRunWaitingEmitter()).acquire()
+        var localLock: LocalDispatchLock.Holder?
+        do {
+            localLock = try LocalDispatchLock(
+                runGroup: runGroup, waitLock: options.waitLock, log: { logStderr($0) },
+                emitWaiting: LocalDispatchLock.apiRunWaitingEmitter()).acquire(interruptCheck: parentInterrupt.isSet)
+        } catch where parentInterrupt.isSet() {
+            logStderr("==> \(error.localizedDescription)")
+            throw DeviceMachineRunner.interruptedBeforeAnySubRun
+        }
         defer { localLock?.release() }
 
         // 割り当てを決めるにはシナリオ一覧が要る(DeviceMachineRunner.run と同じ理由。ここで1回だけ
         // ローカルビルドする。ローカルの子には --skip-build を渡す = 下の buildChildArgs 参照)
-        try ScenarioHost.build(project: project) { logStderr($0) }
-        let all = try ScenarioHost.list(project: project)
+        let all: [ScenarioInfo]
+        do {
+            try ScenarioHost.build(project: project) { logStderr($0) }
+            all = try ScenarioHost.list(project: project)
+        } catch where parentInterrupt.isSet() {
+            try parentInterrupt.exitIfSet(during: "the scenario build", log: { logStderr($0) })
+            throw error
+        }
+        try parentInterrupt.exitIfSet(during: "the scenario build", log: { logStderr($0) })
         guard !all.isEmpty else {
             throw ValidationError(
                 "no scenarios (add a @TestClass under TestProjects/\(project.name)/scenarios/)")
@@ -185,7 +200,7 @@ enum ApiRunMachineFanout {
         // 宣言)。**子を1つも起こさずに抜ける**(DeviceMachineRunner.run と同じ理由)
         guard prelock.acquireInOrder(machines: DispatchPrelock.machinesToLock(
             active.map { $0.group.machineLabel })) else {
-            throw DeviceMachineRunner.interruptedWhileLocking
+            throw DeviceMachineRunner.interruptedBeforeAnySubRun
         }
         // 子タスクへ渡すのは値のコピー(prelock 自身を @Sendable な closure へ持ち込まない)
         let lockMarkers = prelock.markers
@@ -225,6 +240,8 @@ enum ApiRunMachineFanout {
             dispatcher?.interrupt()
         }
         defer { cancelRelay.stop() }
+        // 購読の登録より前の中断は子を起こす前に抜ける(DeviceMachineRunner.run の同じ箇所)
+        try parentInterrupt.exitIfSet(during: "the dispatch lock acquisition", log: { logStderr($0) })
 
         let outcomes = await withTaskGroup(of: (Int, FleetEntryOutcome).self) { taskGroup in
             for (position, entry) in active.enumerated() {
