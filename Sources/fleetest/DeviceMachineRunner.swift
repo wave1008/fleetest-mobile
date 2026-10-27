@@ -257,7 +257,7 @@ enum DeviceMachineRunner {
         // 中断済みなのに複数機械へ run を撃つと、届いていた分の二重実行になりうる)
         guard prelock.acquireInOrder(machines: DispatchPrelock.machinesToLock(
             active.map { $0.1.machineLabel })) else {
-            throw ValidationError("interrupted while acquiring dispatch locks — starting no sub-run")
+            throw interruptedWhileLocking
         }
         // 子タスクへ渡すのは値のコピー(prelock 自身を @Sendable な closure へ持ち込まない)
         let lockMarkers = prelock.markers
@@ -366,7 +366,6 @@ enum DeviceMachineRunner {
                               interruptedWithWorkLeft: interruptedWithWorkLeft)
     }
 
-    /// 動的な割り振りを使うか。`FT_STATIC_SPLIT=1` は保守者の殺しスイッチ(静的な割り当てへ戻す・利用者向けの口ではない)
     /// マシンをまたぐ親の終了コード(run の機械分担・api run の機械分担・複数対象の3経路が共有する)。
     /// - neverHandedFailure: 中断していないのに配れなかったシナリオがある = 1
     /// - interruptedWithWorkLeft: 中断で配らなかったシナリオ・始めなかった対象が残った = 130。**失敗としては記録しない**が、
@@ -375,6 +374,13 @@ enum DeviceMachineRunner {
         FleetProfile.aggregateExitCode(childCodes + (neverHandedFailure ? [1] : []) + (interruptedWithWorkLeft ? [130] : []))
     }
 
+    /// ロックの取得中の中断(子を1つも起こしていない = 全部が残った)の出口。3経路で共有する。
+    /// `ValidationError` で投げると使い方の誤り(64)と help の案内になる。何が起きたかの1行は DispatchPrelock が出し済み
+    static var interruptedWhileLocking: ExitCode {
+        ExitCode(parentExitCode(childCodes: [], neverHandedFailure: false, interruptedWithWorkLeft: true))
+    }
+
+    /// 動的な割り振りを使うか。`FT_STATIC_SPLIT=1` は保守者の殺しスイッチ(静的な割り当てへ戻す・利用者向けの口ではない)
     /// measuresResponse: レスポンス計測の run は動的にしない —— 反復(responseRepeat)は子だけが展開し、親は同じ ID を1回しか
     /// 配らないので、指定の回数を回さずに成功する(`--device` でリモートの1台に絞ると1グループでもここへ来る)
     static func dynamicSplitEnabled(

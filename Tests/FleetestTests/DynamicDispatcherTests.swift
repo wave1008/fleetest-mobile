@@ -177,6 +177,8 @@ final class DynamicDispatcherTests: XCTestCase {
                                                           interruptedWithWorkLeft: false), 1)
         XCTAssertEqual(DeviceMachineRunner.parentExitCode(childCodes: [143, 0], neverHandedFailure: false,
                                                           interruptedWithWorkLeft: true), 143)
+        // ロックの取得中の中断(子を1つも起こしていない)も 130。ValidationError の 64 にしない
+        XCTAssertEqual(DeviceMachineRunner.interruptedWhileLocking.rawValue, 130)
     }
 
     /// 3経路(run の機械分担・api run の機械分担・複数対象)が同じ関数で終了コードを決める(ソース走査)
@@ -188,6 +190,10 @@ final class DynamicDispatcherTests: XCTestCase {
             let text = try String(contentsOf: root.appendingPathComponent(file), encoding: .utf8)
             XCTAssertTrue(text.contains("interruptedWithWorkLeft: interruptedWithWorkLeft)"),
                           "\(file) が中断で残った分を終了コードへ載せていない")
+            XCTAssertTrue(text.contains("throw interruptedWhileLocking") || text.contains("throw DeviceMachineRunner.interruptedWhileLocking"),
+                          "\(file) がロックの取得中の中断を共有の出口(130)で抜けていない")
+            XCTAssertFalse(text.contains("ValidationError(\"interrupted while acquiring"),
+                           "\(file) がロックの取得中の中断を ValidationError(64)で投げている")
         }
         // 渡したのに結果が無い分(子が受け取る前の中断など)も終了コードへ載せる
         for (file, marker) in [("Sources/fleetest/DeviceMachineRunner.swift", "if missing > 0 {"),

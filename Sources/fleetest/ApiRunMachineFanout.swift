@@ -185,7 +185,7 @@ enum ApiRunMachineFanout {
         // 宣言)。**子を1つも起こさずに抜ける**(DeviceMachineRunner.run と同じ理由)
         guard prelock.acquireInOrder(machines: DispatchPrelock.machinesToLock(
             active.map { $0.group.machineLabel })) else {
-            throw ValidationError("interrupted while acquiring dispatch locks — starting no sub-run")
+            throw DeviceMachineRunner.interruptedWhileLocking
         }
         // 子タスクへ渡すのは値のコピー(prelock 自身を @Sendable な closure へ持ち込まない)
         let lockMarkers = prelock.markers

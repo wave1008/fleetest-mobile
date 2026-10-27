@@ -235,7 +235,7 @@ enum MultiTargetRunner {
         defer { prelock.releaseAll() }
         guard prelock.acquireInOrder(machines: DispatchPrelock.machinesToLock(
             labelsInUse(machineLabels, entryMaps: jobs.map { Set($0.entryByMachine.keys) }))) else {
-            throw ValidationError("interrupted while acquiring dispatch locks — starting no sub-run")
+            throw DeviceMachineRunner.interruptedWhileLocking
         }
         let lockMarkers = prelock.markers
         let dispatchStart = Date()
