@@ -294,7 +294,8 @@ enum MultiTargetRunner {
         let coordinator = MultiTargetCoordinator(
             jobs: specs, machineCount: machineLabels.count, overheadMs: overheadByMachine,
             nowMs: clock, lpt: !noLPT, launch: launch, log: { FleetRunner.log($0) })
-        let relay = InterruptRelay.observing { coordinator.interrupt() }
+        // catchUp: ロックの取得中(DispatchPrelock の購読が受けた)の中断も、ここで配り手へ伝える
+        let relay = InterruptRelay.observing(catchUp: true) { coordinator.interrupt() }
         defer { relay.stop() }
         let wallStart = clock()
         coordinator.start()

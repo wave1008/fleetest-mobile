@@ -91,14 +91,18 @@ final class InterruptRelay {
     /// 受けるたび `onInterrupt` を呼ぶだけ(処理は呼び出し側 —— 新しいシナリオの配布停止・
     /// 実行中のシナリオ子への SIGTERM は呼び出し側の責務)。**同じ静的なシグナルソース集合を
     /// `forwarding(to:)` と共有する**(1プロセスに1組。二重にソースを立てない)
-    static func observing(_ onInterrupt: @escaping @Sendable () -> Void) -> InterruptRelay {
+    /// - catchUp: true なら、登録より前にこのプロセスが中断を受けていたときだけ、登録の直後に onInterrupt を1回呼ぶ
+    ///   (forwarding の catchUp と同じ。ロックの取得中に届いた中断を、後から登録する配り手が取りこぼさない)
+    static func observing(catchUp: Bool = false, _ onInterrupt: @escaping @Sendable () -> Void) -> InterruptRelay {
         let token = ObserverToken()
         let id = ObjectIdentifier(token)
-        state.withLock { state in
+        let missed = state.withLock { state -> Bool in
             let wasEmpty = state.targets.isEmpty
             state.targets[id] = .observer(onInterrupt)
             if wasEmpty { installSources(&state) }
+            return catchUp && state.received
         }
+        if missed { onInterrupt() }
         return InterruptRelay(id: id, observerToken: token)
     }
 

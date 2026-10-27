@@ -216,8 +216,15 @@ enum ApiRunMachineFanout {
         async let multiplexed = consume(
             stream: stream, groupMachines: groupMachines, assignedScenarioIDs: active.map { $0.ids },
             isCancelled: { registry.isCancelled })
-        let cancelSources = installCancellation(registry: registry, onInterrupt: { dispatcher?.interrupt() })
-        defer { for source in cancelSources { source.cancel() } }
+        // 中断(拡張のキャンセル = SIGTERM・端末の SIGINT)で子を止めて配るのをやめる。catchUp: ロックの取得中
+        // (DispatchPrelock の購読が受けた)の中断も、ここで伝える = 自前のシグナルソースは過去の中断を知らない。
+        // **stdin の EOF を打ち切りの合図に使わない** —— api run は --debug 以外 stdin を読まず、拡張は stdio[0] を
+        // "ignore"(= /dev/null)で起動する。EOF を見ると起動と同時に全子を殺す(実際に exit=15 で全滅した)
+        let cancelRelay = InterruptRelay.observing(catchUp: true) {
+            registry.terminateAll()
+            dispatcher?.interrupt()
+        }
+        defer { cancelRelay.stop() }
 
         let outcomes = await withTaskGroup(of: (Int, FleetEntryOutcome).self) { taskGroup in
             for (position, entry) in active.enumerated() {
@@ -450,32 +457,6 @@ enum ApiRunMachineFanout {
             lock.lock()
             defer { lock.unlock() }
             return cancelled
-        }
-    }
-
-    /// SIGTERM・SIGINT で registry.terminateAll() を呼ぶ(ApiLiveServe/ApiMonitorCommand と
-    /// 同じ規律: DispatchSourceSignal を使うには先に SIG_IGN が要る)。拡張のキャンセルは
-    /// SIGTERM(vscode-fleetest/src/cli.ts の proc.kill)なのでこれで届く。
-    /// 戻り値は子の待機が終わるまで保持すること(解放されるとハンドラが外れる)。
-    ///
-    /// **stdin の EOF を打ち切りの合図に使ってはいけない** —— `api run` は --debug 以外
-    /// stdin を読まず、拡張は stdio[0] を "ignore"(= /dev/null)で起動する。EOF を見ると
-    /// 起動と同時に全子プロセスを殺すことになる(実際にそうなり、拡張からの実行が
-    /// 開始直後に exit=15 で全滅した)
-    private static func installCancellation(
-        registry: ChildProcessRegistry, onInterrupt: @escaping @Sendable () -> Void = {}
-    ) -> [DispatchSourceSignal] {
-        signal(SIGTERM, SIG_IGN)
-        signal(SIGINT, SIG_IGN)
-        let queue = DispatchQueue(label: "fleetest-api-run-fanout-signal")
-        return [SIGTERM, SIGINT].map { sig in
-            let source = DispatchSource.makeSignalSource(signal: sig, queue: queue)
-            source.setEventHandler {
-                registry.terminateAll()
-                onInterrupt()
-            }
-            source.resume()
-            return source
         }
     }
 

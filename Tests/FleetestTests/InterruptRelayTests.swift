@@ -65,6 +65,51 @@ final class InterruptRelayTests: XCTestCase {
         XCTAssertEqual(late.count(), 0, "catchUp: false の登録へ過去の中断を伝えた")
     }
 
+    /// 購読も同じ: 登録より前の中断は登録の直後に1回、登録の後の中断は通常の通知の1回だけ
+    func testObservingCatchUpCallsOnceForAnEarlierInterruptAndNeverDoubles() throws {
+        final class Count: @unchecked Sendable {
+            // @unchecked の根拠: n は lock の下でしか触らない
+            private let lock = NSLock()
+            private var n = 0
+            func bump() { lock.lock(); n += 1; lock.unlock() }
+            var value: Int { lock.lock(); defer { lock.unlock() }; return n }
+        }
+        let keep = InterruptRelay.observing {}   // シグナルソースを張っておく
+        defer { keep.stop() }
+        kill(getpid(), SIGINT)
+        Thread.sleep(forTimeInterval: 0.3)
+        let early = Count()
+        let lateRelay = InterruptRelay.observing(catchUp: true) { early.bump() }
+        defer { lateRelay.stop() }
+        XCTAssertEqual(early.value, 1, "登録より前の中断を補っていない")
+        InterruptRelay.resetReceivedInterruptForTesting()
+        let fresh = Count()
+        let freshRelay = InterruptRelay.observing(catchUp: true) { fresh.bump() }
+        defer { freshRelay.stop() }
+        XCTAssertEqual(fresh.value, 0, "中断の前の登録で呼んだ")
+        kill(getpid(), SIGINT)
+        let deadline = Date().addingTimeInterval(5)
+        while fresh.value == 0, Date() < deadline { Thread.sleep(forTimeInterval: 0.05) }
+        Thread.sleep(forTimeInterval: 0.3)
+        XCTAssertEqual(fresh.value, 1)
+    }
+
+    /// 3経路の配り手は、ロックの取得中に届いた中断を知るよう catchUp で購読する。api run は自前のシグナルソースを持たない(ソース走査)
+    func testDispatchersObserveWithCatchUp() throws {
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        let read = { (file: String) in
+            try String(contentsOf: root.appendingPathComponent(file), encoding: .utf8)
+        }
+        XCTAssertTrue(try read("Sources/fleetest/MultiTargetRunner.swift")
+            .contains("InterruptRelay.observing(catchUp: true) { coordinator.interrupt() }"))
+        XCTAssertTrue(try read("Sources/fleetest/DeviceMachineRunner.swift")
+            .contains("InterruptRelay.observing(catchUp: true) { dispatcher.interrupt() }"))
+        let api = try read("Sources/fleetest/ApiRunMachineFanout.swift")
+        XCTAssertTrue(api.contains("InterruptRelay.observing(catchUp: true) {"))
+        XCTAssertFalse(api.contains("makeSignalSource"), "api run が過去の中断を知らない自前のシグナルソースを持っている")
+    }
+
     /// runEntry は catchUp で登録する(ソース走査)
     func testRunEntryRegistersWithCatchUp() throws {
         let root = URL(fileURLWithPath: #filePath)

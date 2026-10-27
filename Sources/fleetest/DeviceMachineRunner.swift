@@ -272,7 +272,7 @@ enum DeviceMachineRunner {
             DynamicDispatcher(scenarios: plan.scenarios, estimateMs: plan.estimate, lpt: !noLPT,
                               send: { entry, reply in writers[entry]?.write(line: WorkQueueProtocol.encode(reply)) })
         }
-        let interruptRelay = dispatcher.map { dispatcher in InterruptRelay.observing { dispatcher.interrupt() } }
+        let interruptRelay = dispatcher.map { dispatcher in InterruptRelay.observing(catchUp: true) { dispatcher.interrupt() } }
         defer { interruptRelay?.stop() }
         let outcomes = await withTaskGroup(of: (Int, FleetEntryOutcome).self) { taskGroup in
             for (index, group, ids) in active {
@@ -642,8 +642,9 @@ enum DeviceMachineRunner {
                                       profile: String? = nil, expected: [String] = []) -> RecordedScenarios {
         let resultsDir = RunResultsStore.resultsDir(projectRoot: project.rootURL)
         func scan(since window: Date?) -> RecordedScenarios {
-            let metas = RunResultsStore.scanRuns(resultsDir: resultsDir, since: window)
-                .filter { $0.runGroup == runGroup && (profile == nil || $0.profile == profile) }
+            let metas = (window == nil ? windowlessMetas(resultsDir: resultsDir, runGroup: runGroup)
+                         : RunResultsStore.scanRuns(resultsDir: resultsDir, since: window).filter { $0.runGroup == runGroup })
+                .filter { profile == nil || $0.profile == profile }
             var result = RecordedScenarios()
             for meta in metas {
                 let runDir = RunResultsStore.runDir(resultsDir: resultsDir, runID: meta.runID)
@@ -657,6 +658,19 @@ enum DeviceMachineRunner {
         let windowed = scan(since: since.addingTimeInterval(-clockSkewMargin))
         guard expected.contains(where: { !windowed.all.contains($0) }) else { return windowed }
         return scan(since: nil)
+    }
+
+    /// 窓なしの走査(results の全月の run.json を読む = 数千件で数秒)は、1つのプロセスの中で (結果フォルダ, runGroup) ごとに1回だけ。
+    /// 複数対象の run は同じプロジェクトの対象ごとに照合し直すので、まとめないと中断の後始末が対象の数だけ伸びる。
+    /// 呼ばれるのは全部の子が終わった後だけ(その runGroup の記録はもう増えない)
+    private static let windowlessMetaCache = LockedValue<[String: [RunMetaRecord]]>([:])
+
+    private static func windowlessMetas(resultsDir: URL, runGroup: String) -> [RunMetaRecord] {
+        let key = resultsDir.path + "\u{1}" + runGroup
+        if let cached = windowlessMetaCache.withLock({ $0[key] }) { return cached }
+        let metas = RunResultsStore.scanRuns(resultsDir: resultsDir, since: nil).filter { $0.runGroup == runGroup }
+        windowlessMetaCache.withLock { $0[key] = metas }
+        return metas
     }
 
     /// `all` だけでよい呼び手向け(unrecordedScenarioIDs の入力)
