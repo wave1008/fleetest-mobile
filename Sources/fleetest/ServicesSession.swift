@@ -216,12 +216,16 @@ final class ServicesSession {
     // MARK: 起動
 
     /// compose.yaml が無ければ nil(何もしない)。`stateDir` は `.fleetest`(控えとロックの置き場)。
+    /// `supplyProgress` = run の準備中の段階の箱(DS-18.10。宣言があれば戻るまで共有の行に `services` を立てる)。
+    /// **既定値を置かない** —— run / api run の片方で渡し忘れると、その経路だけ「デバイスの準備」の顔のまま緑で通る。常駐の所有者は nil
     static func up(resolved: ResolvedProfile, stateDir: URL?, options: ServicesUpOptions,
-                   interruptState: RunInterruptState? = nil,
+                   supplyProgress: RunSupplyProgress?, interruptState: RunInterruptState? = nil,
                    home: String = NSHomeDirectory(), onClaimed: (() -> Void)? = nil,
                    log: (String) -> Void) throws -> ServicesSession? {
         let workspace = ServicesFacts.workspace(for: resolved)
         guard try ServicesFacts.composeDeclaresSomething(workspace, log: log) else { return nil }
+        supplyProgress?.set(name: RunSupplyProgress.sharedName, platform: nil, step: .services)
+        defer { supplyProgress?.clearShared(step: .services) }
         guard let stateDir else {
             throw ServicesError(phase: .check, detail: "cannot locate the fleetest state directory (.fleetest), which holds the services lease")
         }
@@ -526,7 +530,7 @@ final class ServicesSession {
     // MARK: 資源の作成
 
     private func persist() throws {
-        try ServicesLeaseStore.write(lease, to: leaseURL)
+        try ServicesLeaseStore.write(lease, to: leaseURL, home: home)
     }
 
     private func checkInterrupted() throws {
@@ -1213,7 +1217,7 @@ final class ServicesSession {
                 + " and the next run (or `fleetest hooks reap`) retries")
             return
         }
-        try? FileManager.default.removeItem(at: leaseURL)
+        ServicesLeaseStore.remove(at: leaseURL, home: home)
         log("→ services: stopped (\(Self.format(Self.now() - began)))")
     }
 }

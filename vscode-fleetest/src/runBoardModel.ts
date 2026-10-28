@@ -83,6 +83,18 @@ export interface RunBoardRun extends RunBoardRawRun {
 export interface MachineRunsEntry {
   readonly observed: boolean;
   readonly runs: readonly RunBoardRun[];
+  /** その機械のサーバーの控え(DS-18.10)。表示は machineServicesNotes を通す */
+  readonly services: readonly RunBoardServicesLease[];
+}
+
+/** サーバーの控え1つ(MonitorServicesLease と同じ形。DS-18.10)。 */
+export interface RunBoardServicesLease {
+  readonly project: string;
+  readonly profile: string;
+  readonly holder: string;
+  readonly pid: number;
+  readonly phase: string;
+  readonly orphan: boolean;
 }
 
 /** applyMonitorRunsEvent への入力(monitorRuns イベント1件。webview 側は postMessage の
@@ -91,6 +103,7 @@ export interface MonitorRunsEventInput {
   readonly machine?: string;
   readonly observed: boolean;
   readonly runs: readonly RunBoardRawRun[];
+  readonly services: readonly RunBoardServicesLease[];
 }
 
 /** monitorRuns イベント1件を控えへ畳む(不変。新しい Map を返す。machineLockModel.ts の
@@ -106,14 +119,58 @@ export function applyMonitorRunsEvent(
     // **控えを消さない**(machineLockModel.ts と同じ理由)。直前の一覧は残すが、observed:false の
     // 間は buildRunGroups/machineRunStatus のどちらも読まない = 表示には出ない。
     const previous = current.get(key);
-    next.set(key, { observed: false, runs: previous?.runs ?? [] });
+    next.set(key, { observed: false, runs: previous?.runs ?? [], services: previous?.services ?? [] });
     return next;
   }
   next.set(key, {
     observed: true,
     runs: event.runs.map((run) => ({ ...run, machine: event.machine, receivedAtMs: nowMs })),
+    services: event.services,
   });
   return next;
+}
+
+/** マシンの行に出すサーバーの1件(DS-18.10)。kind の順はそのまま表示の順。 */
+export interface MachineServicesNote {
+  readonly kind: "running" | "starting" | "stopping" | "orphan";
+  /** "run" / "owner"(ツールチップの対処が違う) */
+  readonly holder: string;
+  readonly project: string;
+  readonly profile: string;
+  readonly pid: number;
+}
+
+/** その機械で run 以外が持つサーバー(`services up` の常駐)と、持ち主が生きていないサーバー(DS-18.10)。
+ * **run が持っていて生きている控えは停止中だけ出す**(起動中・稼働中はその run の行が言う。run の行は台帳が消えた後の
+ * 停止の間は無いので、出さないとサーバーを止めている機械が「空き」に見える)。観測できていない機械は空(不明を混ぜない)。
+ * 並びは kind の順(稼働中 → 起動中 → 停止中 → 持ち主なし)→ 届いた順。 */
+export function machineServicesNotes(
+  state: ReadonlyMap<string, MachineRunsEntry>,
+  machine: string,
+): readonly MachineServicesNote[] {
+  const entry = state.get(machine);
+  if (!entry || !entry.observed) {
+    return [];
+  }
+  const order: readonly MachineServicesNote["kind"][] = ["running", "starting", "stopping", "orphan"];
+  const notes: MachineServicesNote[] = [];
+  for (const lease of entry.services) {
+    let kind: MachineServicesNote["kind"] | undefined;
+    if (lease.orphan) {
+      kind = "orphan";
+    } else if (lease.phase === "tearingDown") {
+      kind = "stopping";
+    } else if (lease.holder === "owner") {
+      kind = lease.phase === "starting" ? "starting" : "running";
+    }
+    if (kind !== undefined) {
+      notes.push({ kind, holder: lease.holder, project: lease.project, profile: lease.profile, pid: lease.pid });
+    }
+  }
+  return notes
+    .map((note, index) => ({ note, index }))
+    .sort((a, b) => order.indexOf(a.note.kind) - order.indexOf(b.note.kind) || a.index - b.index)
+    .map(({ note }) => note);
 }
 
 export type MachineRunStatus = "running" | "idle" | "unknown";
@@ -283,13 +340,16 @@ function mostAdvancedPhase(runs: readonly RunBoardRun[]): "building" | "preparin
 /** 端末の段階の進む順(ready・runnerBuild・pending は含めない。pending だけなら undefined = 「デバイスの準備を開始します」)。 */
 export const SUPPLY_PROGRESS_STEPS = ["booting", "bridge", "configuring", "installing"] as const;
 /** "allReady" = 端末の行が全部 ready(準備中なら「テストを開始しています」。実行中は何も添えない)。 */
-export type SupplyStep = "runnerBuild" | (typeof SUPPLY_PROGRESS_STEPS)[number] | "allReady";
+export type SupplyStep = "services" | "runnerBuild" | (typeof SUPPLY_PROGRESS_STEPS)[number] | "allReady";
 
-/** 準備中に出す段階を1つ選ぶ(台数は出さない = ユーザー決定)。①共有のランナーのビルドが最優先 ②端末は**いちばん進んでいる
+/** 準備中に出す段階を1つ選ぶ(台数は出さない = ユーザー決定)。①共有の行(サーバーの起動・ランナーのビルド)が最優先 ②端末は**いちばん進んでいる
  * 未完了の段階**(起動中とブリッジが混ざればブリッジ)③端末の行が全部 ready なら "allReady"。未知の段階だけ・空なら undefined
  * (呼び手は従来の文言)。
  * 表示文字列は置かない(webview が組む = このファイルは i18n を import できない) */
 export function currentSupplyStep(supply: readonly RunBoardSupply[]): SupplyStep | undefined {
+  if (supply.some((row) => row.name === "" && row.step === "services")) {
+    return "services";
+  }
   if (supply.some((row) => row.name === "" && row.step === "runnerBuild")) {
     return "runnerBuild";
   }

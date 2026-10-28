@@ -577,7 +577,7 @@ struct ServicesCommand: AsyncParsableCommand {
                 throw ExitCode.failure
             }
             for entry in entries {
-                try? FileManager.default.removeItem(at: entry.url)
+                ServicesLeaseStore.remove(at: entry.url, home: NSHomeDirectory())
                 ServicesReaper.removePrivateDirectory(home: NSHomeDirectory(), pid: entry.pid)
             }
             ConsoleOut.out("→ services reset: \(listing.containers.count) container(s), \(listing.networks.count) network(s),"

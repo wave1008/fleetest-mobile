@@ -18,6 +18,7 @@ paths:
   - "Sources/FTCore/SandboxBroker.swift"
   - "Sources/FTCore/SandboxProxy.swift"
   - "Sources/FTServices/**"
+  - "Sources/fleetest/Services*.swift"
   - "Tests/FTServicesTests/**"
   - "Sources/FTCore/StepExecutor*.swift"
   - "Sources/FTCore/SystemUIGate*.swift"
@@ -134,7 +135,9 @@ CLAUDE.md から移した規則(本文は移設前と同一)。この領域の�
   何も消さない・run は止めない・読めない控えもその pid が生きていれば消さない。判定は `Reset.forceDecision` の純粋関数)。
   **排他は押し切らない**(`ServicesLock` に強制解除の経路を足さない。取れなければ消さずに止める)。**排他の実体は固定ファイルの flock**
   (mkdir + 「死んだ持ち主を照合して削除」に戻さない = 照合と削除の間の窓で他者のロックを消す)。親だけが書く場所(`services.lock/`・
-  `services/`・`mcp-ask-offered.json` 等)を足したら `ScenarioSandbox.writeDeniedPaths` にも足す(flock は inode に付く = 消されると排他が崩れる)。`services up` の引数(`--physical` / `--serial`)と run の実機のレーンは `ServicesUpOptions` の1箇所で
+  `services/`・`mcp-ask-offered.json` 等)を足したら `ScenarioSandbox.writeDeniedPaths` にも足す(flock は inode に付く = 消されると排他が崩れる)。
+  **控えを書く・消すのは `ServicesLeaseStore.write` / `.remove` だけ**(機械共通の索引 `~/.fleetest/services-leases/` を同時に保つ =
+  run ボードはこの索引から控えを引く。直に `removeItem` すると監視と `services status` が食い違う。`ServicesLeaseIndexTests` が走査で落とす。DS-18.10)。`services up` の引数(`--physical` / `--serial`)と run の実機のレーンは `ServicesUpOptions` の1箇所で
   `ServicesSession.up` へ入る(呼び手ごとに別の経路を作らない)
 - **ブリッジの ref は、そのドライバが最後に撮った木の中でだけ有効**(ランナー・in-app・Android のブリッジは撮るたびに ref の表を作り直す)。
   **撮ったら、その後に撃つ ref はその木から引き直す**(`liftCoveredTarget` / `ClearOutcome.cleared(actingDriverSnapshot:)` /

@@ -70,12 +70,16 @@ polling (screenshots at a fixed interval); the choice is remembered per workspac
   runner machine. A run going on right now appears on its machine's row with "N of M done" and an
   estimated time left — not just runs you started, but CLI runs and other people's runs too. Before the
   run starts, the row says what it is doing instead of the counts ("Building scenarios…", "Starting device
-  preparation…", "Building the runner…", "Booting devices…", "Starting the bridge…", "Configuring devices…", "Installing the app…",
+  preparation…", "Starting the servers…", "Building the runner…", "Booting devices…", "Starting the bridge…", "Configuring devices…", "Installing the app…",
   "Starting tests…").
   When the run records video, the time left is replaced by "Encoding videos 12/48" (clips done / all clips)
   while the clips are cut after the last scenario.
   The "(3)" right of the run's name is the number of devices running a scenario right now.
   Expanding a row lists that machine's devices; clicking a row selects them in the Line View.
+  Servers you keep up with `fleetest services up` show on their machine's row as "Servers up: <project>"
+  (hover for how to stop them). Servers whose starting process has exited without cleaning up show as
+  "Servers without owner: <project>" (hover for how to remove them). For the few seconds a finished run
+  takes to stop its servers, the row says "Servers stopping: <project>".
 - The **tachometer** to the right of "Running N" in the run board header (shown only while a run is going, and for 10 seconds after it ends; the LED-bar button in the header shows or hides it) shows how fast the
   runs on this Mac and the runner machines **send operations to devices**. The LED bar on the right is the
   count over **the last 3 seconds** per second, and the number (actions/s) is the bar's value itself

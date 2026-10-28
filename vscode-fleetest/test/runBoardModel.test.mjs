@@ -15,6 +15,7 @@ import {
   LOCAL_MACHINE_KEY,
   machineRunStatus,
   currentSupplyStep,
+  machineServicesNotes,
 } from "../src/runBoardModel";
 import { isMonitorEvent } from "../src/monitorDeviceModel";
 import { toWebviewMessage } from "../src/monitorModel";
@@ -263,6 +264,55 @@ test("currentSupplyStep: ランナーのビルドが最優先・端末はいち�
   ]), "configuring", "設定を書き込んでいる端末が残る間は全台 ready と言わない");
 });
 
+test("currentSupplyStep: サーバーの起動(共有の行 services)を出す。端末の段階より先", () => {
+  assert.equal(currentSupplyStep([{ name: "", step: "services" }]), "services");
+  assert.equal(currentSupplyStep([
+    { name: "", step: "services" },
+    { name: "a", platform: "ios", step: "pending" },
+  ]), "services", "端末の予定(pending)があってもサーバーの起動を言う");
+  assert.equal(currentSupplyStep([{ name: "a", platform: "ios", step: "services" }]), undefined,
+    "services は共有の行(name 空文字)のときだけ");
+});
+
+// ---- machineServicesNotes(DS-18.10)--------------------------------------------------------------
+
+function lease(overrides) {
+  return { project: "ec-mobile", profile: "ios-1", holder: "owner", pid: 51200, phase: "running", orphan: false, ...overrides };
+}
+
+test("machineServicesNotes: 常駐は段階で、持ち主のいない控えは orphan。run が持つ生きた控えは停止中だけ出す", () => {
+  const state = applyMonitorRunsEvent(new Map(), {
+    machine: "M1Max", observed: true, runs: [],
+    services: [
+      lease({ project: "gone", holder: "run", pid: 1, orphan: true }),
+      lease({ project: "by-run", holder: "run", pid: 2 }),
+      lease({ project: "by-run-starting", holder: "run", phase: "starting", pid: 6 }),
+      lease({ project: "run-stopping", holder: "run", phase: "tearingDown", pid: 7 }),
+      lease({ project: "stopping", phase: "tearingDown", pid: 3 }),
+      lease({ project: "starting", phase: "starting", pid: 4 }),
+      lease({ project: "up", pid: 5 }),
+    ],
+  });
+  assert.deepEqual(machineServicesNotes(state, "M1Max").map((n) => [n.kind, n.project, n.pid]), [
+    ["running", "up", 5],
+    ["starting", "starting", 4],
+    ["stopping", "run-stopping", 7],
+    ["stopping", "stopping", 3],
+    ["orphan", "gone", 1],
+  ]);
+});
+
+test("machineServicesNotes: 観測できていない機械・控えの無い機械は空(不明をサーバー無しに混ぜない)", () => {
+  let state = applyMonitorRunsEvent(new Map(), { machine: "M1Max", observed: true, runs: [], services: [lease({})] });
+  assert.equal(machineServicesNotes(state, "M1Max").length, 1);
+  state = applyMonitorRunsEvent(state, { machine: "M1Max", observed: false, runs: [], services: [] });
+  assert.deepEqual(machineServicesNotes(state, "M1Max"), []);
+  assert.deepEqual(machineServicesNotes(state, "M1Ultra"), []);
+  // 手元は machine 欠落 = LOCAL_MACHINE_KEY
+  const local = applyMonitorRunsEvent(new Map(), { observed: true, runs: [], services: [lease({})] });
+  assert.equal(machineServicesNotes(local, LOCAL_MACHINE_KEY)[0].kind, "running");
+});
+
 test("束ねた run の supply は machine 昇順の run の順に連結する", () => {
   const supplyOf = (name) => [{ name, platform: "ios", step: "booting" }];
   let state = applyMonitorRunsEvent(new Map(), { machine: "M1Ultra", observed: true,
@@ -284,6 +334,7 @@ const wireEvent = {
     lanes: [{ key: "UDID-1", name: "iPhone 17-01", platform: "ios", scenario: "05_検索",
               scenarioElapsedSeconds: 72 }],
   }],
+  services: [{ project: "ec-mobile", profile: "ios-smoke", holder: "owner", pid: 51200, phase: "running", orphan: false }],
 };
 
 test("isMonitorEvent: monitorRuns の生 NDJSON を受理し、etaSeconds:null を undefined に正規化する", () => {
@@ -344,8 +395,20 @@ test("isMonitorEvent: lanes の型崩れは拒否する。observed:false は run
   brokenLane.runs[0].lanes[0].scenarioElapsedSeconds = "seventy-two";
   assert.equal(isMonitorEvent(brokenLane), false);
 
-  const notObserved = { kind: "monitorRuns", observed: false, runs: [] };
+  const notObserved = { kind: "monitorRuns", observed: false, runs: [], services: [] };
   assert.equal(isMonitorEvent(notObserved), true, "observed:false は runs:[] で妥当");
+});
+
+test("isMonitorEvent: services は必須(DS-18.10)。型崩れは拒否する", () => {
+  const missing = structuredClone(wireEvent);
+  delete missing.services;
+  assert.equal(isMonitorEvent(missing), false, "古い形(services 無し)は受理しない");
+  const broken = structuredClone(wireEvent);
+  broken.services[0].orphan = "no";
+  assert.equal(isMonitorEvent(broken), false);
+  const noPid = structuredClone(wireEvent);
+  delete noPid.services[0].pid;
+  assert.equal(isMonitorEvent(noPid), false);
 });
 
 test("toWebviewMessage: monitorRuns はそのまま webview 契約へ渡す(type だけ kind から改名)", () => {
@@ -356,6 +419,7 @@ test("toWebviewMessage: monitorRuns はそのまま webview 契約へ渡す(type
   assert.equal(posted.machine, "M1Max");
   assert.equal(posted.observed, true);
   assert.deepEqual(posted.runs, value.runs);
+  assert.deepEqual(posted.services, value.services, "サーバーの控えも webview へ渡す");
 });
 
 // ---- machinesWithoutRuns ------------------------------------------------------------------

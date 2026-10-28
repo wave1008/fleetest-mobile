@@ -21,7 +21,8 @@ final class ServicesOwnerTakeoverTests: XCTestCase {
 
     private func place(_ lease: ServicesLease) throws {
         try ServicesLeaseStore.write(lease, to: ServicesLeaseFile.directory(stateDir: stateDir)
-            .appendingPathComponent(ServicesLeaseFile.fileName(pid: lease.pid, prefix: prefix)))
+            .appendingPathComponent(ServicesLeaseFile.fileName(pid: lease.pid, prefix: prefix)),
+            home: stateDir.appendingPathComponent("home").path)
     }
 
     private func lease(pid: Int32, kind: ServicesLease.Kind) -> ServicesLease {

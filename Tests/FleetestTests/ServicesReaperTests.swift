@@ -36,7 +36,7 @@ final class ServicesReaperTests: XCTestCase {
     private func place(_ lease: ServicesLease, named name: String? = nil) throws -> URL {
         let url = ServicesLeaseFile.directory(stateDir: stateDir)
             .appendingPathComponent(name ?? ServicesLeaseFile.fileName(pid: lease.pid, prefix: lease.prefix))
-        try ServicesLeaseStore.write(lease, to: url)
+        try ServicesLeaseStore.write(lease, to: url, home: home)
         return url
     }
 

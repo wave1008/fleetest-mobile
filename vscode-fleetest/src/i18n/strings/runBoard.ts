@@ -23,6 +23,7 @@ export const runBoardStrings = {
   "runBoard.laneDropouts": { ja: "レーン離脱 {count}", en: "{count} lane(s) dropped" },
   "runBoard.preparing": { ja: "デバイスの準備を開始します", en: "Starting device preparation…" },
   // 準備中の端末ごとの供給の段階(台帳の supply)。1つだけ出す(選び方は runBoardModel.currentSupplyStep・台数は出さない)
+  "runBoard.supplyServices": { ja: "サーバーを起動中", en: "Starting the servers…" },
   "runBoard.supplyRunnerBuild": { ja: "ランナーをビルド中", en: "Building the runner…" },
   "runBoard.supplyBooting": { ja: "デバイスを起動中", en: "Booting devices…" },
   "runBoard.supplyBridge": { ja: "ブリッジを起動中", en: "Starting the bridge…" },
@@ -52,5 +53,23 @@ export const runBoardStrings = {
   "runBoard.tachometerTipScale": {
     ja: "1目盛り = 1アクション/秒",
     en: "One segment = 1 action/s",
+  },
+  // マシンの行のサーバー(DS-18.10)。{projects} はプロジェクト名を servicesProjectSeparator でつないだもの
+  "runBoard.servicesProjectSeparator": { ja: "・", en: ", " },
+  "runBoard.servicesRunning": { ja: "サーバー稼働中 {projects}", en: "Servers up: {projects}" },
+  "runBoard.servicesStarting": { ja: "サーバーを起動中 {projects}", en: "Servers starting: {projects}" },
+  "runBoard.servicesStopping": { ja: "サーバーを停止中 {projects}", en: "Servers stopping: {projects}" },
+  "runBoard.servicesOrphan": { ja: "サーバー(持ち主なし) {projects}", en: "Servers without owner: {projects}" },
+  "runBoard.servicesOwnerTip": {
+    ja: "{project} / {profile}: fleetest services up で常駐しています(pid {pid})。止めるには fleetest services down --project {project} --profile {profile}",
+    en: "{project} / {profile}: kept up by fleetest services up (pid {pid}). Stop with fleetest services down --project {project} --profile {profile}",
+  },
+  "runBoard.servicesRunStoppingTip": {
+    ja: "{project} / {profile}: 終わった run(pid {pid})がサーバーを止めています",
+    en: "{project} / {profile}: the finished run (pid {pid}) is stopping the servers",
+  },
+  "runBoard.servicesOrphanTip": {
+    ja: "{project} / {profile}: 起動したプロセス(pid {pid})は終了しています。残ったコンテナは fleetest services reset --project {project} --profile {profile} で片付けます",
+    en: "{project} / {profile}: the process that started them (pid {pid}) has exited. Remove what is left with fleetest services reset --project {project} --profile {profile}",
   },
 } satisfies MessageDict;

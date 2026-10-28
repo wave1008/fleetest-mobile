@@ -498,7 +498,8 @@ public enum ScenarioSandbox {
             ["hooks", "human-ops", "services", "services.lock", "mcp-ask-offered.json", "mcp-runs", "DerivedData", "DerivedData-device", "cleanup.log", "recording-probe"]
                 .map { root + "/.fleetest/" + $0 }
         } + [scope.projectRoot + "/.fleetest/" + HealWriteBack.lockFileName]
-            + ["ftbridge.apk", "dispatch.lock", "dispatch.queue", "retention-sweep.lock"]
+            // `services-leases/` = サーバーの控えの索引(`ServicesLeaseIndex`。親が書き、先の無い索引を消す = 子が symlink を置くと消す先を向け替えられる)
+            + ["ftbridge.apk", "dispatch.lock", "dispatch.queue", "retention-sweep.lock", "services-leases"]
             .map { scope.home + "/.fleetest/" + $0 }
             + ["Library/Caches/fleetest/webview", "Library/Logs/fleetest/emulator"].map { scope.home + "/" + $0 }
     }

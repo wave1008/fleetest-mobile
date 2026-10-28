@@ -736,7 +736,20 @@ body.vscode-dark .tacho-trend-dot { filter: drop-shadow(0 0 2px var(--tacho-line
   color: #ffffff;
 }
 .run-board-idle-machine-status {
-  flex: 1 1 auto;
+  flex: 0 0 auto;
+}
+/* その機械のサーバー(DS-18.10)。「空き」や時刻の右に続ける。持ち主のいないサーバーだけ警告色(片付けが要る) */
+.run-board-services {
+  flex: 0 1 auto;
+  min-width: 0;
+  margin-left: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--vscode-descriptionForeground, #9d9d9d);
+}
+.run-board-services-orphan {
+  color: var(--vscode-editorWarning-foreground, #cca700);
 }
 
 /* run の無い機械は2値(空き / 不明)。**どちらもグレー**(ユーザー決定)——

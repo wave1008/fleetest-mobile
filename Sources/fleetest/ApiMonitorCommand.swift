@@ -217,6 +217,9 @@ struct ApiMonitorCommand: AsyncParsableCommand {
         // 1行も出さないと、拡張は「一度も聞いていない = 不明」のままになり **「空き」を表現できない**
         // (monitorLock の lastOccupancy が Optional なのと同じ理由)
         var lastRunRecords: [RunProgressRecord]?
+        // サーバーの控え(DS-18.10)。同じ monitorRuns に載せる = どちらかが変わったら1行出す
+        var lastServices: [ApiMonitorServicesLease]?
+        let servicesHome = NSHomeDirectory()
         // 台帳が指すシナリオのイベントログを tail して monitorRunLog を出す(ApiMonitorRunLog.swift)
         let runLogTailer = RunLogTailer()
         while !stop.isSet {
@@ -234,10 +237,13 @@ struct ApiMonitorCommand: AsyncParsableCommand {
             let currentRunRecords = RunProgressLedger.readAll(directory: runProgressDir,
                                                               startTime: ProcessLiveness.startTime)
                 .sorted { $0.pid < $1.pid }
-            if Self.shouldEmitRuns(current: currentRunRecords, last: lastRunRecords) {
+            let currentServices = MonitorServicesReader.read(home: servicesHome)
+            if Self.shouldEmitRuns(current: currentRunRecords, last: lastRunRecords) || currentServices != lastServices {
                 lastRunRecords = currentRunRecords
+                lastServices = currentServices
                 emitLine(ApiMonitorRunsEvent(
-                    runs: Self.monitorRuns(records: currentRunRecords, now: Date(), myIssuer: myIssuer)))
+                    runs: Self.monitorRuns(records: currentRunRecords, now: Date(), myIssuer: myIssuer),
+                    services: currentServices))
             }
             // 変化の有無に関わらず毎周期読む(増分があるかはファイルを見ないと分からない。待たない・件数で切らない)
             for event in runLogTailer.poll(records: currentRunRecords) { emitLine(event) }

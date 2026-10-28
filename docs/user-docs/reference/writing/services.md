@@ -189,6 +189,8 @@ For exploring, Live Control and writing scenarios, a person can start the servic
 | `fleetest services status` | Shows the record, the lock and the resources on the runtime, with the size of each named volume and of the images fleetest built (the `build:` images of this workspace and the relay image). Nothing is deleted automatically; use `reset` when they have grown |
 | `fleetest services reset [--force]` | Deletes this workspace's containers, networks, **volumes** and record. `--force` is needed while an `up` holds them (it stops that `up` first). While a run holds them, even `--force` deletes nothing (wait for the run to finish) |
 
+Services started with `up` show on their machine's row of the run board in the VSCode extension's monitor as "Servers up".
+
 **A real run (`fleetest run` / `ft_start_run`) takes over services started with `up`**: it prints a warning, stops them,
 starts them again itself and stops them itself (so that the result is reproducible). While a run holds the services,
 `services down` is refused.

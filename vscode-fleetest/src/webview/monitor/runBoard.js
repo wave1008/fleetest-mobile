@@ -31,6 +31,7 @@ import {
   liveElapsedSeconds,
   liveRemaining,
   currentSupplyStep,
+  machineServicesNotes,
 } from '../../runBoardModel';
 import {
   ACTIONS_PER_SECOND_PER_SEGMENT, ActionTachometer, easeToward, segmentLevel, segmentCount, METER_SEGMENTS, segmentTier,
@@ -561,6 +562,10 @@ function ensureRow(key) {
 
   const timeEl = document.createElement('span');
   timeEl.className = 'run-board-time';
+  // その機械のサーバー(常駐・持ち主なし・停止中。DS-18.10)。マシンの最初の行だけが出す(renderServices)
+  const servicesEl = document.createElement('span');
+  servicesEl.className = 'run-board-services';
+  servicesEl.style.display = 'none';
   const elapsedEl = document.createElement('span');
   elapsedEl.className = 'run-board-elapsed';
   const remainingEl = document.createElement('span');
@@ -579,7 +584,7 @@ function ensureRow(key) {
   leadEl.append(progressEl, countsEl, notesEl);
   const rightEl = document.createElement('span');
   rightEl.className = 'run-board-col-right';
-  rightEl.append(leadEl, statusEl, timeEl);
+  rightEl.append(leadEl, statusEl, timeEl, servicesEl);
   summaryEl.append(leftEl, rightEl);
 
   const issuerEl = document.createElement('div');
@@ -609,7 +614,7 @@ function ensureRow(key) {
 
   const row = {
     rowEl, chevronEl, machineBadgeEl, scopeEl, runningDevicesEl, leadEl, progressEl, progressBarEl, countsEl, statusEl, notesEl,
-    timeEl, elapsedEl, remainingEl, issuerEl, lanesEl,
+    timeEl, elapsedEl, remainingEl, servicesEl, issuerEl, lanesEl,
     key, run: null, idle: null, laneRows: new Map(),
   };
   rows.set(key, row);
@@ -719,7 +724,7 @@ function appendDeviceLane(row, machine, name, lane, receivedAtMs, platform) {
 // `whilePreparing` = 準備中の行か(全台 ready の「テストを開始しています」は準備中にだけ出す。実行中は添えない)
 function supplyLabel(supply, whilePreparing) {
   const keys = {
-    runnerBuild: 'runBoard.supplyRunnerBuild', booting: 'runBoard.supplyBooting',
+    services: 'runBoard.supplyServices', runnerBuild: 'runBoard.supplyRunnerBuild', booting: 'runBoard.supplyBooting',
     bridge: 'runBoard.supplyBridge', configuring: 'runBoard.supplyConfiguring', installing: 'runBoard.supplyInstalling',
     allReady: 'runBoard.supplyStarting',
   };
@@ -812,6 +817,37 @@ function updateRow(row, run) {
   applyRowExpansion(row, hasDevices || showIssuer);
 }
 
+const SERVICES_NOTE_KEYS = {
+  running: 'runBoard.servicesRunning', starting: 'runBoard.servicesStarting',
+  stopping: 'runBoard.servicesStopping', orphan: 'runBoard.servicesOrphan',
+};
+
+/** マシンのサーバー(DS-18.10)。`machine` は machineList() の綴り('' = 手元)。出すのはその機械の最初の行だけ */
+function renderServices(row, machine, first) {
+  const notes = first ? machineServicesNotes(runsByMachine, machine) : [];
+  if (notes.length === 0) {
+    row.servicesEl.style.display = 'none';
+    setHoverTip(row.servicesEl, '');
+    return;
+  }
+  const byKind = new Map();
+  for (const note of notes) {
+    const projects = byKind.get(note.kind) ?? [];
+    if (!projects.includes(note.project)) { projects.push(note.project); }
+    byKind.set(note.kind, projects);
+  }
+  const text = [...byKind].map(([kind, projects]) => t(SERVICES_NOTE_KEYS[kind], { projects: projects.join(t('runBoard.servicesProjectSeparator')) })).join('  ');
+  if (row.servicesEl.textContent !== text) { row.servicesEl.textContent = text; }
+  row.servicesEl.classList.toggle('run-board-services-orphan', byKind.has('orphan'));
+  row.servicesEl.style.display = '';
+  const tipKey = (note) => note.kind === 'orphan' ? 'runBoard.servicesOrphanTip'
+    : note.holder === 'run' ? 'runBoard.servicesRunStoppingTip' : 'runBoard.servicesOwnerTip';
+  const tip = notes.map((note) => t(tipKey(note), {
+    project: note.project, profile: note.profile, pid: String(note.pid),
+  })).join('\n');
+  setHoverTip(row.servicesEl, tip);
+}
+
 function render() {
   const groups = buildRunGroups(runsByMachine);
   renderHeader(groups);
@@ -875,6 +911,15 @@ function render() {
       row.rowEl.remove();
       rows.delete(key);
     }
+  }
+  // サーバーは**マシンの最初の行**(空きの行か、その機械の最初の run の行)に出す = DOM の並びで決める
+  const servicesShown = new Set();
+  for (const el of runBoardRows.children) {
+    const row = rows.get(el.dataset.rowKey);
+    if (!row) { continue; }
+    const machine = row.run ? (row.run.machine ?? LOCAL_MACHINE_KEY) : row.idle.machine;
+    renderServices(row, machine, !servicesShown.has(machine));
+    servicesShown.add(machine);
   }
 
   // **行を作り終えてから測る** —— 既定の幅はいちばん長いラベルから決めるので、
@@ -1075,6 +1120,7 @@ export function applyMonitorRuns(message) {
     machine: message.machine,
     observed: message.observed,
     runs: message.runs,
+    services: message.services,
   });
   tachometer.apply({ machine: message.machine, observed: message.observed, runs: message.runs }, Date.now());
   render();

@@ -157,8 +157,8 @@ export interface MonitorRunLane {
 }
 
 /** 準備中の端末ごとの供給の段階(FTCore.RunProgressSupply と対。DS-18.1)。
- * 端末に属さない共有の段階(ランナーのビルド)は name が空文字。step の語彙は
- * "pending"(予定に入ったがまだ始まっていない)/ "runnerBuild" / "booting" / "bridge" / "configuring" / "installing" / "ready"
+ * 端末に属さない共有の段階(サーバーの起動・ランナーのビルド)は name が空文字。step の語彙は
+ * "pending"(予定に入ったがまだ始まっていない)/ "services"(サーバーを起動中。DS-18.10)/ "runnerBuild" / "booting" / "bridge" / "configuring" / "installing" / "ready"
  * (未知の値は読み手が無視する)。 */
 export interface MonitorRunSupply {
   readonly name: string;
@@ -212,6 +212,21 @@ export interface MonitorRunVideoClips {
   readonly total: number;
 }
 
+/** その機械のサーバー(compose.yaml)の控え1つ(DS-18.10。ProtocolVersion 62。
+ * 契約: Sources/fleetest/ApiMonitorEvents.swift の ApiMonitorServicesLease)。控えが言える事実だけ ——
+ * コンテナが実際に生きているかは持たない。 */
+export interface MonitorServicesLease {
+  readonly project: string;
+  readonly profile: string;
+  /** "run"(run が持つ)/ "owner"(`fleetest services up` の常駐) */
+  readonly holder: string;
+  readonly pid: number;
+  /** "starting" / "running" / "tearingDown" */
+  readonly phase: string;
+  /** 持ち主の pid が生きていない */
+  readonly orphan: boolean;
+}
+
 /** `fleetest api monitor` の NDJSON 1行分のイベント(kind で判別)。 */
 /** 実行ログの行のイベント(monitorRunLog)。monitorPanel.ts / monitorRunLogModel.ts が受ける */
 export type MonitorRunLogEvent = Extract<MonitorEvent, { kind: "monitorRunLog" }>;
@@ -263,6 +278,8 @@ export type MonitorEvent =
       readonly machine?: string;
       readonly observed: boolean;
       readonly runs: readonly MonitorRunEntry[];
+      /** その機械のサーバーの控え全部(DS-18.10)。observed:false では空 */
+      readonly services: readonly MonitorServicesLease[];
     }
   // 実行ログビューへ流す、CLI・他人・リモートが起こした run のデバイス別ログ(ProtocolVersion 61)。
   // device は monitorDevices の id(= 実行ログのレーン id)。lines は周期ごとの増分。
@@ -423,6 +440,18 @@ function isMonitorRunSupply(value: unknown): value is MonitorRunSupply {
   );
 }
 
+function isMonitorServicesLease(value: unknown): value is MonitorServicesLease {
+  return (
+    isRecord(value) &&
+    typeof value.project === "string" &&
+    typeof value.profile === "string" &&
+    typeof value.holder === "string" &&
+    typeof value.pid === "number" &&
+    typeof value.phase === "string" &&
+    typeof value.orphan === "boolean"
+  );
+}
+
 function isMonitorBridgeLogRotationCandidate(value: unknown): value is MonitorBridgeLogRotationCandidate {
   return (
     isRecord(value) &&
@@ -536,7 +565,9 @@ export function isMonitorEvent(value: unknown): value is MonitorEvent {
         typeof value.observed === "boolean" &&
         (value.machine === undefined || typeof value.machine === "string") &&
         Array.isArray(value.runs) &&
-        value.runs.every(isMonitorRunEntry)
+        value.runs.every(isMonitorRunEntry) &&
+        Array.isArray(value.services) &&
+        value.services.every(isMonitorServicesLease)
       );
     case "monitorRunLog":
       for (const key of ["machine", "runID", "owner"] as const) {

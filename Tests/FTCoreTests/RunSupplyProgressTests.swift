@@ -1,6 +1,6 @@
 // RunSupplyProgress(run の準備中の端末ごとの供給の段階。DS-18.1)の検証。
 // 守るもの: ①snapshot は名前順(共有の段階が先頭)②同じ内容への書き込みは通知しない
-// ③クリアは行を消して通知する ④reporter は step nil を消去に写す ⑤通知はロックの外(通知の中で snapshot を読める)。
+// ③クリアは行を消して通知する(共有の行は自分の段階のときだけ) ④reporter は step nil を消去に写す ⑤通知はロックの外(通知の中で snapshot を読める)。
 
 import XCTest
 @testable import FTCore
@@ -41,6 +41,20 @@ final class RunSupplyProgressTests: XCTestCase {
         XCTAssertEqual(calls.value, 1)
         box.clearRunnerBuild()
         XCTAssertEqual(calls.value, 1, "既に無い行のクリアは通知しない")
+    }
+
+    func testClearSharedRemovesTheSharedRowOnlyWhileItHoldsThatStep() {
+        let box = RunSupplyProgress()
+        let calls = LockedValue(0)
+        box.set(name: "", platform: nil, step: .services)
+        box.set(name: "iPhone 17-01", platform: "ios", step: .pending)
+        box.setOnChange(owner: Self.ownerA) { calls.withLock { $0 += 1 } }
+        box.clearShared(step: .runnerBuild)
+        XCTAssertEqual(box.snapshot().map(\.step), ["services", "pending"], "別の段階の共有の行は消さない")
+        XCTAssertEqual(calls.value, 0)
+        box.clearShared(step: .services)
+        XCTAssertEqual(box.snapshot().map(\.name), ["iPhone 17-01"], "端末の行は残る")
+        XCTAssertEqual(calls.value, 1)
     }
 
     func testReporterMapsNilStepToClear() {

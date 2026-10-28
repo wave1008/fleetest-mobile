@@ -29,6 +29,7 @@ VSCode 拡張のデバイスモニターの設計。
 - DS-18.7 やらないと決めたもの
 - DS-18.8 タコメーター(アクション/秒。ユーザー決定 2026-10-28)
 - DS-18.9 実行ログを CLI・他人・リモートの run にも流す(`monitorRunLog`。ユーザー決定 2026-10-28)
+- DS-18.10 サーバー(compose.yaml)を run ボードに出す(`monitorRuns.services`)
 
 ## DS-12 デバイスモニターの画面配信と自己修復
 
@@ -869,7 +870,7 @@ CLI 実行・他人の run・ランナー機で直に打たれた run は `inRun
   拡張は残りの代わりに「動画を編集中 n/m」を出す(機械分担の run は全 run が切り出し中のときだけ合計。ProtocolVersion 55)
 - **準備中の間は端末ごとの供給の段階を `supply` に載せる**(`FTCore.RunProgressSupply`:
   `name`(`devices[].name`。ランナーの build-for-testing は端末に属さないので空文字)・`platform`・
-  `step` = `pending` / `runnerBuild` / `booting` / `bridge` / `configuring` / `installing` / `ready`)。iOS は計画の時点で予定の端末を全台 `pending` で
+  `step` = `pending` / `services` / `runnerBuild` / `booting` / `bridge` / `configuring` / `installing` / `ready`)。iOS は計画の時点で予定の端末を全台 `pending` で
   立てる(同時に起動できる台数の枠を待つ端末に行が無いと、先に済んだ端末だけで「全台 ready」=「テストを開始しています」に見える)。**必須の欄**(古い形は読まない・
   段階の情報が無い run は空配列)。端末の行は `ready` になっても残す(読み手は全部 ready なら「テストを開始しています」)。
   **`configuring`** は iOS のブリッジがそろった後、シミュレータの設定(モーションを減らす・ソフトキーボード)を書き込む間
@@ -933,7 +934,9 @@ CLI 実行・他人の run・ランナー機で直に打たれた run は `inRun
    "elapsedSeconds":261,"total":12,"done":7,"failed":2,"etaSeconds":190,
    "phase":"running","supply":[{"name":"iPhone 17-01","platform":"ios","step":"ready"}],
    "lanes":[{"key":"…","name":"iPhone 17-01","scenario":"05_検索",
-             "scenarioElapsedSeconds":72}]}]}
+             "scenarioElapsedSeconds":72}]}],
+ "services":[{"project":"ec-mobile","profile":"ios-smoke","holder":"owner","pid":51200,
+              "phase":"running","orphan":false}]}
 ```
 
 - **machine は中継する親が埋める**(子は `--device-machine local` で自分を local と名乗るので、
@@ -999,7 +1002,7 @@ CLI 実行・他人の run・ランナー機で直に打たれた run は `inRun
   小さすぎて「開ける」と気づかれない。三角は状態の表示で、**文字は常に ▶・向きは CSS の回転**
   (字を差し替える形は細くて伝わらなかった)。個々の run の行の chevron も同じ規律
 - **準備中の run は本数でなく「いま何をしているか」を1語で出し、進捗バーは隠す**(本数も割合もまだ意味を持たない。
-  語は DS-18.1 の `supply` から = 「シナリオをビルド中」「ランナーをビルド中」「デバイスを起動中」「ブリッジを起動中」
+  語は DS-18.1 の `supply` から = 「シナリオをビルド中」「サーバーを起動中」(DS-18.10)「ランナーをビルド中」「デバイスを起動中」「ブリッジを起動中」
   「デバイスを設定しています」「アプリをインストール中」「テストを開始しています」「Vision コンパイル中」、分からなければ「デバイスの準備を開始します」)。
   経過時間は出す —— どれくらい待っているかが分かる。**件数(「実行中 N」)には数える**
 - **並びは常に機械の順**(local → 登録簿の順。ユーザー決定 2026-09-20)—— run が始まっても
@@ -1194,3 +1197,35 @@ run ボードの見出しに、「実行中 N」・全て展開の右から順�
 - **既知の限界**: 監視の1周期(約 2 秒)より短いシナリオは、監視が開く前に rename されて画面に出ないことがある(ディスクには残る)
 - ProtocolVersion 61(台帳の `eventLog` / `owner`・`monitorRunLog`)
 
+
+### DS-18.10 サーバー(compose.yaml)を run ボードに出す(`monitorRuns.services`)
+
+RR-17(サービスの宣言)のサーバーを run ボードの2か所で出す: run の準備中の段階と、マシンの行(`fleetest services up` の常駐・
+持ち主が死んで残ったもの・run が止めている途中のもの)。
+
+- **準備中の段階 `services`**(`RunProgressSupply.Step.services`): `ServicesSession.up` が compose.yaml に宣言があるときだけ
+  共有の行(name 空文字・platform なし)に立て、戻るとき(成功・失敗とも)に消す。語は「サーバーを起動中」。所有者の引き取り・
+  イメージの取得とビルド・起動完了の待ちを含む。**渡し口(`supplyProgress:`)は既定値を置かない必須の引数** —— run と api run の
+  2経路が渡し、常駐の所有者(`api services-owner`)は nil を渡す。共有の行は `runnerBuild` と同じ名前を使う:
+  サーバーの起動は供給のタスクを起こす前に終わる(サービス → 開始スクリプト → 供給)ので時間が重ならず、消すときは
+  **自分の段階が立っているときだけ消す**(`RunSupplyProgress.clearShared(step:)`)
+- **台帳の最初の書き込みはサーバーの起動より前**(run / api run とも)。後ろに置くと、サーバーの起動と開始スクリプトの間、
+  その run がボードに出ずマシンが「空き」に見える(`RunProgressLedgerWiringTests` が api run の順序を固定)
+- **マシンの行にサーバーを出す**: `monitorRuns` の1機械ぶんに `services`(その機械のサーバーの控え全部)を載せ、絞り込みは
+  表示がする。**run が持っていて生きている控えは停止中だけ出す**(起動中・稼働中はその run の行が段階で言う。run の台帳は
+  サーバーの停止より先に消えるので、出さないとサーバーを止めている間マシンが「空き」に見える)。ほかに出すのは `services up` の常駐
+  (段階で「サーバー稼働中」「サーバーを起動中」「サーバーを停止中」)と、持ち主の pid が生きていない控え(「サーバー(持ち主なし)」)。
+  語の後にプロジェクト名、複数は区切り(`runBoard.servicesProjectSeparator`。日本語は「・」)でつなぐ。マシンの**最初の行**(空きの行か、その機械の最初の run の行)の右の列に置く。
+  ツールチップで止め方(`fleetest services down`)・片付け方(`fleetest services reset`)をプロジェクトとプロファイル付きで言う
+- **控えは機械共通の索引から引く**: 控えは `<リポジトリ>/.fleetest/hooks/<pid>~<接頭辞>.json` で、ランナー機では発行者ごとの
+  work(`<base>/users/<issuer>/work/`。RR-18.6)の下にあるので、ランナー機のクローンで動く監視からは見えない(DS-18.1 の台帳と
+  同じ理由)。索引 `~/.fleetest/services-leases/<控えのファイル名>` の中身は控えの絶対パス1行。**書くのは控えを書く1箇所
+  (`ServicesLeaseStore.write`)・消すのは控えを消す1箇所(`ServicesLeaseStore.remove`)**(`ServicesLeaseIndexTests` が
+  控えの削除の直書きを走査で落とす)。先の無い索引は**書き手が新しい索引を作るときに掃く**(読み手は掃かない = DS-18.1 の③)
+- **欄は事実だけ**: `project` / `profile` / `holder`(`run` / `owner`)/ `pid` / `phase`(`starting` / `running` / `tearingDown`)/
+  `orphan`(pid と開始時刻の照合 = `ServicesLeaseFile.isOrphan`)。読めない控え・版の違う控えは出さない(`fleetest services status` が言う)
+- **周期の中で待たない**: 読むのは索引の列挙と小さな JSON だけ。**ランタイム(docker / container)には照会しない** ——
+  コンテナが実際に生きているかは出さない(控えが言えることだけを言う)
+- **やらないもの**: 停止・reset のボタン、サービスごとの行・公開ポート・大きさ(`services status` の担当)、サーバーの出力を
+  実行ログビューへ流すこと(DS-18.9 の経路はシナリオのイベントログ専用)
+- ProtocolVersion 62(`monitorRuns.services`。必須の欄)

@@ -28,6 +28,7 @@ import {
   type MonitorEvent,
   type MonitorPlatform,
   type MonitorRunEntry,
+  type MonitorServicesLease,
 } from "./monitorDeviceModel";
 import type { DeviceOpKind, DeviceOpQueueStatus } from "./monitorDeviceLifecycle";
 import { isAppPlatformScope } from "./monitorProfileForms";
@@ -73,6 +74,7 @@ export type MonitorToWebviewMessage =
       readonly machine?: string;
       readonly observed: boolean;
       readonly runs: readonly MonitorRunEntry[];
+      readonly services: readonly MonitorServicesLease[];
     }
   // monitor プロセスの再起動(startMonitorProcess)の合図。machineLocks と同じ寿命の規律 ——
   // 新しいプロセスが最初のサイクルで出し直すまで、古い run の控えを webview に残さない。
@@ -605,7 +607,9 @@ export function toWebviewMessage(
         capturedAtMs: event.capturedAtMs,
       };
     case "monitorRuns":
-      return { type: "monitorRuns", machine: event.machine, observed: event.observed, runs: event.runs };
+      return {
+        type: "monitorRuns", machine: event.machine, observed: event.observed, runs: event.runs, services: event.services,
+      };
   }
 }
 

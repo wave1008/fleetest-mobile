@@ -511,6 +511,8 @@ final class ScenarioSandboxTests: XCTestCase {
         XCTAssertEqual(try touch("home/.fleetest/fm-liveness.json"), 0)
         // 親だけが書く場所(子が symlink を置くと親が先を書き換える・消す)
         XCTAssertNotEqual(try touch("home/.fleetest/retention-sweep.lock"), 0)
+        XCTAssertNotEqual(try runSandboxed(["/bin/mkdir", path("home/.fleetest/services-leases")]), 0)
+        XCTAssertNotEqual(try runSandboxed(["/bin/ln", "-s", path("home"), path("home/.fleetest/services-leases")]), 0)
         XCTAssertNotEqual(try touch("tool/.fleetest/cleanup.log"), 0)
         XCTAssertNotEqual(try runSandboxed(["/bin/mkdir", path("repo/.fleetest/recording-probe")]), 0)
         XCTAssertNotEqual(try runSandboxed(["/bin/mkdir", path("home/Library/Caches/fleetest/webview")]), 0)

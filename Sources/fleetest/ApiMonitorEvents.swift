@@ -8,6 +8,7 @@ import FTAndroid
 import FTBridgeClient
 import FTCore
 import FTRemote
+import FTServices
 import ImageIO
 import UniformTypeIdentifiers
 
@@ -142,11 +143,14 @@ struct ApiMonitorRunsEvent: Codable, Equatable {
     /// 同じ規律。**false を「run 無し」と読ませない** —— 拡張は控えを消して「不明」に戻す)
     let observed: Bool
     let runs: [ApiMonitorRunProgress]
+    /// その機械のサーバーの控え全部(DS-18.10。ProtocolVersion 62)。絞り込みは表示がする
+    let services: [ApiMonitorServicesLease]
 
-    init(runs: [ApiMonitorRunProgress], machine: String? = nil) {
+    init(runs: [ApiMonitorRunProgress], services: [ApiMonitorServicesLease], machine: String? = nil) {
         self.machine = machine
         self.observed = true
         self.runs = runs
+        self.services = services
     }
 
     /// 「この機械はもう観測できていない」1行(親が子の死を見たときだけ出す)
@@ -154,6 +158,37 @@ struct ApiMonitorRunsEvent: Codable, Equatable {
         self.machine = machine
         self.observed = false
         self.runs = []
+        self.services = []
+    }
+}
+
+/// サーバーの控え1つ(DS-18.10)。**控えが言える事実だけ**(コンテナが実際に生きているかはランタイムに訊かないと分からないので持たない)
+struct ApiMonitorServicesLease: Codable, Equatable {
+    let project: String
+    let profile: String
+    /// "run" / "owner"(`ServicesLease.Kind`)
+    let holder: String
+    let pid: Int32
+    /// "starting" / "running" / "tearingDown"(`ServicesLease.Phase`)
+    let phase: String
+    /// 持ち主の pid が生きていない(pid と開始時刻の照合 = `ServicesLeaseFile.isOrphan`)
+    let orphan: Bool
+}
+
+/// 機械共通の索引(`ServicesLeaseIndex`)から控えを読む。読めない控え・版の違う控えは出さない(`services status` が言う)。
+/// 周期の中で呼ぶ = 索引の列挙と小さな JSON の読みだけ(待たない)
+enum MonitorServicesReader {
+    static func read(home: String,
+                     isAlive: (Int32, String) -> Bool = ServicesProcessIdentity.isAlive) -> [ApiMonitorServicesLease] {
+        ServicesLeaseIndex.leaseURLs(home: home)
+            .compactMap { ServicesLeaseStore.entry(at: $0)?.lease }
+            .map { lease in
+                ApiMonitorServicesLease(
+                    project: lease.project, profile: lease.profile, holder: lease.kind.rawValue, pid: lease.pid,
+                    phase: lease.phase.rawValue, orphan: ServicesLeaseFile.isOrphan(lease, isAlive: isAlive))
+            }
+            // 並びを固定する(索引の列挙順に依らない = 変化の無い周期で emit しない)
+            .sorted { ($0.project, $0.profile, $0.pid) < ($1.project, $1.profile, $1.pid) }
     }
 }
 

@@ -44,6 +44,12 @@ enum ServicesLeaseStore {
         }
     }
 
+    /// 控え1つ(索引から引いた絶対パス)。ファイル名が控えの形でなければ nil
+    static func entry(at url: URL) -> ServicesLeaseEntry? {
+        guard let parsed = ServicesLeaseFile.parse(fileName: url.lastPathComponent) else { return nil }
+        return ServicesLeaseEntry(url: url, pid: parsed.pid, prefix: parsed.prefix, state: load(url, pid: parsed.pid, prefix: parsed.prefix))
+    }
+
     private static func load(_ url: URL, pid: Int32, prefix: String) -> ServicesLeaseEntry.State {
         guard let raw = try? String(contentsOf: url, encoding: .utf8), let lease = ServicesLeaseFile.decode(raw) else {
             return .unreadable(reason: "the file cannot be decoded")
@@ -57,7 +63,8 @@ enum ServicesLeaseStore {
         return .readable(lease)
     }
 
-    static func write(_ lease: ServicesLease, to url: URL) throws {
+    /// 控えを書き、機械共通の索引(`ServicesLeaseIndex`)にも載せる。`home` は索引の置き場(テストは一時フォルダ)
+    static func write(_ lease: ServicesLease, to url: URL, home: String) throws {
         guard let text = ServicesLeaseFile.encode(lease) else {
             throw ServicesError(phase: .start, detail: "cannot encode the services lease")
         }
@@ -67,6 +74,13 @@ enum ServicesLeaseStore {
         } catch {
             throw ServicesError(phase: .start, detail: "cannot write the services lease \(url.path): \(error.localizedDescription)")
         }
+        ServicesLeaseIndex.register(leaseURL: url, home: home)
+    }
+
+    /// 控えを消す唯一の口(索引も外す。直接 removeItem すると監視に先の無い索引が残る)
+    static func remove(at url: URL, home: String) {
+        try? FileManager.default.removeItem(at: url)
+        ServicesLeaseIndex.unregister(leaseURL: url, home: home)
     }
 }
 
@@ -257,11 +271,11 @@ enum ServicesReaper {
                         remover: Remover, log: (String) -> Void) -> Bool {
         log("🧹 services: removing what \(lease.holderDescription) left behind (prefix \(lease.prefix), \(lease.runtime))")
         if let remaining = remover(lease) {
-            try? ServicesLeaseStore.write(remaining, to: entry.url)
+            try? ServicesLeaseStore.write(remaining, to: entry.url, home: home)
             log("⚠️ services: some resources of pid \(lease.pid) could not be removed; the lease is kept for the next attempt")
             return false
         }
-        try? FileManager.default.removeItem(at: entry.url)
+        ServicesLeaseStore.remove(at: entry.url, home: home)
         removePrivateDirectory(home: home, pid: lease.pid)
         return true
     }

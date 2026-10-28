@@ -121,7 +121,7 @@ test("既定は両方 ON(フィルタを持たない状態と同じ見え方)", 
 test("OFF の側が4つのセクションから消え、監視サイクル後も隠れたまま", (t) => {
   const { window, document } = createWebview();
   t.after(() => window.close());
-  post(window, { type: "monitorRuns", observed: true, runs: [] });
+  post(window, { type: "monitorRuns", observed: true, services: [], runs: [] });
   sendDevices(window);
   document.getElementById("chk-select-all").click();   // 全選択 = 実行ログと拡大表示にも出る
   assert.equal(logNames(document).length, 3, "前提: 実行ログに3台");

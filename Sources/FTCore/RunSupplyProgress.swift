@@ -6,12 +6,14 @@
 import Foundation
 
 /// 台帳 `~/.fleetest/runs/<pid>.json` の supply の1行。
-/// 端末に属さない共有の段階(ランナーの build-for-testing)は name が空文字
+/// 端末に属さない共有の段階(サーバーの起動・ランナーの build-for-testing)は name が空文字
 public struct RunProgressSupply: Codable, Equatable, Sendable {
     public enum Step: String, Sendable {
         /// 予定に入ったがまだ始まっていない(同時に起動できる台数の枠を待つ間)。**全台 ready の判定を誤らせないため**に
         /// 計画の時点で全台ぶん立てる(行の無い端末があると、先に済んだ端末だけで「全部 ready」に見える)
         case pending
+        /// compose.yaml のサーバーを起動中(共有の行。`ServicesSession.up` が立てて消す。DS-18.10)
+        case services
         case runnerBuild
         case booting
         case bridge
@@ -81,6 +83,16 @@ public final class RunSupplyProgress: Sendable {
     }
 
     public func clearRunnerBuild() { clear(name: Self.sharedName) }
+
+    /// 共有の行が `step` のときだけ消す(共有の行は1つ = 別の段階が立っていたら消さない)
+    public func clearShared(step: RunProgressSupply.Step) {
+        let changed = rows.withLock { rows -> Bool in
+            guard rows[Self.sharedName]?.step == step.rawValue else { return false }
+            rows.removeValue(forKey: Self.sharedName)
+            return true
+        }
+        if changed { notify() }
+    }
 
     /// 名前順(共有の段階の空文字が先頭)。順序が決まっていないと同じ内容でも record が毎回違って書き直される
     public func snapshot() -> [RunProgressSupply] {

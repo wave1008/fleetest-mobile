@@ -397,6 +397,45 @@ struct ApiRunCommand: AsyncParsableCommand {
             commandCheckDevices = full.devices.map(CommandTargetCheck.Device.init)
         }
 
+        // 供給の段階の箱。**サーバーの起動と供給のタスクより前に作る**(段階は入口の writeProgress より前に起きうる。
+        // 台帳へ載せるのは writeProgress が書き手を繋いでから)。dry-run/debug では誰も書かない
+        let supplyProgress = RunSupplyProgress()
+
+        // run 進捗の記帳(DS-18.1)。**ビルドより前に1本書く** —— 実測でシナリオの
+        // swift build から供給の記帳が出るまで ~15秒あり、書かないとその間ボードに1本も出ない。
+        // **サーバーの起動(ServicesSession.up)と開始スクリプトより前に書く**(後ろだとその間 run がボードに出ず、
+        // マシンが「空き」に見える。DS-18.10)。総本数・レーンはまだ未確定(total: 0・lanes: [])。
+        // `runWithProfileParallel` が同じ pid ファイルを上書きする。
+        // 条件は androidWorkersTask/iosWorkersTask を起こす条件(下)と同じ = runWithProfileParallel
+        // が実際に呼ばれる経路だけに書く。**後始末**: そこへ到達できずに関数を抜けたら控えを消す
+        let progressPid = ProcessInfo.processInfo.processIdentifier
+        var progressHandedToRunWithProfileParallel = false
+        // 書き直しても**入口の時刻のまま**(経過が巻き戻らない)
+        let progressStartedAt = ISO8601DateFormatter().string(from: Date())
+        let entryProgress = PreparingProgressWriter(
+            pid: progressPid, runID: nil, runGroup: nil, issuer: LocalConfig.resolveIssuerId(),
+            project: testProject.name, profile: resolvedProfile?.runName, startedAt: progressStartedAt,
+            supply: supplyProgress)
+        /// **段階は実際にやっていることだけを言う**(ユーザー決定)—— 入口ではまだ
+        /// ビルドしていない(`--skip-build` = 機械分担のローカル子なら最後までしない)ので
+        /// "preparing" で始め、"building" は `ScenarioHost.build` を挟む間だけ立てて直後に戻す。
+        func writeProgress(phase: String) {
+            guard resolvedProfile != nil, !dryRun, debugOptions == nil else { return }
+            entryProgress.write(phase: phase)
+        }
+        if resolvedProfile != nil, !dryRun, debugOptions == nil {
+            RunProgressLedger.sweep(directory: RunProgressLedger.directory(), startTime: ProcessLiveness.startTime)
+            entryProgress.attach()
+            writeProgress(phase: "preparing")
+        }
+        defer {
+            if resolvedProfile != nil, !dryRun, debugOptions == nil,
+               !progressHandedToRunWithProfileParallel {
+                entryProgress.close()
+                RunProgressLedger.remove(pid: progressPid, directory: RunProgressLedger.directory())
+            }
+        }
+
         // 開始/終了スクリプト(RR-17。ProfileRunner.run と同じ規律 ——
         // デバイスに触る前に撃ち、終了スクリプトは defer で必ず撃つ)。**resolvedAll ではなく
         // 絞り込み後の resolved を渡す**(スクリプトが受け取るデバイス一覧は、この run が実際に
@@ -432,7 +471,8 @@ struct ApiRunCommand: AsyncParsableCommand {
                 animationRestores = ProfileWorkerFactory.captureAnimationRestore(resolved: resolved)
             }
             servicesSession = try ServicesSession.up(
-                resolved: resolved, stateDir: hookStateDir, options: .forRun(resolved), interruptState: interruptState) { logStderr($0) }
+                resolved: resolved, stateDir: hookStateDir, options: .forRun(resolved), supplyProgress: supplyProgress,
+                interruptState: interruptState) { logStderr($0) }
             do {
                 hookSession = try RunHookRunner.begin(
                     resolved: resolved, stateDir: hookStateDir, services: servicesSession, interrupt: interruptState) { logStderr($0) }
@@ -472,9 +512,6 @@ struct ApiRunCommand: AsyncParsableCommand {
             throw RunInterruptedBeforeStartError(phase: "device supply")
         }
         let triageBox = BlankTriageBox()
-        // 供給の段階の箱。**供給のタスクを起こす前に作る**(段階は入口の writeProgress より前に起きうる。
-        // 台帳へ載せるのは writeProgress が書き手を繋いでから)。dry-run/debug では誰も書かない
-        let supplyProgress = RunSupplyProgress()
         // 供給フェーズ(install・凍結triage)の間も run-lease を保つ。RunOrchestrator の lease は
         // シナリオ実行中しか書かれず、その手前に start-device が割り込む穴が空くため
         let supplyLease = (try? RepoRoot.find())
@@ -511,40 +548,6 @@ struct ApiRunCommand: AsyncParsableCommand {
             }
         } else {
             androidWorkersTask = nil
-        }
-
-        // run 進捗の記帳(DS-18.1)。**ビルドより前に1本書く** —— 実測でシナリオの
-        // swift build から供給の記帳が出るまで ~15秒あり、書かないとその間ボードに1本も出ない。
-        // 総本数・レーンはまだ未確定(total: 0・lanes: [])。
-        // `runWithProfileParallel` が同じ pid ファイルを上書きする。
-        // 条件は androidWorkersTask/iosWorkersTask を起こす条件(上)と同じ = runWithProfileParallel
-        // が実際に呼ばれる経路だけに書く。**後始末**: そこへ到達できずに関数を抜けたら控えを消す
-        let progressPid = ProcessInfo.processInfo.processIdentifier
-        var progressHandedToRunWithProfileParallel = false
-        // 書き直しても**入口の時刻のまま**(経過が巻き戻らない)
-        let progressStartedAt = ISO8601DateFormatter().string(from: Date())
-        let entryProgress = PreparingProgressWriter(
-            pid: progressPid, runID: nil, runGroup: nil, issuer: LocalConfig.resolveIssuerId(),
-            project: testProject.name, profile: resolvedProfile?.runName, startedAt: progressStartedAt,
-            supply: supplyProgress)
-        /// **段階は実際にやっていることだけを言う**(ユーザー決定)—— 入口ではまだ
-        /// ビルドしていない(`--skip-build` = 機械分担のローカル子なら最後までしない)ので
-        /// "preparing" で始め、"building" は `ScenarioHost.build` を挟む間だけ立てて直後に戻す。
-        func writeProgress(phase: String) {
-            guard resolvedProfile != nil, !dryRun, debugOptions == nil else { return }
-            entryProgress.write(phase: phase)
-        }
-        if resolvedProfile != nil, !dryRun, debugOptions == nil {
-            RunProgressLedger.sweep(directory: RunProgressLedger.directory(), startTime: ProcessLiveness.startTime)
-            entryProgress.attach()
-            writeProgress(phase: "preparing")
-        }
-        defer {
-            if resolvedProfile != nil, !dryRun, debugOptions == nil,
-               !progressHandedToRunWithProfileParallel {
-                entryProgress.close()
-                RunProgressLedger.remove(pid: progressPid, directory: RunProgressLedger.directory())
-            }
         }
 
         // **ビルドの前にも中断を見る**(供給タスクが既に走っている可能性があるのでキャンセルする)

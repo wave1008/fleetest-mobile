@@ -175,7 +175,8 @@ extension ProfileRunner {
             ? ProfileWorkerFactory.captureAnimationRestore(resolved: resolved) : []
         // サービス(scripts/compose.yaml)は開始スクリプトの前に上げ、片付けは終了スクリプトの後
         let servicesSession = try ServicesSession.up(
-            resolved: resolved, stateDir: hookStateDir, options: .forRun(resolved), interruptState: interruptState) { ConsoleOut.out($0) }
+            resolved: resolved, stateDir: hookStateDir, options: .forRun(resolved), supplyProgress: supplyProgress,
+            interruptState: interruptState) { ConsoleOut.out($0) }
         cleanup.servicesSession = servicesSession
         do {
             cleanup.hookSession = try RunHookRunner.begin(

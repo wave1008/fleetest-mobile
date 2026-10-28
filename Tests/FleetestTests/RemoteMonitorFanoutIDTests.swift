@@ -164,7 +164,7 @@ final class RemoteMonitorFanoutIDTests: XCTestCase {
                                          interval: 2, maxWidth: 960,
                                          log: { _ in }, relayLine: { line in relayed.mutate { $0.append(line) } })
         fanout.ingest(
-            line: #"{"kind":"monitorRuns","observed":true,"runs":[{"pid":41233,"runID":"r1","runGroup":null,"issuer":"alice","mine":false,"project":"ec-mobile","profile":"ios-smoke","phase":"running","elapsedSeconds":10,"total":5,"done":1,"failed":0,"actions":0,"requeued":0,"laneDropouts":0,"etaSeconds":null,"lanes":[],"supply":[]}]}"#,
+            line: #"{"kind":"monitorRuns","observed":true,"runs":[{"pid":41233,"runID":"r1","runGroup":null,"issuer":"alice","mine":false,"project":"ec-mobile","profile":"ios-smoke","phase":"running","elapsedSeconds":10,"total":5,"done":1,"failed":0,"actions":0,"requeued":0,"laneDropouts":0,"etaSeconds":null,"lanes":[],"supply":[]}],"services":[{"project":"ec-mobile","profile":"ios-smoke","holder":"owner","pid":51200,"phase":"running","orphan":false}]}"#,
             machine: "M1Ultra")
         let lines = relayed.value
         guard let line = lines.first, lines.count == 1 else {
@@ -172,6 +172,7 @@ final class RemoteMonitorFanoutIDTests: XCTestCase {
         }
         XCTAssertTrue(line.contains(#""machine":"M1Ultra""#), line)
         XCTAssertTrue(line.contains(#""runID":"r1""#), line)
+        XCTAssertTrue(line.contains(#""holder":"owner""#), "サーバーの控え(DS-18.10)も中継で落とさない: \(line)")
     }
 
     /// 子が落ちたら run 進捗も「もう観測できていない」を1行流す(monitorLock と同じ規律。
@@ -189,6 +190,7 @@ final class RemoteMonitorFanoutIDTests: XCTestCase {
         XCTAssertTrue(line.contains(#""observed":false"#), line)
         XCTAssertTrue(line.contains(#""machine":"M1Ultra""#), line)
         XCTAssertTrue(line.contains(#""runs":[]"#), line)
+        XCTAssertTrue(line.contains(#""services":[]"#), line)
     }
 
     /// **この拡張はランナー機のブリッジを起動し直せない**ので、子(--device-machine 付き)の

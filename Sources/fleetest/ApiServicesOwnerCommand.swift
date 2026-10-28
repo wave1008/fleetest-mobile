@@ -54,7 +54,8 @@ struct ApiServicesOwnerCommand: AsyncParsableCommand {
                 { ServicesOwnerLaunch.claimLog(attempt: URL(fileURLWithPath: path), stable: stableLog, log: log) }
             }
             guard let started = try ServicesSession.up(resolved: target.resolved, stateDir: target.stateDir, options: options,
-                                                       interruptState: interruptState, onClaimed: onClaimed, log: log) else {
+                                                       supplyProgress: nil, interruptState: interruptState,
+                                                       onClaimed: onClaimed, log: log) else {
                 ConsoleOut.err("✗ services: scripts/compose.yaml is absent or declares nothing in \(target.workspace.root.path)")
                 throw ExitCode.failure
             }
