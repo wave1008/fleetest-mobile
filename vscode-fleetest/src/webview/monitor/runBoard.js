@@ -18,7 +18,7 @@ import {
 import { compareMachineOrder } from '../../monitorDeviceModel';
 import { setHoverTip } from './hoverTip.js';
 import {
-  deviceIdForLane, selectOnlyDevices, devicesOnMachine,
+  deviceIdForLane, selectOnlyDevices, devicesOnMachine, setRunningDevices,
   isPlatformVisible, onPlatformFilterChanged,
 } from './deviceTiles.js';
 import { reapplyPaneHeights } from './splitter.js';
@@ -791,6 +791,17 @@ function updateRow(row, run) {
 function render() {
   const groups = buildRunGroups(runsByMachine);
   renderHeader(groups);
+  // グリッドビューの点灯マーク: いまシナリオを走らせているレーン(scenario あり = 待機中は含まない)のデバイス
+  const running = new Set();
+  for (const group of groups) {
+    for (const run of group.runs) {
+      for (const lane of run.lanes) {
+        const id = lane.scenario ? deviceIdForLane(run.machine, lane.key) : undefined;
+        if (id !== undefined) { running.add(id); }
+      }
+    }
+  }
+  setRunningDevices(running);
   const idleByMachine = new Map(
     machinesWithoutRuns(runsByMachine, machineList(), groups).map((e) => [e.machine, e]),
   );
@@ -853,7 +864,7 @@ function render() {
 const SVG_NS = 'http://www.w3.org/2000/svg';
 // バーは幅固定(40段 × 7px。段 5px + 隙間 2px)。見出しの幅に引き伸ばさない(ユーザー決定)
 const METER_W = 280;
-const METER_H = 14;
+const METER_H = 11;
 const TREND_W = 60;
 const TREND_H = 18;
 const tachometer = new ActionTachometer();

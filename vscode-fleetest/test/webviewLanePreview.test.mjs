@@ -553,3 +553,31 @@ test("devices サイクルで中身が変わらなければ、拡大表示のタ
   assert.notEqual(after, placeholder);
   assert.equal(after.textContent, document.querySelector("#grid .tile .frame-placeholder").textContent);
 });
+
+test("グリッドビューの左上の点灯マークは、シナリオを実行中のデバイスだけ点く(ラインビューには出さない)", (t) => {
+  const { window, document } = createWebview();
+  t.after(() => window.close());
+  sendDevices(window, [{}, {}]);
+  clickTile(document, 0);
+  const lamp = () => visiblePreviews(document)[0].querySelector(".run-lamp");
+  assert.ok(lamp(), "グリッドビューにはマークの要素がある");
+  assert.equal(lamp().dataset.on, "0", "run が無い間は消えている");
+  assert.equal(document.querySelector("#grid .tile .run-lamp"), null, "ラインビューのタイルには出さない");
+  const runs = (lanes) => ({
+    type: "monitorRuns", observed: true,
+    runs: [{
+      pid: 1, runID: "r", mine: true, phase: "running", requeued: 0, laneDropouts: 0, actions: 0, supply: [],
+      project: "p", elapsedSeconds: 1, total: 2, done: 0, failed: 0, lanes,
+    }],
+  });
+  window.dispatchEvent(new window.MessageEvent("message", {
+    data: runs([{ key: "UDID-0", name: "Dev 0", platform: "ios", scenario: "S1", scenarioElapsedSeconds: 1 }]),
+  }));
+  assert.equal(lamp().dataset.on, "1", "シナリオを実行中なら点く");
+  window.dispatchEvent(new window.MessageEvent("message", {
+    data: runs([{ key: "UDID-0", name: "Dev 0", platform: "ios" }]),
+  }));
+  assert.equal(lamp().dataset.on, "0", "待機中(scenario なし)は消える");
+  window.dispatchEvent(new window.MessageEvent("message", { data: { type: "monitorRuns", observed: true, runs: [] } }));
+  assert.equal(lamp().dataset.on, "0", "run が終われば消える");
+});

@@ -1637,6 +1637,34 @@ html.select-all-guard * {
    —— 手元のデバイスには見えないダミーのバッジが入る(deviceTiles.js renderMirrorHeader)。
    中身はタイルのヘッダの複製なので、見た目はラインビューのタイルと同じ CSS(.tile-name/.badge)が
    そのまま効く。タイル側の固定高・幅(タイル幅を膨らませないための width:0)だけ打ち消す。 */
+/* グリッドビューの点灯マーク(シナリオを実行中のデバイスだけ。deviceTiles.js の renderMirrorLamp)。
+   左上・マシン名の段(高さ 16px)の縦中央に左寄せ。絶対配置なので中央寄せの段の並びを動かさない */
+.lane-preview { position: relative; }
+.run-lamp {
+  --run-lamp: #1f9d55;
+  position: absolute;
+  left: 6px;
+  top: 8px; /* .lane-preview の padding 4px + (段の高さ 16px − 8px) / 2 */
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--run-lamp);
+  /* 点灯・消灯はフェード(ユーザー決定)。消えている間も要素は置いたまま(絶対配置なので並びは動かない)。
+     消えている間はマウスを拾わない(説明が出ない) */
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.8s ease;
+}
+.run-lamp[data-on="1"] { opacity: 1; pointer-events: auto; }
+@media (prefers-reduced-motion: reduce) {
+  .run-lamp { transition: none; }
+}
+body.vscode-dark .run-lamp {
+  --run-lamp: #39e27d;
+  box-shadow: 0 0 4px var(--run-lamp), 0 0 8px color-mix(in srgb, var(--run-lamp) 50%, transparent);
+}
+body.vscode-high-contrast .run-lamp,
+body.vscode-high-contrast-light .run-lamp { --run-lamp: var(--vscode-foreground); }
 .lane-preview-header {
   flex: 0 0 auto;
   display: flex;

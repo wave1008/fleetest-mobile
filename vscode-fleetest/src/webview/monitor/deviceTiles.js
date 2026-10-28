@@ -167,6 +167,9 @@ function refreshSelectAllState() {
 // h264 はタイルの canvas を drawImage でコピーする(デコードは1回だけ。2重デコードはしない)。
 // device id -> { wrapEl, imgEl, canvasEl }
 const deviceMirrors = new Map();
+// シナリオを実行中のデバイス(run ボードのレーンのうち scenario を持つもの。runBoard.js が setRunningDevices で配る)。
+// グリッドビューの左上の点灯マークだけが読む(ラインビューには出さない。ユーザー決定)
+let runningDeviceIds = new Set();
 
 // 画像高さの絶対下限(px)。セパレーターを手で最小まで詰めたときに 0 や負にならないための床。
 // **タイルの幅もここで決まる**(幅 = この高さ × アスペクト比)。60 では中身が判別できない
@@ -580,6 +583,7 @@ function renderMirror(entry) {
   if (!mirror) {
     return;
   }
+  renderMirrorLamp(entry, mirror);
   renderMirrorHeader(entry, mirror);
   if (entry.frameWrapEl.contains(entry.placeholderEl)) {
     // 中身が前回の複製と同じなら貼り直さない(devices サイクル・フレームのたびに呼ばれる。貼り直すと
@@ -619,6 +623,31 @@ function renderMirror(entry) {
 // ホスト名の段(タイルと同じく名前の下)は**常に置く**。リモートのデバイスにだけ段を足すと、
 // そのデバイスだけ絵の上端が下がって手元と高さが揃わない(ユーザー指摘)。
 // 手元のデバイスには**見えないダミーのバッジ**を入れて高さだけ合わせる(中身が空の段は高さ 0)。
+function renderMirrorLamp(entry, mirror) {
+  const on = runningDeviceIds.has(entry.device.id) ? '1' : '0';
+  if (mirror.lampEl.dataset.on === on) {
+    return;
+  }
+  mirror.lampEl.dataset.on = on;
+  setHoverTip(mirror.lampEl, on === '1' ? t('wvMonitor.tile.running') : '');
+}
+
+/** シナリオを実行中のデバイスの集合を受け取り、変わったデバイスだけ点灯マークを描き直す(runBoard.js の render から) */
+export function setRunningDevices(ids) {
+  const previous = runningDeviceIds;
+  runningDeviceIds = ids;
+  for (const id of new Set([...previous, ...ids])) {
+    if (previous.has(id) === ids.has(id)) {
+      continue;
+    }
+    const entry = tiles.get(id);
+    const mirror = deviceMirrors.get(id);
+    if (entry && mirror) {
+      renderMirrorLamp(entry, mirror);
+    }
+  }
+}
+
 function renderMirrorHeader(entry, mirror) {
   // devices サイクル・フレームのたびに呼ばれる。**複製元が前回と同じなら作り直さない**(マウスを載せている
   // バッジのツールチップが点滅する)
@@ -723,9 +752,13 @@ export function attachDeviceMirror(deviceId, wrapEl) {
     headerEl.className = 'lane-preview-header';
     const frameEl = document.createElement('div');
     frameEl.className = 'lane-preview-frame';
+    // 点灯マーク(左上・マシン名の段の左端。絶対配置なので中央寄せの段の並びを動かさない)
+    const lampEl = document.createElement('span');
+    lampEl.className = 'run-lamp';
+    lampEl.dataset.on = '0';
     wrapEl.textContent = '';
-    wrapEl.append(headerEl, frameEl);
-    mirror = { wrapEl, headerEl, frameEl, imgEl, canvasEl };
+    wrapEl.append(headerEl, frameEl, lampEl);
+    mirror = { wrapEl, headerEl, frameEl, imgEl, canvasEl, lampEl };
     deviceMirrors.set(deviceId, mirror);
   }
   renderMirror(entry);
