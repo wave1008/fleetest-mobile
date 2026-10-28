@@ -398,6 +398,7 @@ function updateIdleRow(row, entry) {
   row.rowEl.classList.remove('run-board-row-hasFailed');
   showMachineBadge(row, machineKey(entry.machine));
   row.scopeEl.textContent = '';
+  row.runningDevicesEl.style.display = 'none';
   row.progressEl.style.display = 'none';
   row.countsEl.textContent = '';
   // 空でも箱を残すと列の gap と margin-right ぶん「空き」が右へずれる(ユーザー指摘)ので畳む
@@ -534,6 +535,10 @@ function ensureRow(key) {
 
   const scopeEl = document.createElement('span');
   scopeEl.className = 'run-board-scope';
+  // シナリオを実行中のデバイスの数「(3)」(ユーザー決定)。名前(scope)のすぐ右に左寄せで付く(scope は伸ばさない)
+  const runningDevicesEl = document.createElement('span');
+  runningDevicesEl.className = 'run-board-running-devices';
+  runningDevicesEl.style.display = 'none';
 
   const progressEl = document.createElement('span');
   progressEl.className = 'run-board-progress';
@@ -564,7 +569,7 @@ function ensureRow(key) {
   // ので、境目(--rb-left)が行の種類によらず1本に見える
   const leftEl = document.createElement('span');
   leftEl.className = 'run-board-col-left';
-  leftEl.append(chevronEl, machineCellEl, scopeEl);
+  leftEl.append(chevronEl, machineCellEl, scopeEl, runningDevicesEl);
   const rightEl = document.createElement('span');
   rightEl.className = 'run-board-col-right';
   rightEl.append(progressEl, countsEl, statusEl, notesEl, timeEl);
@@ -596,7 +601,7 @@ function ensureRow(key) {
   });
 
   const row = {
-    rowEl, chevronEl, machineBadgeEl, scopeEl, progressEl, progressBarEl, countsEl, statusEl, notesEl,
+    rowEl, chevronEl, machineBadgeEl, scopeEl, runningDevicesEl, progressEl, progressBarEl, countsEl, statusEl, notesEl,
     timeEl, elapsedEl, remainingEl, issuerEl, lanesEl,
     key, run: null, idle: null, laneRows: new Map(),
   };
@@ -732,6 +737,17 @@ function updateRow(row, run) {
 
   // profile はプロファイル無し実行(--dry-run 等)では省略されうる(FTCore.RunProgressRecord.profile)。
   row.scopeEl.textContent = run.profile ? `${run.project} / ${run.profile}` : run.project;
+  // 実行中のデバイス数 = レーンのうち scenario を持つもの(待機中は含まない。グリッドビューの点灯マークと同じ基準)。
+  // 走り出す前(レーンがまだ無い)は出さない
+  if (run.phase === 'running') {
+    const runningDevices = run.lanes.filter((lane) => lane.scenario).length;
+    const text = `(${runningDevices})`;
+    if (row.runningDevicesEl.textContent !== text) { row.runningDevicesEl.textContent = text; }
+    row.runningDevicesEl.style.display = '';
+    setHoverTip(row.runningDevicesEl, t('runBoard.runningDevicesTip'));
+  } else {
+    row.runningDevicesEl.style.display = 'none';
+  }
 
   // **走り出す前(ビルド中・供給中・Vision のコンパイル待ち)は進捗を出さない** —— 本数も割合もまだ意味を持たない
   // (DS-18.5)。経過だけは出す(どれくらい待っているかが分かる)

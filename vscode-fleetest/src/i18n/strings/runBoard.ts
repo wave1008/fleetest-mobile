@@ -9,6 +9,7 @@ export const runBoardStrings = {
   // ツールチップと aria-label が共有。**ON/OFF で入れ替えない**(ユーザー決定)——
   // このボタンは「いま開く」ではなく「開いた状態を保つ」モードのスイッチ
   "runBoard.expandAll": { ja: "全て展開を維持", en: "Keep all expanded" },
+  "runBoard.runningDevicesTip": { ja: "シナリオを実行中のデバイスの数", en: "Devices running a scenario" },
   "runBoard.toggleTachometer": { ja: "タコメーターを表示", en: "Show the tachometer" },
   "runBoard.collapse": { ja: "run ボードを閉じる", en: "Collapse run board" },
   "runBoard.expand": { ja: "run ボードを開く", en: "Expand run board" },

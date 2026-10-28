@@ -819,8 +819,16 @@ body.vscode-dark .tacho-trend-dot { filter: drop-shadow(0 0 2px var(--tacho-line
   display: flex;
   align-items: center;
 }
+.run-board-running-devices {
+  flex: 0 0 auto;
+  margin-left: 8px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--vscode-descriptionForeground);
+}
 .run-board-scope {
-  flex: 1 1 auto;
+  /* 伸ばさない(縮むだけ)= 右の「(N)」が名前のすぐ右に付く(左寄せ。ユーザー決定) */
+  flex: 0 1 auto;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

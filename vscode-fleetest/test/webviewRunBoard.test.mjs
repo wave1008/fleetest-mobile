@@ -833,7 +833,7 @@ test("ステータスは右カラム・名前は左カラムに入る", (t) => {
   sendLocalDevice(window);
   post(window, monitorRunsMessage());
   const summary = runRows(document)[0].querySelector(".run-board-row-summary");
-  assert.match(colText(summary, "left"), /^▶local ?ec-mobile \/ ios-smoke$/, "左 = 機械と run の範囲");
+  assert.match(colText(summary, "left"), /^▶local ?ec-mobile \/ ios-smoke ?\(1\)$/, "左 = 機械と run の範囲と実行中のデバイス数");
   assert.match(colText(summary, "right"), /7\/12/, "右 = 進捗");
   assert.match(colText(summary, "right"), /4:21/, "右 = 経過");
   const lane = document.querySelector(".run-board-lane");
@@ -1087,4 +1087,19 @@ test("タコメーターは見出し行のボタンで隠せる(run 実行中で
   assert.equal(tacho.style.display, "", "拡張から ON が届けば出す");
   assert.ok(!tacho.classList.contains("tacho-hidden"));
   assert.ok(toggle.getAttribute("data-hover-tip"), "名前は tooltip が持つ");
+});
+
+test("run の行は実行中のデバイスの数を (N) で出す(待機中のレーンは数えない・走り出す前と空きの行は出さない)", (t) => {
+  const { window, document } = createWebview();
+  t.after(() => window.close());
+  const cell = () => document.querySelector(".run-board-running-devices:not([style*='display: none'])");
+  const lane = (key, scenario) => ({ key, name: key, platform: "ios", ...(scenario ? { scenario, scenarioElapsedSeconds: 1 } : {}) });
+  post(window, monitorRunsMessage({ runs: [{ ...monitorRunsMessage().runs[0],
+    lanes: [lane("U1", "S1"), lane("U2", "S2"), lane("U3", "S3"), lane("U4")] }] }));
+  assert.equal(cell()?.textContent, "(3)", "scenario を持つレーンだけ数える");
+  assert.ok(cell().getAttribute("data-hover-tip"), "説明がある");
+  post(window, monitorRunsMessage({ runs: [{ ...monitorRunsMessage().runs[0], phase: "preparing", lanes: [] }] }));
+  assert.equal(cell(), null, "走り出す前は出さない");
+  post(window, monitorRunsMessage({ runs: [] }));
+  assert.equal(cell(), null, "空きの行には出さない");
 });
