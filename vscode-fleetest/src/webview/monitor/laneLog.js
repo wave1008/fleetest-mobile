@@ -149,6 +149,8 @@ function ensureLane(id, name, platform, updateLabel, machine) {
   // deviceTiles.js が入れる)。
   const preview = document.createElement('div');
   preview.className = 'lane-preview';
+  // グリッドビューの範囲選択(gridMarquee.js)がどのデバイスの拡大表示かを引く
+  preview.dataset.deviceId = id;
   preview.style.display = 'none';
   // グリッドビューのダブルクリック: そのデバイスだけの選択にする。
   // 「このデバイスのみ選択」の直後にもう一度押すと、その前の選択へ戻す(deviceTiles.js)

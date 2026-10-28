@@ -35,6 +35,7 @@ import {
 } from './deviceTiles.js';
 import { applyShowStreamDuringRun } from './streamToggle.js';
 import { applyLaneAction, applyLaneHydrate, updateLaneVisibility } from './laneLog.js';
+import './gridMarquee.js';
 import { applyProjectInfo } from './projectsTab.js';
 import { applyHostMetrics, setHostMetricMachines, setMachineLock, setShowMachineCapacity } from './hostCharts.js';
 import {

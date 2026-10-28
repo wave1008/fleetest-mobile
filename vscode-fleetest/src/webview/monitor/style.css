@@ -1220,6 +1220,17 @@ select:disabled { opacity: 0.5; cursor: default; }
   border-radius: 2px;
   background-color: color-mix(in srgb, var(--vscode-focusBorder, #007acc) 18%, transparent);
 }
+/* グリッドビューの範囲選択(gridMarquee.js)。矩形は viewport 基準で引く・囲んだデバイスに印・ドラッグ中は文字を選ばない */
+.tile-marquee.grid-marquee {
+  position: fixed;
+}
+#preview-grid .lane-preview.marquee-hit {
+  outline: 2px solid var(--vscode-focusBorder, #007acc);
+  outline-offset: -2px;
+}
+#preview-grid.marquee-dragging {
+  user-select: none;
+}
 /* ドラッグ中はタイルの文字が選択されないようにする(pointerdown の preventDefault は
    click まで消してしまうので使えない)。 */
 .grid.marquee-dragging {

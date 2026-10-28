@@ -525,3 +525,61 @@ test("空きエリアの押下→離上で全解除できる", (t) => {
   grid.dispatchEvent(pointerEvent(window, "pointerup", { x: 500, y: 250 }));
   assert.deepEqual(selectedNames(document), []);
 });
+
+// ---- グリッドビュー(「選択したデバイス」)の範囲選択(gridMarquee.js) ----
+
+/** 見えている拡大表示を横に並べる: 幅 190・間隔 10・y 400〜550 */
+function layoutPreviews(document) {
+  [...document.querySelectorAll("#preview-grid .lane-preview")]
+    .filter((el) => el.style.display !== "none")
+    .forEach((el, i) => {
+      const left = i * 200;
+      el.getBoundingClientRect = () => ({
+        left, top: 400, width: 190, height: 150, right: left + 190, bottom: 550, x: left, y: 400,
+      });
+    });
+}
+
+function dragOnPreviewGrid(window, document, x0, y0, x1, y1) {
+  const previewGrid = document.getElementById("preview-grid");
+  previewGrid.dispatchEvent(pointerEvent(window, "pointerdown", { x: x0, y: y0 }));
+  window.dispatchEvent(pointerEvent(window, "pointermove", { x: x1, y: y1 }));
+  window.dispatchEvent(pointerEvent(window, "pointerup", { x: x1, y: y1 }));
+}
+
+test("グリッドビューを左ドラッグすると、囲んだデバイスだけの選択に絞る", (t) => {
+  const { window, document } = createWebview();
+  t.after(() => window.close());
+  sendDevices(window, 3);
+  layoutTiles(document, 3);
+  drag(window, document, 0, 50, 330, 150); // ラインビューで3台とも選ぶ
+  assert.deepEqual(selectedNames(document), ["Dev 0", "Dev 1", "Dev 2"]);
+  layoutPreviews(document);
+  dragOnPreviewGrid(window, document, 5, 405, 300, 500); // 1台目と2台目に掛かる
+  assert.deepEqual(selectedNames(document), ["Dev 0", "Dev 1"], "囲んだ2台だけになる");
+  assert.equal(document.querySelectorAll("#preview-grid .marquee-hit").length, 0, "離したら印は消える");
+});
+
+test("グリッドビューで何も囲まなかったドラッグは選択を変えない", (t) => {
+  const { window, document } = createWebview();
+  t.after(() => window.close());
+  sendDevices(window, 3);
+  layoutTiles(document, 3);
+  drag(window, document, 0, 50, 330, 150);
+  layoutPreviews(document);
+  dragOnPreviewGrid(window, document, 5, 600, 300, 700); // 拡大表示の下の空き
+  assert.deepEqual(selectedNames(document), ["Dev 0", "Dev 1", "Dev 2"]);
+});
+
+test("1台だけの表示では、グリッドビューのドラッグを範囲選択にしない(画面の上はスワイプ)", (t) => {
+  const { window, document } = createWebview();
+  t.after(() => window.close());
+  sendDevices(window, 3);
+  layoutTiles(document, 3);
+  clickImage(window, document, 1);
+  assert.deepEqual(selectedNames(document), ["Dev 1"]);
+  assert.ok(document.getElementById("preview-grid").classList.contains("single-device"));
+  layoutPreviews(document);
+  dragOnPreviewGrid(window, document, 5, 405, 300, 500);
+  assert.deepEqual(selectedNames(document), ["Dev 1"], "変わらない");
+});

@@ -93,7 +93,8 @@ polling (screenshots at a fixed interval); the choice is remembered per workspac
   nothing selected both views say "Select a device" (provisioning progress during a run still appears
   in the Run Log View). The Run Log View shows logs not only of runs started from VS Code but also of runs started
   from the terminal (CLI), by other people, and on runner machines. The view keeps the latest 500 lines per device;
-  the full record stays in the event logs under `results/runs/`. In the Line View tiles and the Grid View, a device that is running a scenario shows a **lamp** (the tachometer's blue on iOS, green on Android) at its
+  the full record stays in the event logs under `results/runs/`. With two or more devices shown in the Grid View,
+  left-dragging a rectangle over them narrows the selection to the devices it covers. In the Line View tiles and the Grid View, a device that is running a scenario shows a **lamp** (the tachometer's blue on iOS, green on Android) at its
   top left (left of the machine name). With exactly one device selected, a column to the right of the enlarged screen stacks **Back**, **Home**, **App Switcher**, **Zoom in** and **Zoom out** buttons, so you
   can operate that device in place (**Back** leaves the single-device view: it restores the selection you had before
   "Select only this device", or clears the selection if there was none). On the screen, **click taps**, **Command(⌘)+click double-taps**,
