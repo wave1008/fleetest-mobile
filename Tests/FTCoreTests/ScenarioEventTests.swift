@@ -132,4 +132,12 @@ final class ScenarioEventTests: XCTestCase {
         let healed = try XCTUnwrap(StepResult.Status.healed(locator).eventStatus.detail)
         XCTAssertTrue(healed.contains(locator.summary), healed)
     }
+    /// actions は載せたときだけ NDJSON に出る(0 は nil = キーごと省略)。往復で値が保たれる
+    func testActionsIsOmittedWhenNilAndRoundTrips() throws {
+        let plain = ScenarioEvent(kind: "step")
+        XCTAssertFalse(plain.encodedLine().contains("\"actions\""))
+        var counted = ScenarioEvent(kind: "step")
+        counted.actions = 4
+        XCTAssertEqual(ScenarioEvent.decode(line: counted.encodedLine())?.actions, 4)
+    }
 }

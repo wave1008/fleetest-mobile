@@ -20,6 +20,8 @@ actor RunProgressState {
     private var total: Int
     private var done = 0
     private var failed = 0
+    /// デバイスへ送った操作の回数の累計(増えるだけ。再キューで捨てた実行のぶんも実際に送ったので減らさない)
+    private var actions = 0
     /// **詰まりの事実だけ**(DS-18.1 段6)。判定・閾値は作らない —— laneIdled/laneLeft
     /// が成立した回数をそのまま数えるだけ
     private var requeuedCount = 0
@@ -66,11 +68,18 @@ actor RunProgressState {
         flush()
     }
 
+    /// 子の step / scenarioFinished が運んだ操作回数の増分を足す。0 以下は無視(書き込みも起こさない)
+    func addActions(_ count: Int) {
+        guard count > 0 else { return }
+        actions += count
+        flush()
+    }
+
     private func flush() {
         guard !finished else { return }
         let record = RunProgressRecord(
             pid: pid, runID: runID, runGroup: runGroup, issuer: issuer, project: project,
-            profile: profile, startedAt: startedAt, total: total, done: done, failed: failed,
+            profile: profile, startedAt: startedAt, total: total, done: done, failed: failed, actions: actions,
             requeued: requeuedCount, laneDropouts: laneDropoutsCount,
             // コンパイル待ち・動画の切り出しの間は残りを出さない(読み手は受信時点の値から秒読みするので、出すと待ちの間に減っていく)
             etaSeconds: ocrCompileWaiters > 0 || videoClips != nil ? nil : currentEtaSeconds(),

@@ -28,7 +28,7 @@ final class RunProgressLedgerTests: XCTestCase {
         RunProgressRecord(
             pid: pid, runID: "run-\(pid)", runGroup: nil, issuer: "alice@air",
             project: "ec-mobile", profile: "ios-smoke", startedAt: "2026-09-20T10:03:12Z",
-            total: 12, done: done, failed: failed, requeued: 0, laneDropouts: 0, etaSeconds: nil,
+            total: 12, done: done, failed: failed, actions: 0, requeued: 0, laneDropouts: 0, etaSeconds: nil,
             lanes: [RunProgressLane(key: "UDID-A", name: "iPhone 17-01", platform: "ios",
                                     scenario: "05_検索", scenarioStartedAt: "2026-09-20T10:04:00Z",
                                     expectedSeconds: nil)],

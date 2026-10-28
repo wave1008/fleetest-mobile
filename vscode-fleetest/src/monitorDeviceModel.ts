@@ -180,6 +180,9 @@ export interface MonitorRunEntry {
   readonly requeued: number;
   /** レーンが離脱した累計。 */
   readonly laneDropouts: number;
+  /** その run がそれまでにデバイスへ送った操作の累計(増えるだけ。run を実行している機械で数えた値。
+   * ProtocolVersion 60。FTCore.RunProgressRecord.actions と対)。 */
+  readonly actions: number;
   /** `RunRecorder` が無い経路(--dry-run/--debug 等)では省略されうる。 */
   readonly runID?: string;
   /** 共有すると機械分担の run として1行に束ねる(runBoardModel.ts)。無ければ単機 run =
@@ -458,6 +461,7 @@ function isMonitorRunEntry(value: unknown): value is MonitorRunEntry {
     value.supply.every(isMonitorRunSupply) &&
     typeof value.requeued === "number" &&
     typeof value.laneDropouts === "number" &&
+    typeof value.actions === "number" &&
     Array.isArray(value.lanes) &&
     value.lanes.every(isMonitorRunLane) &&
     (value.videoClips === undefined ||

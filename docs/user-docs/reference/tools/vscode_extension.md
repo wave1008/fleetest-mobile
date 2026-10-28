@@ -75,6 +75,13 @@ polling (screenshots at a fixed interval); the choice is remembered per workspac
   When the run records video, the time left is replaced by "Encoding videos 12/48" (clips done / all clips)
   while the clips are cut after the last scenario.
   Expanding a row lists that machine's devices; clicking a row selects them in the Line View.
+- The **tachometer** to the right of "Running N" in the run board header shows how many operations the
+  runs on this Mac and the runner machines **sent to devices in the last 60 seconds** (actions/min). Tapping
+  once a second and nothing else reads 60. Only operations sent to a device count — taps, typing, swipes
+  (each swipe of a scroll that searches for an element counts) and the like; screen checks and waits do not,
+  and neither do operations you perform by hand from the monitor. The LED bar on the right shows the rate over **the last 3 seconds** per second, one segment per action/s (it rises and falls smoothly like a car tachometer, and moves more than the number does). The line on the left is the last 5 minutes.
+  Hover over it for a per-machine breakdown. Actions from before the monitor opened are not counted, so the
+  value reads low for the first minute after opening it.
 - The Device Monitor tab is split into three views, top to bottom: the **Line View** (the row of
   device tiles), the **Grid View** (enlarged screens of the selected devices), and the **Run Log View**
   (the run log of the selected devices). Drag a divider to resize, click a view's header to collapse or

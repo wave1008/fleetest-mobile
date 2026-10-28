@@ -34,6 +34,23 @@ final class RunProgressStateTests: XCTestCase {
                          write: { journal.recordWrite($0) }, remove: { journal.recordRemove() })
     }
 
+    /// 子が運んだ操作回数は累計で台帳に載る。0 以下は無視(書き込みも起こさない)
+    func testAddActionsAccumulatesIntoTheRecord() async {
+        let journal = Journal()
+        let state = makeState(journal)
+        await state.laneJoined(key: "UDID-A", name: "iPhone 17-01", platform: "ios")
+        XCTAssertEqual(journal.writes.last?.actions, 0)
+        let writesBefore = journal.writes.count
+        await state.addActions(0)
+        await state.addActions(-3)
+        XCTAssertEqual(journal.writes.count, writesBefore, "0 以下は書かない")
+        await state.addActions(5)
+        await state.addActions(2)
+        XCTAssertEqual(journal.writes.last?.actions, 7)
+        await state.scenarioFinished(laneKey: "UDID-A", passed: true)
+        XCTAssertEqual(journal.writes.last?.actions, 7, "シナリオの終わりで減らない(累計)")
+    }
+
     /// compile-ocr の待ちの間は段階が "compiling" で残りを出さない(読み手は受信時点の残りから秒読みするので、
     /// 出すと何も動いていない間に減っていく)。待ちを抜けたら "running" と残りが戻る
     func testCompileWaitShowsCompilingWithoutEtaThenRunning() async {

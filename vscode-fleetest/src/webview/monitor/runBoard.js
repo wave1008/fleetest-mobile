@@ -8,7 +8,7 @@
 
 import { t } from '../i18n.js';
 import {
-  runBoard, runBoardHeader, runBoardToggle, runBoardTitle, runBoardExpandAll, runBoardRows, runBoardSplit,
+  runBoard, runBoardHeader, runBoardToggle, runBoardTitle, runBoardTachometer, runBoardExpandAll, runBoardRows, runBoardSplit,
 } from './domRefs.js';
 import { vscode, persistedState } from './vscodeApi.js';
 import {
@@ -31,6 +31,9 @@ import {
   liveRemaining,
   currentSupplyStep,
 } from '../../runBoardModel';
+import {
+  ACTIONS_PER_SECOND_PER_SEGMENT, ActionTachometer, easeToward, segmentLevel, METER_SEGMENTS, TREND_POINTS, segmentTier,
+} from '../../actionTachometerModel';
 
 let runsByMachine = new Map();
 // ヘッダの機械要約に出すリモート機の一覧(手元は含まない)。'hostMetricsMachines' に相乗りする
@@ -770,6 +773,150 @@ function render() {
   renderSplit();
 }
 
+// ---- アクション/分メーター(見出しの「実行中 N」の右。純粋ロジックは actionTachometerModel.ts) ----
+// 中身は最初に1回だけ作り、以後は属性と textContent だけ更新する(周期描画で要素を作り直さない規律。
+// マウスを載せている間にツールチップが消えて点滅するのを避ける)。
+const SVG_NS = 'http://www.w3.org/2000/svg';
+// バーは幅固定(40段 × 7px。段 5px + 隙間 2px)。見出しの幅に引き伸ばさない(ユーザー決定)
+const METER_W = 280;
+const METER_H = 18;
+const TREND_W = 60;
+const TREND_H = 18;
+const tachometer = new ActionTachometer();
+const tachoUi = {};
+
+function svgEl(name, attrs) {
+  const el = document.createElementNS(SVG_NS, name);
+  for (const [k, v] of Object.entries(attrs)) { el.setAttribute(k, String(v)); }
+  return el;
+}
+
+function buildTachometer() {
+  const meter = svgEl('svg', { class: 'tacho-meter', width: METER_W, height: METER_H,
+    viewBox: `0 0 ${METER_W} ${METER_H}`, 'aria-hidden': 'true' });
+  const pitch = METER_W / METER_SEGMENTS;
+  tachoUi.segs = [];
+  for (let i = 0; i < METER_SEGMENTS; i += 1) {
+    const seg = svgEl('rect', { class: 'tacho-seg', x: (i * pitch + 1).toFixed(2),
+      y: 0, width: (pitch - 2).toFixed(2), height: METER_H, rx: 1,
+      'data-tier': segmentTier(i), 'data-lit': '0' });
+    meter.appendChild(seg);
+    tachoUi.segs.push(seg);
+  }
+  const value = document.createElement('span');
+  value.className = 'tacho-value';
+  value.textContent = '0';
+  const unit = document.createElement('span');
+  unit.className = 'tacho-unit';
+  const trend = svgEl('svg', { class: 'tacho-trend', width: TREND_W, height: TREND_H,
+    viewBox: `0 0 ${TREND_W} ${TREND_H}`, 'aria-hidden': 'true' });
+  tachoUi.area = svgEl('path', { class: 'tacho-trend-area', d: '' });
+  tachoUi.line = svgEl('path', { class: 'tacho-trend-line', d: '', fill: 'none' });
+  tachoUi.dot = svgEl('circle', { class: 'tacho-trend-dot', r: 1.8, cx: TREND_W - 2, cy: TREND_H - 2 });
+  trend.append(tachoUi.area, tachoUi.line, tachoUi.dot);
+  runBoardTachometer.append(trend, value, unit, meter);
+  tachoUi.value = value;
+  tachoUi.unit = unit;
+}
+
+function setAttrIfChanged(el, name, value) {
+  if (el.getAttribute(name) !== value) { el.setAttribute(name, value); }
+}
+function setTextIfChanged(el, text) {
+  if (el.textContent !== text) { el.textContent = text; }
+}
+
+// バーは目標(直近 3 秒の 1 秒あたり)へ慣性で追いつく(easeToward)。元の更新は約 2 秒ごとなので、
+// そのまま写すと段々に跳ねる。動いている間だけ requestAnimationFrame を回し、追いついたら止める
+// (隠れたパネルでは rAF が止まる)。動きを減らす設定・rAF の無い環境では即座に写す
+const reduceMotion = typeof window.matchMedia === 'function'
+  && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+function drawMeter() {
+  tachoUi.segs.forEach((seg, i) => {
+    const level = segmentLevel(tachoUi.shown, i);
+    setAttrIfChanged(seg, 'data-lit', level > 0 ? '1' : '0');
+    // 途中の段だけ薄く点ける(満ちた段・消えた段は既定の不透明度)
+    const opacity = level > 0 && level < 1 ? level.toFixed(2) : '';
+    if (seg.style.fillOpacity !== opacity) { seg.style.fillOpacity = opacity; }
+  });
+}
+
+function stepMeter(ts) {
+  const dt = tachoUi.lastFrame === undefined ? 0 : ts - tachoUi.lastFrame;
+  tachoUi.lastFrame = ts;
+  tachoUi.shown = easeToward(tachoUi.shown, tachoUi.target, dt);
+  if (Math.abs(tachoUi.target - tachoUi.shown) < 0.01) { tachoUi.shown = tachoUi.target; }
+  drawMeter();
+  tachoUi.frame = tachoUi.shown === tachoUi.target ? undefined : requestAnimationFrame(stepMeter);
+  if (tachoUi.frame === undefined) { tachoUi.lastFrame = undefined; }
+}
+
+function setMeterTarget(perSecond) {
+  tachoUi.target = perSecond;
+  if (tachoUi.shown === undefined || reduceMotion || typeof requestAnimationFrame !== 'function') {
+    tachoUi.shown = perSecond;
+    drawMeter();
+    return;
+  }
+  if (tachoUi.frame === undefined && tachoUi.shown !== perSecond) {
+    tachoUi.frame = requestAnimationFrame(stepMeter);
+  }
+}
+
+function renderTachometer() {
+  if (!tachoUi.segs) { buildTachometer(); }
+  const now = Date.now();
+  const snap = tachometer.snapshot(now);
+  const value = Math.round(snap.value);
+  setMeterTarget(snap.meterPerSecond);
+  setTextIfChanged(tachoUi.value, String(value));
+  const unit = t('runBoard.tachometerUnit');
+  setTextIfChanged(tachoUi.unit, unit);
+
+  // 推移: x は点の並び、y は表示中の最大(最低 1目盛り)に対する比。null(観測前)は描かない
+  const pad = 2;
+  const pts = [];
+  const trendMax = Math.max(ACTIONS_PER_SECOND_PER_SEGMENT * 60, ...snap.trend.filter((v) => v !== null));
+  snap.trend.forEach((v, i) => {
+    if (v === null) { return; }
+    const x = (i * (TREND_W - pad * 2)) / (TREND_POINTS - 1) + pad;
+    const y = TREND_H - pad - Math.min(1, v / trendMax) * (TREND_H - pad * 2);
+    pts.push([x, y]);
+  });
+  if (pts.length > 0) {
+    const fmt = (p) => `${p[0].toFixed(1)} ${p[1].toFixed(1)}`;
+    const line = 'M' + pts.map(fmt).join(' L');
+    const first = pts[0];
+    const last = pts[pts.length - 1];
+    setAttrIfChanged(tachoUi.line, 'd', line);
+    setAttrIfChanged(tachoUi.area, 'd', `${line} L${last[0].toFixed(1)} ${TREND_H} L${first[0].toFixed(1)} ${TREND_H} Z`);
+    setAttrIfChanged(tachoUi.dot, 'cx', last[0].toFixed(1));
+    setAttrIfChanged(tachoUi.dot, 'cy', last[1].toFixed(1));
+  }
+
+  const label = (machine) => machineLabel(machine);
+  const lines = [t('runBoard.tachometerTipTotal', { value: String(value) })];
+  if (snap.byMachine.length > 1 || (snap.byMachine.length === 1 && snap.byMachine[0].machine !== LOCAL_MACHINE_KEY)) {
+    for (const m of snap.byMachine) {
+      lines.push(t('runBoard.tachometerTipMachine', { machine: label(m.machine), value: String(Math.round(m.value)) }));
+    }
+  }
+  if (snap.unobservedMachines.length > 0) {
+    lines.push(t('runBoard.tachometerTipUnobserved', { machines: snap.unobservedMachines.map(label).join(', ') }));
+  }
+  lines.push(t('runBoard.tachometerTipDefinition'));
+  lines.push(t('runBoard.tachometerTipMeter', { value: snap.meterPerSecond.toFixed(1) }));
+  lines.push(t('runBoard.tachometerTipScale'));
+  if (snap.observedSeconds < 60) {
+    lines.push(t('runBoard.tachometerTipWarmup', { seconds: String(snap.observedSeconds) }));
+  }
+  const tip = lines.join('\n');
+  if (runBoardTachometer.getAttribute('data-hover-tip') !== tip) { setHoverTip(runBoardTachometer, tip); }
+  setAttrIfChanged(runBoardTachometer, 'aria-label', t('runBoard.tachometerAria', { value: String(value) }));
+  setAttrIfChanged(runBoardTachometer, 'role', 'img');
+}
+
 /** main.js の 'monitorRuns' ケースから渡す(1件 = 1機械ぶん。契約は monitorDeviceModel.ts)。 */
 export function applyMonitorRuns(message) {
   runsByMachine = applyMonitorRunsEvent(runsByMachine, {
@@ -777,20 +924,27 @@ export function applyMonitorRuns(message) {
     observed: message.observed,
     runs: message.runs,
   });
+  tachometer.apply({ machine: message.machine, observed: message.observed, runs: message.runs }, Date.now());
   render();
+  renderTachometer();
 }
 
 /** monitor プロセスの(再)起動の合図。machineLocks と同じ寿命 —— 古い run の控えを畳む。 */
 export function resetRunBoard() {
   runsByMachine = new Map();
+  tachometer.markAllUnobserved();
   render();
+  renderTachometer();
 }
 
 applyCollapsedUi();
 render();
+renderTachometer();
 
 // 経過・残りの秒読み(webview の時計)。**DOM は作り直さず数字だけ**書き換える(CLAUDE.md の規律)。
 setInterval(() => {
+  tachometer.tick(Date.now());
+  renderTachometer();
   for (const row of rows.values()) {
     if (row.run) {
       renderRowTime(row);

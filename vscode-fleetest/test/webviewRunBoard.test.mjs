@@ -83,7 +83,7 @@ function monitorRunsMessage(overrides) {
     type: "monitorRuns",
     observed: true,
     runs: [{
-      pid: 41233, runID: "run-1", mine: true, phase: "running", requeued: 0, laneDropouts: 0, supply: [],
+      pid: 41233, runID: "run-1", mine: true, phase: "running", requeued: 0, laneDropouts: 0, actions: 0, supply: [],
       project: "ec-mobile", profile: "ios-smoke",
       elapsedSeconds: 261, total: 12, done: 7, failed: 2,
       lanes: [{ key: "UDID-1", name: "iPhone 17-01", platform: "ios", scenario: "05_検索",
@@ -150,7 +150,7 @@ test("準備中の run は本数でなく「準備中」を出し、進捗バー
   const { window, document } = createWebview();
   t.after(() => window.close());
   post(window, { type: "monitorRuns", machine: "M1Max", observed: true, runs: [{
-    pid: 41233, runID: "run-1", mine: true, phase: "preparing", requeued: 0, laneDropouts: 0, supply: [],
+    pid: 41233, runID: "run-1", mine: true, phase: "preparing", requeued: 0, laneDropouts: 0, actions: 0, supply: [],
     project: "E2E-iOS", profile: "ios-inapp-boost",
     elapsedSeconds: 12, total: 0, done: 0, failed: 0, lanes: [],
   }] });
@@ -177,7 +177,7 @@ test("準備中の run は供給の段階を1つ出す(ランナーのビルド�
     { name: "iPhone 17-03", platform: "ios", step: "bridge" },
   ];
   post(window, { type: "monitorRuns", machine: "M1Max", observed: true, runs: [{
-    pid: 41233, runID: "run-1", mine: true, phase: "preparing", requeued: 0, laneDropouts: 0, supply,
+    pid: 41233, runID: "run-1", mine: true, phase: "preparing", requeued: 0, laneDropouts: 0, actions: 0, supply,
     project: "E2E-iOS", profile: "ios-inapp-boost",
     elapsedSeconds: 12, total: 0, done: 0, failed: 0, lanes: [],
   }] });
@@ -188,7 +188,7 @@ test("準備中の run は供給の段階を1つ出す(ランナーのビルド�
 
   // ランナーのビルド(端末に属さない行)→ 段階が進んで ready が増える
   post(window, { type: "monitorRuns", machine: "M1Max", observed: true, runs: [{
-    pid: 41233, runID: "run-1", mine: true, phase: "preparing", requeued: 0, laneDropouts: 0,
+    pid: 41233, runID: "run-1", mine: true, phase: "preparing", requeued: 0, laneDropouts: 0, actions: 0,
     supply: [{ name: "", platform: "ios", step: "runnerBuild" },
              { name: "iPhone 17-01", platform: "ios", step: "ready" },
              { name: "iPhone 17-02", platform: "ios", step: "installing" }],
@@ -205,7 +205,7 @@ test("ビルド中・コンパイル中は供給の段階を添えない", (t) =
   t.after(() => window.close());
   for (const [phase, expected] of [["building", "シナリオをビルド中"], ["compiling", "Vision コンパイル中"]]) {
     post(window, { type: "monitorRuns", machine: "M1Max", observed: true, runs: [{
-      pid: 41233, runID: "run-1", mine: true, phase, requeued: 0, laneDropouts: 0,
+      pid: 41233, runID: "run-1", mine: true, phase, requeued: 0, laneDropouts: 0, actions: 0,
       supply: [{ name: "iPhone 17-01", platform: "ios", step: "booting" }],
       project: "E2E-iOS", profile: "ios-inapp-boost",
       elapsedSeconds: 12, total: 0, done: 0, failed: 0, lanes: [],
@@ -219,7 +219,7 @@ test("供給の段階がすべて ready の準備中は「テストを開始し�
   const { window, document } = createWebview();
   t.after(() => window.close());
   post(window, { type: "monitorRuns", machine: "M1Max", observed: true, runs: [{
-    pid: 41233, runID: "run-1", mine: true, phase: "preparing", requeued: 0, laneDropouts: 0,
+    pid: 41233, runID: "run-1", mine: true, phase: "preparing", requeued: 0, laneDropouts: 0, actions: 0,
     supply: [{ name: "iPhone 17-01", platform: "ios", step: "ready" }],
     project: "E2E-iOS", profile: "ios-inapp-boost",
     elapsedSeconds: 12, total: 0, done: 0, failed: 0, lanes: [],
@@ -233,7 +233,7 @@ test("設定を書き込んでいる端末が残る準備中は「デバイス�
   const { window, document } = createWebview();
   t.after(() => window.close());
   post(window, { type: "monitorRuns", machine: "M1Max", observed: true, runs: [{
-    pid: 41233, runID: "run-1", mine: true, phase: "preparing", requeued: 0, laneDropouts: 0,
+    pid: 41233, runID: "run-1", mine: true, phase: "preparing", requeued: 0, laneDropouts: 0, actions: 0,
     supply: [{ name: "iPhone 17-01", platform: "ios", step: "ready" },
              { name: "iPhone 17-02", platform: "ios", step: "configuring" }],
     project: "E2E-iOS", profile: "ios-inapp-boost",
@@ -273,7 +273,7 @@ test("Vision のコンパイル待ちの run は「Vision コンパイル中」�
   const { window, document } = createWebview();
   t.after(() => window.close());
   post(window, { type: "monitorRuns", machine: "M1Max", observed: true, runs: [{
-    pid: 41233, runID: "run-1", mine: true, phase: "compiling", requeued: 0, laneDropouts: 0, supply: [],
+    pid: 41233, runID: "run-1", mine: true, phase: "compiling", requeued: 0, laneDropouts: 0, actions: 0, supply: [],
     project: "E2E-iOS", profile: "ios-inapp-boost",
     elapsedSeconds: 30, total: 4, done: 0, failed: 0, lanes: [],
   }] });
@@ -286,7 +286,7 @@ test("動画の切り出し中は残りの代わりに「動画を編集中 n/m�
   const { window, document } = createWebview();
   t.after(() => window.close());
   post(window, { type: "monitorRuns", observed: true, runs: [{
-    pid: 41233, runID: "run-1", mine: true, phase: "running", requeued: 0, laneDropouts: 0, supply: [],
+    pid: 41233, runID: "run-1", mine: true, phase: "running", requeued: 0, laneDropouts: 0, actions: 0, supply: [],
     project: "E2E-iOS", profile: "ios-inapp-boost", elapsedSeconds: 171, total: 48, done: 48, failed: 0, lanes: [],
     videoClips: { done: 12, total: 48 },
   }] });
@@ -299,7 +299,7 @@ test("動画の切り出し中は残りの代わりに「動画を編集中 n/m�
 test("失敗があるときだけ ❌失敗数 を足し、無ければ本数だけ", (t) => {
   const { window, document } = createWebview();
   t.after(() => window.close());
-  const base = { pid: 41233, runID: "run-1", mine: true, phase: "running", requeued: 0, laneDropouts: 0, supply: [],
+  const base = { pid: 41233, runID: "run-1", mine: true, phase: "running", requeued: 0, laneDropouts: 0, actions: 0, supply: [],
     project: "E2E-iOS", profile: "ios-inapp-boost", elapsedSeconds: 30, lanes: [] };
   post(window, { type: "monitorRuns", observed: true, runs: [{ ...base, total: 54, done: 54, failed: 2 }] });
   assert.equal(runRows(document)[0].querySelector(".run-board-counts").textContent, "54/54❌2");
@@ -650,7 +650,7 @@ test("「起動中のデバイス」で絞っていてもツリーの台は消�
   });
   // ビルド中 = レーンがまだ1本も無い。デバイスの一覧だけがツリーの供給源になる
   post(window, { type: "monitorRuns", observed: true, runs: [{
-    pid: 41233, runID: "run-1", mine: true, phase: "building", requeued: 0, laneDropouts: 0, supply: [],
+    pid: 41233, runID: "run-1", mine: true, phase: "building", requeued: 0, laneDropouts: 0, actions: 0, supply: [],
     project: "E2E-CMP", profile: "ios-inapp-boost",
     elapsedSeconds: 8, total: 0, done: 0, failed: 0, lanes: [],
   }] });
@@ -784,7 +784,7 @@ test("準備中に開いた run の行は、走り出して runID が付いて�
   t.after(() => window.close());
   sendDevices(window, [{ name: "iPhone 17 Pro-01", udid: "U-L1" }]);
   const run = (fields) => ({ type: "monitorRuns", observed: true, runs: [Object.assign({
-    pid: 41233, mine: true, requeued: 0, laneDropouts: 0, supply: [], project: "E2E-iOS", profile: "ios-inapp-boost",
+    pid: 41233, mine: true, requeued: 0, laneDropouts: 0, actions: 0, supply: [], project: "E2E-iOS", profile: "ios-inapp-boost",
     elapsedSeconds: 3, total: 0, done: 0, failed: 0, lanes: [],
   }, fields)] });
   post(window, run({ phase: "preparing" }));
@@ -956,4 +956,36 @@ test("機械の行は設定タブのマシン一覧の順に並び、並べ替�
   assert.deepEqual(machines(), ["local", "M1Max", "M1Ultra"], "一覧が届く前は名前順");
   post(window, { type: "remoteConfig", hosts: [{ machine: "M1Ultra", host: "u@u", dir: "" }, { machine: "M1Max", host: "u@m", dir: "" }] });
   assert.deepEqual(machines(), ["local", "M1Ultra", "M1Max"]);
+});
+
+test("アクション/分メーター: run 0 本でも出て、再適用で要素が作り直されず、内訳が説明に出る", async (t) => {
+  const { window, document } = createWebview();
+  t.after(() => window.close());
+  const tacho = document.getElementById("run-board-tachometer");
+  assert.ok(tacho, "見出しにメーターの入れ物がある");
+  assert.equal(tacho.querySelectorAll(".tacho-seg").length, 40, "run 0 本でも40段が出る");
+  assert.equal(tacho.querySelectorAll(".tacho-seg[data-lit='1']").length, 0, "全段消灯");
+  assert.equal(tacho.querySelector(".tacho-value").textContent, "0");
+
+  const withActions = (machine, actions) => monitorRunsMessage({
+    machine,
+    runs: [{ ...monitorRunsMessage().runs[0], actions }],
+  });
+  post(window, withActions("M1Max", 0));
+  const nodes = [...tacho.querySelectorAll("*")];
+  post(window, withActions("M1Max", 100));
+  post(window, withActions("M1Max", 160));
+  assert.deepEqual([...tacho.querySelectorAll("*")], nodes, "同じノードのまま(作り直さない)");
+  assert.equal(tacho.querySelector(".tacho-value").textContent, "160");
+  // バーは慣性で追いつくので、直後はまだ点いていない。数フレーム待つと点き始める(連続的に伸びる)
+  assert.equal(tacho.querySelectorAll(".tacho-seg[data-lit='1']").length, 0, "直後は跳ねない");
+  await new Promise((resolve) => setTimeout(resolve, 300));
+  const litAfter = tacho.querySelectorAll(".tacho-seg[data-lit='1']").length;
+  assert.ok(litAfter > 0 && litAfter < 40, `途中まで伸びている(${litAfter} 段)`);
+  const tip = tacho.getAttribute("data-hover-tip");
+  assert.match(tip, /M1Max: 160/, "機械別の内訳");
+  assert.match(tacho.getAttribute("aria-label"), /160/);
+  // 同じ内容の再適用で説明を書き直さない
+  post(window, withActions("M1Max", 160));
+  assert.equal(tacho.getAttribute("data-hover-tip"), tip);
 });

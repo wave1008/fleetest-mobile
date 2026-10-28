@@ -112,6 +112,8 @@ struct ApiMonitorRunProgress: Codable, Equatable {
     let total: Int
     let done: Int
     let failed: Int
+    /// この run でデバイスへ実際に送った操作の累計。台帳の値をそのまま運ぶ(ProtocolVersion 60)
+    let actions: Int
     /// **詰まりの事実**(DS-18.5 段6): 結果を捨てて振り直した累計。台帳の値をそのまま運ぶ
     let requeued: Int
     /// **詰まりの事実**: レーンが離脱した累計。台帳の値をそのまま運ぶ

@@ -301,6 +301,8 @@ public final class FTDriveCore {
     public var redactAccountValues = false
     /// ステップの減速の計画(`--host-load-pacing`)。nil = 減速しない(設定で無効・dry-run・MCP の直接操作・コード生成)
     public var hostLoadPacing: HostLoadPacingPlan?
+    /// 包みドライバ(`ActionCountingDriver`)と共有する数え箱。step イベントごとに増分を `actions` へ載せる。nil = 数えない(dry-run・テスト)
+    public var actionCounter: ActionCounter?
     /// その瞬間の CPU 使用率(0〜1)を測る口。ScenarioRunnerMain が `InstantHostCPU.read` を入れる(テストは差し替える)。
     /// nil = 測れない = 減速しない
     public var hostCPUNow: (() -> Double?)?
@@ -1763,6 +1765,7 @@ public final class FTDriveCore {
         event.guarded = guarded ? true : nil
         event.command = command
         event.response = response
+        if let taken = actionCounter?.take(), taken > 0 { event.actions = taken }
         // 素性は失敗にだけ付ける(呼び出し側が誤って渡しても落とす)
         if case .failed = status { event.failureKind = failureKind?.rawValue }
         emit(event)

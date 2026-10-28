@@ -575,7 +575,13 @@ struct RunScenario: AsyncParsableCommand {
         }
         // 技術識別子: Android は adb serial、iOS はシミュレータ UDID(共に既存のドライバ構築引数の再利用)
         let deviceIdentifier = runPlatform == "android" ? serial : udid
-        let core = FTDriveCore(driver: driver, platform: runPlatform, app: appBundleID,
+        // 型判定(`driver is InAppDriver` 等)はここより前で終えている。以後に渡る AppDriver は全部この数え箱を共有する包みを通す
+        let actionCounter = ActionCounter()
+        let countedDriver: AppDriver = ActionCountingDriver(base: driver, counter: actionCounter)
+        let countedFallbackDriver = fallbackDriver.map { ActionCountingDriver(base: $0, counter: actionCounter) as AppDriver }
+        let countedTypeDriver = typeDriver.map { ActionCountingDriver(base: $0, counter: actionCounter) as AppDriver }
+        let countedHomeScreenDriver = homeScreenDriver.map { ActionCountingDriver(base: $0, counter: actionCounter) as AppDriver }
+        let core = FTDriveCore(driver: countedDriver, platform: runPlatform, app: appBundleID,
                                scenarioID: scenarioID, scenarioTitle: scenarioTitle,
                                delegate: delegate, healingEnabled: heal,
                                tunables: runTunables,
@@ -590,11 +596,11 @@ struct RunScenario: AsyncParsableCommand {
                                dryRun: dryRun,
                                fingerprintCacheURL: fingerprintCacheURL,
                                selectorInventoryURL: selectorInventoryURL,
-                               fallbackDriver: fallbackDriver,
+                               fallbackDriver: countedFallbackDriver,
                                primaryCaptureOmitsSystemUI: primaryCaptureOmitsSystemUI,
-                               typeDriver: typeDriver, preferTypeDriver: preferTypeDriver,
+                               typeDriver: countedTypeDriver, preferTypeDriver: preferTypeDriver,
                                typeDriverGestures: typeDriverGestures,
-                               homeScreenDriver: homeScreenDriver,
+                               homeScreenDriver: countedHomeScreenDriver,
                                deviceName: deviceName, deviceIdentifier: deviceIdentifier,
                                physical: physical,
                                uiFramework: uiFrameworkHint,
@@ -618,6 +624,7 @@ struct RunScenario: AsyncParsableCommand {
         }
         core.redactAccountValues = redactAccountValues
         core.hostLoadPacing = runHostLoadPacing
+        core.actionCounter = actionCounter
         if runHostLoadPacing != nil {
             // 測れない(サンドボックス等で host_processor_info が失敗)ときは1回言って減速なしで続ける
             let hostCPU = InstantHostCPU(logFailure: { ConsoleOut.err("[fleetest] host load pacing is off: " + $0) })
@@ -796,6 +803,9 @@ struct RunScenario: AsyncParsableCommand {
         // このプロセス(1 シナリオ)で検出したアプリのクラッシュ証跡(LastAppCrash。iOS の
         // crashAnnotated 経路 / Android の appProcessEvidence 経路が見つけたときだけ非 nil)
         finished.appCrash = LastAppCrash.shared.snapshot()
+        // 最後のステップの後の端数(afterEach・片付け・向きの復元など)
+        let remainingActions = actionCounter.take()
+        if remainingActions > 0 { finished.actions = remainingActions }
         emit(finished)
 
         // FM 失敗は各呼び出し箇所が nil を返して素通りさせる契約のため、結果からは見えない。

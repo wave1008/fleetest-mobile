@@ -72,6 +72,9 @@ public struct RunProgressRecord: Codable, Equatable, Sendable {
     public let total: Int
     public let done: Int
     public let failed: Int
+    /// この run でデバイスへ実際に送った操作の累計(`ActionCountingDriver` が数え、子の step / scenarioFinished の `actions` を足す)。
+    /// 準備中は 0。モニターの「アクション/分」の元(区間の差分は読み手が取る)
+    public let actions: Int
     /// **詰まりの事実**(段6・DS-18.5): 結果を捨てて振り直した累計
     /// (`RunProgressState.laneIdled` が成立した回数)。判定・文言は作らない —— 事実の並置だけ
     public let requeued: Int
@@ -92,7 +95,7 @@ public struct RunProgressRecord: Codable, Equatable, Sendable {
     public let videoClips: RunProgressVideoClips?
 
     public init(pid: Int32, runID: String?, runGroup: String?, issuer: String?, project: String,
-               profile: String?, startedAt: String, total: Int, done: Int, failed: Int,
+               profile: String?, startedAt: String, total: Int, done: Int, failed: Int, actions: Int,
                requeued: Int, laneDropouts: Int, etaSeconds: Int?, lanes: [RunProgressLane],
                phase: String, supply: [RunProgressSupply], videoClips: RunProgressVideoClips?) {
         self.pid = pid
@@ -105,6 +108,7 @@ public struct RunProgressRecord: Codable, Equatable, Sendable {
         self.total = total
         self.done = done
         self.failed = failed
+        self.actions = actions
         self.requeued = requeued
         self.laneDropouts = laneDropouts
         self.etaSeconds = etaSeconds

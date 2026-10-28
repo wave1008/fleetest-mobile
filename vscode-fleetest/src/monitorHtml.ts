@@ -374,6 +374,8 @@ function renderDevicesPanel(): string {
         <!-- ツリーを開いた形のアイコン(下向きの三角 + インデントした行。ユーザー決定)。名前は tooltip と aria-label が持つ
              (runBoard.js)。クリックはヘッダ行の開閉へ波及させない(stopPropagation) -->
         <button id="run-board-expand-all" class="icon-button run-board-expand-all" type="button" aria-pressed="false"><svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M1.6 2.9h4.2L3.7 6.6z"/><rect x="7" y="2.9" width="7.4" height="1.5" rx="0.7"/><rect x="9" y="7.2" width="5.4" height="1.5" rx="0.7"/><rect x="9" y="11.5" width="5.4" height="1.5" rx="0.7"/></svg></button>
+        <!-- アクション/分メーター。中身は runBoard.js が最初に1回だけ作る。見出しの残り幅いっぱいに伸びる -->
+        <span id="run-board-tachometer" class="run-board-tachometer"></span>
       </div>
       <div id="run-board-rows" class="run-board-rows"></div>
       <!-- 2カラムの境目(ユーザー決定)。マウスで幅を変える。**見出し行には掛けない**

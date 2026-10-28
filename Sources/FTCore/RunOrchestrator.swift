@@ -660,6 +660,8 @@ public enum ScenarioRunner {
                               registerChildProcess: (@Sendable (Process) -> @Sendable () -> Void)? = nil,
                               /// ScenarioRecording.humanOperationsStateDir への素通し
                               humanOperationsStateDir: URL? = nil,
+                              /// 子の step / scenarioFinished が運ぶ `actions`(デバイスへ送った操作の回数の増分)を run 進捗の台帳へ渡す。nil = 台帳を持たない経路
+                              onActions: (@Sendable (Int) -> Void)? = nil,
                               /// ScenarioHost.run(stillFramesDir:) への素通し(静止画方式の録画)
                               stillFramesDir: URL? = nil,
                               onEvent: @escaping (RunEvent) -> Void) async -> ScenarioOutcome {
@@ -691,6 +693,9 @@ public enum ScenarioRunner {
             appPath: appPath, appName: appName, appBundleID: appBundleID,
             hostNotices: hostNotices,
             registerChildProcess: registerChildProcess, stillFramesDir: stillFramesDir) { event in
+            if event.kind == "step" || event.kind == "scenarioFinished", let actions = event.actions {
+                onActions?(actions)
+            }
             switch event.kind {
             case "sceneStarted":
                 onEvent(.sceneStarted(worker: worker.label, flowURL: item.url,
@@ -1826,6 +1831,10 @@ public final class RunOrchestrator: Sendable {
                 hostNotices: residualAlertNotice.map { [$0] } ?? [],
                 registerChildProcess: registerChildProcess,
                 humanOperationsStateDir: humanOperationsStateDir,
+                onActions: { [weak self] actions in
+                    guard let self else { return }
+                    Task { await self.progressState?.addActions(actions) }
+                },
                 stillFramesDir: stillFramesDir,
                 onEvent: { [continuation, fmCounter = self.fmUnavailable] event in
                     // **FM 全滅のまま走ったシナリオを数える**(合否は変えない。summary の

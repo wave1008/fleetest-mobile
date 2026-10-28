@@ -147,7 +147,7 @@ final class MCPRunJobsTests: XCTestCase {
     private func progress(pid: Int32, profile: String = "smoke", project: String = "Shop",
                           startedOffset: TimeInterval = 5) -> RunProgressRecord {
         RunProgressRecord(pid: pid, runID: nil, runGroup: nil, issuer: nil, project: project, profile: profile,
-                          startedAt: iso(startedOffset), total: 10, done: 3, failed: 1, requeued: 0,
+                          startedAt: iso(startedOffset), total: 10, done: 3, failed: 1, actions: 0, requeued: 0,
                           laneDropouts: 0, etaSeconds: nil, lanes: [], phase: "running", supply: [], videoClips: nil)
     }
 

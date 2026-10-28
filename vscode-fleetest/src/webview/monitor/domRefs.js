@@ -21,6 +21,7 @@ export const lineViewSelection = document.getElementById('line-view-selection');
 export const runBoardHeader = document.getElementById('run-board-header');
 export const runBoardToggle = document.getElementById('run-board-toggle');
 export const runBoardTitle = document.getElementById('run-board-title');
+export const runBoardTachometer = document.getElementById('run-board-tachometer');
 export const runBoardExpandAll = document.getElementById('run-board-expand-all');
 export const runBoardRows = document.getElementById('run-board-rows');
 // 2カラムの境目(ドラッグで幅を変える。runBoard.js)。

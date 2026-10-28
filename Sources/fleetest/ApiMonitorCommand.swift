@@ -693,7 +693,7 @@ struct ApiMonitorCommand: AsyncParsableCommand {
                     // 台帳の startedAt は RunOrchestrator が ISO8601DateFormatter で書いた値なので
                     // 通常パースは失敗しない。壊れていたら 0(不明な負の経過を出すよりまし)
                     elapsedSeconds: record.startedAt.isEmpty ? 0 : (elapsedSeconds(since: record.startedAt) ?? 0),
-                    total: record.total, done: record.done, failed: record.failed,
+                    total: record.total, done: record.done, failed: record.failed, actions: record.actions,
                     // 詰まりの事実(段6)。台帳の値をそのまま運ぶ(判定・文言は作らない)
                     requeued: record.requeued, laneDropouts: record.laneDropouts,
                     // 段5(残り見積もり。DS-18.4)。台帳の値をそのまま運ぶ ——

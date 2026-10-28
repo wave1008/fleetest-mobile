@@ -42,6 +42,8 @@ export interface RunBoardRawRun {
   readonly requeued: number;
   /** レーンが離脱した累計。 */
   readonly laneDropouts: number;
+  /** デバイスへ送った操作の累計(増えるだけ。actionTachometerModel.ts が速さへ畳む)。 */
+  readonly actions: number;
   /** 準備中の端末ごとの供給の段階。空 = 段階の情報なし(推測で埋めない)。 */
   readonly supply: readonly RunBoardSupply[];
   /** `RunRecorder` が無い経路(--dry-run/--debug 等)では省略されうる。省略時は pid が代わりの鍵。 */

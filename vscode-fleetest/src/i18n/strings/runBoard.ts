@@ -37,4 +37,26 @@ export const runBoardStrings = {
     en: "~0:00 left (+{time} over)",
   },
   "runBoard.encodingVideo": { ja: "動画を編集中 {done}/{total}", en: "Encoding videos {done}/{total}" },
+  // アクション/分メーター(見出し「実行中 N」の右)。ja の「マシン」は利用者向け表記
+  "runBoard.tachometerUnit": { ja: "アクション/分", en: "actions/min" },
+  "runBoard.tachometerAria": { ja: "タコメーター {value} アクション/分", en: "Tachometer {value} actions/min" },
+  "runBoard.tachometerTipTotal": { ja: "{value} アクション/分", en: "{value} actions/min" },
+  "runBoard.tachometerTipMachine": { ja: "{machine}: {value}", en: "{machine}: {value}" },
+  "runBoard.tachometerTipUnobserved": { ja: "観測できていないマシン: {machines}", en: "Not observed: {machines}" },
+  "runBoard.tachometerTipDefinition": {
+    ja: "直近 60 秒にデバイスへ送った操作の数",
+    en: "Operations sent to devices in the last 60 seconds",
+  },
+  "runBoard.tachometerTipMeter": {
+    ja: "メーター: {value} アクション/秒(直近 3 秒の数 ÷ 3)",
+    en: "Meter: {value} actions/s (last 3 seconds ÷ 3)",
+  },
+  "runBoard.tachometerTipScale": {
+    ja: "1目盛り = 1アクション/秒",
+    en: "One segment = 1 action/s",
+  },
+  "runBoard.tachometerTipWarmup": {
+    ja: "観測を始めて {seconds} 秒(60 秒に満たない間は少なめに出ます)",
+    en: "Observed for {seconds}s (reads low until 60s have passed)",
+  },
 } satisfies MessageDict;
