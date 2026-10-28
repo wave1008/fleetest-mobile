@@ -20,20 +20,6 @@ final class DeviceMachineRunnerChildArgsTests: XCTestCase {
             quiet: true, junitPath: nil, reportDir: reportDir)
     }
 
-    /// 先行ビルドの相手(--build-with-project)はリモートの子にだけ運ぶ(手元の子は --skip-build でビルドしない)
-    func testBuildWithProjectGoesOnlyToRemoteChildren() {
-        func withProjects(host: String) -> [String] {
-            DeviceMachineRunner.childArgs(
-                project: "E2E", host: host, profile: "p", scenarios: ["Warm.up"], folders: [],
-                noLPT: false, lptHistoryRuns: nil, performanceMode: false,
-                forceLock: false, remoteDir: nil, remoteTimeout: nil,
-                quiet: true, junitPath: nil, buildWithProjects: ["E2EX", "E2EY"])
-        }
-        let remote = withProjects(host: "M1Ultra")
-        XCTAssertEqual(remote.indices.filter { remote[$0] == "--build-with-project" }.map { remote[$0 + 1] }, ["E2EX", "E2EY"])
-        XCTAssertFalse(withProjects(host: "local").contains("--build-with-project"))
-    }
-
     /// ローカル子は親が既に払ったビルドを繰り返させない
     func testLocalChildGetsSkipBuild() {
         XCTAssertTrue(args(host: "local").contains("--skip-build"))

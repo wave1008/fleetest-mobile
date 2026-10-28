@@ -105,15 +105,6 @@ struct RunCommonOptions: ParsableArguments {
             visibility: .hidden))
     var workQueue = false
 
-    /// **手で打つものではない**。複数対象の run の親がリモートの子へ渡す、同じマシンで回りうるほかの対象のプロジェクト。
-    /// 子は自分のプロジェクトと一緒に1回の swift build で先に作る(`ScenarioHost.prebuildTogether`)。ssh 越しは `RemoteRunArgs` が中継する
-    @Option(name: .customLong("build-with-project"),
-            help: ArgumentHelp(
-              "Internal: also build this project's scenarios in the same swift build (repeatable). "
-              + "Set by the parent of a multi-target run; not for hand use",
-              visibility: .hidden))
-    var buildWithProjects: [String] = []
-
     /// **手で打つものではない**。RemoteRunDispatcher がミラー後の絶対パスを渡す
     /// (Sources/FTRemote/RemoteDispatch.swift の RemoteRunArgs.build)。プロファイルの
     /// `remoteControl.workspace` を上書きし、appPath のインストール先(ステージ先。原本の解決基準は

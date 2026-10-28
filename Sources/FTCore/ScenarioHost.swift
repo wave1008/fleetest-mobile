@@ -244,16 +244,17 @@ public enum ScenarioHost {
     /// 呼び手はこのあと各プロジェクトを今までどおり `build` に通す(指紋が一致すれば swift build を呼ばず署名の固定だけが走る)。
     /// swift build は起こすだけで計画の作り直しに 7〜13 秒払うので、`--product` を1本ずつ起こすと 15 本で 135 秒・まとめると 10 秒(PT-8.1)。
     /// **失敗しても投げない** —— まとめたビルドはパッケージの全ターゲットを作る = 回さないプロジェクトが壊れていても失敗するので、
-    /// そのときは呼び手の `build` が1本ずつ作り、自分のプロジェクトが壊れていればそこで名指しする
-    public static func prebuildTogether(projects: [TestProject], log: ((String) -> Void)? = nil,
-                                        willBuild: (() -> Void)? = nil) {
+    /// そのときは呼び手の `build` が1本ずつ作り、自分のプロジェクトが壊れていればそこで名指しする。
+    /// `--product` は1回に1つしか効かない(複数渡すと最後の1つだけ)ので、必要な製品だけをまとめる口は無い。
+    /// **ランナー機の子へ広げない** —— ランナー機の作業フォルダは利用者側のパッケージで、無関係の壊れたプロジェクトがあり、
+    /// まとめたビルドが毎回失敗して1本ずつに戻った(PT-8.1)
+    public static func prebuildTogether(projects: [TestProject], log: ((String) -> Void)? = nil) {
         guard let root = packageRoot() else { return }
         let stale: [(project: TestProject, fingerprint: String?)] = projects.compactMap { project in
             let fingerprint = BuildFingerprint.compute(repoRoot: root, scenariosDir: project.scenariosDir)
             return buildNeeded(fingerprint: fingerprint, project: project, root: root) ? (project, fingerprint) : nil
         }
         if stale.count >= 2 {
-            willBuild?()
             log?("→ Building scenarios of \(stale.count) projects in one swift build...")
             if ResolvedPinSync.pinnedResolveNeeded(packageRoot: root) {
                 _ = try? Shell.run(["swift", "package", "resolve", "--only-use-versions-from-resolved-file"], cwd: root)
@@ -270,10 +271,6 @@ public enum ScenarioHost {
         }
     }
 
-    /// 名前からプロジェクトを引く(引けない名前は飛ばす = 先行ビルドの対象を減らすだけで run は止めない)
-    public static func projects(named names: [String]) -> [TestProject] {
-        names.compactMap { try? project(named: $0) }
-    }
 
     /// `build` が swift build を呼ぶか(呼ばずに答える。省く条件は `build` と同じ1箇所)。
     /// `fleetest run` はこれが true の回だけ、ビルドの前に供給を起こして並行に進める

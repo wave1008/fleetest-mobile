@@ -700,17 +700,10 @@ struct RunScenarios: AsyncParsableCommand {
         // ビルドはホスト側で 1 回だけ(サブプロセスは自らビルドしない)
         if !common.skipBuild {
             do {
-                let willBuild = {
+                try ScenarioHost.build(project: testProject, log: { ConsoleOut.out($0) }, willBuild: {
                     writeProgress(phase: "building")
                     ConsoleOut.out("→ Building scenarios (\(testProject.name))...")
-                }
-                // 同じマシンで回りうるほかの対象と1回の swift build でまとめる(複数対象の run のリモートの子だけ。先行ビルド = 失敗しても下の build が作る)
-                if !common.buildWithProjects.isEmpty {
-                    ScenarioHost.prebuildTogether(
-                        projects: [testProject] + ScenarioHost.projects(named: common.buildWithProjects),
-                        log: { ConsoleOut.out($0) }, willBuild: willBuild)
-                }
-                try ScenarioHost.build(project: testProject, log: { ConsoleOut.out($0) }, willBuild: willBuild)
+                })
             } catch {
                 writeJUnitForEarlyFailure(project: testProject, phase: "build", error: error)
                 throw error
@@ -1132,7 +1125,6 @@ struct RunScenarios: AsyncParsableCommand {
             setOverrides: dispatchOverrides,
             noLPT: common.noLPT, lptHistoryRuns: common.lptHistoryRuns,
             performanceMode: performanceMode, broadcast: broadcast, workQueue: common.workQueue,
-            buildWithProjects: common.buildWithProjects,
             localJUnitPath: junit, remoteTimeoutSeconds: common.remoteTimeout, runGroup: common.runGroup)
         if exitCode != 0 {
             throw ExitCode(exitCode)

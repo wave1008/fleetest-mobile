@@ -102,7 +102,6 @@ struct RemoteRunDispatcher {
                   performanceMode: Bool,
                   broadcast: Bool = false,
                   workQueue: Bool = false,
-                  buildWithProjects: [String] = [],
                   localJUnitPath: String?,
                   remoteTimeoutSeconds: Int?, runGroup: String? = nil) async throws -> Int32 {
         let setupStart = Date()
@@ -154,7 +153,6 @@ struct RemoteRunDispatcher {
             setOverrides: setOverrides,
             noLPT: noLPT, lptHistoryRuns: lptHistoryRuns,
             performanceMode: performanceMode, broadcast: broadcast, workQueue: workQueue,
-            buildWithProjects: buildWithProjects,
             remoteJUnitPath: remoteJUnitPath, reportDir: remoteReportDir, workspace: remoteWorkspace,
             runGroup: runGroup)
         let timeoutSeconds = RemoteTimeout.seconds(
@@ -219,7 +217,6 @@ struct RemoteRunDispatcher {
                      performanceMode: Bool,
                      defaultTimeout: Double?, scenarioTimeout: Double?,
                      workQueue: Bool = false,
-                     buildWithProjects: [String] = [],
                      remoteTimeoutSeconds: Int?, runGroup: String? = nil) async throws -> Int32 {
         let setupStart = Date()
         let (layout, session) = try resolveLayout()
@@ -251,7 +248,6 @@ struct RemoteRunDispatcher {
             setOverrides: setOverrides, noLPT: noLPT, lptHistoryRuns: lptHistoryRuns,
             performanceMode: performanceMode,
             defaultTimeout: defaultTimeout, scenarioTimeout: scenarioTimeout, workQueue: workQueue,
-            buildWithProjects: buildWithProjects,
             reportDir: remoteReportDir, workspace: remoteWorkspace, runGroup: runGroup)
         let timeoutSeconds = RemoteTimeout.seconds(
             explicit: remoteTimeoutSeconds, scenarioCount: scenarios.count)

@@ -66,13 +66,6 @@ enum MultiTargetRunner {
         return machineLabels.indices.filter { used.contains($0) }.map { machineLabels[$0] }
     }
 
-    /// そのマシンで回りうる、ほかの対象のプロジェクト名(重複なし・初出の順)。リモートの子が自分のプロジェクトと一緒に
-    /// 先行ビルドする(`--build-with-project`)= 2本目以降の子は指紋の一致でビルドを飛ばす
-    static func projectsAlsoOn(machine: Int, besides own: String, jobs: [(project: String, machines: Set<Int>)]) -> [String] {
-        var seen: Set<String> = [own]
-        return jobs.filter { $0.machines.contains(machine) }.map(\.project).filter { seen.insert($0).inserted }
-    }
-
     /// 2つ以上の対象と併用できないフラグの最初の1つ(純粋関数。順序は利用者に見せたい順)
     static func firstRejection(flags: [(name: String, isSet: Bool)]) -> String? {
         flags.first(where: { $0.isSet }).map {
@@ -267,7 +260,6 @@ enum MultiTargetRunner {
                 childExited: { dispatcher.childExited(entry: $0) }, interrupt: { dispatcher.interrupt() }))
         }
         let jobByID = Dictionary(uniqueKeysWithValues: jobs.map { ($0.id, $0) })
-        let projectMachines = jobs.map { (project: $0.project.name, machines: Set($0.entryByMachine.keys)) }
         let childCounter = LockedValue(0)
         let childHosts = LockedValue<[(host: String, index: Int)]>([])
         let outcomes = LockedValue<[ChildOutcome]>([])
@@ -287,9 +279,7 @@ enum MultiTargetRunner {
                 performanceMode: performanceMode, forceLock: forceLock,
                 remoteDir: remoteDir, remoteTimeout: remoteTimeout, quiet: quiet,
                 junitPath: FleetRunner.entryJUnitPath(tempDir: junitTempDir, index: index),
-                runGroup: runGroup, reportDir: reportDir, workQueue: true,
-                buildWithProjects: MultiTargetRunner.projectsAlsoOn(
-                    machine: machine, besides: job.project.name, jobs: projectMachines))
+                runGroup: runGroup, reportDir: reportDir, workQueue: true)
             let dispatcher = job.dispatcher
             let marker = lockMarkers[group.machineLabel]
             let heal = job.healCollection

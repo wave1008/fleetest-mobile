@@ -124,16 +124,6 @@ final class MultiTargetRunnerTests: XCTestCase {
         XCTAssertEqual(Set(h.launched), ["A@0", "B@1"], "1本ももらえないマシン2が加わった: \(h.launched)")
     }
 
-    /// そのマシンで回りうるほかの対象のプロジェクトだけ・自分と重複は除く(初出の順)
-    func testProjectsAlsoOnAMachine() {
-        let jobs: [(project: String, machines: Set<Int>)] = [
-            ("A", [0, 1]), ("B", [1]), ("A", [1]), ("C", [0]), ("D", [1, 2]),
-        ]
-        XCTAssertEqual(MultiTargetRunner.projectsAlsoOn(machine: 1, besides: "A", jobs: jobs), ["B", "D"])
-        XCTAssertEqual(MultiTargetRunner.projectsAlsoOn(machine: 0, besides: "C", jobs: jobs), ["A"])
-        XCTAssertEqual(MultiTargetRunner.projectsAlsoOn(machine: 3, besides: "A", jobs: jobs), [])
-    }
-
     func testMachineWithoutALaneNeverGetsTheJob() {
         let h = Harness(machines: 2, lanes: ["C": [0], "D": [0, 1]],
                         scenarios: ["C": 10, "D": 4], order: ["C", "D"])
