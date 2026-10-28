@@ -346,6 +346,22 @@ final class RemoteMonitorFanout: @unchecked Sendable {
             relayLine(text)
             return
         }
+        if kind == "monitorRunLog" {
+            // 他人・CLI・リモートの run のログ。**マシン名と device のマシン付き id は親が直す**
+            // (子は `--device-machine local` で `machine` を出さず、device は `<platform>:<lane.name>`)
+            guard var event = try? JSONDecoder().decode(ApiMonitorRunLogEvent.self, from: data) else {
+                log("[monitor] \(machine): cannot read the remote monitorRunLog line")
+                return
+            }
+            event.machine = machine
+            event.device = Self.machineScopedDevice(event.device, machine: machine)
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+            guard let encoded = try? encoder.encode(event),
+                  let text = String(data: encoded, encoding: .utf8) else { return }
+            relayLine(text)
+            return
+        }
         if kind == "monitorBridgeLogRotation" {
             // **中継しない**——この機械の拡張はランナー機のブリッジを起動し直せないので、そこの候補を
             // 手元へ流すと拡張が向こうのデバイス名で手元へ撃つ(ApiMonitorBridgeLogRotationEvent の doc)。
@@ -395,6 +411,16 @@ final class RemoteMonitorFanout: @unchecked Sendable {
         lock.lock()
         devicesByMachine[machine] = byID
         lock.unlock()
+    }
+
+    /// `<platform>:<name>` → `<platform>:<machine>/<name>`(既にこのマシン名で始まっていれば直さない。
+    /// 判定は machineScoped と同じ。id の規則は DeviceMachineGrouping.workerID)
+    static func machineScopedDevice(_ device: String, machine: String) -> String {
+        guard let colon = device.firstIndex(of: ":") else { return device }
+        let platform = String(device[device.startIndex..<colon])
+        let name = String(device[device.index(after: colon)...])
+        guard !name.hasPrefix(machine + "/") else { return device }
+        return DeviceMachineGrouping.workerID(platform: platform, machine: machine, name: name)
     }
 
     /// 中継行の `"device":"<platform>:<name>"` を `"<platform>:<machine>/<name>"` へ書き換える。

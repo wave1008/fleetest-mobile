@@ -450,6 +450,10 @@ export class MonitorProcessManager {
           this.publishDevices(keepFinishedStorage(this.latestDevices, sortMonitorDevices(value.devices, this.machineOrder)));
           return;
         }
+        if (value.kind === "monitorRunLog") {
+          this.deps.notifyRunLog(value);
+          return;
+        }
         if (value.kind === "monitorBridgeLogRotation") {
           // webview へは送らない(この自動修復はタイル表示を持たない)。MonitorBridgeLogRotation へ
           // 委譲するだけ(monitorBridgeLogRotation.ts)。

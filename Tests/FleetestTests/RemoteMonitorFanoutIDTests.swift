@@ -27,6 +27,25 @@ final class RemoteMonitorFanoutIDTests: XCTestCase {
                        "マシンのバッジは親が入れる(子は自分を local と見なす)")
     }
 
+    /// 子の monitorRunLog は machine を持たず device もマシンを含まない。親が両方を埋める
+    /// (埋めないと拡張が手元の同名タイルのログとして読む)。既にマシン付きなら直さない
+    func testRunLogLineGetsMachineAndScopedDevice() throws {
+        let relayed = LockedLines()
+        let fanout = RemoteMonitorFanout(machines: ["M1Ultra"], project: "P", profile: nil,
+                                         interval: 2, maxWidth: 960,
+                                         log: { _ in }, relayLine: { relayed.append($0) })
+        let line = #"{"device":"ios:iPhone 17-01","kind":"monitorRunLog","lines":["a","b"],"owner":"h:1","pid":7,"runID":"r"}"#
+        fanout.ingest(line: line, machine: "M1Ultra")
+        let out = try XCTUnwrap(relayed.values.first)
+        let event = try JSONDecoder().decode(ApiMonitorRunLogEvent.self, from: Data(out.utf8))
+        XCTAssertEqual(event.machine, "M1Ultra")
+        XCTAssertEqual(event.device, "ios:M1Ultra/iPhone 17-01")
+        XCTAssertEqual(event.lines, ["a", "b"])
+        XCTAssertEqual(event.owner, "h:1")
+        XCTAssertEqual(RemoteMonitorFanout.machineScopedDevice("ios:M1Ultra/iPhone 17-01", machine: "M1Ultra"),
+                       "ios:M1Ultra/iPhone 17-01", "既にマシン付きなら直さない")
+    }
+
     /// 子の monitorStorage は id をマシン付きに直して中継し、保持している子の一覧も同じ値へ書き換える
     /// (書き換えないと親の次の周期で古い「測定中」に戻る)
     func testStorageLineIsScopedAndPatchesTheHeldDevice() throws {

@@ -35,7 +35,8 @@ import * as path from "node:path";
 import type { Readable } from "node:stream";
 import * as vscode from "vscode";
 import { repairDisplay, repairWifi } from "./adbWifiRepair";
-import { childEnv } from "./childEnv";
+import { childEnv, streamOwnerValue } from "./childEnv";
+import { reduceMonitorRunLog } from "./monitorRunLogModel";
 import type { FleetestCli } from "./cli";
 import { type FleetestConfig, resolveAdb, resolveProjectName } from "./config";
 import { binaryDirs } from "./binaryPathResolve";
@@ -45,6 +46,7 @@ import { type StreamFoldReason, streamVisibilityChange, streamVisible } from "./
 import {
   isMonitorFromWebviewMessage,
   type MonitorBridgeLogRotationCandidate,
+  type MonitorRunLogEvent,
   type MonitorControlCommand,
   disabledMachineSet,
   type MonitorDevice,
@@ -132,6 +134,8 @@ export interface MonitorPanelDeps {
   /** monitorBridgeLogRotationイベントをMonitorBridgeLogRotationへ渡す(monitorProcessManager.tsの
    * monitorBridgeLogRotation処理から呼ぶ)。 */
   notifyBridgeLogRotationCandidate(candidate: MonitorBridgeLogRotationCandidate | null): void;
+  /** monitorRunLog(CLI・他人・リモートの run のログ)を実行ログのレーンへ積んで webview へ送る。 */
+  notifyRunLog(event: MonitorRunLogEvent): void;
   /** 機械の占有(dispatch.lock)が変わったときに MonitorProcessManager が呼ぶ。
    * **手元も含む**(キーは runBoardModel の LOCAL_MACHINE_KEY)。**配信の自動退避**
    * (占有中の機械のライブ配信を畳んでポーリングへ落とす)の入口
@@ -411,6 +415,11 @@ export class MonitorPanelController implements vscode.Disposable {
         this.bridgeLogRotation.reevaluate();
       },
       notifyBridgeLogRotationCandidate: (candidate) => this.bridgeLogRotation.observe(candidate),
+      notifyRunLog: (event) => {
+        for (const action of reduceMonitorRunLog(this.laneState, event, streamOwnerValue())) {
+          this.post({ type: "runEvent", action });
+        }
+      },
       notifyMachineLocks: (locks) => {
         // 占有が変わった瞬間に畳む/戻す(次の monitorDevices を待たない = run の開始直後に
         // 配信が残っている時間を作らない)

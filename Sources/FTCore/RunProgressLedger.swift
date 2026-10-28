@@ -42,15 +42,20 @@ public struct RunProgressLane: Codable, Equatable, Sendable {
     /// `scenario` が nil、または実績表に無ければ nil(推測値は書かない)。値は固定 ——
     /// シナリオ開始時に1回引く。**「いつもと比べてどうだったか」を後から分析するために残す**
     public let expectedSeconds: Int?
+    /// このレーンがいま書いているシナリオのイベントログ(`.inflight-<UUID>.ndjson`)の**絶対パス**。
+    /// 読み手(`api monitor`)が fd で開いて実行ログビューへ流す(イベントログにデバイスの情報は無いので、対応は親が台帳で持つ)。
+    /// 待機中・記録の無い経路(dry-run 等)は nil
+    public let eventLog: String?
 
     public init(key: String, name: String, platform: String?, scenario: String?,
-               scenarioStartedAt: String?, expectedSeconds: Int?) {
+               scenarioStartedAt: String?, expectedSeconds: Int?, eventLog: String? = nil) {
         self.key = key
         self.name = name
         self.platform = platform
         self.scenario = scenario
         self.scenarioStartedAt = scenarioStartedAt
         self.expectedSeconds = expectedSeconds
+        self.eventLog = eventLog
     }
 }
 
@@ -93,11 +98,15 @@ public struct RunProgressRecord: Codable, Equatable, Sendable {
     /// 全シナリオの後の動画の切り出しの進み(`VideoRecordingCoordinator.finish`)。切り出しの間だけ非 nil で、
     /// その間 etaSeconds は nil(読み手は残りの代わりにこれを出す)。phase は "running" のまま
     public let videoClips: RunProgressVideoClips?
+    /// run を回しているプロセスの環境変数 `FT_STREAM_OWNER` の値**だけ**(`StreamOwner.current` の `FT_PARENT_PID` への
+    /// fallback は使わない)。拡張から起こした run を見分ける印で、CLI の run は nil。リモートの run も `RemoteShell` が運ぶので同じ値を持つ
+    public let owner: String?
 
     public init(pid: Int32, runID: String?, runGroup: String?, issuer: String?, project: String,
                profile: String?, startedAt: String, total: Int, done: Int, failed: Int, actions: Int,
                requeued: Int, laneDropouts: Int, etaSeconds: Int?, lanes: [RunProgressLane],
-               phase: String, supply: [RunProgressSupply], videoClips: RunProgressVideoClips?) {
+               phase: String, supply: [RunProgressSupply], videoClips: RunProgressVideoClips?,
+               owner: String?) {
         self.pid = pid
         self.runID = runID
         self.runGroup = runGroup
@@ -116,8 +125,16 @@ public struct RunProgressRecord: Codable, Equatable, Sendable {
         self.phase = phase
         self.supply = supply
         self.videoClips = videoClips
+        self.owner = owner
     }
 
+    /// 環境変数 `FT_STREAM_OWNER` の値だけ。空は nil(`StreamOwner.current` の FT_PARENT_PID への fallback はしない)
+    public static func ownerFromEnvironment(
+        _ environment: [String: String] = ProcessInfo.processInfo.environment
+    ) -> String? {
+        guard let value = environment[StreamOwner.environmentKey], !value.isEmpty else { return nil }
+        return value
+    }
 }
 
 /// 動画の切り出しの進み。done は成否を問わず終えた本数(失敗・断念も数える = total で必ず止まる)

@@ -662,6 +662,8 @@ public enum ScenarioRunner {
                               humanOperationsStateDir: URL? = nil,
                               /// 子の step / scenarioFinished が運ぶ `actions`(デバイスへ送った操作の回数の増分)を run 進捗の台帳へ渡す。nil = 台帳を持たない経路
                               onActions: (@Sendable (Int) -> Void)? = nil,
+                              /// ScenarioHost.run(onEventLogStarted:) への素通し(run 進捗の台帳のレーンへイベントログのパスを載せる)
+                              onEventLogStarted: (@Sendable (URL) -> Void)? = nil,
                               /// ScenarioHost.run(stillFramesDir:) への素通し(静止画方式の録画)
                               stillFramesDir: URL? = nil,
                               onEvent: @escaping (RunEvent) -> Void) async -> ScenarioOutcome {
@@ -692,7 +694,8 @@ public enum ScenarioRunner {
             },
             appPath: appPath, appName: appName, appBundleID: appBundleID,
             hostNotices: hostNotices,
-            registerChildProcess: registerChildProcess, stillFramesDir: stillFramesDir) { event in
+            registerChildProcess: registerChildProcess, stillFramesDir: stillFramesDir,
+            onEventLogStarted: onEventLogStarted) { event in
             if event.kind == "step" || event.kind == "scenarioFinished", let actions = event.actions {
                 onActions?(actions)
             }
@@ -1834,6 +1837,11 @@ public final class RunOrchestrator: Sendable {
                 onActions: { [weak self] actions in
                     guard let self else { return }
                     Task { await self.progressState?.addActions(actions) }
+                },
+                onEventLogStarted: { [weak self] url in
+                    guard let self else { return }
+                    let laneKey = progressLaneKey
+                    Task { await self.progressState?.setLaneEventLog(laneKey: laneKey, path: url.path) }
                 },
                 stillFramesDir: stillFramesDir,
                 onEvent: { [continuation, fmCounter = self.fmUnavailable] event in

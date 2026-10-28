@@ -15,6 +15,12 @@ export const PARENT_PID_ENV = "FT_PARENT_PID";
  * 同一性は別の変数で運ぶ。値は `<hostname>:<pid>`(同じランナーを別の Mac から眺めても衝突しない)。 */
 export const STREAM_OWNER_ENV = "FT_STREAM_OWNER";
 
+/** この拡張ホストの FT_STREAM_OWNER の値。childEnv と、監視が流す monitorRunLog の owner 照合
+ * (monitorRunLogModel.ts)が同じ値を使う —— 組み立てを2か所に置かない。 */
+export function streamOwnerValue(): string {
+  return `${hostname()}:${process.pid}`;
+}
+
 /** 拡張が spawn/exec/execFile する全プロセスに渡す env を組み立てる。既存の追加分(extra)は
  * 保ちつつ FT_PARENT_PID / FT_STREAM_OWNER で上書きする(呼び手が誤って渡していても拡張ホストを優先)。 */
 export function childEnv(extra?: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
@@ -22,6 +28,6 @@ export function childEnv(extra?: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
     ...process.env,
     ...extra,
     [PARENT_PID_ENV]: String(process.pid),
-    [STREAM_OWNER_ENV]: `${hostname()}:${process.pid}`,
+    [STREAM_OWNER_ENV]: streamOwnerValue(),
   };
 }

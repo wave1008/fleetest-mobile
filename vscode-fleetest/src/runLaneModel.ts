@@ -141,6 +141,16 @@ function pushLine(state: RunLaneState, laneId: string, text: string): LaneAction
   return [{ type: "line", laneId, text }];
 }
 
+/** 監視が流す他者の run のログ行(monitorRunLog)を、bus 経路と同じ pushLine でレーンへ積む。
+ * laneState に積むので webview 再生成時の laneHydrate でも戻る。表示文字列は置かない(行は整形済み)。 */
+export function appendLaneLines(state: RunLaneState, laneId: string, lines: readonly string[]): LaneAction[] {
+  const actions: LaneAction[] = [];
+  for (const text of lines) {
+    actions.push(...pushLine(state, laneId, text));
+  }
+  return actions;
+}
+
 /** runStarted 受信時に呼ぶ。 */
 export function resetRunLaneState(state: RunLaneState): LaneAction[] {
   state.lanes.clear();

@@ -217,6 +217,8 @@ struct ApiMonitorCommand: AsyncParsableCommand {
         // 1行も出さないと、拡張は「一度も聞いていない = 不明」のままになり **「空き」を表現できない**
         // (monitorLock の lastOccupancy が Optional なのと同じ理由)
         var lastRunRecords: [RunProgressRecord]?
+        // 台帳が指すシナリオのイベントログを tail して monitorRunLog を出す(ApiMonitorRunLog.swift)
+        let runLogTailer = RunLogTailer()
         while !stop.isSet {
             // 待たない(BridgeLogRotationSampler の doc)。間隔が経っていれば背景で測り始めるだけ
             bridgeLogRotationSampler.scheduleIfDue()
@@ -237,6 +239,8 @@ struct ApiMonitorCommand: AsyncParsableCommand {
                 emitLine(ApiMonitorRunsEvent(
                     runs: Self.monitorRuns(records: currentRunRecords, now: Date(), myIssuer: myIssuer)))
             }
+            // 変化の有無に関わらず毎周期読む(増分があるかはファイルを見ないと分からない。待たない・件数で切らない)
+            for event in runLogTailer.poll(records: currentRunRecords) { emitLine(event) }
             // **保持ファイル(`fleetest monitor pause`)は毎周期の頭で見る** —— kill と違い
             // 拡張に再起動されない止め方(FTCore.MonitorHold)。手元スコープのときだけ:
             // fan-out の子(--device-machine 付き)はランナー機側の hold を親の拡張へ波及させない。

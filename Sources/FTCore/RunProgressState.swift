@@ -16,6 +16,8 @@ actor RunProgressState {
     private let project: String
     private let profile: String?
     private let startedAt: String
+    /// `FT_STREAM_OWNER` の値(init で1回だけ読んで固定)
+    private let owner: String?
     /// pulled(`ScenarioDispatch.pulled`)のときだけ `growTotal` で増える。それ以外は不変
     private var total: Int
     private var done = 0
@@ -46,8 +48,10 @@ actor RunProgressState {
         estimates: [RunProgressEstimate.ScenarioKey: Double] = [:],
         pendingScenarios: [RunProgressEstimate.ScenarioKey] = [],
         supply: RunSupplyProgress? = nil,
+        owner: String? = RunProgressRecord.ownerFromEnvironment(),
         write: (@Sendable (RunProgressRecord) -> Void)?, remove: (@Sendable () -> Void)?) {
         self.supply = supply
+        self.owner = owner
         self.pid = pid
         self.runID = runID
         self.runGroup = runGroup
@@ -85,7 +89,7 @@ actor RunProgressState {
             etaSeconds: ocrCompileWaiters > 0 || videoClips != nil ? nil : currentEtaSeconds(),
             lanes: lanesByKey.values.sorted { $0.key < $1.key },
             phase: ocrCompileWaiters > 0 ? "compiling" : "running",
-            supply: supply?.snapshot() ?? [], videoClips: videoClips)
+            supply: supply?.snapshot() ?? [], videoClips: videoClips, owner: owner)
         guard record != lastWritten else { return }
         let firstWrite = lastWritten == nil
         lastWritten = record
@@ -162,6 +166,17 @@ actor RunProgressState {
 
     func videoClipsProgress(done: Int, total: Int) {
         videoClips = RunProgressVideoClips(done: done, total: total)
+        flush()
+    }
+
+    /// そのレーンが書いているシナリオのイベントログのパス(`ScenarioHost.run(onEventLogStarted:)` が scenarioStarted の後に届ける)。
+    /// シナリオが無いレーン(次へ移った・待機・離脱後に遅れて届いた通知)へは載せない
+    func setLaneEventLog(laneKey: String, path: String) {
+        guard let lane = lanesByKey[laneKey], lane.scenario != nil else { return }
+        lanesByKey[laneKey] = RunProgressLane(
+            key: lane.key, name: lane.name, platform: lane.platform, scenario: lane.scenario,
+            scenarioStartedAt: lane.scenarioStartedAt, expectedSeconds: lane.expectedSeconds,
+            eventLog: path)
         flush()
     }
 

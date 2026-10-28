@@ -348,4 +348,53 @@ final class RunProgressStateTests: XCTestCase {
         await state.scenarioFinished(laneKey: "UDID-A", passed: true)
         XCTAssertNil(journal.writes.last?.lanes.first?.expectedSeconds, "完了後は待機中へ戻る")
     }
+
+    private func makeState(_ journal: Journal, owner: String?) -> RunProgressState {
+        RunProgressState(pid: 4242, runID: "r1", runGroup: nil, issuer: nil, project: "p", profile: nil,
+                         startedAt: Date(), total: 2, owner: owner,
+                         write: { journal.recordWrite($0) }, remove: { journal.recordRemove() })
+    }
+
+    /// イベントログのパスはシナリオ実行中のレーンに載り、次のシナリオ・再キュー・完了・待機で nil へ戻る
+    func testEventLogIsSetOnTheRunningLaneAndClearedWhenItMovesOn() async {
+        let journal = Journal()
+        let state = makeState(journal)
+        await state.laneJoined(key: "UDID-A", name: "iPhone 17-01", platform: "ios")
+        await state.setLaneEventLog(laneKey: "UDID-A", path: "/r/events/.inflight-0.ndjson")
+        XCTAssertNil(journal.writes.last?.lanes.first?.eventLog, "シナリオの無いレーンには載せない(遅れて届いた通知)")
+        await state.scenarioStarted(laneKey: "UDID-A", scenario: "A", at: Date())
+        XCTAssertNil(journal.writes.last?.lanes.first?.eventLog, "scenarioStarted の時点では未設定")
+        await state.setLaneEventLog(laneKey: "UDID-A", path: "/r/events/.inflight-1.ndjson")
+        XCTAssertEqual(journal.writes.last?.lanes.first?.eventLog, "/r/events/.inflight-1.ndjson")
+        XCTAssertEqual(journal.writes.last?.lanes.first?.scenario, "A", "他の欄は保つ")
+        await state.scenarioFinished(laneKey: "UDID-A", passed: true)
+        XCTAssertNil(journal.writes.last?.lanes.first?.eventLog, "完了後の待機では nil")
+        await state.scenarioStarted(laneKey: "UDID-A", scenario: "B", at: Date())
+        XCTAssertNil(journal.writes.last?.lanes.first?.eventLog, "次のシナリオへ移ったら前のパスを持ち越さない")
+        await state.setLaneEventLog(laneKey: "UDID-A", path: "/r/events/.inflight-2.ndjson")
+        await state.laneIdled(laneKey: "UDID-A")
+        XCTAssertNil(journal.writes.last?.lanes.first?.eventLog, "再キューでも nil")
+        await state.scenarioStarted(laneKey: "UDID-A", scenario: "C", at: Date())
+        await state.setLaneEventLog(laneKey: "UDID-A", path: "/r/events/.inflight-3.ndjson")
+        await state.laneLeft(key: "UDID-A")
+        XCTAssertTrue(journal.writes.last?.lanes.isEmpty ?? false, "離脱したレーンごと消える")
+    }
+
+    /// owner は init で渡された値が全 record に載る(環境変数 FT_STREAM_OWNER の値だけ。fallback は読まない)
+    func testOwnerIsCarriedOnEveryRecord() async {
+        let journal = Journal()
+        let state = makeState(journal, owner: "host:123")
+        await state.laneJoined(key: "UDID-A", name: "iPhone 17-01", platform: "ios")
+        await state.addActions(1)
+        XCTAssertFalse(journal.writes.isEmpty)
+        XCTAssertTrue(journal.writes.allSatisfy { $0.owner == "host:123" })
+    }
+
+    func testOwnerFromEnvironmentReadsOnlyStreamOwner() {
+        XCTAssertEqual(RunProgressRecord.ownerFromEnvironment(["FT_STREAM_OWNER": "h:9"]), "h:9")
+        XCTAssertNil(RunProgressRecord.ownerFromEnvironment(["FT_PARENT_PID": "123"]),
+                     "FT_PARENT_PID への fallback はしない(CLI の run は nil)")
+        XCTAssertNil(RunProgressRecord.ownerFromEnvironment(["FT_STREAM_OWNER": ""]))
+        XCTAssertNil(RunProgressRecord.ownerFromEnvironment([:]))
+    }
 }

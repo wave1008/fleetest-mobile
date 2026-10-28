@@ -20,7 +20,7 @@ final class ApiMonitorRunProgressTests: XCTestCase {
             pid: 41233, runID: "r1", runGroup: nil, issuer: issuer, project: "ec-mobile",
             profile: "ios-smoke", startedAt: "2026-09-20T10:03:12Z", total: 12, done: 7, failed: 2, actions: actions,
             requeued: requeued, laneDropouts: laneDropouts,
-            etaSeconds: 999, lanes: lanes, phase: phase, supply: supply, videoClips: videoClips)
+            etaSeconds: 999, lanes: lanes, phase: phase, supply: supply, videoClips: videoClips, owner: nil)
     }
 
     /// 動画の切り出しの進みは台帳の値をそのまま運ぶ(無ければ nil のまま)
@@ -131,7 +131,7 @@ final class ApiMonitorRunProgressTests: XCTestCase {
         let noEstimate = RunProgressRecord(
             pid: 41233, runID: "r1", runGroup: nil, issuer: "alice@air", project: "ec-mobile",
             profile: "ios-smoke", startedAt: "2026-09-20T10:03:12Z", total: 12, done: 7, failed: 2, actions: 0,
-            requeued: 0, laneDropouts: 0, etaSeconds: nil, lanes: [], phase: "running", supply: [], videoClips: nil)
+            requeued: 0, laneDropouts: 0, etaSeconds: nil, lanes: [], phase: "running", supply: [], videoClips: nil, owner: nil)
         let out = ApiMonitorCommand.monitorRuns(records: [noEstimate], now: now, myIssuer: "bob@office")
         XCTAssertNil(out.first?.etaSeconds)
     }
@@ -140,11 +140,11 @@ final class ApiMonitorRunProgressTests: XCTestCase {
         let a = RunProgressRecord(pid: 300, runID: nil, runGroup: nil, issuer: nil, project: "p",
                                   profile: nil, startedAt: "2026-09-20T10:00:00Z", total: 1, done: 0,
                                   failed: 0, actions: 0, requeued: 0, laneDropouts: 0, etaSeconds: nil, lanes: [],
-                                  phase: "running", supply: [], videoClips: nil)
+                                  phase: "running", supply: [], videoClips: nil, owner: nil)
         let b = RunProgressRecord(pid: 100, runID: nil, runGroup: nil, issuer: nil, project: "p",
                                   profile: nil, startedAt: "2026-09-20T10:00:00Z", total: 1, done: 0,
                                   failed: 0, actions: 0, requeued: 0, laneDropouts: 0, etaSeconds: nil, lanes: [],
-                                  phase: "running", supply: [], videoClips: nil)
+                                  phase: "running", supply: [], videoClips: nil, owner: nil)
         let out = ApiMonitorCommand.monitorRuns(records: [a, b], now: now, myIssuer: "bob@office")
         XCTAssertEqual(out.map(\.pid), [100, 300])
     }

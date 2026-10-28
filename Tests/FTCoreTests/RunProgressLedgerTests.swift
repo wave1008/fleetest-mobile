@@ -32,7 +32,7 @@ final class RunProgressLedgerTests: XCTestCase {
             lanes: [RunProgressLane(key: "UDID-A", name: "iPhone 17-01", platform: "ios",
                                     scenario: "05_検索", scenarioStartedAt: "2026-09-20T10:04:00Z",
                                     expectedSeconds: nil)],
-            phase: phase, supply: supply, videoClips: nil)
+            phase: phase, supply: supply, videoClips: nil, owner: nil)
     }
 
     func testDefaultDirectoryIsHomeDotFleetestRuns() {
@@ -47,6 +47,29 @@ final class RunProgressLedgerTests: XCTestCase {
         RunProgressLedger.write(record, directory: dir)
         let read = RunProgressLedger.readAll(directory: dir, isAlive: { _ in true }, startTime: Self.unknownStart)
         XCTAssertEqual(read, [record])
+    }
+
+    /// eventLog(レーン)と owner(record)は台帳を往復する。キー名はリテラルで固定(読み手 api monitor との契約)
+    func testEventLogAndOwnerRoundTripThroughTheLedger() throws {
+        let dir = tempDir()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let lane = RunProgressLane(key: "UDID-A", name: "iPhone 17-01", platform: "ios", scenario: "S",
+                                   scenarioStartedAt: "2026-09-20T10:04:00Z", expectedSeconds: nil,
+                                   eventLog: "/r/events/.inflight-A.ndjson")
+        let record = RunProgressRecord(
+            pid: 41233, runID: nil, runGroup: nil, issuer: nil, project: "p", profile: nil,
+            startedAt: "2026-09-20T10:03:12Z", total: 1, done: 0, failed: 0, actions: 0, requeued: 0,
+            laneDropouts: 0, etaSeconds: nil, lanes: [lane], phase: "running", supply: [], videoClips: nil,
+            owner: "host:77")
+        RunProgressLedger.write(record, directory: dir)
+        let read = RunProgressLedger.readAll(directory: dir, isAlive: { _ in true }, startTime: Self.unknownStart)
+        XCTAssertEqual(read, [record])
+        // キー名をリテラルで固定する(JSONEncoder は "/" を "\/" と書くので、文字列でなく JSON として読む)
+        let data = try Data(contentsOf: dir.appendingPathComponent("41233.json"))
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        XCTAssertEqual(json["owner"] as? String, "host:77")
+        let lanes = try XCTUnwrap(json["lanes"] as? [[String: Any]])
+        XCTAssertEqual(lanes.first?["eventLog"] as? String, "/r/events/.inflight-A.ndjson")
     }
 
     /// 供給の段階は欄ごと往復する(名前・platform・段階の文字列)。リテラルで固定する

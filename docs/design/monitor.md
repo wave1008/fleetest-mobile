@@ -28,6 +28,7 @@ VSCode 拡張のデバイスモニターの設計。
 - DS-18.6 実装の段
 - DS-18.7 やらないと決めたもの
 - DS-18.8 タコメーター(アクション/秒。ユーザー決定 2026-10-28)
+- DS-18.9 実行ログを CLI・他人・リモートの run にも流す(`monitorRunLog`。ユーザー決定 2026-10-28)
 
 ## DS-12 デバイスモニターの画面配信と自己修復
 
@@ -809,11 +810,16 @@ CLI 実行・他人の run・ランナー機で直に打たれた run は `inRun
   "project": "ec-mobile", "profile": "ios-smoke",
   "phase": "running", "requeued": 1, "laneDropouts": 0,
   "startedAt": "2026-09-20T10:03:12Z", "total": 12, "done": 7, "failed": 2,
+  "actions": 412, "owner": "<host>:<pid>",
   "etaSeconds": 190,
   "supply": [ { "name": "iPhone 17-01", "platform": "ios", "step": "booting" } ],
   "lanes": [ { "key": "<udid|serial>", "name": "iPhone 17-01", "platform": "ios",
-               "scenario": "05_検索", "scenarioStartedAt": "…" } ] }
+               "scenario": "05_検索", "scenarioStartedAt": "…",
+               "eventLog": "<runDir>/events/.inflight-<UUID>.ndjson" } ] }
 ```
+
+`actions`(デバイスへ送った操作の累計)は DS-18.8、`owner`(拡張から起こした run の印)と `eventLog`(そのレーンがいま書いて
+いるイベントログ)は DS-18.9。
 
 - **記帳は `RunOrchestrator` の1箇所**。run-lease と同じ注入口(`writeRunLease` の隣)で、
   `runSequential` / `runParallel` の両方がここを通る = 記帳の実装を2つ持たない
@@ -1111,7 +1117,7 @@ CLI 実行・他人の run・ランナー機で直に打たれた run は `inRun
 - **空き機械の要約をヘッダに置くこと**: 要約と本体で同じ情報が2箇所に出て邪魔になる(ユーザー決定
   2026-09-20)。空き機械は本体に並べ、ヘッダには件数だけを置く(DS-18.5)
 - **自分の run だけ `runEvent` から描く**: 供給源を台帳に一本化する。2通りの経路を持つと、
-  同じ run が自分と他人で違う数字になる(runEvent はログレーン用に残す)
+  同じ run が自分と他人で違う数字になる(runEvent はログレーン用に残す。他人・CLI・リモートの run のログは DS-18.9)
 - **`results/<runID>/run.json` を実況の供給源にする**: `RunMetaRecord` は begin() の時点で pid ごと
   書かれており「実行中かクラッシュか」も読めるが、①**発行者ごとの work の下**にあるので他人の run が
   見えない ②毎周期 `scenarios/*.json` を数えるのは走査が重い ③**結果 JSON のスキーマの定義元は
@@ -1151,3 +1157,28 @@ run ボードの見出しに、「実行中 N」・全て展開の右から順�
   読めないので採らなかった。推移の線の縦だけは表示中の最大に合わせる
 - **色は VSCode のテーマに従う**(`body.vscode-dark` はネオンの発光、`vscode-light` は発光なしの計器調、ハイコントラストは
   テーマの色だけ)。発光は点いた段・数値・推移の線だけで、見出し行の地色と文字はテーマ色のまま。**数値の文字色はいちばん上に点いている段の色**(低・中・高。何も点いていなければ最下段の色。ユーザー決定)
+
+### DS-18.9 実行ログを CLI・他人・リモートの run にも流す(`monitorRunLog`。ユーザー決定 2026-10-28)
+
+実行ログビューの行は、拡張が自分で起こした run の NDJSON(`runEvent`)からしか来なかった。run ボードと同じく
+**誰がどこから起こした run でも**、各マシンの監視が自分のマシンのイベントログを読んで流す。
+
+- **デバイスとファイルの対応は台帳に載せる**: イベントログ(`events/.inflight-<UUID>.ndjson`)自身にはデバイスの情報が無いので、
+  親(`ScenarioHost.run` → `RunOrchestrator`)がレーンの `RunProgressLane.eventLog` に**いま書いているファイルの絶対パス**を書く。
+  レーンが次のシナリオへ移る・待機になると nil に戻る
+- **読み手は各マシンの `api monitor`**(`RunLogTailer`。`Sources/fleetest/ApiMonitorRunLog.swift`): 台帳が指すファイルを
+  **先頭から** fd で開き、毎周期、前回の位置から増えたぶんだけ pread で読む。**fd を持ち続ける**ので、シナリオの終わりの
+  rename の後も読み切れる。**周期の中で待たない**(1周期で読むのは読み始めた時点のファイルサイズまで)。開くのは
+  `events/.inflight-*.ndjson` の通常ファイルだけ(台帳は機械グローバルで誰でも書ける)
+- **整形は `ScenarioLogFormatter`**(CLI の通常出力と同じ)。stderr / text の行はそのまま・読めない行も原文で出す(捨てない)
+- **行を省略・間引き・件数で打ち切らない**(ユーザー決定。テストのエビデンス)。画面のレーンは従来どおり最新 500 行
+  (`runLaneModel.ts` の `MAX_LANE_LINES`)で古い行から消えるが、証跡はディスクのイベントログに全部残る(ユーザー決定)
+- **ssh は足さない**: リモートは既存の fan-out の1本に `monitorRunLog` が乗る。中継(`RemoteMonitorFanout.ingest`)が
+  `machine` を埋め、`device` をマシン付きの id(`<platform>:<machine>/<name>`)に直す
+- **拡張が自分で起こした run は捨てる**(既存の `runEvent` で既に出ている。そちらは供給の進行・待機列なども持つので経路を1本に
+  まとめない)。見分けは台帳の `RunProgressRecord.owner` = run を回すプロセスの `FT_STREAM_OWNER`(拡張ホストが子へ渡し、
+  `RemoteShell` が ssh 越しにも export する)。拡張は自分の値(`childEnv.ts` の `streamOwnerValue`)と一致する行を捨てる。
+  CLI の run は owner が無いので表示する
+- **既知の限界**: 監視の1周期(約 2 秒)より短いシナリオは、監視が開く前に rename されて画面に出ないことがある(ディスクには残る)
+- ProtocolVersion 61(台帳の `eventLog` / `owner`・`monitorRunLog`)
+

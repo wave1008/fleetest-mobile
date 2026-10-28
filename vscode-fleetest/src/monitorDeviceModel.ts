@@ -213,6 +213,9 @@ export interface MonitorRunVideoClips {
 }
 
 /** `fleetest api monitor` の NDJSON 1行分のイベント(kind で判別)。 */
+/** 実行ログの行のイベント(monitorRunLog)。monitorPanel.ts / monitorRunLogModel.ts が受ける */
+export type MonitorRunLogEvent = Extract<MonitorEvent, { kind: "monitorRunLog" }>;
+
 export type MonitorEvent =
   | { readonly kind: "monitorDevices"; readonly devices: readonly MonitorDevice[] }
   // 1台のストレージ計測が終わった瞬間(契約は Sources/fleetest/ApiMonitorEvents.swift の ApiMonitorStorageEvent)。
@@ -260,6 +263,19 @@ export type MonitorEvent =
       readonly machine?: string;
       readonly observed: boolean;
       readonly runs: readonly MonitorRunEntry[];
+    }
+  // 実行ログビューへ流す、CLI・他人・リモートが起こした run のデバイス別ログ(ProtocolVersion 61)。
+  // device は monitorDevices の id(= 実行ログのレーン id)。lines は周期ごとの増分。
+  // owner = その run を起こしたプロセスの FT_STREAM_OWNER(拡張が起こした run はこの拡張ホストの値
+  // = 既に bus 経路で出ているので捨てる。monitorRunLogModel.ts)。契約: Sources/fleetest の monitorRunLog と対
+  | {
+      readonly kind: "monitorRunLog";
+      readonly machine?: string;
+      readonly device: string;
+      readonly runID?: string;
+      readonly pid: number;
+      readonly owner?: string;
+      readonly lines: readonly string[];
     }
   // ブリッジ診断ログの合計が上限を超え、起動し直しの候補になったデバイス(§背景・
   // monitorBridgeLogRotation.ts が消費)。候補が変わったとき/最初の1回だけ届く(周期毎ではない)。
@@ -521,6 +537,21 @@ export function isMonitorEvent(value: unknown): value is MonitorEvent {
         (value.machine === undefined || typeof value.machine === "string") &&
         Array.isArray(value.runs) &&
         value.runs.every(isMonitorRunEntry)
+      );
+    case "monitorRunLog":
+      for (const key of ["machine", "runID", "owner"] as const) {
+        if (value[key] === null) {
+          value[key] = undefined;
+        }
+      }
+      return (
+        typeof value.device === "string" &&
+        typeof value.pid === "number" &&
+        (value.machine === undefined || typeof value.machine === "string") &&
+        (value.runID === undefined || typeof value.runID === "string") &&
+        (value.owner === undefined || typeof value.owner === "string") &&
+        Array.isArray(value.lines) &&
+        value.lines.every((line) => typeof line === "string")
       );
     case "monitorBridgeLogRotation":
       // 契約上ここに machine は乗らない(このマシンのデバイスだけ・リモート中継なし)。

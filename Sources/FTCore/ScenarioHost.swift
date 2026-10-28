@@ -594,6 +594,9 @@ public enum ScenarioHost {
                            /// true = シナリオではなくクラスの afterAll だけを走らせる(runAfterAlls 専用)。
                            /// scenarioID は "<Class>.afterAll"。扱いは deviceTearDownOnly と同じ(記録に載せない)
                            afterAllOnly: Bool = false,
+                           /// イベントログ(inflight)を開いた直後に、その絶対パスを呼び手へ知らせる(run 進捗の台帳へ載せて
+                           /// 他のプロセスの `api monitor` に読ませる)。ログを開けなかった・記録の無い経路では呼ばれない
+                           onEventLogStarted: (@Sendable (URL) -> Void)? = nil,
                            onEvent: @escaping (ScenarioEvent) -> Void) async -> Bool {
         // 所要(startedAt / clockStart)に含めないよう、計時より前で待つ(awaitOCRModelCompile の doc)。
         // RunOrchestrator 経由ならシナリオの印より前で待ち終えているので、ここは即抜ける
@@ -637,6 +640,7 @@ public enum ScenarioHost {
         // **FT_EVENT_LOG_PATH / EventLogAppender(下のベンチ用)とは無関係の別物**
         let eventLog: ScenarioEventLog? = (dryRun ? nil : recording)
             .flatMap { ScenarioEventLog.start(runDir: $0.recorder.runDir) }
+        if let eventLog { onEventLogStarted?(eventLog.inflightURL) }
         // このシナリオの窓 [startedAt, 確定] の間に人が同じデバイスをライブ操作で触った事実(`HumanOperationLedger`)。
         // 鍵は run-lease と同じ(`serial ?? udid`)。iOS の --port 直指定で udid が無いときは引かない。
         // 確定点3つ(起動前の失敗・タイムアウト・通常終了)が必ず通る
