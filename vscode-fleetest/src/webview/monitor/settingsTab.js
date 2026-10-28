@@ -423,7 +423,11 @@ function ensureColorPopover() {
     }
     closeColorPopover();
   });
-  window.addEventListener('scroll', () => closeColorPopover(), true);
+  // ログの欄([data-auto-scroll-log])の自動スクロールでは閉じない(deviceTiles.js の同じ扱いを参照)
+  window.addEventListener('scroll', (event) => {
+    if (event.target instanceof Element && event.target.closest('[data-auto-scroll-log]')) { return; }
+    closeColorPopover();
+  }, true);
   return colorPopover;
 }
 

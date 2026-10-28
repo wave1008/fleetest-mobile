@@ -78,6 +78,8 @@ export function clockText(now = new Date()) {
  * persistKey: 幅を vscode.setState に保存するキー。defaultLabelWidth: CSS の --oplog-label-width の既定と揃えること。
  * 見出し行は一覧の中に置く(外に置くと横スクロールで列がずれる)。clear / replace・行数の上限では消さない。 */
 export function createOplogView(listEl, { persistKey, defaultLabelWidth }) {
+  // 自分で末尾へスクロールする欄の印(laneLog.js の lane-body と同じ。右クリックのメニューはこの中の scroll では閉じない)
+  listEl.dataset.autoScrollLog = '';
   let labelWidth =
     typeof persistedState[persistKey] === 'number' && persistedState[persistKey] >= MIN_OPLOG_LABEL_WIDTH
       ? persistedState[persistKey]

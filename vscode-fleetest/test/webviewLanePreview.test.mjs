@@ -602,3 +602,38 @@ test("点灯マークの色は OS で分ける(Android は緑系 = data-platform
   const lamps = visiblePreviews(document).map((el) => el.querySelector(".run-lamp").dataset.platform).sort();
   assert.deepEqual(lamps, ["android", "ios"]);
 });
+
+test("右クリックのメニューは、実行ログの欄の自動スクロールでは閉じない(ほかのスクロールでは閉じる)", (t) => {
+  const { window, document } = createWebview();
+  t.after(() => window.close());
+  sendDevices(window, [{}]);
+  clickTile(document, 0);
+  const tile = document.querySelector("#grid .tile");
+  tile.dispatchEvent(new window.MouseEvent("contextmenu", { bubbles: true, cancelable: true, clientX: 50, clientY: 50 }));
+  const menu = document.getElementById("device-op-menu");
+  assert.ok(menu.classList.contains("visible"), "メニューが開く");
+  const logBody = document.querySelector("#lanes-grid .lane-body");
+  assert.ok(logBody?.hasAttribute("data-auto-scroll-log"), "実行ログの欄に印がある");
+  logBody.dispatchEvent(new window.Event("scroll"));
+  assert.ok(menu.classList.contains("visible"), "ログの欄のスクロールでは閉じない");
+  document.getElementById("grid").dispatchEvent(new window.Event("scroll"));
+  assert.ok(!menu.classList.contains("visible"), "タイルの並びのスクロールでは閉じる");
+});
+
+test("devices サイクルで並びが変わらなければ実行ログのレーンを付け直さない(本文のスクロール位置が先頭へ戻らない)", (t) => {
+  const { window, document } = createWebview();
+  t.after(() => window.close());
+  sendDevices(window, [{}, {}, {}]);
+  const grid = document.getElementById("lanes-grid");
+  const moved = [];
+  const observer = new window.MutationObserver((records) => {
+    for (const r of records) { moved.push(...r.removedNodes); }
+  });
+  observer.observe(grid, { childList: true });
+  t.after(() => observer.disconnect());
+  sendDevices(window, [{}, {}, {}]);
+  sendDevices(window, [{}, {}, {}]);
+  return new Promise((resolve) => setTimeout(resolve, 0)).then(() => {
+    assert.equal(moved.length, 0, "同じ並びのまま付け直していない");
+  });
+});

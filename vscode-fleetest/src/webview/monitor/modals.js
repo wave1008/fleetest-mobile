@@ -1589,7 +1589,11 @@ document.addEventListener('keydown', (event) => {
   closeDevicePickDeleteMenu();
   event.preventDefault();   // メニューを閉じただけで、奥のダイアログは閉じない
 });
-document.addEventListener('scroll', () => closeDevicePickDeleteMenu(), true);
+// ログの欄([data-auto-scroll-log])の自動スクロールでは閉じない(deviceTiles.js の同じ扱いを参照)
+document.addEventListener('scroll', (event) => {
+  if (event.target instanceof Element && event.target.closest('[data-auto-scroll-log]')) { return; }
+  closeDevicePickDeleteMenu();
+}, true);
 window.addEventListener('resize', () => closeDevicePickDeleteMenu());
 // 行上の contextmenu は stopPropagation 済み。行外で右クリックした場合に残さないためのガード。
 document.addEventListener('contextmenu', () => closeDevicePickDeleteMenu());

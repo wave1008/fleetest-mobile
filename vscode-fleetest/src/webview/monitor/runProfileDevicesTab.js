@@ -438,6 +438,10 @@ document.addEventListener('keydown', (event) => {
     closeDeviceMenu();
   }
 });
-document.addEventListener('scroll', () => closeDeviceMenu(), true);
+// ログの欄([data-auto-scroll-log])の自動スクロールでは閉じない(deviceTiles.js の同じ扱いを参照)
+document.addEventListener('scroll', (event) => {
+  if (event.target instanceof Element && event.target.closest('[data-auto-scroll-log]')) { return; }
+  closeDeviceMenu();
+}, true);
 window.addEventListener('resize', () => closeDeviceMenu());
 document.addEventListener('contextmenu', () => closeDeviceMenu());

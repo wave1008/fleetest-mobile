@@ -1884,6 +1884,12 @@ body.vscode-dark .run-lamp {
   stroke-width: 6;
   opacity: 0.9;
 }
+/* 実行ログビューの行の高さはビューの高さに合わせる(レーンは横に並ぶ1行だけ)。指定しないと行の高さが中身(ログの行数)
+   まで伸び、レーンの本文ではなく #lanes-grid 全体がスクロールして、本文の自動送り(laneLog.js の appendLaneLine)が
+   効かなかった。最低の高さは .lane の min-height と同じ */
+#lanes-grid {
+  grid-auto-rows: minmax(160px, 1fr);
+}
 .lane {
   display: flex;
   flex-direction: column;

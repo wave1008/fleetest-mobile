@@ -1445,7 +1445,12 @@ document.addEventListener('keydown', (event) => {
   }
 });
 // capture:true: scroll はバブリングしないため、子要素(grid横スクロール等)のscrollも拾うために必要。
-document.addEventListener('scroll', () => closeDeviceOpMenu(), true);
+// **ログの欄([data-auto-scroll-log])の中の scroll では閉じない** —— 行が足されるたびに欄が自分で末尾へ送り、
+// その scroll でメニューが選ぶ前に閉じていた。ログの欄はタイルとは別の欄なので、メニューの指す先は動かない
+document.addEventListener('scroll', (event) => {
+  if (event.target instanceof Element && event.target.closest('[data-auto-scroll-log]')) { return; }
+  closeDeviceOpMenu();
+}, true);
 window.addEventListener('resize', () => closeDeviceOpMenu());
 // タイル外の右クリック(OS既定メニューが開く場合)用。タイル上はstopPropagation済みで来ない。
 document.addEventListener('contextmenu', () => closeDeviceOpMenu());

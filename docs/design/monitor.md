@@ -1179,6 +1179,14 @@ run ボードの見出しに、「実行中 N」・全て展開の右から順�
   まとめない)。見分けは台帳の `RunProgressRecord.owner` = run を回すプロセスの `FT_STREAM_OWNER`(拡張ホストが子へ渡し、
   `RemoteShell` が ssh 越しにも export する)。拡張は自分の値(`childEnv.ts` の `streamOwnerValue`)と一致する行を捨てる。
   CLI の run は owner が無いので表示する
+- **自動スクロールで右クリックのメニューを閉じない**: 実行ログの欄は行が足されるたびに自分で末尾へ送り、その scroll で
+  「どこかのスクロールで閉じる」メニュー(デバイスの操作・デバイス選択の削除・マシンの色)が選ぶ前に閉じていた。自分で送る欄に
+  `data-auto-scroll-log` を付け、その中の scroll では閉じない(ログの欄はタイルとは別の欄で、メニューの指す先は動かない)
+- **末尾にいるときだけ自動で末尾へ送る**(ユーザー決定)。送るのはレーンの本文(`.lane-body`)なので、実行ログビューの行の高さを
+  ビューに合わせる(`#lanes-grid { grid-auto-rows: minmax(160px, 1fr) }`)。指定が無いと行が中身の行数まで伸び、外側の
+  `#lanes-grid` がスクロールして本文の送りが効かなかった
+  **並びが変わらない限りレーンを付け直さない**(`laneLog.js` の `reorderLanes`)—— devices サイクルごとに `appendChild` で付け直すと、
+  本文のスクロール位置が先頭へ戻り、末尾で読んでいても勝手に上へ跳んだ
 - **既知の限界**: 監視の1周期(約 2 秒)より短いシナリオは、監視が開く前に rename されて画面に出ないことがある(ディスクには残る)
 - ProtocolVersion 61(台帳の `eventLog` / `owner`・`monitorRunLog`)
 

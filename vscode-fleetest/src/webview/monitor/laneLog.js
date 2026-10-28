@@ -56,14 +56,24 @@ function reorderLanes() {
   const ordered = [...lanes.keys()].sort(
     (a, b) => (rank.get(a) ?? Number.MAX_SAFE_INTEGER) - (rank.get(b) ?? Number.MAX_SAFE_INTEGER),
   );
-  for (const id of ordered) {
-    const lane = lanes.get(id);
-    lanesGrid.appendChild(lane.el);
-    if (lane.previewEl.parentElement === previewGrid) {
-      previewGrid.appendChild(lane.previewEl);
-    }
+  // **並びが既に正しければ付け直さない** —— devices サイクル(約 2 秒)ごとに呼ばれるので、毎回 appendChild で移動すると
+  // レーンの本文のスクロール位置が先頭へ戻り(付け直した要素はスクロール位置を失う)、末尾で読んでいても勝手に上へ跳んだ
+  const laneEls = ordered.map((id) => lanes.get(id).el);
+  if (!sameChildOrder(lanesGrid, laneEls)) {
+    for (const el of laneEls) { lanesGrid.appendChild(el); }
+  }
+  const previewEls = ordered.map((id) => lanes.get(id).previewEl).filter((el) => el.parentElement === previewGrid);
+  if (!sameChildOrder(previewGrid, previewEls)) {
+    for (const el of previewEls) { previewGrid.appendChild(el); }
   }
   syncLaneMachineRow();
+}
+
+/** parent の子のうち els に含まれるものが、els と同じ順で並んでいるか(ほかの子は無視する) */
+function sameChildOrder(parent, els) {
+  const wanted = new Set(els);
+  const current = [...parent.children].filter((el) => wanted.has(el));
+  return current.length === els.length && current.every((el, index) => el === els[index]);
 }
 
 // worker id(またはタイルが存在しない全体レーン)ごとの「実行中」状態。
@@ -129,6 +139,9 @@ function ensureLane(id, name, platform, updateLabel, machine) {
   setLaneHeader(header, name, platform, machine);
   const body = document.createElement('div');
   body.className = 'lane-body';
+  // 行が足されるたびに自分で末尾へスクロールする欄の印。右クリックのメニューはこの中の scroll では閉じない
+  // (deviceTiles.js / runProfileDevicesTab.js。プログラムのスクロールでも scroll イベントが出て、選ぶ前に閉じていた)
+  body.dataset.autoScrollLog = '';
   el.append(header, body);
   lanesGrid.appendChild(el);
 
