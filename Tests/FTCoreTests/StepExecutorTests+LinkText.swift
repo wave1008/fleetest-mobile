@@ -39,10 +39,12 @@ final class StepExecutorLinkTextTests: XCTestCase {
                     frame: FTRect(x: 0, y: 360, width: 400, height: 60), depth: 1)
     }
 
-    private func run(screenshots: [Data], linkText: String) async -> (StepOutcome, FakeAppDriver) {
+    private func run(screenshots: [Data], linkText: String,
+                     commandTimeoutSeconds: TimeInterval? = nil) async -> (StepOutcome, FakeAppDriver) {
         let driver = FakeAppDriver(name: "primary", log: CallLog(), snapshotElements: [[paragraph()]],
                                    screenshots: screenshots)
-        let executor = StepExecutor(driver: driver, occlusionOCRMode: .off, isAndroid: true, tunables: RunTunables())
+        let executor = StepExecutor(driver: driver, occlusionOCRMode: .off, isAndroid: true, tunables: RunTunables(),
+                                    commandTimeoutSeconds: commandTimeoutSeconds)
         var step = FlowStep(action: "tap", locator: FlowLocator(id: "terms"))
         step.linkText = linkText
         return (await executor.execute(step), driver)
@@ -91,6 +93,42 @@ final class StepExecutorLinkTextTests: XCTestCase {
         guard case .failed(let message) = outcome.status else { XCTFail("実際は \(outcome.status)"); return }
         XCTAssertTrue(message.contains("OCR read nothing from a built-in image with known text either, just now"), message)
         XCTAssertFalse(message.contains("single colour"), message)
+        XCTAssertFalse(message.contains("waited"), "外枠の無い呼び手(MCP)は読み手を待たない: \(message)")
+    }
+
+    /// 読み手がその瞬間に失敗していたら、外枠の中で戻るのを待って読み直す(読みは操作ではないので撃ち直しても二重にならない)
+    func testWaitsForTheReaderToRecoverAndThenFindsTheLink() async throws {
+        setenv(OCRDeadInjection.environmentKey, "1", 1)
+        defer { unsetenv(OCRDeadInjection.environmentKey) }
+        // 最初の1周(3 回撮る ≒ 1〜2 秒)が死んだまま終わってから戻す = 待つ経路を通る
+        _ = await RegionText.awaitModelCompile(mode: .on)
+        let revive = Task { try await Task.sleep(for: .seconds(4)); unsetenv(OCRDeadInjection.environmentKey) }
+        defer { revive.cancel() }
+        let (outcome, _) = await run(screenshots: [try shot("Please accept the Terms of Service")],
+                                     linkText: "Terms of Service", commandTimeoutSeconds: 30)
+        guard case .passed = outcome.status else { XCTFail("実際は \(outcome.status)"); return }
+        let note = outcome.driverFallback ?? ""
+        XCTAssertTrue(note.contains("located by ocr"), note)
+        XCTAssertTrue(note.contains("waited") && note.contains("for the OCR reader to recover"), note)
+    }
+
+    /// 戻らなければ外枠の中で諦め、待った事実と読み手の故障の両方を言う(外枠を使い切って無情報の timeout にしない)
+    func testGivesUpWithinTheCommandTimeoutWhenTheReaderStaysDead() async throws {
+        setenv(OCRDeadInjection.environmentKey, "1", 1)
+        defer { unsetenv(OCRDeadInjection.environmentKey) }
+        // コンパイル待ちは締め切りから外す扱い(DeadlineExclusion)なので、先に済ませてから測る
+        _ = await RegionText.awaitModelCompile(mode: .on)
+        let clock = ContinuousClock()
+        let start = clock.now
+        let (outcome, _) = await run(screenshots: [try shot("Please accept the Terms of Service")],
+                                     linkText: "Terms of Service", commandTimeoutSeconds: 4)
+        let elapsed = clock.now - start
+        guard case .failed(let message) = outcome.status else { XCTFail("実際は \(outcome.status)"); return }
+        XCTAssertTrue(message.contains("OCR read nothing from a built-in image with known text either, just now"), message)
+        XCTAssertTrue(message.contains("for the OCR reader to recover"), message)
+        XCTAssertGreaterThan(elapsed, .seconds(2), "待たずに諦めた")
+        // 外枠 4 秒 + 諦めた後の故障の確かめ1回ぶん
+        XCTAssertLessThan(elapsed, .seconds(5), "外枠を越えて待った")
     }
 
     /// 生死の確認の絵そのものが、生きた読み手で読めること(読めない絵だと常に「故障」と言ってしまう)。
