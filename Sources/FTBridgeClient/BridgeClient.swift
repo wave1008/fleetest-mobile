@@ -932,6 +932,13 @@ public final class BridgeClient: AppDriver, Sendable {
         return phones.first.map { .physical(udid: $0.udid) }
     }
 
+    /// ステップ実行器の期待(`RefExpectationScope`)が自分の最新の表と食い違えば撃たずに断る(DOM の ref は座標で撃つので照合しない)
+    private func refuseIfStepExpectationContradicts(_ ref: Int) throws {
+        guard let expected = RefExpectationScope.expected, let latest = refExpectations[ref],
+              RefExpectationScope.contradicts(expected, latest: latest) else { return }
+        throw DriverError.staleRef(detail: RefExpectationScope.refusalDetail(ref: ref, expected: expected, latest: latest))
+    }
+
     public func tap(ref: Int) async throws {
         lastActionNote = nil
         lastTapHitAreaMiss = nil
@@ -939,6 +946,7 @@ public final class BridgeClient: AppDriver, Sendable {
             try await tap(x: center.x, y: center.y)
             return
         }
+        try refuseIfStepExpectationContradicts(ref)
         let probe = Self.staleTapProbeEnabled(ProcessInfo.processInfo.environment) ? true : nil
         let res: OKResponse = try await post("/tap", body: TapRequest(ref: ref, expect: refExpectations[ref],
                                                                       probeStaleRef: probe),
@@ -975,6 +983,7 @@ public final class BridgeClient: AppDriver, Sendable {
             try await tap(x: center.x, y: center.y)
             ref = nil
         }
+        if let ref { try refuseIfStepExpectationContradicts(ref) }
         let res: OKResponse = try await post("/type", body: TypeRequest(ref: ref, text: text, expect: ref.flatMap { refExpectations[$0] }),
                                              timeout: interactionTimeout)
         // ランナーの打ち直し(TypeReadback.Plan.retype)の申告。tap と同じく driverFallback へ運ぶ
@@ -991,6 +1000,7 @@ public final class BridgeClient: AppDriver, Sendable {
             try await tap(x: center.x, y: center.y)
             ref = nil
         }
+        if let ref { try refuseIfStepExpectationContradicts(ref) }
         let _: OKResponse = try await post("/clear", body: ClearRequest(ref: ref, expect: ref.flatMap { refExpectations[$0] }),
                                            timeout: interactionTimeout)
     }
@@ -1213,6 +1223,7 @@ public final class BridgeClient: AppDriver, Sendable {
             try await press(x: center.x, y: center.y, duration: duration)
             return
         }
+        try refuseIfStepExpectationContradicts(ref)
         let _: OKResponse = try await post("/press", body: PressRequest(ref: ref, duration: duration, expect: refExpectations[ref]),
                                            timeout: timeout(forDuration: duration))
     }

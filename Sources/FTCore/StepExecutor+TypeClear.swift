@@ -28,7 +28,9 @@ extension StepExecutor {
             resolved = again
         }
         start = clock.now
-        try await td.type(ref: resolved.element.ref, text: step.text ?? "")
+        try await RefExpectationScope.firing(resolved.element) {
+            try await td.type(ref: resolved.element.ref, text: step.text ?? "")
+        }
         phase.actionMs += Self.ms(clock.now - start)
         return (true, note)
     }
@@ -514,7 +516,8 @@ extension StepExecutor {
         var actingSnapshot = refreshed?.snapshot
         do {
             let start = clock.now
-            try await actingDriver.clearInput(ref: refreshed?.element.ref ?? element.ref)
+            let target = refreshed?.element ?? element
+            try await RefExpectationScope.firing(target) { try await actingDriver.clearInput(ref: target.ref) }
             phase.actionMs += Self.ms(clock.now - start)
             // 事後検証: ブリッジが 200 を返しても実際に消えていない(嘘の成功)場合の保険。
             // 同じ driver で snapshot を撮り直し、同じ locator を再解決して value を見る

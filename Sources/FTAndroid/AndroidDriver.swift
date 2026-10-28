@@ -19,6 +19,9 @@ public final class AndroidDriver: AppDriver {
     // 直近スナップショットの ref → 中心座標(iOS ランナーと同じ方式)。iOS と違い CLI プロセス内に
     // 住むため、呼び出しをまたぐ手動駆動用に一時ファイルへも永続化する(run は単一プロセスで不要だが無害)
     private var refCenters: [Int: (x: Double, y: Double)] = [:]
+    /// 最後の snapshot(重複の除去・DOM の差し込みの後 = ステップ実行器が見る木)の ref ごとの目印。永続化しない
+    /// (別プロセスで復元した表には無い = 照合しない)。`RefExpectationScope` の照合相手
+    private var refExpectationTable: [Int: RefExpectation] = [:]
     /// DOM 由来の要素の ref → ブリッジが知っている a11y の ref(自作アプリの WebView のときだけ埋まる)。
     /// **注入(type / clear)でだけ差し替える**。ブリッジは自分の snapshot の ref しか受け付けない
     /// (未知の ref は 404)ので、これが無いと WebView 内の入力だけが落ちる
@@ -701,7 +704,21 @@ public final class AndroidDriver: AppDriver {
         guard let center = refCenters[ref] else {
             throw DriverError.badResponse(status: 404, body: "unknown reference number [\(ref)]. Take a snapshot first")
         }
+        try refuseIfStepExpectationContradicts(ref)
         try await tap(x: center.0, y: center.1)
+    }
+
+    /// ステップ実行器の期待(`RefExpectationScope`)を**自分の表**と照らし、食い違えば撃たずに断る。
+    /// 内側の BridgeClient へは期待を外して渡す(呼び手が `withoutStepExpectation` で包む)—— あちらの表は DOM の差し込み前で、
+    /// DOM の ref は `bridgeRef` で別の番号へ写るので、照らすと誤って断る
+    private func refuseIfStepExpectationContradicts(_ ref: Int?) throws {
+        guard let ref, let expected = RefExpectationScope.expected, let latest = refExpectationTable[ref],
+              RefExpectationScope.contradicts(expected, latest: latest) else { return }
+        throw DriverError.staleRef(detail: RefExpectationScope.refusalDetail(ref: ref, expected: expected, latest: latest))
+    }
+
+    private func withoutStepExpectation<T>(_ body: () async throws -> T) async rethrows -> T {
+        try await RefExpectationScope.$expected.withValue(nil) { try await body() }
     }
 
     public func tap(x: Double, y: Double) async throws {
@@ -710,8 +727,9 @@ public final class AndroidDriver: AppDriver {
 
     public func clearInput(ref: Int?) async throws {
         restoreStateIfNeeded()
+        try refuseIfStepExpectationContradicts(ref)
         let target = bridgeRef(ref)
-        try await withBridge { try await $0.clearInput(ref: target) }
+        try await withoutStepExpectation { try await withBridge { try await $0.clearInput(ref: target) } }
     }
 
     /// ホストの ref をブリッジが知っている ref へ写す(DOM 由来だけ差し替わる。domBridgeRefs 参照)。
@@ -745,13 +763,15 @@ public final class AndroidDriver: AppDriver {
         await settleViaBridge()
     }
 
-    /// ブリッジ snapshot の結果をホスト側 ref テーブルにも写す(CLI プロセス跨ぎの手動駆動を保つ)
-    private func syncLocalState(from snapshot: SnapshotResponse) {
+    /// ブリッジ snapshot の結果をホスト側 ref テーブルにも写す(CLI プロセス跨ぎの手動駆動を保つ)。internal = テストが表を置く口
+    func syncLocalState(from snapshot: SnapshotResponse) {
         var centers: [Int: (x: Double, y: Double)] = [:]
         for element in snapshot.elements {
             centers[element.ref] = (x: element.frame.centerX, y: element.frame.centerY)
         }
         refCenters = centers
+        refExpectationTable = Dictionary(snapshot.elements.map { ($0.ref, RefExpectation($0)) },
+                                         uniquingKeysWith: { first, _ in first })
         screen = snapshot.screen
         persistState()
     }
@@ -769,15 +789,16 @@ public final class AndroidDriver: AppDriver {
         // 分離して本文の SET_TEXT 後に Enter キーイベントを送る(pressEnter と同じ経路。文中の
         // 改行はそのまま文字として本文に残す)
         restoreStateIfNeeded()
+        try refuseIfStepExpectationContradicts(ref)
         let target = bridgeRef(ref)
         let (main, hasTrailingNewline) = Self.splitTrailingNewline(text)
         do {
             guard hasTrailingNewline else {
-                try await withBridge { try await $0.type(ref: target, text: text) }
+                try await withoutStepExpectation { try await withBridge { try await $0.type(ref: target, text: text) } }
                 return
             }
             // 本文が空でも ref があれば SET_TEXT を通し、対象ノードへのフォーカス確立を維持する
-            try await withBridge { try await $0.type(ref: target, text: main) }
+            try await withoutStepExpectation { try await withBridge { try await $0.type(ref: target, text: main) } }
         } catch let error as DriverError {
             throw Self.typeNoFocusAdvice(after: error, hadRef: ref != nil) ?? error
         }
@@ -1247,6 +1268,7 @@ public final class AndroidDriver: AppDriver {
         guard let center = refCenters[ref] else {
             throw DriverError.badResponse(status: 404, body: "unknown reference number [\(ref)]. Take a snapshot first")
         }
+        try refuseIfStepExpectationContradicts(ref)
         // tap(ref:) と同じくホスト側で座標解決してブリッジへは x/y で送る(ブリッジ再起動で
         // ブリッジ側 ref 表だけが消えてもずれない。注入経路は InputInjector.press のまま)。
         // ブリッジ v8 以降が前提(v7 は /press が ref 必須。probe の版照合で自動更新される)

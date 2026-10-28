@@ -719,7 +719,9 @@ extension StepExecutor {
                         try await actingDriver.press(x: element.frame.centerX, y: bandY, duration: hold)
                         driverFallback = Self.joinNotes(driverFallback, Self.bottomBandTapNote)
                     } else {
-                        try await actingDriver.press(ref: element.ref, duration: hold)
+                        try await RefExpectationScope.firing(element) {
+                            try await actingDriver.press(ref: element.ref, duration: hold)
+                        }
                     }
                     phase.actionMs += Self.ms(clock.now - start)
                 } catch {
@@ -807,7 +809,7 @@ extension StepExecutor {
                 adviseTarget(TapTargetGeometry.occlusionAdvisory(
                     for: element, in: snapshot.elements, screen: snapshot.screen, isAndroid: isAndroid))
                 do {
-                    try await actingDriver.tap(ref: element.ref)
+                    try await RefExpectationScope.firing(element) { try await actingDriver.tap(ref: element.ref) }
                     // 読むのは ref で撃った直後だけ(座標の経路は tap(ref:) を通らない = 前回の値が残る)
                     if let miss = actingDriver.lastTapHitAreaMiss {
                         let centre = "(\(Int(miss.x.rounded())), \(Int(miss.y.rounded())))"
@@ -985,7 +987,9 @@ extension StepExecutor {
             }
             do {
                 start = clock.now
-                try await actingDriver.type(ref: element.ref, text: step.text ?? "")
+                try await RefExpectationScope.firing(element) {
+                    try await actingDriver.type(ref: element.ref, text: step.text ?? "")
+                }
                 // ランナーの打ち直しの申告(TypeReadback.Plan.retype → OKResponse.note)。tap と同じく合流
                 driverFallback = Self.joinNotes(driverFallback, actingDriver.lastActionNote)
                 phase.actionMs += Self.ms(clock.now - start)
