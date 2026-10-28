@@ -80,7 +80,8 @@ class 読み込み中の骨組みと末尾の読み込みを扱えること {
                 }.expectation {
                     waitForDisplay("#txt_footer_error", waitSeconds: 6)
                     select("#txt_loading_state").textIs("state=error")
-                    exist("#btn_retry")
+                    // エラーの行と再試行は末尾送りが終わった後に差し込まれ、一覧が伸びて窓の下へ外れうる(送りが速いと必ず)
+                    exist("#btn_retry", scroll: .down)
                 }
             }
             scene(3, "再試行で 50 件になる") {
