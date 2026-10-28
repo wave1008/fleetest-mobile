@@ -58,6 +58,25 @@ enum InAppSettle {
         heartbeat = timer
     }
 
+    /// **絵が止まるまで待つ**(1 フレームあけた2回の画素の指紋が一致するまで・上限 capMs)。メインで呼び、done もメインで1回。
+    /// 合成タッチの直前だけに使う: 長押しで開いたメニューは指を離した後、CA のアニメを伴わずに動く間はタッチを捨てる
+    /// (`waitOnMain` は CA のアニメしか見ないので抜ける。E2EX-iOS の長押しメニューで 8 台同時に 15/24 が空振りし、赤の回は全部
+    /// 要求の到着から撃つまでの約 120ms に絵が変わっていた。FD-2.1)。ループするアニメの画面は上限まで待って先へ進む
+    static func waitForStillFrame(_ window: UIWindow, capMs: Int, done: @escaping (_ still: Bool) -> Void) {
+        let start = CACurrentMediaTime()
+        var last = InAppRenderCatchUp.pixelPrint(window)
+        func poll() {
+            DispatchQueue.main.asyncAfter(deadline: .now() + InAppRenderCatchUp.pollSeconds) {
+                let now = InAppRenderCatchUp.pixelPrint(window)
+                if now == last { done(true); return }
+                if (CACurrentMediaTime() - start) * 1000 >= Double(capMs) { done(false); return }
+                last = now
+                poll()
+            }
+        }
+        poll()
+    }
+
     /// 直前の評価時点の contentOffset(スクロールの動きを差分で見るため)
     private static var lastOffsets: [ObjectIdentifier: CGPoint] = [:]
 

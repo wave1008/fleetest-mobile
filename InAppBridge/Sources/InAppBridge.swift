@@ -670,10 +670,13 @@ final class FTInAppBridge {
         /// 確定する前の frame を叩いた実害)。省くのは 250ms の小休止と 2 回目の取り直し・activate
         func synthAtCurrentFrame(stale: NSObject, window: UIWindow) {
             InAppSettle.waitOnMain(capMs: Self.tapByRefSettleCapMs) { _ in
-                if let fresh = self.refreshedNode(matching: stale, ref: ref, window: window) {
-                    adoptFreshFrame(fresh)
+                // CA のアニメが無くても絵が動いている間はタッチが捨てられる(長押しメニュー。InAppSettle.waitForStillFrame)
+                InAppSettle.waitForStillFrame(window, capMs: Self.tapByRefSettleCapMs) { _ in
+                    if let fresh = self.refreshedNode(matching: stale, ref: ref, window: window) {
+                        adoptFreshFrame(fresh)
+                    }
+                    synthFallback(window)
                 }
-                synthFallback(window)
             }
         }
         func retry(_ remaining: Int, stale: NSObject, window: UIWindow) {
