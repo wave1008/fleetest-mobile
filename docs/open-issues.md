@@ -263,6 +263,16 @@
 - 未確認: XCUITest が合成したドラッグの速さ・終点が、Compose の SwipeToDismiss の閾値(位置か速さ)を超えていない回が
   あるのか、指を離した後の慣性で戻っているのか。`fleetest results frames` で失敗した回のコマを見るのが次の一手
 
+### OI-38 E2EX-iOS の長押しメニューの項目で `inapp-tap-outside-hit-area` が出るが、本物の指でも押せる
+- 状態: 再現済み
+- 確認: 88f8bf8c(2026-10-28)
+- 経緯: 2026-10-28 の合成タッチの直前の待ち(v222〜)の後から、8 台同時の 29 回中 21 回で出る(直す前の run では出ていなかった)
+
+- 形: `tap("複製")` に「a real touch at the centre of its frame lands on another view (UIStackView at (201, 354))」。xcuitest モード
+  (枠の中心を本物の指で押す)は 8/8 緑 = 注記の言う「別の物に当たる」は起きていない(検知の誤検知の候補)
+- 未確認: 枠が止まった後の中心で hitTest が UIStackView を返すのに、その UIStackView が項目の view の祖先にならない理由
+  (メニューの項目の AX 要素と view の対応)。注記は判定を変えない(緑のまま)ので、急ぎではない
+
 ### OI-15 E2EX-Flutter の XCUITest で、探索の終わりの空打ちが対象の行そのものを押す
 - 状態: 再現済み
 - 確認: コミット未記録(2026-10-08)

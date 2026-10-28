@@ -158,6 +158,8 @@ if [ "$PERFORMANCE" = 1 ]; then
   "$FLEETEST" monitor pause --for 60
   MONITOR_PAUSED=1
 fi
+# 配信を張ったままなら警告だけ出す(止めない。--performance は上で止めている)
+[ "$BUILD_ONLY" = 1 ] || python3 "$ROOT/Scripts/streaming_check.py"
 
 # needs_rebuild / record_sdk(SUT を作り直すかの判定。ソースの mtime と外部 SDK の版)
 . "$ROOT/Scripts/sut-rebuild.sh"

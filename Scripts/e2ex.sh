@@ -89,6 +89,8 @@ done
 trap 'crash_dialog_restore' EXIT
 trap 'crash_dialog_restore; exit 130' INT TERM HUP
 crash_dialog_suppress
+# 配信を張ったままなら警告だけ出す(止めない。--on なら向こうの機械の配信ヘルパーを見る)
+[ "$BUILD_ONLY" = 1 ] || python3 "$ROOT/Scripts/streaming_check.py"
 
 # モードの指定は iOS だけを回す(Android にモードの選択肢は無い。理由は Scripts/e2e.sh の同じ箇所)
 if [ "$IOS_MODE_ONLY" = 1 ] && [ "$RUN_IOS" = 0 ]; then
