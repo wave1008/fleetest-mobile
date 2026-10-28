@@ -55,11 +55,11 @@ def build_targets(suites, xcuitest, suts=None):
     return targets
 
 
-def run_args(targets):
+def run_args(targets, record=False):
     args = [FLEETEST, "run"]
     for _, project, profile in targets:
         args += ["--target", f"{project}:{profile}"]
-    return args + ["--set", "record=false"]   # 回帰は録画しない
+    return args + ["--set", f"record={'true' if record else 'false'}"]   # 回帰は既定で録画しない(e2e.sh 等の --record と同じ)
 
 
 def machines():
@@ -134,6 +134,7 @@ def main():
     ap.add_argument("--ios-xcuitest", action="store_true", help="iOS の xcuitest モードの対象も足す")
     ap.add_argument("--negative", action="store_true", help="最後に陽性対照(Scripts/e2e-negative.sh)をこの Mac で回す")
     ap.add_argument("--skip-build", action="store_true", help="最初の SUT の鮮度確認・ビルドの段を飛ばす")
+    ap.add_argument("--record", action="store_true", help="録画する(既定は --set record=false)")
     ap.add_argument("--dry-run", action="store_true", help="対象の一覧と撃つコマンドだけ出す(デバイスを使わない)")
     opts = ap.parse_args()
     suites = [s for s in opts.suites.split(",") if s]
@@ -149,7 +150,7 @@ def main():
     if opts.dry_run:
         for suite, project, profile in targets:
             print(f"{suite}: {project}:{profile}")
-        print(" ".join(shlex.quote(a) for a in run_args(targets)))
+        print(" ".join(shlex.quote(a) for a in run_args(targets, opts.record)))
         if witness:
             print(f"+ in-app の証人: {WITNESS[0]} / {WITNESS[1]}")
         return 0
@@ -174,7 +175,7 @@ def main():
 
     print("==> 段 2: fleetest run(空いたマシンが次の対象を取る)")
     run_started = time.time()
-    run_ok = subprocess.run(run_args(targets), cwd=ROOT, env=env).returncode == 0
+    run_ok = subprocess.run(run_args(targets, opts.record), cwd=ROOT, env=env).returncode == 0
     witness_ok = True
     if witness:
         print(f"\n═══ {WITNESS[0]} / ios-inapp-boost(in-app の証人: {WITNESS[1]})═══")

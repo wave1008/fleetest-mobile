@@ -49,6 +49,17 @@ final class DynamicSplitTests: XCTestCase {
         XCTAssertEqual(decision, .hold(reconsiderAt: 60_000))
     }
 
+    func testSlowMachineTakesScenarioWhenFastLaneHasBacklog() {
+        let fast = lane(0, "a"), slow = lane(1, "b")
+        // fast は 60s に空く。s1 → fast(120s)。s2 は fast だと 180s・slow だと 50 + 120 = 170s → slow が取る
+        let lanes = [State(lane: fast, busy: (scenario("run"), 0)), State(lane: slow, busy: nil)]
+        let estimate = table(["s1": [60_000, 120_000], "s2": [60_000, 120_000], "run": [60_000, 120_000]])
+        XCTAssertEqual(
+            DynamicSplit.decide(for: slow, now: 50_000, pending: [scenario("s1"), scenario("s2")],
+                                lanes: lanes, estimateMs: estimate),
+            .assign("s2"))
+    }
+
     func testSlowMachineTakesShortScenarioRatherThanWaiting() {
         let fast = lane(0, "a"), slow = lane(1, "b")
         let decision = DynamicSplit.decide(

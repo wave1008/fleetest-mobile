@@ -4,9 +4,11 @@
 //
 // 規則(ユーザー指示):
 // - 候補 = そのレーンの platform で回せる待ちシナリオ。見込みの長い順(同着は ID 昇順 = LPT・決定的)
-// - 候補ごとに here = 今 + このレーンでの見込み / alt = 他レーン(他マシン + 同じマシンの他レーン)に回したときの
-//   一番早い終わり。here <= alt の最初の候補を渡す
-// - 渡せる候補が無ければ待たせる(遅いマシンが終わり際に長いシナリオを取って全体を引き延ばさない)
+// - 候補を全部その順に、他レーン(他マシン + 同じマシンの他レーン)も含めて「空く時刻 + そのレーンでの見込み」が一番早いレーンへ
+//   仮に積み(BacklogPlacement。同着はこのレーン)、このレーンに最初に積まれた候補を渡す。
+//   候補が1本なら here = 今 + このレーンでの見込み <= alt = 他レーンの一番早い終わり、と同じ
+// - 1本も積まれなければ待たせる(遅いマシンが終わり際に長いシナリオを取って全体を引き延ばさない)。
+//   他レーンに控えている候補を数えずに比べると、控えの山を前に遅いレーンが待ち続ける
 // - 安全弁: 他レーンが見込みの時刻を過ぎても空かないときは、超過した分だけ空く時刻を後ろへ倒す
 //   (固まった速いレーンを遅いレーンが待ち続けない)。待たせた判断が変わりうる時刻は reconsiderAt で返す
 public enum DynamicSplit {
@@ -71,12 +73,12 @@ public enum DynamicSplit {
             return expected >= now ? expected : now + (now - expected)
         }
 
-        for candidate in candidates {
-            let here = now + candidate.here
-            let alt = others.map { freeAt($0) + estimateMs(candidate.scenario, $0.lane.entry) }.min()
-                ?? .infinity
-            if here <= alt { return .assign(candidate.scenario.id) }
-        }
+        let placed = BacklogPlacement.place(
+            jobs: candidates.map(\.scenario), requester: requester, requesterAvailable: now,
+            workers: others.map { (worker: $0.lane, available: freeAt($0)) },
+            cost: { scenario, lane in estimateMs(scenario, lane.entry) })
+        if let first = placed.first { return .assign(first.id) }
+        let placedOn = Dictionary(placed.placements.map { ($0.job, $0) }, uniquingKeysWith: { first, _ in first })
 
         // 規則が反転しうる最も早い時刻。空いている他レーンは時刻を作らない(そのレーンの要求で判断される)
         var reconsiderAt: Double?
@@ -90,9 +92,15 @@ public enum DynamicSplit {
             if expected > now {
                 consider(expected)
             } else {
-                // 超過中は alt も here も時刻に 1:1 で伸びるので、t + (t - expected) + estL >= t + estHere を解く
+                // 超過中は alt も here も時刻に 1:1 で伸びるので、t + (t - expected) + B + estL >= t + estHere を解く。
+                // B = 仮に積んだときその候補より先にそのレーンへ積まれた分(0 = 控えを数えない場合の時刻。早めに見直すのは害が無い)
                 for candidate in candidates {
-                    consider(expected + candidate.here - estimateMs(candidate.scenario, state.lane.entry))
+                    let p = placedOn[candidate.scenario]
+                    let base = expected + candidate.here - estimateMs(candidate.scenario, state.lane.entry)
+                    consider(base)
+                    if let p, p.worker == state.lane {
+                        consider(base - (p.availableBefore - freeAt(state)))
+                    }
                 }
             }
         }

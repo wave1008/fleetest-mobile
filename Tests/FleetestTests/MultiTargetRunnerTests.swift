@@ -26,9 +26,9 @@ final class MultiTargetRunnerTests: XCTestCase {
         static func key(_ job: String, _ machine: Int) -> String { "\(job)#\(machine)" }
 
         /// lanes: 仕事 → そのマシンの添字の集合(entry はマシンの添字と同じにする)。scenarios: 仕事 → 本数。
-        /// msPerScenario: マシン → 1本の見込み[ms](無ければ 1000)
+        /// msPerScenario: マシン → 1本の見込み[ms](無ければ 1000)。overheadMs: マシン → 固定費[ms](無ければ 0)
         init(machines: Int, lanes: [String: Set<Int>], scenarios: [String: Int], order: [String],
-             msPerScenario: [Int: Double] = [:]) {
+             msPerScenario: [Int: Double] = [:], overheadMs: [Int: Double] = [:]) {
             for (job, count) in scenarios {
                 pending.withLock {
                     $0[job] = (0..<count).map { DynamicSplit.Scenario(id: "\(job).s\($0)", platform: "ios") }
@@ -47,7 +47,7 @@ final class MultiTargetRunnerTests: XCTestCase {
                     interrupt: { [self] in interrupted.withLock { $0.append(id) } })
             }
             coordinator = MultiTargetCoordinator(
-                jobs: specs, machineCount: machines, overheadMs: Array(repeating: 0, count: machines),
+                jobs: specs, machineCount: machines, overheadMs: (0..<machines).map { overheadMs[$0] ?? 0 },
                 nowMs: { [self] in clock.withLock { $0 } },
                 timer: { [self] afterMs, fire in
                     timers.withLock { $0.append((afterMs, fire)) }
@@ -112,6 +112,16 @@ final class MultiTargetRunnerTests: XCTestCase {
                         scenarios: ["A": 10, "B": 2], order: ["A", "B"])
         h.coordinator.start()
         XCTAssertTrue(h.launched.contains("A@2"), "未開始が無い終わり際は残りの多い仕事に加わる: \(h.launched)")
+    }
+
+    /// 加わっても1本ももらえないなら加わらない(子 run の後始末のぶん終わりを延ばした)。
+    /// A・B は各 2 本 × 1s を1台ずつで回す。マシン2 は固定費 1.5s → 2.5s にしか空かず、2本目も担当が 2s で終える。
+    /// 量を割れるものとして見ると 2s → 1.75s に早まる計算になり加わっていた
+    func testMachineDoesNotJoinWhenItWouldReceiveNoScenario() {
+        let h = Harness(machines: 3, lanes: ["A": [0, 1, 2], "B": [0, 1, 2]],
+                        scenarios: ["A": 2, "B": 2], order: ["A", "B"], overheadMs: [2: 1500])
+        h.coordinator.start()
+        XCTAssertEqual(Set(h.launched), ["A@0", "B@1"], "1本ももらえないマシン2が加わった: \(h.launched)")
     }
 
     func testMachineWithoutALaneNeverGetsTheJob() {

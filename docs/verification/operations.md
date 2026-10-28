@@ -266,7 +266,7 @@ Flutter と RN の実機用は **Release 構成**(Flutter の Debug は flutter 
   使えなかったシナリオの検査・検証済みの印(全部緑のときだけ)・推奨・陽性対照(`--negative`)を1回。ログは `.fleetest/regress/<時刻>/`
   (段 1 のビルド)。E2EX / E2EY のプロファイルにもリモートのデバイスがある(スクリプトは `--runner local` で回すので影響しない)。
   `--ios-xcuitest` で xcuitest モードの対象も足す・`--suites` で絞るとそのスイートの印だけを書き、`--suts` で絞った回は印を書かない。`--skip-build` で段 1 を飛ばす・
-  `--dry-run` で対象と撃つコマンドだけ出す。SUT をそろえられないマシンがあれば回さない(設定タブでそのマシンを無効にすれば外れる)。
+  `--record` で録画する(既定は `--set record=false`)・`--dry-run` で対象と撃つコマンドだけ出す。SUT をそろえられないマシンがあれば回さない(設定タブでそのマシンを無効にすれば外れる)。
   **先に commit → `Scripts/align.sh`**(リモートはアライン済みのコミットで動く)
 - **`e2e.sh` / `e2ex.sh` / `e2ey.sh` は引数に関係なく「スイート全体」として `Scripts/test-scope-guard.py` が断る**(全実施を頼まれたときだけ
   `FT_FULL_TEST=1`)。絞った確認は `fleetest run --project <P> --profile <prof> --scenario <クラス>` で通るシナリオを名指しする

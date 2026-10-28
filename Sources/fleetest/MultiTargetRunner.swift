@@ -651,7 +651,21 @@ final class MultiTargetCoordinator: Sendable {
             hasPending: { id in !(jobs[id]?.pending().isEmpty ?? true) },
             machines: states,
             aloneMs: { id, m in aloneMs(job: id, machine: m, state: snapshot) },
-            overheadMs: { m in m < overheadMs.count ? overheadMs[m] : 0 }, lpt: lpt)
+            overheadMs: { m in m < overheadMs.count ? overheadMs[m] : 0 },
+            joinGainMs: { id, m in joinGain(job: id, machine: m, state: snapshot, now: now) }, lpt: lpt)
+    }
+
+    /// machine が走っている仕事に加わると終わりがどれだけ早まるか(`JobSchedule.joinGain`)。担当のデバイスは今、加わるデバイスは固定費の後に空く
+    private func joinGain(job id: String, machine: Int, state s: State, now: Double) -> Double? {
+        guard let job = jobs[id], let lane = job.lanes[machine] else { return nil }
+        func joinLane(_ l: Lane, at t: Double) -> JobSchedule.JoinLane {
+            JobSchedule.JoinLane(entry: l.entry, devices: l.devices, platforms: l.platforms, availableAt: t)
+        }
+        let members = (s.running[id] ?? []).sorted().compactMap { job.lanes[$0].map { joinLane($0, at: now) } }
+        let overhead = machine < overheadMs.count ? overheadMs[machine] : 0
+        return JobSchedule.joinGain(
+            pending: job.pending(), members: members, joiner: joinLane(lane, at: now + overhead),
+            estimateMs: job.estimateMs)
     }
 
     /// その仕事を、このマシンのこの仕事のデバイスだけで、まだ配っていない分を全部回す時間[ms]。
