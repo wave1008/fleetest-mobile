@@ -58,16 +58,17 @@ enum InAppSettle {
         heartbeat = timer
     }
 
-    /// **絵が止まるまで待つ**(1 フレームあけた2回の画素の指紋が一致するまで・上限 capMs)。メインで呼び、done もメインで1回。
-    /// 合成タッチの直前だけに使う: 長押しで開いたメニューは指を離した後、CA のアニメを伴わずに動く間はタッチを捨てる
+    /// **押す要素の枠の絵が止まるまで待つ**(1 フレームあけた2回の、枠の中の画素の指紋が一致するまで・上限 capMs)。メインで呼び、
+    /// done もメインで1回。合成タッチの直前だけに使う: 長押しで開いたメニューは指を離した後、CA のアニメを伴わずに動く間はタッチを捨てる
     /// (`waitOnMain` は CA のアニメしか見ないので抜ける。E2EX-iOS の長押しメニューで 8 台同時に 15/24 が空振りし、赤の回は全部
-    /// 要求の到着から撃つまでの約 120ms に絵が変わっていた。FD-2.1)。ループするアニメの画面は上限まで待って先へ進む
-    static func waitForStillFrame(_ window: UIWindow, capMs: Int, done: @escaping (_ still: Bool) -> Void) {
+    /// 要求の到着から撃つまでの約 120ms に絵が変わっていた。FD-2.1)。**窓全体では見ない** —— プルダウンメニューは項目が止まった後も
+    /// 窓のどこかが動き続け、緑で通っていたタップが毎回 0.5〜0.8 秒(上限)待った。ループするアニメの枠は上限まで待って先へ進む
+    static func waitForStillFrame(_ window: UIWindow, rect: CGRect, capMs: Int, done: @escaping (_ still: Bool) -> Void) {
         let start = CACurrentMediaTime()
-        var last = InAppRenderCatchUp.pixelPrint(window)
+        var last = InAppRenderCatchUp.pixelPrint(window, rect: rect)
         func poll() {
             DispatchQueue.main.asyncAfter(deadline: .now() + InAppRenderCatchUp.pollSeconds) {
-                let now = InAppRenderCatchUp.pixelPrint(window)
+                let now = InAppRenderCatchUp.pixelPrint(window, rect: rect)
                 if now == last { done(true); return }
                 if (CACurrentMediaTime() - start) * 1000 >= Double(capMs) { done(false); return }
                 last = now
@@ -188,11 +189,12 @@ enum InAppRenderCatchUp {
     /// 描画の固定費は 0.05〜0.25 倍でほぼ同じ(11〜13ms)なので、小さくしても安くならない
     static let printScale: CGFloat = 0.25
 
-    /// メインで呼ぶ。低解像度の画素の指紋
-    static func pixelPrint(_ window: UIWindow) -> Int {
+    /// メインで呼ぶ。低解像度の画素の指紋(rect = 窓の座標での範囲。nil は窓全体。描画の費用は範囲に依らない)
+    static func pixelPrint(_ window: UIWindow, rect: CGRect? = nil) -> Int {
         let format = UIGraphicsImageRendererFormat()
         format.scale = printScale
-        let image = UIGraphicsImageRenderer(bounds: window.bounds, format: format).image { _ in
+        let bounds = rect.map { $0.intersection(window.bounds) }.flatMap { $0.isEmpty ? nil : $0 } ?? window.bounds
+        let image = UIGraphicsImageRenderer(bounds: bounds, format: format).image { _ in
             window.drawHierarchy(in: window.bounds, afterScreenUpdates: false)
         }
         guard let data = image.cgImage?.dataProvider?.data as Data? else { return 0 }
