@@ -289,7 +289,7 @@ final class VideoRecordingCoordinatorExportTests: XCTestCase {
                       "録画の確かめ(撮り直しの待ち)はシナリオの区間を始める前に済ませる = 待ちをシナリオに数えない")
         XCTAssertTrue(orchestrator.contains("stillFramesDir: stillFramesDir,\n                onEvent:"),
                       "runOne へ撮影先を渡していない")
-        XCTAssertTrue(orchestrator.contains("registerChildProcess: registerChildProcess, stillFramesDir: stillFramesDir)"),
+        XCTAssertTrue(orchestrator.contains("registerChildProcess: registerChildProcess, stillFramesDir: stillFramesDir,"),
                       "runOne が ScenarioHost.run へ撮影先を渡していない")
         XCTAssertTrue(try source("Sources/FTCore/ScenarioHost.swift")
                         .contains(#"args += ["--still-frames-dir", stillFramesDir.path]"#))

@@ -59,8 +59,14 @@ final class InAppTapActivateRetryTests: XCTestCase {
             return XCTFail("整定待ちか合成タッチが見つかりません")
         }
         XCTAssertLessThan(settle.lowerBound, touch.lowerBound, "合成タッチは整定の後")
-        XCTAssertEqual(path.components(separatedBy: "synthFallback(").count - 1, 1,
-                       "整定を通らずに合成タッチへ落ちる枝を作らない")
+        var touches = 0
+        var cursor = path.startIndex
+        while let hit = path.range(of: "synthFallback(", range: cursor..<path.endIndex) {
+            XCTAssertLessThan(settle.lowerBound, hit.lowerBound, "整定を通らずに合成タッチへ落ちる枝を作らない")
+            touches += 1
+            cursor = hit.upperBound
+        }
+        XCTAssertGreaterThan(touches, 0)
     }
 
     /// 撃ち直さない経路も、取り直した現在 frame で撃つこと(RN のコールドラウンチでレイアウト確定前の
