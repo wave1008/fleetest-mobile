@@ -963,7 +963,8 @@ test("アクション/分メーター: run 0 本でも出て、再適用で要�
   t.after(() => window.close());
   const tacho = document.getElementById("run-board-tachometer");
   assert.ok(tacho, "見出しにメーターの入れ物がある");
-  assert.equal(tacho.querySelectorAll(".tacho-seg").length, 40, "run 0 本でも40段が出る");
+  assert.equal(tacho.querySelectorAll(".tacho-seg").length, 40, "run 0 本でも40段は作ってある");
+  assert.equal(tacho.style.display, "none", "run 0 本の間は出さない");
   assert.equal(tacho.querySelectorAll(".tacho-seg[data-lit='1']").length, 0, "全段消灯");
   assert.equal(tacho.querySelector(".tacho-value").textContent, "0");
 
@@ -976,16 +977,114 @@ test("アクション/分メーター: run 0 本でも出て、再適用で要�
   post(window, withActions("M1Max", 100));
   post(window, withActions("M1Max", 160));
   assert.deepEqual([...tacho.querySelectorAll("*")], nodes, "同じノードのまま(作り直さない)");
-  assert.equal(tacho.querySelector(".tacho-value").textContent, "160");
+  // 数値はバーと連動する(直後はバーも数値も 0 のまま)
+  assert.equal(tacho.querySelector(".tacho-value").textContent, "0", "直後はバーと同じく 0");
   // バーは慣性で追いつくので、直後はまだ点いていない。数フレーム待つと点き始める(連続的に伸びる)
   assert.equal(tacho.querySelectorAll(".tacho-seg[data-lit='1']").length, 0, "直後は跳ねない");
   await new Promise((resolve) => setTimeout(resolve, 300));
   const litAfter = tacho.querySelectorAll(".tacho-seg[data-lit='1']").length;
   assert.ok(litAfter > 0 && litAfter < 40, `途中まで伸びている(${litAfter} 段)`);
+  const shownNumber = Number(tacho.querySelector(".tacho-value").textContent);
+  // 数値 = バーの表示値 × 60。点いている段数(途中の段を含む)と同じ値の帯にある
+  assert.ok(shownNumber > (litAfter - 1) * 60 && shownNumber <= litAfter * 60, `数値 ${shownNumber} が ${litAfter} 段と連動`);
   const tip = tacho.getAttribute("data-hover-tip");
-  assert.match(tip, /M1Max: 160/, "機械別の内訳");
-  assert.match(tacho.getAttribute("aria-label"), /160/);
+  // 説明と読み上げはバーの目標値(直近 3 秒の 160 = 160 / 3 × 60 = 3200/分)
+  assert.match(tip, /M1Max: 3200/, "機械別の内訳");
+  assert.match(tacho.getAttribute("aria-label"), /3200/);
   // 同じ内容の再適用で説明を書き直さない
   post(window, withActions("M1Max", 160));
   assert.equal(tacho.getAttribute("data-hover-tip"), tip);
+});
+
+const hostMetricsTick = {
+  type: "hostMetrics", cpu: 0.2, cpuCores: 8, gpu: 0.25, gpuCores: 38,
+  memUsedBytes: 8 * 1024 ** 3, memTotalBytes: 32 * 1024 ** 3,
+  fmCalls: 0, fmFailures: 0, fmTotalMs: 0, fmTextState: null, fmVisionState: null, fmDeadReason: null,
+  fmCheckedAt: 0, visionCalls: 0, visionFailures: 0, visionTotalMs: 0, ocrCompiling: 0,
+};
+
+test("推移のチャートは CPU・GPU と同じ host-metrics の tick で1点ずつ積み、直近 60 点が左へ流れる", async (t) => {
+  const { window } = createWebview();
+  t.after(() => window.close());
+  const q = (sel) => window.document.querySelector(`#run-board-tachometer ${sel}`);
+  post(window, monitorRunsMessage({ runs: [{ ...monitorRunsMessage().runs[0], actions: 0 }] }));
+  await new Promise((resolve) => setTimeout(resolve, 1_100));
+  assert.equal(q(".tacho-trend-line").getAttribute("d"), "", "monitorRuns と 1 秒の時計では描かない");
+  post(window, hostMetricsTick);
+  post(window, hostMetricsTick);
+  assert.notEqual(q(".tacho-trend-line").getAttribute("d"), "", "手元の host-metrics の tick で描く");
+  // ゲージが 0 ならチャートも 0(底 = 高さ 18 − 余白 2)
+  assert.equal(q(".tacho-trend-dot").getAttribute("cy"), "16.0", "ゲージ 0 で底");
+  for (let i = 0; i < 70; i += 1) { post(window, hostMetricsTick); }
+  const points = q(".tacho-trend-line").getAttribute("d").split("L").length;
+  assert.equal(points, 60, "CPU・GPU と同じ直近 60 点だけ(古い点は流れて消える)");
+});
+
+test("タコメーター: 40段に収まらない値では右端に張り付かず、同じ間隔の段を右へ足して延ばす", async (t) => {
+  const { window, document } = createWebview();
+  t.after(() => window.close());
+  const tacho = document.getElementById("run-board-tachometer");
+  const meter = tacho.querySelector(".tacho-meter");
+  const visible = () => [...tacho.querySelectorAll(".tacho-seg")].filter((s) => s.style.display !== "none");
+  assert.equal(visible().length, 40);
+  assert.equal(tacho.querySelector(".tacho-value").getAttribute("data-tier"), "low", "0 のときは最下段の色");
+  assert.equal(Number(meter.getAttribute("width")), 280);
+  const run = (actions) => monitorRunsMessage({ runs: [{ ...monitorRunsMessage().runs[0], actions }] });
+  post(window, run(0));
+  post(window, run(600)); // 直近 3 秒に 600 = 200/秒 → 200 段まで延びていく
+  await new Promise((resolve) => setTimeout(resolve, 400));
+  const grown = visible();
+  assert.ok(grown.length > 40, `右へ足した(${grown.length} 段)`);
+  assert.ok(Number(meter.getAttribute("width")) > 280, "幅も延びる");
+  assert.equal(grown[grown.length - 1].getAttribute("data-tier"), "high", "足した段は高の色");
+  assert.equal(grown.filter((s) => s.getAttribute("data-lit") === "1").length, grown.length, "延ばした段まで点いている");
+  assert.equal(tacho.querySelector(".tacho-value").getAttribute("data-tier"), "high", "数値の色はいちばん上の段の色");
+});
+
+test("タコメーターは run が終わっても 10 秒は出したまま、その後フェードで隠す。間に次の run が来れば隠さない", async (t) => {
+  const { window, document } = createWebview();
+  t.after(() => window.close());
+  const tacho = document.getElementById("run-board-tachometer");
+  const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+  assert.equal(tacho.style.display, "none", "起動直後(run 0 本)は隠す");
+  post(window, monitorRunsMessage());
+  assert.equal(tacho.style.display, "", "run が来たら出す");
+  // 終わってすぐ次の run が来る(周の切れ目)= 隠さない
+  post(window, monitorRunsMessage({ runs: [] }));
+  await wait(1_000);
+  assert.ok(!tacho.classList.contains("tacho-hidden"), "終わって 1 秒はまだ出したまま");
+  post(window, monitorRunsMessage());
+  // もう一度終わって 10 秒待つ = フェードで消える
+  post(window, monitorRunsMessage({ runs: [] }));
+  await wait(9_000);
+  assert.ok(!tacho.classList.contains("tacho-hidden"), "9 秒ではまだ出したまま(次の run の前の 1 秒は数えない)");
+  await wait(1_300);
+  assert.ok(tacho.classList.contains("tacho-hidden"), "10 秒たったら透明へ向かう");
+  assert.match(tacho.style.transition, /opacity/);
+  await wait(500);
+  assert.equal(tacho.style.display, "none", "フェードの後に隠す");
+  // 次の run でフェードで出す
+  post(window, monitorRunsMessage());
+  assert.equal(tacho.style.display, "");
+  assert.ok(!tacho.classList.contains("tacho-hidden"), "不透明へ向かう");
+});
+
+test("タコメーターは見出し行のボタンで隠せる(run 実行中でも)。戻せばまた出る", (t) => {
+  const { window, document, sent } = createWebview();
+  t.after(() => window.close());
+  const tacho = document.getElementById("run-board-tachometer");
+  const toggle = document.getElementById("run-board-tachometer-toggle");
+  post(window, monitorRunsMessage());
+  assert.equal(tacho.style.display, "", "既定は出す");
+  assert.equal(toggle.getAttribute("aria-pressed"), "true");
+  const collapsedBefore = document.getElementById("run-board-toggle").getAttribute("aria-expanded");
+  toggle.click();
+  assert.ok(tacho.classList.contains("tacho-hidden"), "押せば run 実行中でも隠す(フェード)");
+  assert.equal(toggle.getAttribute("aria-pressed"), "false");
+  assert.deepEqual(sent.filter((m) => m.type === "setShowTachometer").map((m) => m.value), [false], "拡張へ保存を頼む");
+  assert.equal(document.getElementById("run-board-toggle").getAttribute("aria-expanded"), collapsedBefore, "ボードは開閉しない");
+  post(window, { type: "showTachometer", value: true });
+  assert.equal(tacho.style.display, "", "拡張から ON が届けば出す");
+  assert.ok(!tacho.classList.contains("tacho-hidden"));
+  assert.ok(toggle.getAttribute("data-hover-tip"), "名前は tooltip が持つ");
 });

@@ -39,7 +39,7 @@ import { applyProjectInfo } from './projectsTab.js';
 import { applyHostMetrics, setHostMetricMachines, setMachineLock, setShowMachineCapacity } from './hostCharts.js';
 import {
   applyMonitorRuns, resetRunBoard, setRunBoardCollapsed, setRunBoardExpandAll, setRunBoardMachines,
-  refreshRunBoardDevices,
+  refreshRunBoardDevices, setShowTachometer,
 } from './runBoard.js';
 import { applyProjectDeviceCatalog } from './runProfileDevicesTab.js';
 import {
@@ -264,6 +264,9 @@ window.addEventListener('message', (event) => {
     case 'showMachineCapacity':
       setShowMachineCapacity(!!message.value);
       applySettings(message);
+      break;
+    case 'showTachometer':
+      setShowTachometer(!!message.value);
       break;
     case 'pollingMode':
     case 'liveFps':

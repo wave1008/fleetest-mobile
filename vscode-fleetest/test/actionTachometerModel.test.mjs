@@ -5,7 +5,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
-  ACTIONS_PER_SECOND_PER_SEGMENT, ActionTachometer, METER_WINDOW_MS, METER_TIME_CONSTANT_MS, easeToward, segmentLevel, litSegments, METER_SEGMENTS, segmentTier, TREND_POINTS,
+  ACTIONS_PER_SECOND_PER_SEGMENT, ActionTachometer, METER_WINDOW_MS, METER_TIME_CONSTANT_MS, easeToward, segmentLevel, segmentCount, litSegments, METER_SEGMENTS, segmentTier,
 } from "../src/actionTachometerModel";
 
 const S = 1000;
@@ -72,20 +72,7 @@ test("機械別の内訳は同じ計算で、手元(空文字)が先頭", () => 
   t.apply(ev(70, { machine: "M1Max" }), 5 * S);
   const s = t.snapshot(5 * S);
   assert.equal(s.value, 75);
-  assert.deepEqual(s.byMachine, [{ machine: "", value: 5 }, { machine: "M1Max", value: 70 }]);
-});
-
-test("推移は30点で、観測開始より前の点は null", () => {
-  const t = new ActionTachometer();
-  t.apply(ev(0), 1000 * S);
-  t.apply(ev(10), 1030 * S);
-  const { trend } = t.snapshot(1030 * S);
-  assert.equal(trend.length, TREND_POINTS);
-  assert.equal(trend[0], null);
-  assert.equal(trend[TREND_POINTS - 1], 10);
-  const firstValue = trend.findIndex((v) => v !== null);
-  assert.ok(firstValue > 0 && firstValue < TREND_POINTS - 1);
-  assert.equal(trend[firstValue - 1], null);
+  assert.deepEqual(s.byMachine.map(({ machine, value }) => ({ machine, value })), [{ machine: "", value: 5 }, { machine: "M1Max", value: 70 }]);
 });
 
 test("点灯段数と段の色帯", () => {
@@ -96,7 +83,7 @@ test("点灯段数と段の色帯", () => {
   assert.equal(litSegments(1), 1);
   assert.equal(litSegments(15.3), 15);
   assert.equal(litSegments(40), METER_SEGMENTS);
-  assert.equal(litSegments(999), METER_SEGMENTS, "超えたら全段点灯のまま");
+  assert.equal(litSegments(55), 55, "40段を超えても数える(右へ延ばす)");
   assert.deepEqual([0, 23, 24, 33, 34, 39].map(segmentTier), ["low", "low", "mid", "mid", "high", "high"]);
 });
 
@@ -128,4 +115,25 @@ test("バーは目標へ慣性で追いつき、途中の段は割合だけ点�
   assert.equal(segmentLevel(3.25, 2), 1);
   assert.equal(segmentLevel(3.25, 3), 0.25, "途中の段は割合");
   assert.equal(segmentLevel(3.25, 4), 0);
+});
+
+test("機械別にもメーターと同じ窓の 1 分あたりが付く", () => {
+  const m = new ActionTachometer();
+  m.apply({ observed: true, runs: [{ pid: 1, runID: "a", actions: 0 }] }, 0);
+  m.apply({ machine: "M1Ultra", observed: true, runs: [{ pid: 2, runID: "b", actions: 0 }] }, 0);
+  m.apply({ observed: true, runs: [{ pid: 1, runID: "a", actions: 6 }] }, 10_000);
+  m.apply({ machine: "M1Ultra", observed: true, runs: [{ pid: 2, runID: "b", actions: 9 }] }, 10_000);
+  const s = m.snapshot(11_000);
+  // 3 秒前(8s)以前で最新は 0s の 0 → 手元 6 / 3 × 60 = 120・M1Ultra 9 / 3 × 60 = 180
+  assert.deepEqual(s.byMachine.map((x) => [x.machine, x.meterPerMinute]), [["", 120], ["M1Ultra", 180]]);
+  assert.equal(s.meterPerSecond * 60, 300, "合計もバーと同じ窓");
+});
+
+test("40段に収まらない値では段を右へ足し、下がれば 40段に戻る", () => {
+  assert.equal(segmentCount(0), METER_SEGMENTS);
+  assert.equal(segmentCount(39.2), METER_SEGMENTS);
+  assert.equal(segmentCount(40), METER_SEGMENTS);
+  assert.equal(segmentCount(40.3), 41, "途中の段まで含めて足す");
+  assert.equal(segmentCount(57), 57);
+  assert.equal(segmentTier(45), "high", "足した段は高の色");
 });

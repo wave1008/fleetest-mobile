@@ -10,20 +10,14 @@ import { LOCAL_MACHINE_KEY } from "./runBoardModel";
 
 /** 表示値の窓(ms)。「アクション/分」という単位の定義そのもの(直近 60 秒に増えた数)。 */
 export const RATE_WINDOW_MS = 60_000;
-/** 推移の表示範囲(ms)。 */
-export const TREND_SPAN_MS = 5 * 60_000;
-/** 推移の点の刻み(ms)。 */
-export const TREND_STEP_MS = 10_000;
-/** 推移の点数(範囲 / 刻み)。 */
-export const TREND_POINTS = TREND_SPAN_MS / TREND_STEP_MS;
 /** メーターの段数(見出しの残り幅に引き伸ばして描く)。 */
 export const METER_SEGMENTS = 40;
 /** メーター(LED バー)の窓(ms)。直近 3 秒に増えた数 ÷ 3 = 1 秒あたり(ユーザー決定)。数値・推移の 60 秒窓とは別 */
 export const METER_WINDOW_MS = 3_000;
-/** 1目盛りのアクション/秒(ユーザー決定)。全段で METER_SEGMENTS × これ = 40/秒、超えたら全段点灯のまま。 */
+/** 1目盛りのアクション/秒(ユーザー決定)。METER_SEGMENTS 段(40/秒)を超えたら段を右へ足す(右端に張り付かせない。ユーザー決定)。 */
 export const ACTIONS_PER_SECOND_PER_SEGMENT = 1;
-/** サンプルの保持(ms)。推移の最古の点でも「その 60 秒前」の値を引けるぶん。 */
-const SAMPLE_RETENTION_MS = TREND_SPAN_MS + RATE_WINDOW_MS;
+/** サンプルの保持(ms)。いちばん長い窓(RATE_WINDOW_MS)の前端の値を引けるぶん。 */
+const SAMPLE_RETENTION_MS = RATE_WINDOW_MS;
 
 /** バーの慣性の時定数(ms)。元の更新はモニターの周期(約 2 秒)ごとなので、その半分にすると次の更新までに
  * 約 86% 追いつく = 段々に跳ねず、遅れも 1 周期に収まる(車のタコメーターの針のように連続的に動かす。ユーザー決定) */
@@ -45,18 +39,24 @@ export function segmentLevel(shownPerSecond: number, index: number): number {
 
 export type SegmentTier = "low" | "mid" | "high";
 
-/** 下から 7/12 までが低・10/12 までが中・残りが高(段数に依らない割合)。 */
+/** 下から 7/12 までが低・10/12 までが中・残りが高(段数に依らない割合)。右へ足した段(index ≥ METER_SEGMENTS)は高。 */
 export function segmentTier(index: number): SegmentTier {
   const f = index / METER_SEGMENTS;
   return f < 7 / 12 ? "low" : f < 10 / 12 ? "mid" : "high";
 }
 
-/** 点灯する段数(0…METER_SEGMENTS)。引数はアクション/秒(`meterPerSecond`)。1段 = ACTIONS_PER_SECOND_PER_SEGMENT。 */
+/** 点灯する段数(上限なし)。引数はアクション/秒(`meterPerSecond`)。1段 = ACTIONS_PER_SECOND_PER_SEGMENT。 */
 export function litSegments(perSecond: number): number {
   if (!(perSecond > 0)) {
     return 0;
   }
-  return Math.min(METER_SEGMENTS, Math.round(perSecond / ACTIONS_PER_SECOND_PER_SEGMENT));
+  return Math.round(perSecond / ACTIONS_PER_SECOND_PER_SEGMENT);
+}
+
+/** 描く段数。既定の METER_SEGMENTS 段に収まらない値なら、途中の段まで含めて右へ足した段数(下がれば戻る)。 */
+export function segmentCount(shownPerSecond: number): number {
+  const needed = shownPerSecond > 0 ? Math.ceil(shownPerSecond / ACTIONS_PER_SECOND_PER_SEGMENT) : 0;
+  return Math.max(METER_SEGMENTS, needed);
 }
 
 export interface ActionTachometerEvent {
@@ -69,11 +69,14 @@ export interface ActionTachometerEvent {
 export interface MachineRate {
   /** LOCAL_MACHINE_KEY("")= 手元。表示語への変換は呼び手。 */
   readonly machine: string;
+  /** 直近 60 秒に増えた数(推移と同じ計算)。 */
   readonly value: number;
+  /** メーターと同じ窓(直近 METER_WINDOW_MS)の 1 分あたり。表示する数値はこちら(バーと連動させる。ユーザー決定)。 */
+  readonly meterPerMinute: number;
 }
 
 export interface ActionTachometerSnapshot {
-  /** 直近 60 秒に増えた数。 */
+  /** 直近 60 秒に増えた数(推移の点と同じ計算。表示する数値ではない = 数値はバーと連動する meterPerSecond × 60)。 */
   readonly value: number;
   /** メーターの値: 直近 METER_WINDOW_MS に増えた数を秒に割った 1 秒あたり。 */
   readonly meterPerSecond: number;
@@ -83,8 +86,6 @@ export interface ActionTachometerSnapshot {
   readonly unobservedMachines: readonly string[];
   /** 観測を始めてからの秒。60 未満の間は value が少なめに出る(割り戻しはしない)。 */
   readonly observedSeconds: number;
-  /** 推移 TREND_POINTS 点(古い→新しい)。観測開始より前の点は null。 */
-  readonly trend: readonly (number | null)[];
 }
 
 interface RunCounter {
@@ -196,6 +197,8 @@ export class ActionTachometer {
       .map((machine) => ({
         machine,
         value: this.rateAt(nowMs, (s) => s.byMachine.get(machine) ?? 0),
+        meterPerMinute: this.rateAt(nowMs, (s) => s.byMachine.get(machine) ?? 0, METER_WINDOW_MS)
+          * (60_000 / METER_WINDOW_MS),
       }))
       .sort((a, b) => (a.machine === b.machine ? 0
         : a.machine === LOCAL_MACHINE_KEY ? -1
@@ -208,11 +211,6 @@ export class ActionTachometer {
       .sort();
 
     const start = this.startMs ?? nowMs;
-    const trend: (number | null)[] = [];
-    for (let i = 0; i < TREND_POINTS; i += 1) {
-      const t = nowMs - (TREND_POINTS - 1 - i) * TREND_STEP_MS;
-      trend.push(t < start ? null : this.rateAt(t, totalOf));
-    }
 
     return {
       value,
@@ -220,7 +218,6 @@ export class ActionTachometer {
       byMachine,
       unobservedMachines,
       observedSeconds: Math.max(0, Math.floor((nowMs - start) / 1000)),
-      trend,
     };
   }
 }

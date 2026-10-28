@@ -580,37 +580,35 @@ html[lang="en"] .header-count {
    VSCode が body に付けるテーマのクラスで切り替える。発光は暗いテーマの
    **点いた段・数値・推移の線だけ**(見出し行の地色や他の文字はテーマ色のまま) */
 .run-board-tachometer {
-  flex: 0 0 auto;
+  /* 40段を超えるとバーが右へ延びる。見出し行を押し広げず、行の右端で切る(縮められるのはこの入れ物だけ) */
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
   display: inline-flex;
   align-items: center;
   gap: 8px;
   margin-left: 12px;
   --tacho-low: #0f8b8d;
   --tacho-mid: #3d5afe;
-  --tacho-high: #d81b60;
+  --tacho-high: #d32f2f;
   --tacho-off: #dde3ea;
-  --tacho-text: var(--vscode-foreground);
   --tacho-line: #3d5afe;
   --tacho-fill: rgba(61, 90, 254, 0.12);
   --tacho-glow-seg: none;
-  --tacho-glow-text: none;
 }
 body.vscode-dark .run-board-tachometer {
   --tacho-low: #00e5ff;
-  --tacho-mid: #7c4dff;
-  --tacho-high: #ff2bd6;
+  --tacho-mid: #a37cff;
+  --tacho-high: #ff3b3b;
   --tacho-off: #12262d;
-  --tacho-text: #7df9ff;
   --tacho-line: #00e5ff;
   --tacho-fill: rgba(0, 229, 255, 0.16);
-  --tacho-glow-text: 0 0 6px rgba(0, 229, 255, 0.75), 0 0 14px rgba(0, 229, 255, 0.35);
 }
 body.vscode-light .run-board-tachometer {
   --tacho-low: #0f8b8d;
   --tacho-mid: #3d5afe;
-  --tacho-high: #d81b60;
+  --tacho-high: #d32f2f;
   --tacho-off: #dde3ea;
-  --tacho-text: #0b3d5c;
   --tacho-line: #3d5afe;
   --tacho-fill: rgba(61, 90, 254, 0.12);
 }
@@ -620,13 +618,16 @@ body.vscode-high-contrast-light .run-board-tachometer {
   --tacho-mid: var(--vscode-foreground);
   --tacho-high: var(--vscode-foreground);
   --tacho-off: transparent;
-  --tacho-text: var(--vscode-foreground);
   --tacho-line: var(--vscode-foreground);
   --tacho-fill: transparent;
 }
 .tacho-trend {
   flex: 0 0 auto;
   display: block;
+}
+.run-board-tachometer.tacho-hidden {
+  /* フェードで隠す途中・隠した後(transition は runBoard.js の setTachometerVisible が書く) */
+  opacity: 0;
 }
 .tacho-meter {
   flex: 0 0 auto;
@@ -649,18 +650,28 @@ body.vscode-dark .tacho-seg[data-lit="1"][data-tier="low"] { filter: drop-shadow
 body.vscode-dark .tacho-seg[data-lit="1"][data-tier="mid"] { filter: drop-shadow(0 0 2px var(--tacho-mid)); }
 body.vscode-dark .tacho-seg[data-lit="1"][data-tier="high"] { filter: drop-shadow(0 0 2px var(--tacho-high)); }
 .tacho-value {
-  /* 桁で右の並び(単位・バー)が動かないよう最小幅を固定して右寄せ */
-  min-width: 3.2ch;
+  /* 桁で右の並び(単位・バー)が動かないよう幅を固定して右寄せ。5桁 = 99999/分まで(実測の負荷は手元 8 台で
+     約 900/分・バーの全段 40/秒 = 2400/分)。min-width では 4 桁目から欄が広がって左右に揺れた */
+  flex: 0 0 auto;
+  width: 5ch;
+  white-space: nowrap;
   text-align: right;
   font-family: var(--vscode-editor-font-family, monospace);
   font-variant-numeric: tabular-nums;
-  font-size: 1.15em;
   font-weight: 700;
-  color: var(--tacho-text);
-  text-shadow: var(--tacho-glow-text);
+  /* 色はいちばん上に点いている段の色(data-tier は runBoard.js の drawMeter が書く。ユーザー決定) */
+  color: var(--tacho-low);
+}
+.tacho-value[data-tier="mid"] { color: var(--tacho-mid); }
+.tacho-value[data-tier="high"] { color: var(--tacho-high); }
+/* 発光は暗いテーマだけ。色は文字色(= 段の色)から作る */
+body.vscode-dark .tacho-value {
+  text-shadow: 0 0 6px color-mix(in srgb, currentColor 75%, transparent),
+    0 0 14px color-mix(in srgb, currentColor 35%, transparent);
 }
 .tacho-unit {
   white-space: nowrap;
+  font-size: 0.85em;
   opacity: 0.8;
 }
 .tacho-trend-area { fill: var(--tacho-fill); stroke: none; }

@@ -31,7 +31,8 @@ import {
 } from './machineColors.js';
 import { compareMachineOrder } from '../../monitorDeviceModel';
 
-const HM_MAX_SAMPLES = 60;
+// run ボードのタコメーターの推移(runBoard.js)も同じ点数で流す(隣のチャートと流れる速さを揃える)
+export const HM_MAX_SAMPLES = 60;
 // 手元の tick が途絶えたとみなすまでの猶予(ms)。手元の host-metrics 子が落ちてから自動再起動
 // までの待ち(monitorProcessManager.ts scheduleHostMetricsRestart の 5000ms)と同値 —— これを
 // 超えて手元が無音なら、手元は止まっているとみなして刻みをリモートへ委譲する。

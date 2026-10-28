@@ -23,6 +23,7 @@ export const runBoardToggle = document.getElementById('run-board-toggle');
 export const runBoardTitle = document.getElementById('run-board-title');
 export const runBoardTachometer = document.getElementById('run-board-tachometer');
 export const runBoardExpandAll = document.getElementById('run-board-expand-all');
+export const runBoardTachometerToggle = document.getElementById('run-board-tachometer-toggle');
 export const runBoardRows = document.getElementById('run-board-rows');
 // 2カラムの境目(ドラッグで幅を変える。runBoard.js)。
 export const runBoardSplit = document.getElementById('run-board-split');

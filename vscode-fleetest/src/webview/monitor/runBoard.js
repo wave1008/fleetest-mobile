@@ -8,7 +8,7 @@
 
 import { t } from '../i18n.js';
 import {
-  runBoard, runBoardHeader, runBoardToggle, runBoardTitle, runBoardTachometer, runBoardExpandAll, runBoardRows, runBoardSplit,
+  runBoard, runBoardHeader, runBoardToggle, runBoardTitle, runBoardTachometer, runBoardTachometerToggle, runBoardExpandAll, runBoardRows, runBoardSplit,
 } from './domRefs.js';
 import { vscode, persistedState } from './vscodeApi.js';
 import {
@@ -22,6 +22,7 @@ import {
   isPlatformVisible, onPlatformFilterChanged,
 } from './deviceTiles.js';
 import { reapplyPaneHeights } from './splitter.js';
+import { HM_MAX_SAMPLES, onHostMetricsCommitted } from './hostCharts.js';
 import {
   LOCAL_MACHINE_KEY,
   applyMonitorRunsEvent,
@@ -32,10 +33,16 @@ import {
   currentSupplyStep,
 } from '../../runBoardModel';
 import {
-  ACTIONS_PER_SECOND_PER_SEGMENT, ActionTachometer, easeToward, segmentLevel, METER_SEGMENTS, TREND_POINTS, segmentTier,
+  ACTIONS_PER_SECOND_PER_SEGMENT, ActionTachometer, easeToward, segmentLevel, segmentCount, METER_SEGMENTS, segmentTier,
 } from '../../actionTachometerModel';
 
 let runsByMachine = new Map();
+// 見出し行のタコメーター表示切替(既定 ON。値は monitorPanel.ts の showTachometer メッセージで届く)。
+// OFF でも数え続ける(ON に戻したとき数値とチャートが途切れない)。**モジュール冒頭に置く** —— 末尾の初回 render() が読む
+let showTachometer = true;
+// 動きを減らす設定(バーの慣性とタコメーターのフェードを切る)。**モジュール冒頭に置く** —— 初回 render() が読む
+const reduceMotion = typeof window.matchMedia === 'function'
+  && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 // ヘッダの機械要約に出すリモート機の一覧(手元は含まない)。'hostMetricsMachines' に相乗りする
 // (専用のホスト配線を増やさない —— 対象は「直近の monitorDevices に居る機械」で run ボードが
 // 知りたい「フリートに居る機械」と同じ集合)。
@@ -272,8 +279,61 @@ export function setRunBoardMachines(machines) {
   render();
 }
 
+// run の開始・終了(と見出し行のボタン)でタコメーターをフェードで出し入れする(ユーザー決定)。
+// 消すときは透明になってから display:none(見出し行の並びが詰まるのはフェードの後)。出すときは表示してから不透明へ。
+// 最初の1回(パネルを開いた直後)と動きを減らす設定では即座に切り替える
+const TACHO_FADE_MS = 400; // 見た目の時間(ms)。CSS の transition もここから書く
+let tachoVisible; // undefined = まだ1度も決めていない
+let tachoFadeTimer;
+
+function setTachometerVisible(visible) {
+  if (visible === tachoVisible) { return; }
+  const first = tachoVisible === undefined;
+  tachoVisible = visible;
+  clearTimeout(tachoFadeTimer);
+  const animate = !first && !reduceMotion;
+  runBoardTachometer.style.transition = animate ? `opacity ${TACHO_FADE_MS}ms ease` : '';
+  if (visible) {
+    runBoardTachometer.style.display = '';
+    if (animate) { void runBoardTachometer.offsetWidth; } // 透明の状態を一度描かせてから外す = 遷移が走る
+    runBoardTachometer.classList.remove('tacho-hidden');
+  } else {
+    runBoardTachometer.classList.add('tacho-hidden');
+    if (animate) {
+      tachoFadeTimer = setTimeout(() => { runBoardTachometer.style.display = 'none'; }, TACHO_FADE_MS);
+    } else {
+      runBoardTachometer.style.display = 'none';
+    }
+  }
+}
+
+// run が終わっても TACHO_HOLD_AFTER_RUN_MS は出したまま(ユーザー決定)。その間に次の run が始まれば隠さない
+// (周の切れ目でちらつかない)。ボタンで OFF にしたときは利用者の操作なので待たない
+const TACHO_HOLD_AFTER_RUN_MS = 10_000;
+let tachoHoldTimer;
+
+function updateTachometerVisibility(runCount) {
+  if (!showTachometer || runCount > 0) {
+    clearTimeout(tachoHoldTimer);
+    tachoHoldTimer = undefined;
+    setTachometerVisible(showTachometer);
+    return;
+  }
+  if (tachoVisible !== true) {
+    setTachometerVisible(false); // 出していない(パネルを開いた時点で run が無い等)なら待たない
+    return;
+  }
+  tachoHoldTimer ??= setTimeout(() => {
+    tachoHoldTimer = undefined;
+    setTachometerVisible(false);
+  }, TACHO_HOLD_AFTER_RUN_MS);
+}
+
 function renderHeader(groups) {
   runBoardTitle.textContent = t('runBoard.title', { count: String(groups.length) });
+  // タコメーターは run が実行中(「実行中 N」の N ≥ 1。準備中も含む)のときだけ出す(ユーザー決定)。
+  // hidden 属性は .run-board-tachometer の display に負けるので style で切る。隠している間も数え続ける
+  updateTachometerVisibility(groups.length);
   // **折りたたみ中は出さない**(本体が見えないので押しても何も起きない)。run 0 本でも出す ——
   // これはモードのスイッチで、「いま開く行があるか」とは別
   runBoardExpandAll.style.display = collapsed ? 'none' : '';
@@ -287,12 +347,26 @@ function renderHeader(groups) {
   const expandAllLabel = t('runBoard.expandAll');
   setHoverTip(runBoardExpandAll, expandAllLabel);
   runBoardExpandAll.setAttribute('aria-label', expandAllLabel);
+  // タコメーターの表示切替。run 0 本・畳み中でも出す(モードのスイッチ。見せ方は「全て展開」と同じ .toggled)
+  runBoardTachometerToggle.classList.toggle('toggled', showTachometer);
+  runBoardTachometerToggle.setAttribute('aria-pressed', showTachometer ? 'true' : 'false');
+  const tachometerToggleLabel = t('runBoard.toggleTachometer');
+  setHoverTip(runBoardTachometerToggle, tachometerToggleLabel);
+  runBoardTachometerToggle.setAttribute('aria-label', tachometerToggleLabel);
 }
 
 function setExpandAll(value) {
   expandAll = value;
   vscode.postMessage({ type: 'setRunBoardExpandAll', value });
 }
+
+// 押したらその場で切り替え、拡張へ保存を頼む(拡張は同じ値を showTachometer で返す)。ヘッダ行の開閉へ波及させない
+runBoardTachometerToggle.addEventListener('click', (event) => {
+  event.stopPropagation();
+  showTachometer = !showTachometer;
+  vscode.postMessage({ type: 'setShowTachometer', value: showTachometer });
+  render();
+});
 
 // **ヘッダ行の開閉へ波及させない** —— 親(run-board-header)が click で開閉するので、
 // stopPropagation を外すとボタンを押した瞬間にボードごと畳まれる
@@ -779,7 +853,7 @@ function render() {
 const SVG_NS = 'http://www.w3.org/2000/svg';
 // バーは幅固定(40段 × 7px。段 5px + 隙間 2px)。見出しの幅に引き伸ばさない(ユーザー決定)
 const METER_W = 280;
-const METER_H = 18;
+const METER_H = 14;
 const TREND_W = 60;
 const TREND_H = 18;
 const tachometer = new ActionTachometer();
@@ -794,15 +868,9 @@ function svgEl(name, attrs) {
 function buildTachometer() {
   const meter = svgEl('svg', { class: 'tacho-meter', width: METER_W, height: METER_H,
     viewBox: `0 0 ${METER_W} ${METER_H}`, 'aria-hidden': 'true' });
-  const pitch = METER_W / METER_SEGMENTS;
+  tachoUi.meter = meter;
   tachoUi.segs = [];
-  for (let i = 0; i < METER_SEGMENTS; i += 1) {
-    const seg = svgEl('rect', { class: 'tacho-seg', x: (i * pitch + 1).toFixed(2),
-      y: 0, width: (pitch - 2).toFixed(2), height: METER_H, rx: 1,
-      'data-tier': segmentTier(i), 'data-lit': '0' });
-    meter.appendChild(seg);
-    tachoUi.segs.push(seg);
-  }
+  ensureSegments(METER_SEGMENTS);
   const value = document.createElement('span');
   value.className = 'tacho-value';
   value.textContent = '0';
@@ -829,11 +897,35 @@ function setTextIfChanged(el, text) {
 // バーは目標(直近 3 秒の 1 秒あたり)へ慣性で追いつく(easeToward)。元の更新は約 2 秒ごとなので、
 // そのまま写すと段々に跳ねる。動いている間だけ requestAnimationFrame を回し、追いついたら止める
 // (隠れたパネルでは rAF が止まる)。動きを減らす設定・rAF の無い環境では即座に写す
-const reduceMotion = typeof window.matchMedia === 'function'
-  && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// 段の間隔(px)は既定の幅 ÷ 既定の段数で固定し、40段を超える値では同じ間隔の段を右へ足す(右端に張り付かせない)
+const SEG_PITCH = METER_W / METER_SEGMENTS;
+
+/** 段を count 個まで用意する。**作った段は消さない**(下がったら隠すだけ = 周期描画で要素を作り直さない規律) */
+function ensureSegments(count) {
+  for (let i = tachoUi.segs.length; i < count; i += 1) {
+    const seg = svgEl('rect', { class: 'tacho-seg', x: (i * SEG_PITCH + 1).toFixed(2),
+      y: 0, width: (SEG_PITCH - 2).toFixed(2), height: METER_H, rx: 1,
+      'data-tier': segmentTier(i), 'data-lit': '0' });
+    tachoUi.meter.appendChild(seg);
+    tachoUi.segs.push(seg);
+  }
+}
 
 function drawMeter() {
+  // 数値(アクション/分)はバーが今表示している値から出す = バーが 0 なら 0・慣性で一緒に動く(ユーザー決定)
+  setTextIfChanged(tachoUi.value, String(Math.round(tachoUi.shown * 60)));
+  // 数値の色は、いちばん上に点いている段(途中の段を含む)の色。何も点いていなければ最下段の色
+  setAttrIfChanged(tachoUi.value, 'data-tier', segmentTier(Math.max(0, Math.ceil(tachoUi.shown) - 1)));
+  // 40段に収まらなければ右へ延ばす(下がれば戻る)。幅は段数 × 間隔
+  const count = segmentCount(tachoUi.shown);
+  ensureSegments(count);
+  const width = (count * SEG_PITCH).toFixed(2);
+  setAttrIfChanged(tachoUi.meter, 'width', width);
+  setAttrIfChanged(tachoUi.meter, 'viewBox', `0 0 ${width} ${METER_H}`);
   tachoUi.segs.forEach((seg, i) => {
+    const shown = i < count;
+    if (seg.style.display !== (shown ? '' : 'none')) { seg.style.display = shown ? '' : 'none'; }
     const level = segmentLevel(tachoUi.shown, i);
     setAttrIfChanged(seg, 'data-lit', level > 0 ? '1' : '0');
     // 途中の段だけ薄く点ける(満ちた段・消えた段は既定の不透明度)
@@ -864,42 +956,53 @@ function setMeterTarget(perSecond) {
   }
 }
 
+// 推移のチャートは CPU・GPU のチャートと同じ瞬間に描く(host-metrics の tick = onHostMetricsCommitted。ユーザー決定)。
+// 別の時計で描くと隣のチャートと動く瞬間がずれる。host-metrics が来ない間(モニター停止中など)は止まる = 隣と同じ
+function drawTrend() {
+  if (!tachoUi.segs) { return; }
+  // その瞬間にカウンタが表示している値(バーの値 × 60)を積む = ゲージが 0 ならチャートも 0(ユーザー決定)。
+  // CPU・GPU と同じく直近 HM_MAX_SAMPLES 点を右詰めで並べ、古い点は左へ流れて消える
+  tachoUi.trendSamples ??= [];
+  tachoUi.trendSamples.push(Math.round((tachoUi.shown ?? 0) * 60));
+  if (tachoUi.trendSamples.length > HM_MAX_SAMPLES) { tachoUi.trendSamples.shift(); }
+  const samples = tachoUi.trendSamples;
+  if (samples.length < 2) { return; }
+  // y は表示中の最大(最低 1目盛り = 60/分)に対する比
+  const pad = 2;
+  const trendMax = Math.max(ACTIONS_PER_SECOND_PER_SEGMENT * 60, ...samples);
+  const stepX = (TREND_W - pad * 2) / (HM_MAX_SAMPLES - 1);
+  const startIndex = HM_MAX_SAMPLES - samples.length;
+  const pts = samples.map((v, i) => [
+    pad + (startIndex + i) * stepX,
+    TREND_H - pad - Math.min(1, v / trendMax) * (TREND_H - pad * 2),
+  ]);
+  const fmt = (p) => `${p[0].toFixed(1)} ${p[1].toFixed(1)}`;
+  const line = 'M' + pts.map(fmt).join(' L');
+  const first = pts[0];
+  const last = pts[pts.length - 1];
+  setAttrIfChanged(tachoUi.line, 'd', line);
+  setAttrIfChanged(tachoUi.area, 'd', `${line} L${last[0].toFixed(1)} ${TREND_H} L${first[0].toFixed(1)} ${TREND_H} Z`);
+  setAttrIfChanged(tachoUi.dot, 'cx', last[0].toFixed(1));
+  setAttrIfChanged(tachoUi.dot, 'cy', last[1].toFixed(1));
+}
+
+onHostMetricsCommitted(drawTrend);
+
 function renderTachometer() {
   if (!tachoUi.segs) { buildTachometer(); }
   const now = Date.now();
   const snap = tachometer.snapshot(now);
-  const value = Math.round(snap.value);
+  // 説明と読み上げは目標の値(バーが追いついた先)。表示中の数値は drawMeter が毎フレーム書く
+  const value = Math.round(snap.meterPerSecond * 60);
   setMeterTarget(snap.meterPerSecond);
-  setTextIfChanged(tachoUi.value, String(value));
   const unit = t('runBoard.tachometerUnit');
   setTextIfChanged(tachoUi.unit, unit);
-
-  // 推移: x は点の並び、y は表示中の最大(最低 1目盛り)に対する比。null(観測前)は描かない
-  const pad = 2;
-  const pts = [];
-  const trendMax = Math.max(ACTIONS_PER_SECOND_PER_SEGMENT * 60, ...snap.trend.filter((v) => v !== null));
-  snap.trend.forEach((v, i) => {
-    if (v === null) { return; }
-    const x = (i * (TREND_W - pad * 2)) / (TREND_POINTS - 1) + pad;
-    const y = TREND_H - pad - Math.min(1, v / trendMax) * (TREND_H - pad * 2);
-    pts.push([x, y]);
-  });
-  if (pts.length > 0) {
-    const fmt = (p) => `${p[0].toFixed(1)} ${p[1].toFixed(1)}`;
-    const line = 'M' + pts.map(fmt).join(' L');
-    const first = pts[0];
-    const last = pts[pts.length - 1];
-    setAttrIfChanged(tachoUi.line, 'd', line);
-    setAttrIfChanged(tachoUi.area, 'd', `${line} L${last[0].toFixed(1)} ${TREND_H} L${first[0].toFixed(1)} ${TREND_H} Z`);
-    setAttrIfChanged(tachoUi.dot, 'cx', last[0].toFixed(1));
-    setAttrIfChanged(tachoUi.dot, 'cy', last[1].toFixed(1));
-  }
 
   const label = (machine) => machineLabel(machine);
   const lines = [t('runBoard.tachometerTipTotal', { value: String(value) })];
   if (snap.byMachine.length > 1 || (snap.byMachine.length === 1 && snap.byMachine[0].machine !== LOCAL_MACHINE_KEY)) {
     for (const m of snap.byMachine) {
-      lines.push(t('runBoard.tachometerTipMachine', { machine: label(m.machine), value: String(Math.round(m.value)) }));
+      lines.push(t('runBoard.tachometerTipMachine', { machine: label(m.machine), value: String(Math.round(m.meterPerMinute)) }));
     }
   }
   if (snap.unobservedMachines.length > 0) {
@@ -908,13 +1011,15 @@ function renderTachometer() {
   lines.push(t('runBoard.tachometerTipDefinition'));
   lines.push(t('runBoard.tachometerTipMeter', { value: snap.meterPerSecond.toFixed(1) }));
   lines.push(t('runBoard.tachometerTipScale'));
-  if (snap.observedSeconds < 60) {
-    lines.push(t('runBoard.tachometerTipWarmup', { seconds: String(snap.observedSeconds) }));
-  }
   const tip = lines.join('\n');
   if (runBoardTachometer.getAttribute('data-hover-tip') !== tip) { setHoverTip(runBoardTachometer, tip); }
   setAttrIfChanged(runBoardTachometer, 'aria-label', t('runBoard.tachometerAria', { value: String(value) }));
   setAttrIfChanged(runBoardTachometer, 'role', 'img');
+}
+
+export function setShowTachometer(show) {
+  showTachometer = show;
+  render();
 }
 
 /** main.js の 'monitorRuns' ケースから渡す(1件 = 1機械ぶん。契約は monitorDeviceModel.ts)。 */

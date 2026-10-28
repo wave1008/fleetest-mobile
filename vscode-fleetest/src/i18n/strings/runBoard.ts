@@ -9,6 +9,7 @@ export const runBoardStrings = {
   // ツールチップと aria-label が共有。**ON/OFF で入れ替えない**(ユーザー決定)——
   // このボタンは「いま開く」ではなく「開いた状態を保つ」モードのスイッチ
   "runBoard.expandAll": { ja: "全て展開を維持", en: "Keep all expanded" },
+  "runBoard.toggleTachometer": { ja: "タコメーターを表示", en: "Show the tachometer" },
   "runBoard.collapse": { ja: "run ボードを閉じる", en: "Collapse run board" },
   "runBoard.expand": { ja: "run ボードを開く", en: "Expand run board" },
   "runBoard.expandLanes": { ja: "デバイスごとの内訳を開く", en: "Show per-device lanes" },
@@ -44,8 +45,8 @@ export const runBoardStrings = {
   "runBoard.tachometerTipMachine": { ja: "{machine}: {value}", en: "{machine}: {value}" },
   "runBoard.tachometerTipUnobserved": { ja: "観測できていないマシン: {machines}", en: "Not observed: {machines}" },
   "runBoard.tachometerTipDefinition": {
-    ja: "直近 60 秒にデバイスへ送った操作の数",
-    en: "Operations sent to devices in the last 60 seconds",
+    ja: "直近 3 秒にデバイスへ送った操作の数を 1 分あたりに直した値(メーターと連動)",
+    en: "Operations sent to devices in the last 3 seconds, per minute (follows the meter)",
   },
   "runBoard.tachometerTipMeter": {
     ja: "メーター: {value} アクション/秒(直近 3 秒の数 ÷ 3)",
@@ -54,9 +55,5 @@ export const runBoardStrings = {
   "runBoard.tachometerTipScale": {
     ja: "1目盛り = 1アクション/秒",
     en: "One segment = 1 action/s",
-  },
-  "runBoard.tachometerTipWarmup": {
-    ja: "観測を始めて {seconds} 秒(60 秒に満たない間は少なめに出ます)",
-    en: "Observed for {seconds}s (reads low until 60s have passed)",
   },
 } satisfies MessageDict;
