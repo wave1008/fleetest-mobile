@@ -160,7 +160,7 @@ test("FLEETEST_REF がスクリプトの取得元とクローンの ref を揃�
   assert.match(INSTALL_SH, /REF="\$\{FLEETEST_REF:-\}"/, "install.sh が FLEETEST_REF を読んでいません");
   assert.match(INSTALL_SH, /git clone \$\{REF:\+--branch "\$REF"\}/,
     "新規 clone が REF を指定していません");
-  assert.match(INSTALL_SH, /fetch --tags origin "\$REF"/,
+  assert.match(INSTALL_SH, /fetch --force --tags origin "\$REF"/,
     "既存クローンを REF へ揃えていません");
   // スキル側はクローンの Scripts/(手順書と同じ版)をローカルで実行する =
   // 手順書とスクリプトの版は構造的に揃う
@@ -201,13 +201,21 @@ test("ref へ揃えるとき、ブランチは追跡付き・タグは detached"
     "ブランチかどうかの判定がありません");
 });
 
+test("タグの取得は付け直されたタグも上書きする(--force)", () => {
+  // 外すと、上流でタグを付け直した後(履歴の書き換え)に既存クローンの fetch が would clobber で exit 1 になり、
+  // move_to_release が「オフライン」と同じ戻り値で受け手を古い版に黙って留める
+  const release = INSTALL_SH.slice(INSTALL_SH.indexOf("move_to_release() {"), INSTALL_SH.indexOf("release_track_applies() {"));
+  assert.match(release, /fetch -q --force --tags origin/, "move_to_release のタグ取得に --force がありません");
+  assert.match(INSTALL_SH, /fetch --force --tags origin "\$REF"/, "FLEETEST_REF 経路のタグ取得に --force がありません");
+});
+
 test("ref へ揃える経路でも自己再 exec の材料を取る", () => {
   // 取らないと、揃えた先の新しい install.sh が**その回に1つも実行されない**
   // (CLAUDE.md の再 exec の項と同じ実害)
   const refBranch = INSTALL_SH.indexOf('elif [ -n "$REF" ]; then');
   const section = INSTALL_SH.slice(refBranch, INSTALL_SH.indexOf("version pinned:"));
   const captured = section.indexOf("HEAD_BEFORE_PULL=");
-  const fetched = section.indexOf("fetch --tags origin");
+  const fetched = section.indexOf("fetch --force --tags origin");
   assert.ok(captured > 0, "REF 経路が HEAD_BEFORE_PULL を取っていません(再 exec が働きません)");
   assert.ok(captured < fetched, "HEAD_BEFORE_PULL を fetch の後で取っています(常に同じ値になります)");
 });

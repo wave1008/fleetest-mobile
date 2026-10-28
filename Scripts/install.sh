@@ -256,8 +256,10 @@ move_to_release() {
     RELEASE_TAG="$here"; RELEASE_RESULT=unchanged
     return 0
   fi
-  # 全タグを取る(最新1本だけだと、間のリリースの注釈が update.sh の What's new から抜ける)
-  GIT_TERMINAL_PROMPT=0 git -C "$TOOL_ROOT" fetch -q --tags origin >>"$RAW_SINK" 2>&1 || return 1
+  # 全タグを取る(最新1本だけだと、間のリリースの注釈が update.sh の What's new から抜ける)。
+  # **--force を外さない**: 上流でタグを付け直すと(履歴の書き換え)既存のタグが would clobber で拒否され、
+  # exit 1 =「オフライン」に化けて受け手が古い版に黙って留まる。リリースタグは上流が正
+  GIT_TERMINAL_PROMPT=0 git -C "$TOOL_ROOT" fetch -q --force --tags origin >>"$RAW_SINK" 2>&1 || return 1
   git -C "$TOOL_ROOT" checkout -q --detach "refs/tags/$latest" >>"$RAW_SINK" 2>&1 || return 3
   git -C "$TOOL_ROOT" config fleetest.channel release || return 3
   RELEASE_RESULT=moved
@@ -544,7 +546,7 @@ if [ -d "$TOOL_ROOT_RAW/.git" ] || [ -f "$TOOL_ROOT_RAW/Package.swift" ]; then
     else
       ref_checkout=(checkout -q --detach FETCH_HEAD)
     fi
-    if git -C "$TOOL_ROOT" fetch --tags origin "$REF" >>"$RAW_SINK" 2>&1 \
+    if git -C "$TOOL_ROOT" fetch --force --tags origin "$REF" >>"$RAW_SINK" 2>&1 \
        && git -C "$TOOL_ROOT" "${ref_checkout[@]}" >>"$RAW_SINK" 2>&1; then
       # 明示指示が勝つ: リリース追従の印を消す(残すと detached のタグ・SHA でも次の REF 無しの実行がリリースへ戻す)
       git -C "$TOOL_ROOT" config --unset fleetest.channel >/dev/null 2>&1 || true
