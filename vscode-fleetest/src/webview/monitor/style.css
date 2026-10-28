@@ -913,6 +913,14 @@ body.vscode-dark .tacho-trend-dot { filter: drop-shadow(0 0 2px var(--tacho-line
 .run-board[data-collapsed="true"] .run-board-split {
   display: none;
 }
+.run-board-lead {
+  /* 時刻より前のまとまり。幅は全 run 行で最大に揃える(--rb-lead = runBoard.js の renderLeadWidth) */
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: var(--rb-lead, 0px);
+}
 .run-board-progress {
   flex: 0 0 auto;
   width: 90px;

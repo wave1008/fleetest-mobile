@@ -399,6 +399,8 @@ function updateIdleRow(row, entry) {
   showMachineBadge(row, machineKey(entry.machine));
   row.scopeEl.textContent = '';
   row.runningDevicesEl.style.display = 'none';
+  // 空きの行は時刻を持たないので、揃える幅(--rb-lead)ごと畳む(残すと「空き」が右へ押される)
+  row.leadEl.style.display = 'none';
   row.progressEl.style.display = 'none';
   row.countsEl.textContent = '';
   // 空でも箱を残すと列の gap と margin-right ぶん「空き」が右へずれる(ユーザー指摘)ので畳む
@@ -570,9 +572,14 @@ function ensureRow(key) {
   const leftEl = document.createElement('span');
   leftEl.className = 'run-board-col-left';
   leftEl.append(chevronEl, machineCellEl, scopeEl, runningDevicesEl);
+  // 時刻より前(進捗バー・本数または準備中の一言・注記)を1つにまとめ、幅を全 run 行で揃える
+  // (--rb-lead = renderLeadWidth が最大を測る)= 経過 / 残りの左端が行の種類によらず1本に揃う(ユーザー決定)
+  const leadEl = document.createElement('span');
+  leadEl.className = 'run-board-lead';
+  leadEl.append(progressEl, countsEl, notesEl);
   const rightEl = document.createElement('span');
   rightEl.className = 'run-board-col-right';
-  rightEl.append(progressEl, countsEl, statusEl, notesEl, timeEl);
+  rightEl.append(leadEl, statusEl, timeEl);
   summaryEl.append(leftEl, rightEl);
 
   const issuerEl = document.createElement('div');
@@ -601,7 +608,7 @@ function ensureRow(key) {
   });
 
   const row = {
-    rowEl, chevronEl, machineBadgeEl, scopeEl, runningDevicesEl, progressEl, progressBarEl, countsEl, statusEl, notesEl,
+    rowEl, chevronEl, machineBadgeEl, scopeEl, runningDevicesEl, leadEl, progressEl, progressBarEl, countsEl, statusEl, notesEl,
     timeEl, elapsedEl, remainingEl, issuerEl, lanesEl,
     key, run: null, idle: null, laneRows: new Map(),
   };
@@ -730,6 +737,7 @@ function updateRow(row, run) {
   row.run = run;
   row.idle = null;
   row.statusEl.style.display = 'none';
+  row.leadEl.style.display = '';
   row.countsEl.style.display = '';
   row.timeEl.style.display = '';
   row.rowEl.classList.toggle('run-board-row-hasFailed', run.failed > 0);
@@ -872,6 +880,18 @@ function render() {
   // **行を作り終えてから測る** —— 既定の幅はいちばん長いラベルから決めるので、
   // 行が揃っていないと短い側に決まってしまう
   renderSplit();
+  renderLeadWidth();
+}
+
+/** run 行の「時刻より前」のまとまりの幅を、いちばん広い行に揃える(--rb-lead)。
+ *  自然な幅を測るため一度 0 に戻してから読む(要素は作り直さない)。空きの行は時刻を持たないので対象外 */
+function renderLeadWidth() {
+  runBoard.style.setProperty('--rb-lead', '0px');
+  let widest = 0;
+  for (const row of rows.values()) {
+    if (row.run) { widest = Math.max(widest, row.leadEl.offsetWidth); }
+  }
+  runBoard.style.setProperty('--rb-lead', widest + 'px');
 }
 
 // ---- アクション/秒メーター(見出しの「実行中 N」の右。純粋ロジックは actionTachometerModel.ts) ----

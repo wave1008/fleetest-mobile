@@ -1103,3 +1103,33 @@ test("run の行は実行中のデバイスの数を (N) で出す(待機中の�
   post(window, monitorRunsMessage({ runs: [] }));
   assert.equal(cell(), null, "空きの行には出さない");
 });
+
+test("run 行の経過 / 残りの左端は、実行中の行と準備中の行で揃う(時刻より前のまとまりを同じ幅にする)", (t) => {
+  const { window, document } = createWebview();
+  t.after(() => window.close());
+  // jsdom はレイアウトを持たないので、まとまりの自然な幅を中身の文字数から作る
+  Object.defineProperty(window.HTMLElement.prototype, "offsetWidth", {
+    configurable: true,
+    get() {
+      if (!this.classList.contains("run-board-lead")) { return 0; }
+      const min = parseFloat(getComputedStyleSafe(this)) || 0;
+      return Math.max(min, this.textContent.length * 7);
+    },
+  });
+  function getComputedStyleSafe(el) {
+    return el.ownerDocument.getElementById("run-board").style.getPropertyValue("--rb-lead");
+  }
+  const base = monitorRunsMessage().runs[0];
+  post(window, monitorRunsMessage({ runs: [base] }));
+  post(window, { type: "monitorRuns", machine: "M1Max", observed: true,
+    runs: [{ ...base, pid: 2, runID: "run-2", phase: "preparing", lanes: [], supply: [{ name: "", step: "bridge" }] }] });
+  post(window, { type: "hostMetricsMachines", machines: ["M1Max", "M1Ultra"] });
+  post(window, { type: "monitorRuns", machine: "M1Ultra", observed: true, runs: [] });
+  const leads = [...document.querySelectorAll(".run-board-lead")].filter((el) => el.style.display !== "none");
+  assert.equal(leads.length, 2, "実行中と準備中の2行");
+  const width = document.getElementById("run-board").style.getPropertyValue("--rb-lead");
+  assert.ok(parseFloat(width) > 0, "揃える幅が入る");
+  assert.equal(width, Math.max(...leads.map((el) => el.textContent.length * 7)) + "px", "いちばん広い行に揃える");
+  const idleLead = [...document.querySelectorAll(".run-board-lead")].find((el) => el.style.display === "none");
+  assert.ok(idleLead, "空きの行はまとまりごと畳む(「空き」を押さない)");
+});
