@@ -555,10 +555,17 @@ struct ApiRunCommand: AsyncParsableCommand {
         }
         // ビルドはホスト側で 1 回だけ(サブプロセスは自らビルドしない)
         if !common.skipBuild {
-            try ScenarioHost.build(project: testProject, log: { logStderr($0) }, willBuild: {
+            let willBuild = {
                 writeProgress(phase: "building")
                 logStderr("→ Building scenarios (\(testProject.name))...")
-            })
+            }
+            // 理由は Fleetest.swift の同じ箇所(--build-with-project)
+            if !common.buildWithProjects.isEmpty {
+                ScenarioHost.prebuildTogether(
+                    projects: [testProject] + ScenarioHost.projects(named: common.buildWithProjects),
+                    log: { logStderr($0) }, willBuild: willBuild)
+            }
+            try ScenarioHost.build(project: testProject, log: { logStderr($0) }, willBuild: willBuild)
             writeProgress(phase: "preparing")
         } else {
             // 食い違っていても止めない(警告のみ。)
@@ -861,7 +868,7 @@ struct ApiRunCommand: AsyncParsableCommand {
             noLPT: common.noLPT, lptHistoryRuns: common.lptHistoryRuns,
             performanceMode: performanceMode,
             defaultTimeout: defaultTimeout, scenarioTimeout: scenarioTimeout.map(Double.init),
-            workQueue: common.workQueue,
+            workQueue: common.workQueue, buildWithProjects: common.buildWithProjects,
             remoteTimeoutSeconds: common.remoteTimeout, runGroup: common.runGroup)
         if exitCode != 0 {
             throw ExitCode(exitCode)

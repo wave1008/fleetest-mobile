@@ -473,7 +473,7 @@ enum DeviceMachineRunner {
         performanceMode: Bool,
         forceLock: Bool, remoteDir: String?, remoteTimeout: Int?,
         quiet: Bool, junitPath: String?, broadcast: Bool = false, runGroup: String? = nil,
-        reportDir: String? = nil, workQueue: Bool = false
+        reportDir: String? = nil, workQueue: Bool = false, buildWithProjects: [String] = []
     ) -> [String] {
         var args = FleetRunner.buildArgs(
             project: project, host: host, profile: profile,
@@ -489,6 +489,8 @@ enum DeviceMachineRunner {
         }
         // 動的な割り振り(RR-8.1)の子だけ。--scenario は全候補で、回すのは親が1本ずつ渡した分
         if workQueue { args += ["--work-queue"] }
+        // 手元の子はビルドしない(--skip-build = 親がまとめて済ませた)ので、運ぶのはリモートの子だけ
+        if host != "local" { for name in buildWithProjects { args += ["--build-with-project", name] } }
         return args
     }
 

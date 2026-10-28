@@ -681,6 +681,7 @@ public enum RemoteRunArgs {
                              performanceMode: Bool,
                              broadcast: Bool = false,
                              workQueue: Bool = false,
+                             buildWithProjects: [String] = [],
                              remoteJUnitPath: String?,
                              reportDir: String?, workspace: String? = nil,
                              runGroup: String? = nil) -> [String] {
@@ -727,6 +728,8 @@ public enum RemoteRunArgs {
         if broadcast { args.append("--broadcast") }
         // 中継しないとリモートは自分の持ち分を静的に決めて走る(親の配りを待たない)。stdin の中継は RemoteRunDispatcher
         if workQueue { args.append("--work-queue") }
+        // 中継しないと向こうの子は自分のプロジェクトだけを作り、子 run ごとに swift build の起動の固定費を払う
+        for name in buildWithProjects { args += ["--build-with-project", name] }
         if let remoteJUnitPath { args += ["--junit", remoteJUnitPath] }
         // 束ね鍵は**中継しないと向こうの run.json に載らない** = リモートで撮った録画だけが
         // 束から外れる(RunMetaRecord.runGroup の宣言)
@@ -742,6 +745,7 @@ public enum RemoteRunArgs {
                                 performanceMode: Bool,
                                 defaultTimeout: Double?, scenarioTimeout: Double?,
                                 workQueue: Bool = false,
+                                buildWithProjects: [String] = [],
                                 reportDir: String?, workspace: String? = nil,
                                 runGroup: String? = nil) -> [String] {
         // --runner local の理由は build() のコメント(リモートでの再ディスパッチを止める)
@@ -766,6 +770,8 @@ public enum RemoteRunArgs {
         if let scenarioTimeout { args += ["--scenario-timeout", formatTimeout(scenarioTimeout)] }
         // 理由は build() の --work-queue と同じ
         if workQueue { args.append("--work-queue") }
+        // 理由は build() の --build-with-project と同じ
+        for name in buildWithProjects { args += ["--build-with-project", name] }
         // 中継の理由は build() の --run-group と同じ
         if let runGroup { args += ["--run-group", runGroup] }
         return args

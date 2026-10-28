@@ -204,7 +204,7 @@ public enum ScenarioHost {
 
     /// プロジェクトのシナリオをビルドする。ホスト側で 1 回だけ呼び、サブプロセスは自らビルドしない
     /// (並列ワーカーが同時に swift build して SPM ロック競合するのを防ぐ)。
-    /// no-op の swift build でも ~2.6s かかるため、BuildFingerprint が前回ビルド時と一致し
+    /// no-op の swift build でも 7〜13 秒かかるため(PT-8.1)、BuildFingerprint が前回ビルド時と一致し
     /// (mtime+size 比較。コンテンツ hash ではない)、かつバイナリが実在すればビルドをスキップする。
     /// `willBuild` は**実際に swift build を呼ぶ直前にだけ**呼ぶ(省くときは呼ばない。
     /// run ボードの段階 "building" の書き手がここに載る)
@@ -238,6 +238,41 @@ public enum ScenarioHost {
         if let runner = try? runnerURL(project: project) {
             pinSigningIdentifier(binary: runner, productName: project.productName, log: log)
         }
+    }
+
+    /// 複数のプロジェクトのうちビルドが要るものが2つ以上あれば、1回の素の `swift build` でまとめて作って指紋を残す(先行ビルド)。
+    /// 呼び手はこのあと各プロジェクトを今までどおり `build` に通す(指紋が一致すれば swift build を呼ばず署名の固定だけが走る)。
+    /// swift build は起こすだけで計画の作り直しに 7〜13 秒払うので、`--product` を1本ずつ起こすと 15 本で 135 秒・まとめると 10 秒(PT-8.1)。
+    /// **失敗しても投げない** —— まとめたビルドはパッケージの全ターゲットを作る = 回さないプロジェクトが壊れていても失敗するので、
+    /// そのときは呼び手の `build` が1本ずつ作り、自分のプロジェクトが壊れていればそこで名指しする
+    public static func prebuildTogether(projects: [TestProject], log: ((String) -> Void)? = nil,
+                                        willBuild: (() -> Void)? = nil) {
+        guard let root = packageRoot() else { return }
+        let stale: [(project: TestProject, fingerprint: String?)] = projects.compactMap { project in
+            let fingerprint = BuildFingerprint.compute(repoRoot: root, scenariosDir: project.scenariosDir)
+            return buildNeeded(fingerprint: fingerprint, project: project, root: root) ? (project, fingerprint) : nil
+        }
+        if stale.count >= 2 {
+            willBuild?()
+            log?("→ Building scenarios of \(stale.count) projects in one swift build...")
+            if ResolvedPinSync.pinnedResolveNeeded(packageRoot: root) {
+                _ = try? Shell.run(["swift", "package", "resolve", "--only-use-versions-from-resolved-file"], cwd: root)
+            }
+            if (try? Shell.run(["swift", "build"], cwd: root))?.status == 0 {
+                for entry in stale {
+                    if let fingerprint = entry.fingerprint {
+                        BuildFingerprint.store(fingerprint, productName: entry.project.productName, repoRoot: root)
+                    }
+                }
+            } else {
+                log?("→ The combined build failed; building each project on its own")
+            }
+        }
+    }
+
+    /// 名前からプロジェクトを引く(引けない名前は飛ばす = 先行ビルドの対象を減らすだけで run は止めない)
+    public static func projects(named names: [String]) -> [TestProject] {
+        names.compactMap { try? project(named: $0) }
     }
 
     /// `build` が swift build を呼ぶか(呼ばずに答える。省く条件は `build` と同じ1箇所)。

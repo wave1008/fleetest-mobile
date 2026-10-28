@@ -436,6 +436,22 @@ final class RemoteDispatchTests: XCTestCase {
             ["run", "--project", "E2E", "--profile", "ios-inapp-boost", "--quiet", "--runner", "local"])
     }
 
+    /// 先行ビルドの相手は run / api run の両方で向こうの子へ中継する(落とすと子 run ごとに swift build の固定費を払う)
+    func testBuildWithProjectIsRelayed() {
+        let run = RemoteRunArgs.build(
+            project: "E2E", profile: "p", scenarios: [], folders: [],
+            noLPT: false, lptHistoryRuns: nil, performanceMode: false,
+            buildWithProjects: ["E2EX"], remoteJUnitPath: nil, reportDir: nil)
+        let api = RemoteRunArgs.buildApi(
+            project: "E2E", profile: "p", scenarios: [],
+            noLPT: false, lptHistoryRuns: nil, performanceMode: false,
+            defaultTimeout: nil, scenarioTimeout: nil, buildWithProjects: ["E2EX"], reportDir: nil)
+        for args in [run, api] {
+            let i = args.firstIndex(of: "--build-with-project")
+            XCTAssertEqual(i.map { args[$0 + 1] }, "E2EX", "\(args)")
+        }
+    }
+
     /// **リモートのサブ実行はデバイスの絞り込みを中継しないと効かない**(2026-08-17 の実走)。
     /// 向こうは同じマシンプロファイルを受け取るので、渡さないと全ホストぶんのデバイスを自分のものと
     /// して解決しようとする。**ただし渡すのは "local" 固定** —— ローカルエイリアスは発行側だけの
