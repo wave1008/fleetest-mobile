@@ -1641,7 +1641,9 @@ html.select-all-guard * {
    左上・マシン名の段(高さ 16px)の縦中央に左寄せ。絶対配置なので中央寄せの段の並びを動かさない */
 .lane-preview { position: relative; }
 .run-lamp {
-  --run-lamp: #1f9d55;
+  /* 色はタコメーターの「低」の段と同じ(ユーザー決定)。値は .run-board-tachometer の --tacho-low とテーマごとに一致させる
+     (あちらの変数は .run-board-tachometer の中でしか見えない) */
+  --run-lamp: #0f8b8d;
   position: absolute;
   left: 6px;
   top: 8px; /* .lane-preview の padding 4px + (段の高さ 16px − 8px) / 2 */
@@ -1660,7 +1662,7 @@ html.select-all-guard * {
   .run-lamp { transition: none; }
 }
 body.vscode-dark .run-lamp {
-  --run-lamp: #39e27d;
+  --run-lamp: #00e5ff;
   box-shadow: 0 0 4px var(--run-lamp), 0 0 8px color-mix(in srgb, var(--run-lamp) 50%, transparent);
 }
 body.vscode-high-contrast .run-lamp,
