@@ -554,7 +554,7 @@ test("devices サイクルで中身が変わらなければ、拡大表示のタ
   assert.equal(after.textContent, document.querySelector("#grid .tile .frame-placeholder").textContent);
 });
 
-test("グリッドビューの左上の点灯マークは、シナリオを実行中のデバイスだけ点く(ラインビューには出さない)", (t) => {
+test("左上の点灯マークは、シナリオを実行中のデバイスだけ点く(ラインビューのタイルとグリッドビューの両方)", (t) => {
   const { window, document } = createWebview();
   t.after(() => window.close());
   sendDevices(window, [{}, {}]);
@@ -562,7 +562,12 @@ test("グリッドビューの左上の点灯マークは、シナリオを実�
   const lamp = () => visiblePreviews(document)[0].querySelector(".run-lamp");
   assert.ok(lamp(), "グリッドビューにはマークの要素がある");
   assert.equal(lamp().dataset.on, "0", "run が無い間は消えている");
-  assert.equal(document.querySelector("#grid .tile .run-lamp"), null, "ラインビューのタイルには出さない");
+  const tileLamp = () => document.querySelector("#grid .tile .run-lamp");
+  assert.ok(tileLamp(), "ラインビューのタイルにもマークがある");
+  assert.equal(tileLamp().dataset.on, "0");
+  assert.equal(document.querySelector("#grid .tile .tile-machine-row .run-lamp"), null,
+    "マシン名の段の中には入れない(拡大表示へ複製される段なので二重に出る)");
+  assert.equal(visiblePreviews(document)[0].querySelectorAll(".run-lamp").length, 1, "拡大表示のマークは1つだけ");
   const runs = (lanes) => ({
     type: "monitorRuns", observed: true,
     runs: [{
@@ -574,12 +579,14 @@ test("グリッドビューの左上の点灯マークは、シナリオを実�
     data: runs([{ key: "UDID-0", name: "Dev 0", platform: "ios", scenario: "S1", scenarioElapsedSeconds: 1 }]),
   }));
   assert.equal(lamp().dataset.on, "1", "シナリオを実行中なら点く");
+  assert.equal(tileLamp().dataset.on, "1", "ラインビューのタイルも点く");
   window.dispatchEvent(new window.MessageEvent("message", {
     data: runs([{ key: "UDID-0", name: "Dev 0", platform: "ios" }]),
   }));
   assert.equal(lamp().dataset.on, "0", "待機中(scenario なし)は消える");
   window.dispatchEvent(new window.MessageEvent("message", { data: { type: "monitorRuns", observed: true, runs: [] } }));
   assert.equal(lamp().dataset.on, "0", "run が終われば消える");
+  assert.equal(tileLamp().dataset.on, "0", "ラインビューのタイルも消える");
 });
 
 test("点灯マークの色は OS で分ける(Android は緑系 = data-platform)", (t) => {

@@ -168,7 +168,7 @@ function refreshSelectAllState() {
 // device id -> { wrapEl, imgEl, canvasEl }
 const deviceMirrors = new Map();
 // シナリオを実行中のデバイス(run ボードのレーンのうち scenario を持つもの。runBoard.js が setRunningDevices で配る)。
-// グリッドビューの左上の点灯マークだけが読む(ラインビューには出さない。ユーザー決定)
+// ラインビューのタイルとグリッドビューの拡大表示の左上の点灯マークが読む(ユーザー決定)
 let runningDeviceIds = new Set();
 
 // 画像高さの絶対下限(px)。セパレーターを手で最小まで詰めたときに 0 や負にならないための床。
@@ -373,7 +373,12 @@ function createTile(device) {
   // 実行中/キュー待ち/録画中のバッジはタイル左下(フッター先頭)。録画は実行中の右(ユーザー指定)。
   footer.append(runningBadge, recordingBadge, frozenBadge, queuedBadge, stateBadge, spacer, renderBadge);
 
-  tile.append(machineRow, header, frameWrap, footer);
+  // 点灯マーク(左上・マシン名の段の左端)。**段の中に入れない** —— 段はグリッドビューの見出しへ複製される
+  // (renderMirrorHeader)ので、中に入れると拡大表示に二重に出る。絶対配置なので中央寄せの段を動かさない
+  const lampEl = document.createElement('span');
+  lampEl.className = 'run-lamp';
+  lampEl.dataset.on = '0';
+  tile.append(machineRow, header, frameWrap, footer, lampEl);
   grid.appendChild(tile);
 
   const entry = {
@@ -383,6 +388,7 @@ function createTile(device) {
     // 拡大表示(出力ペイン)のタグ段はこの2つの複製で作る(renderMirrorHeader)
     headerEl: header,
     machineRowEl: machineRow,
+    lampEl,
     // そのデバイスの直列キュー上の状態({ op: 'up'|'down', status: 'queued'|'running' })。
     // キューに入っていなければ undefined。
     opBusy: undefined,
@@ -446,6 +452,7 @@ function createTile(device) {
     lastOpFailed: false,
   };
   tiles.set(device.id, entry);
+  renderLamp(lampEl, entry);
   return entry;
 }
 
@@ -618,16 +625,21 @@ function renderMirror(entry) {
   }
 }
 
-function renderMirrorLamp(entry, mirror) {
+/** 点灯マーク1つを描く(タイルと拡大表示で共有)。変わったときだけ書く */
+function renderLamp(lampEl, entry) {
   // 色は OS で分ける(iOS = タコメーターの青・Android = 緑系。ユーザー決定。CSS の .run-lamp[data-platform])
   const platform = entry.device.platform === 'android' ? 'android' : 'ios';
-  if (mirror.lampEl.dataset.platform !== platform) { mirror.lampEl.dataset.platform = platform; }
+  if (lampEl.dataset.platform !== platform) { lampEl.dataset.platform = platform; }
   const on = runningDeviceIds.has(entry.device.id) ? '1' : '0';
-  if (mirror.lampEl.dataset.on === on) {
+  if (lampEl.dataset.on === on) {
     return;
   }
-  mirror.lampEl.dataset.on = on;
-  setHoverTip(mirror.lampEl, on === '1' ? t('wvMonitor.tile.running') : '');
+  lampEl.dataset.on = on;
+  setHoverTip(lampEl, on === '1' ? t('wvMonitor.tile.running') : '');
+}
+
+function renderMirrorLamp(entry, mirror) {
+  renderLamp(mirror.lampEl, entry);
 }
 
 /** シナリオを実行中のデバイスの集合を受け取り、変わったデバイスだけ点灯マークを描き直す(runBoard.js の render から) */
@@ -639,8 +651,12 @@ export function setRunningDevices(ids) {
       continue;
     }
     const entry = tiles.get(id);
+    if (!entry) {
+      continue;
+    }
+    renderLamp(entry.lampEl, entry);
     const mirror = deviceMirrors.get(id);
-    if (entry && mirror) {
+    if (mirror) {
       renderMirrorLamp(entry, mirror);
     }
   }

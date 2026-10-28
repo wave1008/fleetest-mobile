@@ -576,8 +576,37 @@ html[lang="en"] .header-count {
 #run-board-title {
   min-width: 56px;
 }
-/* アクション/秒メーター(#run-board-tachometer。中身は runBoard.js が1回だけ作る)。色は変数で、
-   VSCode が body に付けるテーマのクラスで切り替える。発光は暗いテーマの
+/* タコメーターと点灯マーク(.run-lamp)の共通の色。VSCode が body に付けるテーマのクラスで切り替える
+   (既定 = ライト)。点灯マークは iOS が --tacho-low・Android が --run-lamp-android(ユーザー決定) */
+body {
+  --tacho-low: #0f8b8d;
+  --tacho-mid: #3d5afe;
+  --tacho-high: #d32f2f;
+  --tacho-off: #dde3ea;
+  --tacho-line: #3d5afe;
+  --tacho-fill: rgba(61, 90, 254, 0.12);
+  --run-lamp-android: #1f9d55;
+}
+body.vscode-dark {
+  --tacho-low: #00e5ff;
+  --tacho-mid: #a37cff;
+  --tacho-high: #ff3b3b;
+  --tacho-off: #12262d;
+  --tacho-line: #00e5ff;
+  --tacho-fill: rgba(0, 229, 255, 0.16);
+  --run-lamp-android: #39e27d;
+}
+body.vscode-high-contrast,
+body.vscode-high-contrast-light {
+  --tacho-low: var(--vscode-foreground);
+  --tacho-mid: var(--vscode-foreground);
+  --tacho-high: var(--vscode-foreground);
+  --tacho-off: transparent;
+  --tacho-line: var(--vscode-foreground);
+  --tacho-fill: transparent;
+  --run-lamp-android: var(--vscode-foreground);
+}
+/* アクション/秒メーター(#run-board-tachometer。中身は runBoard.js が1回だけ作る)。発光は暗いテーマの
    **点いた段・数値・推移の線だけ**(見出し行の地色や他の文字はテーマ色のまま) */
 .run-board-tachometer {
   /* 40段を超えるとバーが右へ延びる。見出し行を押し広げず、行の右端で切る(縮められるのはこの入れ物だけ) */
@@ -588,38 +617,6 @@ html[lang="en"] .header-count {
   align-items: center;
   gap: 8px;
   margin-left: 12px;
-  --tacho-low: #0f8b8d;
-  --tacho-mid: #3d5afe;
-  --tacho-high: #d32f2f;
-  --tacho-off: #dde3ea;
-  --tacho-line: #3d5afe;
-  --tacho-fill: rgba(61, 90, 254, 0.12);
-  --tacho-glow-seg: none;
-}
-body.vscode-dark .run-board-tachometer {
-  --tacho-low: #00e5ff;
-  --tacho-mid: #a37cff;
-  --tacho-high: #ff3b3b;
-  --tacho-off: #12262d;
-  --tacho-line: #00e5ff;
-  --tacho-fill: rgba(0, 229, 255, 0.16);
-}
-body.vscode-light .run-board-tachometer {
-  --tacho-low: #0f8b8d;
-  --tacho-mid: #3d5afe;
-  --tacho-high: #d32f2f;
-  --tacho-off: #dde3ea;
-  --tacho-line: #3d5afe;
-  --tacho-fill: rgba(61, 90, 254, 0.12);
-}
-body.vscode-high-contrast .run-board-tachometer,
-body.vscode-high-contrast-light .run-board-tachometer {
-  --tacho-low: var(--vscode-foreground);
-  --tacho-mid: var(--vscode-foreground);
-  --tacho-high: var(--vscode-foreground);
-  --tacho-off: transparent;
-  --tacho-line: var(--vscode-foreground);
-  --tacho-fill: transparent;
 }
 .tacho-trend {
   flex: 0 0 auto;
@@ -1276,6 +1273,8 @@ html.select-all-guard * {
 .tile-machine-row {
   display: flex;
   align-items: center;
+  /* マシン名は左右中央(ユーザー決定)。左上の点灯マークは段の外に絶対配置なので重ならない */
+  justify-content: center;
   flex: 0 0 16px;
   height: 16px;
   overflow: hidden;
@@ -1649,9 +1648,8 @@ html.select-all-guard * {
    左上・マシン名の段(高さ 16px)の縦中央に左寄せ。絶対配置なので中央寄せの段の並びを動かさない */
 .lane-preview { position: relative; }
 .run-lamp {
-  /* 色はタコメーターの「低」の段と同じ(ユーザー決定)。値は .run-board-tachometer の --tacho-low とテーマごとに一致させる
-     (あちらの変数は .run-board-tachometer の中でしか見えない) */
-  --run-lamp: #0f8b8d;
+  /* 色は body の共通の色から(iOS = タコメーターの「低」の段と同じ) */
+  --run-lamp: var(--tacho-low);
   position: absolute;
   left: 6px;
   top: 8px; /* .lane-preview の padding 4px + (段の高さ 16px − 8px) / 2 */
@@ -1666,18 +1664,17 @@ html.select-all-guard * {
   transition: opacity 0.8s ease;
 }
 .run-lamp[data-on="1"] { opacity: 1; pointer-events: auto; }
+/* ラインビューのタイルでは、タイルの padding 8px の内側・マシン名の段(16px)の縦中央 */
+.tile { position: relative; }
+.tile > .run-lamp { left: 8px; top: 12px; }
 @media (prefers-reduced-motion: reduce) {
   .run-lamp { transition: none; }
 }
 /* Android は緑系(ユーザー決定)。暗いテーマの発光も同じ色になる(box-shadow は --run-lamp から作る) */
-.run-lamp[data-platform="android"] { --run-lamp: #1f9d55; }
-body.vscode-dark .run-lamp[data-platform="android"] { --run-lamp: #39e27d; }
+.run-lamp[data-platform="android"] { --run-lamp: var(--run-lamp-android); }
 body.vscode-dark .run-lamp {
-  --run-lamp: #00e5ff;
   box-shadow: 0 0 4px var(--run-lamp), 0 0 8px color-mix(in srgb, var(--run-lamp) 50%, transparent);
 }
-body.vscode-high-contrast .run-lamp,
-body.vscode-high-contrast-light .run-lamp { --run-lamp: var(--vscode-foreground); }
 .lane-preview-header {
   flex: 0 0 auto;
   display: flex;
