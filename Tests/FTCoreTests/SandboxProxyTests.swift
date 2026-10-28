@@ -200,8 +200,28 @@ final class SandboxProxyTests: XCTestCase {
         defer { first.stop() }
         XCTAssertThrowsError(try SandboxProxy(
             allowedDomains: ["example.com"], bindAddress: "127.0.0.1", bindPort: first.port,
-            destinationPolicy: .permissive))
-        // 空いている番号(bind(0) で得て閉じる)を指定するとその番号になる
+            destinationPolicy: .permissive)) { error in
+            XCTAssertEqual((error as? POSIXError)?.code, .EADDRINUSE, "使用中の番号は本当の理由で断る: \(error)")
+        }
+        // 空いている番号(bind(0) で得て閉じる)を指定するとその番号になる。閉じてから取り直すまでの間に
+        // 並列の他のプロセスが同じ番号を取ることがある(EADDRINUSE)ので、そのときだけ別の番号で取り直す
+        for attempt in 1...Self.freePortAttempts {
+            let freePort = Self.probeFreePort()
+            do {
+                let second = try SandboxProxy(allowedDomains: ["example.com"], bindPort: freePort, destinationPolicy: .permissive)
+                defer { second.stop() }
+                XCTAssertEqual(second.port, freePort)
+                return
+            } catch let error as POSIXError where error.code == .EADDRINUSE && attempt < Self.freePortAttempts {
+                continue
+            }
+        }
+    }
+
+    /// 空けた番号を取られる窓はマイクロ秒(閉じてから取り直すまで)なので、続けて5回取られることは実質ない
+    private static let freePortAttempts = 5
+
+    private static func probeFreePort() -> UInt16 {
         let probe = socket(AF_INET, SOCK_STREAM, 0)
         var address = sockaddr_in()
         address.sin_len = UInt8(MemoryLayout<sockaddr_in>.size)
@@ -216,10 +236,7 @@ final class SandboxProxyTests: XCTestCase {
             $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { getsockname(probe, $0, &length) }
         }
         close(probe)
-        let freePort = UInt16(bigEndian: actual.sin_port)
-        let second = try SandboxProxy(allowedDomains: ["example.com"], bindPort: freePort, destinationPolicy: .permissive)
-        defer { second.stop() }
-        XCTAssertEqual(second.port, freePort)
+        return UInt16(bigEndian: actual.sin_port)
     }
 
     func testNonNumericBindAddressThrows() {

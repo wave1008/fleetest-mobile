@@ -145,9 +145,14 @@ public final class SandboxProxy: @unchecked Sendable {
         parameters.requiredLocalEndpoint = NWEndpoint.hostPort(host: .ipv4(local), port: wanted)
         listener = try NWListener(using: parameters)
         let ready = DispatchSemaphore(value: 0)
+        // 失敗の本当の理由(使用中 = EADDRINUSE 等)を投げる。丸めると「番号を取られた」と「アドレスが無い」が区別できない
+        let failure = LockedValue<NWError?>(nil)
         listener.stateUpdateHandler = { state in
             switch state {
-            case .ready, .failed, .cancelled: ready.signal()
+            case .failed(let error):
+                failure.withLock { $0 = error }
+                ready.signal()
+            case .ready, .cancelled: ready.signal()
             default: break
             }
         }
@@ -156,6 +161,8 @@ public final class SandboxProxy: @unchecked Sendable {
         ready.wait()
         guard let bound = listener.port?.rawValue, bound != 0 else {
             listener.cancel()
+            if case .posix(let code)? = failure.value { throw POSIXError(code) }
+            if let error = failure.value { throw error }
             throw POSIXError(.EADDRNOTAVAIL)
         }
         port = bound
