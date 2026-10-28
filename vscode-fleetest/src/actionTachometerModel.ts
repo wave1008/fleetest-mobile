@@ -1,5 +1,5 @@
 // actionTachometerModel.ts
-// run ボード見出しの「アクション/分」メーターの純粋ロジック(vscode 非依存)。**表示文字列は置かない** ——
+// run ボード見出しの「アクション/秒」メーター(タコメーター)の純粋ロジック(vscode 非依存)。**表示文字列は置かない** ——
 // このファイルは webview バンドルにも入る(runBoard.js が直接 import。runBoardModel.ts と同じ形)ので
 // i18n/index.ts を import できない。文言は呼び手が t() で作る。
 //
@@ -8,16 +8,14 @@
 
 import { LOCAL_MACHINE_KEY } from "./runBoardModel";
 
-/** 表示値の窓(ms)。「アクション/分」という単位の定義そのもの(直近 60 秒に増えた数)。 */
-export const RATE_WINDOW_MS = 60_000;
-/** メーターの段数(見出しの残り幅に引き伸ばして描く)。 */
+/** メーターの既定の段数(段の間隔は固定。超える値では同じ間隔の段を右へ足す = segmentCount)。 */
 export const METER_SEGMENTS = 40;
-/** メーター(LED バー)の窓(ms)。直近 3 秒に増えた数 ÷ 3 = 1 秒あたり(ユーザー決定)。数値・推移の 60 秒窓とは別 */
+/** メーター(LED バー)と数値の窓(ms)。直近 3 秒に増えた数 ÷ 3 = 1 秒あたり(ユーザー決定) */
 export const METER_WINDOW_MS = 3_000;
 /** 1目盛りのアクション/秒(ユーザー決定)。METER_SEGMENTS 段(40/秒)を超えたら段を右へ足す(右端に張り付かせない。ユーザー決定)。 */
 export const ACTIONS_PER_SECOND_PER_SEGMENT = 1;
-/** サンプルの保持(ms)。いちばん長い窓(RATE_WINDOW_MS)の前端の値を引けるぶん。 */
-const SAMPLE_RETENTION_MS = RATE_WINDOW_MS;
+/** サンプルの保持(ms)。窓(METER_WINDOW_MS)の前端の値を引けるぶん(前端より古い 1 件は tick が残す)。 */
+const SAMPLE_RETENTION_MS = METER_WINDOW_MS;
 
 /** バーの慣性の時定数(ms)。元の更新はモニターの周期(約 2 秒)ごとなので、その半分にすると次の更新までに
  * 約 86% 追いつく = 段々に跳ねず、遅れも 1 周期に収まる(車のタコメーターの針のように連続的に動かす。ユーザー決定) */
@@ -69,23 +67,17 @@ export interface ActionTachometerEvent {
 export interface MachineRate {
   /** LOCAL_MACHINE_KEY("")= 手元。表示語への変換は呼び手。 */
   readonly machine: string;
-  /** 直近 60 秒に増えた数(推移と同じ計算)。 */
-  readonly value: number;
-  /** メーターと同じ窓(直近 METER_WINDOW_MS)の 1 分あたり。表示する数値はこちら(バーと連動させる。ユーザー決定)。 */
-  readonly meterPerMinute: number;
+  /** メーターと同じ窓(直近 METER_WINDOW_MS)の 1 秒あたり。 */
+  readonly meterPerSecond: number;
 }
 
 export interface ActionTachometerSnapshot {
-  /** 直近 60 秒に増えた数(推移の点と同じ計算。表示する数値ではない = 数値はバーと連動する meterPerSecond × 60)。 */
-  readonly value: number;
-  /** メーターの値: 直近 METER_WINDOW_MS に増えた数を秒に割った 1 秒あたり。 */
+  /** メーターと数値の目標: 直近 METER_WINDOW_MS に増えた数を秒に割った 1 秒あたり(表示は呼び手が慣性で追う)。 */
   readonly meterPerSecond: number;
   /** 機械別の同じ計算(手元を先頭、残りは名前順)。 */
   readonly byMachine: readonly MachineRate[];
   /** observed:false の機械(寄与は凍結中)。 */
   readonly unobservedMachines: readonly string[];
-  /** 観測を始めてからの秒。60 未満の間は value が少なめに出る(割り戻しはしない)。 */
-  readonly observedSeconds: number;
 }
 
 interface RunCounter {
@@ -109,7 +101,6 @@ export class ActionTachometer {
   /** 観測が途切れた機械(次に観測できたとき基準を取り直す)。 */
   private readonly needsRebase = new Set<string>();
   private samples: Sample[] = [];
-  private startMs: number | undefined;
 
   /** monitorRuns イベント1件を畳み、サンプルを積む。 */
   apply(event: ActionTachometerEvent, nowMs: number): void {
@@ -152,7 +143,6 @@ export class ActionTachometer {
       total += counter.contribution;
       byMachine.set(counter.machine, (byMachine.get(counter.machine) ?? 0) + counter.contribution);
     }
-    this.startMs ??= nowMs;
     this.samples.push({ t: nowMs, total, byMachine });
     const cutoff = nowMs - SAMPLE_RETENTION_MS;
     let drop = 0;
@@ -177,11 +167,11 @@ export class ActionTachometer {
     return found;
   }
 
-  /** t までの windowMs に増えた数。 */
-  private rateAt(t: number, pick: (s: Sample) => number, windowMs = RATE_WINDOW_MS): number {
+  /** t までの METER_WINDOW_MS に増えた数を秒に割った 1 秒あたり。 */
+  private perSecondAt(t: number, pick: (s: Sample) => number): number {
     const newest = this.sampleAt(t);
-    const older = this.sampleAt(t - windowMs);
-    return Math.max(0, pick(newest) - pick(older));
+    const older = this.sampleAt(t - METER_WINDOW_MS);
+    return Math.max(0, pick(newest) - pick(older)) / (METER_WINDOW_MS / 1000);
   }
 
   snapshot(nowMs: number): ActionTachometerSnapshot {
@@ -189,16 +179,13 @@ export class ActionTachometer {
       this.tick(nowMs);
     }
     const totalOf = (s: Sample) => s.total;
-    const value = this.rateAt(nowMs, totalOf);
-    const meterPerSecond = this.rateAt(nowMs, totalOf, METER_WINDOW_MS) / (METER_WINDOW_MS / 1000);
+    const meterPerSecond = this.perSecondAt(nowMs, totalOf);
 
     const machines = new Set<string>(this.samples[this.samples.length - 1]!.byMachine.keys());
     const byMachine = [...machines]
       .map((machine) => ({
         machine,
-        value: this.rateAt(nowMs, (s) => s.byMachine.get(machine) ?? 0),
-        meterPerMinute: this.rateAt(nowMs, (s) => s.byMachine.get(machine) ?? 0, METER_WINDOW_MS)
-          * (60_000 / METER_WINDOW_MS),
+        meterPerSecond: this.perSecondAt(nowMs, (s) => s.byMachine.get(machine) ?? 0),
       }))
       .sort((a, b) => (a.machine === b.machine ? 0
         : a.machine === LOCAL_MACHINE_KEY ? -1
@@ -210,14 +197,6 @@ export class ActionTachometer {
       .map(([machine]) => machine)
       .sort();
 
-    const start = this.startMs ?? nowMs;
-
-    return {
-      value,
-      meterPerSecond,
-      byMachine,
-      unobservedMachines,
-      observedSeconds: Math.max(0, Math.floor((nowMs - start) / 1000)),
-    };
+    return { meterPerSecond, byMachine, unobservedMachines };
   }
 }

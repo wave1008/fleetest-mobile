@@ -858,7 +858,7 @@ function render() {
   renderSplit();
 }
 
-// ---- アクション/分メーター(見出しの「実行中 N」の右。純粋ロジックは actionTachometerModel.ts) ----
+// ---- アクション/秒メーター(見出しの「実行中 N」の右。純粋ロジックは actionTachometerModel.ts) ----
 // 中身は最初に1回だけ作り、以後は属性と textContent だけ更新する(周期描画で要素を作り直さない規律。
 // マウスを載せている間にツールチップが消えて点滅するのを避ける)。
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -869,6 +869,8 @@ const TREND_W = 60;
 const TREND_H = 18;
 const tachometer = new ActionTachometer();
 const tachoUi = {};
+// 数値(アクション/秒)の書式。小数 1 桁(1 目盛り = 1/秒なので、整数に丸めると 1 段に満たない動きが数値に出ない)
+const formatPerSecond = (perSecond) => (perSecond ?? 0).toFixed(1);
 
 function svgEl(name, attrs) {
   const el = document.createElementNS(SVG_NS, name);
@@ -884,7 +886,7 @@ function buildTachometer() {
   ensureSegments(METER_SEGMENTS);
   const value = document.createElement('span');
   value.className = 'tacho-value';
-  value.textContent = '0';
+  value.textContent = formatPerSecond(0);
   const unit = document.createElement('span');
   unit.className = 'tacho-unit';
   const trend = svgEl('svg', { class: 'tacho-trend', width: TREND_W, height: TREND_H,
@@ -905,10 +907,6 @@ function setTextIfChanged(el, text) {
   if (el.textContent !== text) { el.textContent = text; }
 }
 
-// バーは目標(直近 3 秒の 1 秒あたり)へ慣性で追いつく(easeToward)。元の更新は約 2 秒ごとなので、
-// そのまま写すと段々に跳ねる。動いている間だけ requestAnimationFrame を回し、追いついたら止める
-// (隠れたパネルでは rAF が止まる)。動きを減らす設定・rAF の無い環境では即座に写す
-
 // 段の間隔(px)は既定の幅 ÷ 既定の段数で固定し、40段を超える値では同じ間隔の段を右へ足す(右端に張り付かせない)
 const SEG_PITCH = METER_W / METER_SEGMENTS;
 
@@ -924,8 +922,8 @@ function ensureSegments(count) {
 }
 
 function drawMeter() {
-  // 数値(アクション/分)はバーが今表示している値から出す = バーが 0 なら 0・慣性で一緒に動く(ユーザー決定)
-  setTextIfChanged(tachoUi.value, String(Math.round(tachoUi.shown * 60)));
+  // 数値(アクション/秒)はバーが今表示している値そのもの = バーが 0 なら 0・慣性で一緒に動く(ユーザー決定)
+  setTextIfChanged(tachoUi.value, formatPerSecond(tachoUi.shown));
   // 数値の色は、いちばん上に点いている段(途中の段を含む)の色。何も点いていなければ最下段の色
   setAttrIfChanged(tachoUi.value, 'data-tier', segmentTier(Math.max(0, Math.ceil(tachoUi.shown) - 1)));
   // 40段に収まらなければ右へ延ばす(下がれば戻る)。幅は段数 × 間隔
@@ -945,6 +943,9 @@ function drawMeter() {
   });
 }
 
+// バーは目標(直近 3 秒の 1 秒あたり)へ慣性で追いつく(easeToward)。元の更新は約 2 秒ごとなので、
+// そのまま写すと段々に跳ねる。動いている間だけ requestAnimationFrame を回し、追いついたら止める
+// (隠れたパネルでは rAF が止まる)。動きを減らす設定・rAF の無い環境では即座に写す
 function stepMeter(ts) {
   const dt = tachoUi.lastFrame === undefined ? 0 : ts - tachoUi.lastFrame;
   tachoUi.lastFrame = ts;
@@ -971,16 +972,16 @@ function setMeterTarget(perSecond) {
 // 別の時計で描くと隣のチャートと動く瞬間がずれる。host-metrics が来ない間(モニター停止中など)は止まる = 隣と同じ
 function drawTrend() {
   if (!tachoUi.segs) { return; }
-  // その瞬間にカウンタが表示している値(バーの値 × 60)を積む = ゲージが 0 ならチャートも 0(ユーザー決定)。
+  // その瞬間にカウンタが表示している値(= バーの値。アクション/秒)を積む = ゲージが 0 ならチャートも 0(ユーザー決定)。
   // CPU・GPU と同じく直近 HM_MAX_SAMPLES 点を右詰めで並べ、古い点は左へ流れて消える
   tachoUi.trendSamples ??= [];
-  tachoUi.trendSamples.push(Math.round((tachoUi.shown ?? 0) * 60));
+  tachoUi.trendSamples.push(tachoUi.shown ?? 0);
   if (tachoUi.trendSamples.length > HM_MAX_SAMPLES) { tachoUi.trendSamples.shift(); }
   const samples = tachoUi.trendSamples;
   if (samples.length < 2) { return; }
-  // y は表示中の最大(最低 1目盛り = 60/分)に対する比
+  // y は表示中の最大(最低 1目盛り = 1/秒)に対する比
   const pad = 2;
-  const trendMax = Math.max(ACTIONS_PER_SECOND_PER_SEGMENT * 60, ...samples);
+  const trendMax = Math.max(ACTIONS_PER_SECOND_PER_SEGMENT, ...samples);
   const stepX = (TREND_W - pad * 2) / (HM_MAX_SAMPLES - 1);
   const startIndex = HM_MAX_SAMPLES - samples.length;
   const pts = samples.map((v, i) => [
@@ -1004,27 +1005,26 @@ function renderTachometer() {
   const now = Date.now();
   const snap = tachometer.snapshot(now);
   // 説明と読み上げは目標の値(バーが追いついた先)。表示中の数値は drawMeter が毎フレーム書く
-  const value = Math.round(snap.meterPerSecond * 60);
+  const value = formatPerSecond(snap.meterPerSecond);
   setMeterTarget(snap.meterPerSecond);
   const unit = t('runBoard.tachometerUnit');
   setTextIfChanged(tachoUi.unit, unit);
 
   const label = (machine) => machineLabel(machine);
-  const lines = [t('runBoard.tachometerTipTotal', { value: String(value) })];
+  const lines = [t('runBoard.tachometerTipTotal', { value })];
   if (snap.byMachine.length > 1 || (snap.byMachine.length === 1 && snap.byMachine[0].machine !== LOCAL_MACHINE_KEY)) {
     for (const m of snap.byMachine) {
-      lines.push(t('runBoard.tachometerTipMachine', { machine: label(m.machine), value: String(Math.round(m.meterPerMinute)) }));
+      lines.push(t('runBoard.tachometerTipMachine', { machine: label(m.machine), value: formatPerSecond(m.meterPerSecond) }));
     }
   }
   if (snap.unobservedMachines.length > 0) {
     lines.push(t('runBoard.tachometerTipUnobserved', { machines: snap.unobservedMachines.map(label).join(', ') }));
   }
   lines.push(t('runBoard.tachometerTipDefinition'));
-  lines.push(t('runBoard.tachometerTipMeter', { value: snap.meterPerSecond.toFixed(1) }));
   lines.push(t('runBoard.tachometerTipScale'));
   const tip = lines.join('\n');
   if (runBoardTachometer.getAttribute('data-hover-tip') !== tip) { setHoverTip(runBoardTachometer, tip); }
-  setAttrIfChanged(runBoardTachometer, 'aria-label', t('runBoard.tachometerAria', { value: String(value) }));
+  setAttrIfChanged(runBoardTachometer, 'aria-label', t('runBoard.tachometerAria', { value }));
   setAttrIfChanged(runBoardTachometer, 'role', 'img');
 }
 

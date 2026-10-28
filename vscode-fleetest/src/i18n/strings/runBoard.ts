@@ -38,19 +38,15 @@ export const runBoardStrings = {
     en: "~0:00 left (+{time} over)",
   },
   "runBoard.encodingVideo": { ja: "動画を編集中 {done}/{total}", en: "Encoding videos {done}/{total}" },
-  // アクション/分メーター(見出し「実行中 N」の右)。ja の「マシン」は利用者向け表記
-  "runBoard.tachometerUnit": { ja: "アクション/分", en: "actions/min" },
-  "runBoard.tachometerAria": { ja: "タコメーター {value} アクション/分", en: "Tachometer {value} actions/min" },
-  "runBoard.tachometerTipTotal": { ja: "{value} アクション/分", en: "{value} actions/min" },
+  // アクション/秒メーター(見出し「実行中 N」の右)。ja の「マシン」は利用者向け表記
+  "runBoard.tachometerUnit": { ja: "アクション/秒", en: "actions/s" },
+  "runBoard.tachometerAria": { ja: "タコメーター {value} アクション/秒", en: "Tachometer {value} actions/s" },
+  "runBoard.tachometerTipTotal": { ja: "{value} アクション/秒", en: "{value} actions/s" },
   "runBoard.tachometerTipMachine": { ja: "{machine}: {value}", en: "{machine}: {value}" },
   "runBoard.tachometerTipUnobserved": { ja: "観測できていないマシン: {machines}", en: "Not observed: {machines}" },
   "runBoard.tachometerTipDefinition": {
-    ja: "直近 3 秒にデバイスへ送った操作の数を 1 分あたりに直した値(メーターと連動)",
-    en: "Operations sent to devices in the last 3 seconds, per minute (follows the meter)",
-  },
-  "runBoard.tachometerTipMeter": {
-    ja: "メーター: {value} アクション/秒(直近 3 秒の数 ÷ 3)",
-    en: "Meter: {value} actions/s (last 3 seconds ÷ 3)",
+    ja: "直近 3 秒にデバイスへ送った操作の数 ÷ 3(メーターと連動)",
+    en: "Operations sent to devices in the last 3 seconds ÷ 3 (follows the meter)",
   },
   "runBoard.tachometerTipScale": {
     ja: "1目盛り = 1アクション/秒",

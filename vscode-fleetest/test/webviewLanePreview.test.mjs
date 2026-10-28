@@ -581,3 +581,17 @@ test("グリッドビューの左上の点灯マークは、シナリオを実�
   window.dispatchEvent(new window.MessageEvent("message", { data: { type: "monitorRuns", observed: true, runs: [] } }));
   assert.equal(lamp().dataset.on, "0", "run が終われば消える");
 });
+
+test("点灯マークの色は OS で分ける(Android は緑系 = data-platform)", (t) => {
+  const { window, document } = createWebview();
+  t.after(() => window.close());
+  const devices = [
+    { id: "a0", name: "Pixel", platform: "android", state: "connected", detail: "", kind: "virtual", serial: "emulator-5554", recording: false, registered: true },
+    { id: "i0", name: "iPhone", platform: "ios", state: "connected", detail: "", kind: "virtual", udid: "UDID-I", recording: false, registered: true },
+  ];
+  window.dispatchEvent(new window.MessageEvent("message", { data: { type: "devices", devices } }));
+  clickTile(document, 0);
+  clickTile(document, 1);
+  const lamps = visiblePreviews(document).map((el) => el.querySelector(".run-lamp").dataset.platform).sort();
+  assert.deepEqual(lamps, ["android", "ios"]);
+});

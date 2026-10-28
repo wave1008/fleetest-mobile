@@ -77,13 +77,12 @@ polling (screenshots at a fixed interval); the choice is remembered per workspac
   Expanding a row lists that machine's devices; clicking a row selects them in the Line View.
 - The **tachometer** to the right of "Running N" in the run board header (shown only while a run is going, and for 10 seconds after it ends; the LED-bar button in the header shows or hides it) shows how fast the
   runs on this Mac and the runner machines **send operations to devices**. The LED bar on the right is the
-  count over **the last 3 seconds** per second, and the number (actions/min) is the bar's value per minute
-  (when the bar is at zero, so is the number). Tapping once a second and nothing else reads 60. Only operations sent to a device count — taps, typing, swipes
+  count over **the last 3 seconds** per second, and the number (actions/s) is the bar's value itself
+  (when the bar is at zero, so is the number). Tapping once a second and nothing else reads 1.0. Only operations sent to a device count — taps, typing, swipes
   (each swipe of a scroll that searches for an element counts) and the like; screen checks and waits do not,
   and neither do operations you perform by hand from the monitor. Each segment of the bar is 1 action/s; it rises and falls smoothly like a car
   tachometer, and the number moves with it. The line on the left is the number over the last 60 seconds and scrolls
-  left once a second like the CPU and GPU charts (it drops to zero with the gauge). Hover over it for a per-machine breakdown. Actions from before the monitor
-  opened are not counted.
+  left once a second like the CPU and GPU charts (it drops to zero with the gauge). Hover over it for a per-machine breakdown.
 - The Device Monitor tab is split into three views, top to bottom: the **Line View** (the row of
   device tiles), the **Grid View** (enlarged screens of the selected devices), and the **Run Log View**
   (the run log of the selected devices). Drag a divider to resize, click a view's header to collapse or
@@ -91,7 +90,7 @@ polling (screenshots at a fixed interval); the choice is remembered per workspac
 - The Grid View and the Run Log View show **only the devices selected in the Line View**. Clicking
   anywhere on a tile toggles its selection; clicking outside the tiles clears the selection. With
   nothing selected both views say "Select a device" (provisioning progress during a run still appears
-  in the Run Log View). In the Grid View, a device that is running a scenario shows a **lamp** (the tachometer's blue) at its
+  in the Run Log View). In the Grid View, a device that is running a scenario shows a **lamp** (the tachometer's blue on iOS, green on Android) at its
   top left (left of the machine name). With exactly one device selected, a column to the right of the enlarged screen stacks **Back**, **Home**, **App Switcher**, **Zoom in** and **Zoom out** buttons, so you
   can operate that device in place (**Back** leaves the single-device view: it restores the selection you had before
   "Select only this device", or clears the selection if there was none). On the screen, **click taps**, **Command(⌘)+click double-taps**,

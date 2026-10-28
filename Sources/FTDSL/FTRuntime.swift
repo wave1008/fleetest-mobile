@@ -301,7 +301,8 @@ public final class FTDriveCore {
     public var redactAccountValues = false
     /// ステップの減速の計画(`--host-load-pacing`)。nil = 減速しない(設定で無効・dry-run・MCP の直接操作・コード生成)
     public var hostLoadPacing: HostLoadPacingPlan?
-    /// 包みドライバ(`ActionCountingDriver`)と共有する数え箱。step イベントごとに増分を `actions` へ載せる。nil = 数えない(dry-run・テスト)
+    /// 包みドライバ(`ActionCountingDriver`)と共有する数え箱。step イベントごとに増分を `actions` へ載せる。
+    /// nil = 数えない(包みを掛けない組み立て = テスト等。ScenarioRunnerMain は dry-run でも入れるが、dry-run は台帳を書かない)
     public var actionCounter: ActionCounter?
     /// その瞬間の CPU 使用率(0〜1)を測る口。ScenarioRunnerMain が `InstantHostCPU.read` を入れる(テストは差し替える)。
     /// nil = 測れない = 減速しない

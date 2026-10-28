@@ -374,7 +374,7 @@ function renderDevicesPanel(): string {
         <!-- ツリーを開いた形のアイコン(下向きの三角 + インデントした行。ユーザー決定)。名前は tooltip と aria-label が持つ
              (runBoard.js)。クリックはヘッダ行の開閉へ波及させない(stopPropagation) -->
         <button id="run-board-expand-all" class="icon-button run-board-expand-all" type="button" aria-pressed="false"><svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M1.6 2.9h4.2L3.7 6.6z"/><rect x="7" y="2.9" width="7.4" height="1.5" rx="0.7"/><rect x="9" y="7.2" width="5.4" height="1.5" rx="0.7"/><rect x="9" y="11.5" width="5.4" height="1.5" rx="0.7"/></svg></button>
-        <!-- アクション/分メーター。中身は runBoard.js が最初に1回だけ作る。見出しの残り幅いっぱいに伸びる -->
+        <!-- アクション/秒メーター。中身は runBoard.js が最初に1回だけ作る。見出しの残り幅いっぱいに伸びる -->
         <!-- タコメーターの表示切替(既定 ON。LED バーの形のアイコン = 点いた4段・消えた2段。名前は tooltip と aria-label が持つ = runBoard.js)。
              クリックはヘッダ行の開閉へ波及させない(stopPropagation) -->
         <button id="run-board-tachometer-toggle" class="icon-button run-board-tachometer-toggle" type="button" aria-pressed="true"><svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><rect x="0.5" y="5" width="1.8" height="6" rx="0.4"/><rect x="3.1" y="5" width="1.8" height="6" rx="0.4"/><rect x="5.7" y="5" width="1.8" height="6" rx="0.4"/><rect x="8.3" y="5" width="1.8" height="6" rx="0.4"/><rect x="10.9" y="5" width="1.8" height="6" rx="0.4" opacity="0.35"/><rect x="13.5" y="5" width="1.8" height="6" rx="0.4" opacity="0.35"/></svg></button>

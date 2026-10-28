@@ -73,7 +73,7 @@ public struct RunProgressRecord: Codable, Equatable, Sendable {
     public let done: Int
     public let failed: Int
     /// この run でデバイスへ実際に送った操作の累計(`ActionCountingDriver` が数え、子の step / scenarioFinished の `actions` を足す)。
-    /// 準備中は 0。モニターの「アクション/分」の元(区間の差分は読み手が取る)
+    /// 準備中は 0。モニターのタコメーター(アクション/秒)の元(区間の差分は読み手が取る)
     public let actions: Int
     /// **詰まりの事実**(段6・DS-18.5): 結果を捨てて振り直した累計
     /// (`RunProgressState.laneIdled` が成立した回数)。判定・文言は作らない —— 事実の並置だけ

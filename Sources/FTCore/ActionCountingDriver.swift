@@ -1,5 +1,5 @@
 // ActionCountingDriver.swift
-// シナリオ実行中にデバイスへ実際に送った操作の回数を数える AppDriver の包み(モニターの「アクション/分」)。
+// シナリオ実行中にデバイスへ実際に送った操作の回数を数える AppDriver の包み(モニターの「アクション/秒」)。
 
 import Foundation
 

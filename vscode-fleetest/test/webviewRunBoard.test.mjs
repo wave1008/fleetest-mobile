@@ -958,7 +958,7 @@ test("機械の行は設定タブのマシン一覧の順に並び、並べ替�
   assert.deepEqual(machines(), ["local", "M1Ultra", "M1Max"]);
 });
 
-test("アクション/分メーター: run 0 本でも出て、再適用で要素が作り直されず、内訳が説明に出る", async (t) => {
+test("アクション/秒メーター: run 0 本でも出て、再適用で要素が作り直されず、内訳が説明に出る", async (t) => {
   const { window, document } = createWebview();
   t.after(() => window.close());
   const tacho = document.getElementById("run-board-tachometer");
@@ -966,7 +966,7 @@ test("アクション/分メーター: run 0 本でも出て、再適用で要�
   assert.equal(tacho.querySelectorAll(".tacho-seg").length, 40, "run 0 本でも40段は作ってある");
   assert.equal(tacho.style.display, "none", "run 0 本の間は出さない");
   assert.equal(tacho.querySelectorAll(".tacho-seg[data-lit='1']").length, 0, "全段消灯");
-  assert.equal(tacho.querySelector(".tacho-value").textContent, "0");
+  assert.equal(tacho.querySelector(".tacho-value").textContent, "0.0");
 
   const withActions = (machine, actions) => monitorRunsMessage({
     machine,
@@ -978,19 +978,19 @@ test("アクション/分メーター: run 0 本でも出て、再適用で要�
   post(window, withActions("M1Max", 160));
   assert.deepEqual([...tacho.querySelectorAll("*")], nodes, "同じノードのまま(作り直さない)");
   // 数値はバーと連動する(直後はバーも数値も 0 のまま)
-  assert.equal(tacho.querySelector(".tacho-value").textContent, "0", "直後はバーと同じく 0");
+  assert.equal(tacho.querySelector(".tacho-value").textContent, "0.0", "直後はバーと同じく 0");
   // バーは慣性で追いつくので、直後はまだ点いていない。数フレーム待つと点き始める(連続的に伸びる)
   assert.equal(tacho.querySelectorAll(".tacho-seg[data-lit='1']").length, 0, "直後は跳ねない");
   await new Promise((resolve) => setTimeout(resolve, 300));
   const litAfter = tacho.querySelectorAll(".tacho-seg[data-lit='1']").length;
   assert.ok(litAfter > 0 && litAfter < 40, `途中まで伸びている(${litAfter} 段)`);
   const shownNumber = Number(tacho.querySelector(".tacho-value").textContent);
-  // 数値 = バーの表示値 × 60。点いている段数(途中の段を含む)と同じ値の帯にある
-  assert.ok(shownNumber > (litAfter - 1) * 60 && shownNumber <= litAfter * 60, `数値 ${shownNumber} が ${litAfter} 段と連動`);
+  // 数値 = バーの表示値(1 目盛り = 1/秒)。点いている段数(途中の段を含む)と同じ値の帯にある
+  assert.ok(shownNumber > litAfter - 1 && shownNumber <= litAfter, `数値 ${shownNumber} が ${litAfter} 段と連動`);
   const tip = tacho.getAttribute("data-hover-tip");
-  // 説明と読み上げはバーの目標値(直近 3 秒の 160 = 160 / 3 × 60 = 3200/分)
-  assert.match(tip, /M1Max: 3200/, "機械別の内訳");
-  assert.match(tacho.getAttribute("aria-label"), /3200/);
+  // 説明と読み上げはバーの目標値(直近 3 秒の 160 = 160 / 3 = 53.3/秒)
+  assert.match(tip, /M1Max: 53\.3/, "機械別の内訳");
+  assert.match(tacho.getAttribute("aria-label"), /53\.3/);
   // 同じ内容の再適用で説明を書き直さない
   post(window, withActions("M1Max", 160));
   assert.equal(tacho.getAttribute("data-hover-tip"), tip);

@@ -618,12 +618,10 @@ function renderMirror(entry) {
   }
 }
 
-// 絵の上のタグ段。タイルのヘッダ(実機バッジ・デバイス名のピル・未登録バッジ)をそのまま複製する
-// —— ラインビューと同じ見た目・同じ内容にするため(組み立て直すと renderMeta の切替と食い違う)。
-// ホスト名の段(タイルと同じく名前の下)は**常に置く**。リモートのデバイスにだけ段を足すと、
-// そのデバイスだけ絵の上端が下がって手元と高さが揃わない(ユーザー指摘)。
-// 手元のデバイスには**見えないダミーのバッジ**を入れて高さだけ合わせる(中身が空の段は高さ 0)。
 function renderMirrorLamp(entry, mirror) {
+  // 色は OS で分ける(iOS = タコメーターの青・Android = 緑系。ユーザー決定。CSS の .run-lamp[data-platform])
+  const platform = entry.device.platform === 'android' ? 'android' : 'ios';
+  if (mirror.lampEl.dataset.platform !== platform) { mirror.lampEl.dataset.platform = platform; }
   const on = runningDeviceIds.has(entry.device.id) ? '1' : '0';
   if (mirror.lampEl.dataset.on === on) {
     return;
@@ -648,6 +646,11 @@ export function setRunningDevices(ids) {
   }
 }
 
+// 絵の上のタグ段。タイルのヘッダ(実機バッジ・デバイス名のピル・未登録バッジ)をそのまま複製する
+// —— ラインビューと同じ見た目・同じ内容にするため(組み立て直すと renderMeta の切替と食い違う)。
+// ホスト名の段(タイルと同じく名前の下)は**常に置く**。リモートのデバイスにだけ段を足すと、
+// そのデバイスだけ絵の上端が下がって手元と高さが揃わない(ユーザー指摘)。
+// 手元のデバイスには**見えないダミーのバッジ**を入れて高さだけ合わせる(中身が空の段は高さ 0)。
 function renderMirrorHeader(entry, mirror) {
   // devices サイクル・フレームのたびに呼ばれる。**複製元が前回と同じなら作り直さない**(マウスを載せている
   // バッジのツールチップが点滅する)

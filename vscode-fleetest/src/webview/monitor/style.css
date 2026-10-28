@@ -576,7 +576,7 @@ html[lang="en"] .header-count {
 #run-board-title {
   min-width: 56px;
 }
-/* アクション/分メーター(#run-board-tachometer。中身は runBoard.js が1回だけ作る)。色は変数で、
+/* アクション/秒メーター(#run-board-tachometer。中身は runBoard.js が1回だけ作る)。色は変数で、
    VSCode が body に付けるテーマのクラスで切り替える。発光は暗いテーマの
    **点いた段・数値・推移の線だけ**(見出し行の地色や他の文字はテーマ色のまま) */
 .run-board-tachometer {
@@ -650,8 +650,8 @@ body.vscode-dark .tacho-seg[data-lit="1"][data-tier="low"] { filter: drop-shadow
 body.vscode-dark .tacho-seg[data-lit="1"][data-tier="mid"] { filter: drop-shadow(0 0 2px var(--tacho-mid)); }
 body.vscode-dark .tacho-seg[data-lit="1"][data-tier="high"] { filter: drop-shadow(0 0 2px var(--tacho-high)); }
 .tacho-value {
-  /* 桁で右の並び(単位・バー)が動かないよう幅を固定して右寄せ。5桁 = 99999/分まで(実測の負荷は手元 8 台で
-     約 900/分・バーの全段 40/秒 = 2400/分)。min-width では 4 桁目から欄が広がって左右に揺れた */
+  /* 桁で右の並び(単位・バー)が動かないよう幅を固定して右寄せ。5文字 = 999.9/秒まで(実測の負荷は手元 8 台で
+     約 15/秒・バーの全段 40/秒)。min-width では桁が増えたところで欄が広がって左右に揺れた */
   flex: 0 0 auto;
   width: 5ch;
   white-space: nowrap;
@@ -1661,6 +1661,9 @@ html.select-all-guard * {
 @media (prefers-reduced-motion: reduce) {
   .run-lamp { transition: none; }
 }
+/* Android は緑系(ユーザー決定)。暗いテーマの発光も同じ色になる(box-shadow は --run-lamp から作る) */
+.run-lamp[data-platform="android"] { --run-lamp: #1f9d55; }
+body.vscode-dark .run-lamp[data-platform="android"] { --run-lamp: #39e27d; }
 body.vscode-dark .run-lamp {
   --run-lamp: #00e5ff;
   box-shadow: 0 0 4px var(--run-lamp), 0 0 8px color-mix(in srgb, var(--run-lamp) 50%, transparent);
