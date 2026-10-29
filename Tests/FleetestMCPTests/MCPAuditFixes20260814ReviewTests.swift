@@ -41,6 +41,22 @@ final class MCPAuditFixes20260814ReviewTests: XCTestCase {
         text.components(separatedBy: .whitespacesAndNewlines).joined()
     }
 
+    /// ft_list_apps の候補 udid を組む本文。**共有の `iosTargetUDID` へ寄せた**ので、ft_list_apps がそれを通すなら
+    /// その本文も含める(候補の順序 = 呼び出し引数の udid → 控え → ポートの記録 は iosTargetUDID が持つ)
+    private func listAppsCandidateSource() throws -> String {
+        let source = try Self.dispatchSource()
+        let start = try XCTUnwrap(source.range(of: "func ftListApps("), "ft_list_apps の実装が見つからない")
+        let tail = source[start.upperBound...]
+        let end = try XCTUnwrap(tail.range(of: "func ftLogs("), "次の関数が見つからない")
+        var body = String(tail[..<end.lowerBound])
+        if body.contains("iosTargetUDID("),
+           let shared = source.range(of: "func iosTargetUDID(") {
+            let sharedTail = source[shared.upperBound...]
+            body += String(sharedTail.prefix(600))
+        }
+        return compact(body)
+    }
+
     // MARK: - 欠陥① ft_list_apps: 実機判定を throw し得るシミュレータ経路より先にする
 
     /// **ソース走査**: 候補 udid(実機かどうかの判定材料)を組む行が、投げ得る
@@ -69,12 +85,7 @@ final class MCPAuditFixes20260814ReviewTests: XCTestCase {
     /// 頼ると、udid: を渡した呼び出しでも(直接ポート経路の driver() は ExploreDriverResolver が
     /// SimulatorCatalog しか見ないため)実機では `udids[key]` が nil のままで拾えない
     func testListAppsCandidateUDIDConsultsTheRawArgumentFirst() throws {
-        let source = try Self.dispatchSource()
-        let start = try XCTUnwrap(source.range(of: "func ftListApps("),
-                                  "ft_list_apps の実装が見つからない")
-        let tail = source[start.upperBound...]
-        let end = try XCTUnwrap(tail.range(of: "func ftLogs("), "次の関数が見つからない")
-        let body = compact(String(tail[..<end.lowerBound]))
+        let body = try listAppsCandidateSource()
 
         XCTAssertTrue(body.contains(compact("(args[\"udid\"] as? String)")),
                      "候補 udid が呼び出し引数の udid: を直接見ていない")
@@ -84,12 +95,7 @@ final class MCPAuditFixes20260814ReviewTests: XCTestCase {
     /// (`.fleetest/bridge-<port>.device` = `BridgeDeviceRecord`)を候補に含めること。
     /// これが無いと、udid: も渡さず port: だけで実機を指した呼び出しは依然として拾えない
     func testListAppsCandidateUDIDFallsBackToThePortRecordForBareUdidlessPortCalls() throws {
-        let source = try Self.dispatchSource()
-        let start = try XCTUnwrap(source.range(of: "func ftListApps("),
-                                  "ft_list_apps の実装が見つからない")
-        let tail = source[start.upperBound...]
-        let end = try XCTUnwrap(tail.range(of: "func ftLogs("), "次の関数が見つからない")
-        let body = compact(String(tail[..<end.lowerBound]))
+        let body = try listAppsCandidateSource()
 
         XCTAssertTrue(body.contains(compact("BridgeDeviceRecord.load(port: port, repoRoot:")),
                      "port: 経路の候補 udid が BridgeDeviceRecord(実機専用のポート記録)を"
