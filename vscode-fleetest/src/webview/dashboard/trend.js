@@ -26,11 +26,15 @@ closeBtn.addEventListener('click', () => {
   section.style.display = 'none';
 });
 
+// 行が OS ごとに分かれた表(summary・flaky)から開いたときだけ、その OS の run に絞る(null = 全 OS)
+let trendPlatform = null;
+
 function titleFor(scenarioID) {
-  return t('wvDashboard.trend.title', { scenarioID });
+  return t('wvDashboard.trend.title', { scenarioID: trendPlatform ? `${scenarioID} [${trendPlatform}]` : scenarioID });
 }
 
-export function requestTrend(scenarioID) {
+export function requestTrend(scenarioID, platform = null) {
+  trendPlatform = platform;
   section.style.display = 'block';
   titleEl.textContent = titleFor(scenarioID);
   clearChildren(bodyEl);
@@ -72,6 +76,7 @@ export function showTrendData(scenarioID, records) {
   if (titleEl.textContent !== titleFor(scenarioID)) {
     return; // 別シナリオのリクエスト後に古い応答が届いた場合は無視する
   }
+  records = trendPlatform ? records.filter((record) => record.platform === trendPlatform) : records;
   if (records.length === 0) {
     const empty = document.createElement('div');
     empty.className = 'section-empty';

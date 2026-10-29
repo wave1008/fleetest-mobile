@@ -372,7 +372,7 @@ final class ScrollSearchStopTests: XCTestCase {
                                                        containerIsPartialHeight: true)
         stopped.directionMatchedScrollFrameCandidate = "#carousel_tags"
         let message = StepExecutor.scrollNotFoundMessage(step, stopped, defaultMaxSwipes: 8)
-        XCTAssertTrue(message.contains("scrollFrame: #carousel_tags"), message)
+        XCTAssertTrue(message.contains("scrollFrame: \"#carousel_tags\""), "貼れる形(文字列リテラル)で勧める: \(message)")
     }
 
     /// 候補が無ければ従来どおり(誤って何かを勧めない)

@@ -25,7 +25,7 @@ function listSection(heading, entries) {
     const span = document.createElement('span');
     span.className = 'scenario-id-clickable';
     span.textContent = entry.scenarioID + ' [' + entry.platform + ']';
-    span.addEventListener('click', () => requestTrend(entry.scenarioID));
+    span.addEventListener('click', () => requestTrend(entry.scenarioID, entry.platform));
     li.appendChild(span);
     ul.appendChild(li);
   }

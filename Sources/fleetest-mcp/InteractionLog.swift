@@ -31,7 +31,8 @@ struct InteractionLog {
         /// 刈り込みの一覧に出す1行。**記録時に作る** —— 生成時に組み直すと、番号付きで見せた
         /// 説明と実際に落ちる手がズレる(選んで捨てる機能では致命的)
         var summary: String = ""
-        /// 手を撃った宛先(`MCPServer.sessionKey`)。**下書きは1台分だけ** —— 1つのプロセスで
+        /// 手を撃った台の鍵(`MCPServer.draftDeviceKey` = `ios:<udid>` / `android:<serial>`、引けなければ sessionKey。
+        /// **sessionKey と比べない**)。**下書きは1台分だけ** —— 1つのプロセスで
         /// 2台を操作すると、別デバイスの手が1本のシナリオへ混ざる。nil は宛先を持たない記録(宣言など)で、どの台の下書きにも入る
         var deviceKey: String?
     }

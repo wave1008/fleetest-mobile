@@ -229,12 +229,12 @@ export function renderRunsTable(groups, statsByRunID, selectCell) {
   syncChildren(body, rows);
 }
 
-/** summaryTable.js/flaky テーブルで共用(クリックで requestTrend)。 */
-export function scenarioIdCell(scenarioID) {
+/** summaryTable.js/flaky テーブルで共用(クリックで requestTrend)。行は OS ごとなので、推移もその OS の run に絞る */
+export function scenarioIdCell(scenarioID, platform) {
   const cell = document.createElement('td');
   cell.textContent = scenarioID;
   cell.className = 'scenario-id-clickable';
-  cell.addEventListener('click', () => requestTrend(scenarioID));
+  cell.addEventListener('click', () => requestTrend(scenarioID, platform));
   return cell;
 }
 
@@ -248,7 +248,7 @@ export function renderFlakyTable(flaky) {
     const tr = document.createElement('tr');
     tr.dataset.sig = JSON.stringify([row.scenarioID, row.platform, row.recentResults]);
     tr.append(
-      scenarioIdCell(row.scenarioID),
+      scenarioIdCell(row.scenarioID, row.platform),
       td(row.platform),
       // recentResults は新しい順: 先頭が「直近」列、残りが「履歴(新→旧)」列
       tdMid(recentResultsMarks(row.recentResults.slice(0, 1))),

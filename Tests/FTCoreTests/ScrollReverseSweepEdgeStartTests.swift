@@ -92,8 +92,8 @@ final class ScrollReverseSweepEdgeStartTests: XCTestCase {
         XCTAssertFalse(message.contains("reverse sweep"), message)
     }
 
-    /// 弾切れ(maxSwipes を使い切った)側の逆走査も同じ条件で撃たない。maxSwipes: 1 は2周目の比較の前に
-    /// ループを抜けるので、端で打ち切る側の guard を通らずにこちらへ来る(F26 の再現は maxSwipes: 1 だった)
+    /// 弾切れ(maxSwipes を使い切った)側の逆走査も同じ条件で撃たない。maxSwipes: 1 は端で打ち切る側の guard
+    /// (2周続けて動かない)へ届かずにこちらへ来る(最後の周回は直前の1本が動かしたかだけを比べる)
     func testNoReverseSweepWhenSwipesRunOutWithoutAnyMovement() async throws {
         let driver = EdgeStartTargetOnOtherSideDriver(
             screen: FTRect(x: 0, y: 0, width: 400, height: 800))
@@ -106,6 +106,21 @@ final class ScrollReverseSweepEdgeStartTests: XCTestCase {
 
         XCTAssertFalse(result.found, "指定と逆の側にある要素を見つけて成功している")
         XCTAssertEqual(driver.drags, 0, "1度も動かなかった探索で逆走査のドラッグを撃った")
+    }
+
+    /// maxSwipes: 1 でその1本が動いて対象を通り過ぎたら、弾切れの逆走査で拾う(最後の1本の効果も比べる)
+    func testSingleSwipeThatMovedPastTheTargetStillGetsTheReverseSweep() async throws {
+        let driver = SwipedPastTargetDriver(screen: FTRect(x: 0, y: 0, width: 400, height: 800))
+        let executor = StepExecutor(driver: driver, isAndroid: false, tunables: RunTunables())
+        let step = FlowStep(action: "scrollTo", locator: FlowLocator(id: "row_target"),
+                            direction: "up", maxSwipes: 1)
+        var phase = StepExecutor.PhaseAccumulator()
+
+        let result = try await executor.runScrollSearch(step: step, phase: &phase)
+
+        XCTAssertEqual(driver.swipes, 1)
+        XCTAssertGreaterThan(driver.drags, 0, "1本が動いたのに逆走査を撃たなかった")
+        XCTAssertTrue(result.found, "通り過ぎた対象を逆走査で拾えていない")
     }
 
     /// 逆走査の最初の1本が撃てずに諦めた回は「逆走査した・画面は戻した位置のまま」と言わない(何も動かしていない)
@@ -170,6 +185,57 @@ private final class DragRefusingDriver: AppDriver {
             ElementInfo(ref: 4, type: "button", identifier: "row_ghost", label: nil, value: nil, placeholder: nil,
                         enabled: true, frame: FTRect(x: 16, y: -1000, width: 368, height: 56), depth: 1),
         ]
+        return SnapshotResponse(sessionBundleID: nil, screen: screen, elements: elements, truncatedCount: 0)
+    }
+}
+
+/// 順方向の1本で中身が動き(対象は通り過ぎて木から消えたまま)、逆走査のドラッグを受けると対象が現れる
+private final class SwipedPastTargetDriver: AppDriver {
+    private let screen: FTRect
+    private(set) var swipes = 0
+    private(set) var drags = 0
+
+    init(screen: FTRect) { self.screen = screen }
+
+    func status() async throws -> StatusResponse {
+        StatusResponse(ready: true, device: "fake", osVersion: "-", sessionBundleID: nil)
+    }
+    func install(packagePath: String) async throws -> String? { nil }
+    func uninstall(bundleID: String) async throws {}
+    func launch(bundleID: String) async throws {}
+    func isAppForeground(bundleID: String) async throws -> Bool { true }
+    func foregroundAppID() async throws -> String? { nil }
+    func terminate() async throws {}
+    func screenshot() async throws -> Data { Data() }
+    func type(ref: Int?, text: String) async throws {}
+    func tap(ref: Int) async throws {}
+    func tap(x: Double, y: Double) async throws {}
+    func press(ref: Int, duration: Double) async throws {}
+    func swipe(_ direction: FTSwipeDirection) async throws { swipes += 1 }
+    func drag(fromX: Double, fromY: Double, toX: Double, toY: Double,
+              pressSeconds: Double, durationSeconds: Double) async throws { drags += 1 }
+
+    func snapshot() async throws -> SnapshotResponse {
+        let offset = Double(swipes) * 120
+        var elements = [
+            ElementInfo(ref: 1, type: "scrollView", identifier: "list", label: nil, value: nil,
+                       placeholder: nil, enabled: true,
+                       frame: FTRect(x: 0, y: 0, width: 400, height: 800), depth: 0, scrollable: true),
+            ElementInfo(ref: 2, type: "button", identifier: "row_01", label: nil, value: nil,
+                       placeholder: nil, enabled: true,
+                       frame: FTRect(x: 16, y: 40 + offset, width: 368, height: 56), depth: 1),
+            ElementInfo(ref: 3, type: "button", identifier: "row_02", label: nil, value: nil,
+                       placeholder: nil, enabled: true,
+                       frame: FTRect(x: 16, y: 120 + offset, width: 368, height: 56), depth: 1),
+            ElementInfo(ref: 4, type: "button", identifier: "row_ghost", label: nil, value: nil,
+                       placeholder: nil, enabled: true,
+                       frame: FTRect(x: 16, y: -1000, width: 368, height: 56), depth: 1)
+        ]
+        if drags > 0 {
+            elements.append(ElementInfo(ref: 5, type: "button", identifier: "row_target", label: nil,
+                                        value: nil, placeholder: nil, enabled: true,
+                                        frame: FTRect(x: 16, y: 400, width: 368, height: 56), depth: 1))
+        }
         return SnapshotResponse(sessionBundleID: nil, screen: screen, elements: elements, truncatedCount: 0)
     }
 }

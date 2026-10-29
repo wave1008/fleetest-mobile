@@ -105,3 +105,31 @@ test("flaky scenarioID cell click requests the trend and opens the section", (t)
   });
   assert.equal(window.document.querySelectorAll("#trend-body tbody tr").length, 1);
 });
+
+// 行は OS ごと(summary・flaky)なので、開いた推移もその OS の run に絞る(混ぜると行の成功率と推移の並びが合わない)
+test("summary row click limits the trend to that row's platform", (t) => {
+  const { window, sendToWebview } = createWebview();
+  t.after(() => window.close());
+  const payload = {
+    ...PAYLOAD,
+    summary: [{ scenarioID: "Foo.S0010", platform: "android", runs: 2, successRate: 50, avgDurationMs: 100, medianDurationMs: 100 }],
+  };
+  sendToWebview({ type: "dashboard", message: { type: "data", payload } });
+  const cell = window.document.querySelector("#table-summary-body td.scenario-id-clickable");
+  assert.ok(cell, "summary table renders a clickable scenarioID cell");
+  cell.click();
+  assert.match(window.document.getElementById("trend-title").textContent, /\[android\]/);
+
+  const record = (platform, second) => ({
+    schemaVersion: 1, runID: `${RUN.runID}-${platform}`, scenarioID: "Foo.S0010", platform, host: "H",
+    passed: true, startedAt: `2026-09-01T00:00:${second}Z`, durationMs: 100, scenes: [],
+    steps: { total: 1, passed: 1, failed: 0 },
+  });
+  sendToWebview({
+    type: "dashboard",
+    message: { type: "trend", scenarioID: "Foo.S0010", records: [record("ios", "10"), record("android", "20")] },
+  });
+  const rows = window.document.querySelectorAll("#trend-body tbody tr");
+  assert.equal(rows.length, 1, "only the android run is listed");
+  assert.ok(rows[0].querySelectorAll("td")[1].title.endsWith("-android"), "the listed run is the android one");
+});

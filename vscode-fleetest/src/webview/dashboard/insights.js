@@ -41,7 +41,8 @@ function insightLine(insight) {
   message.textContent = insight.message;
   if (insight.scenarioID) {
     message.classList.add('scenario-id-clickable');
-    message.addEventListener('click', () => requestTrend(insight.scenarioID));
+    // 行は OS ごと = 推移もその OS の run に絞る(platform を持たない行は全 OS)
+    message.addEventListener('click', () => requestTrend(insight.scenarioID, insight.platform ?? null));
   }
   li.append(icon, message);
   // deviceBias は scenarioID と worker の両方を持つので、デバイスへのリンクは本文と別に添える

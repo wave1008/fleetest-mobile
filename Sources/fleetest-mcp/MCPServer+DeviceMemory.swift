@@ -9,12 +9,6 @@ import FTCore
 
 extension MCPServer {
 
-    /// **ツールが device ターゲット(port/serial/udid)を受けるか**。schema 駆動(port または serial
-    /// プロパティの有無)にしてあるので、ツール一覧を追加でメンテしなくても toolDefinitions と
-    /// 自動的に揃う。**port だけでは見ない**: scope: .none で serial だけを個別宣言する
-    /// ツール(ft_logs)が port を持たないため、port 単独判定だと fold から漏れて記憶が効かなかった。
-    /// device を受けないツール(ft_doctor 等)へ記憶を適用すると、宛先と無関係な応答に
-    /// 「この機を使い回しています」という誤解を招く注記が付く
     /// ツールのスキーマがその引数を宣言しているか。呼び出しの外(ツール名が空)は true(案内を削らない側)
     static func toolDeclares(_ argument: String, tool: String) -> Bool {
         guard !tool.isEmpty else { return true }
@@ -24,6 +18,12 @@ extension MCPServer {
         return props[argument] != nil
     }
 
+    /// **ツールが device ターゲット(port/serial/udid)を受けるか**。schema 駆動(port または serial
+    /// プロパティの有無)にしてあるので、ツール一覧を追加でメンテしなくても toolDefinitions と
+    /// 自動的に揃う。**port だけでは見ない**: scope: .none で serial だけを個別宣言する
+    /// ツール(ft_logs)が port を持たないため、port 単独判定だと fold から漏れて記憶が効かなかった。
+    /// device を受けないツール(ft_doctor 等)へ記憶を適用すると、宛先と無関係な応答に
+    /// 「この機を使い回しています」という誤解を招く注記が付く
     static func toolAcceptsDeviceTarget(_ tool: String) -> Bool {
         guard let definition = toolDefinitions.first(where: { $0["name"] as? String == tool }),
               let schema = definition["inputSchema"] as? [String: Any],

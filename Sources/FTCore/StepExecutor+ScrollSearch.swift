@@ -773,6 +773,13 @@ extension StepExecutor {
                 }
                 continue
             }
+            // **最後の周回は送らないが、直前の1本が動かしたかは比べる**(読みはもう撮ってある = 費用ゼロ)。
+            // 比べないと maxSwipes: 1 で1本が動いて対象を通り過ぎた探索を「1度も動かなかった」と読み、弾切れの逆走査を撃たない
+            if attempt == maxSwipes, let earlier = previousSnapshot,
+               Self.contentSignature(earlier.elements) != Self.contentSignature(snapshot.elements) {
+                contentEverMoved = true
+                previousSnapshot = snapshot
+            }
             if attempt < maxSwipes {
                 // **明示 scrollFrame が解決できないなら、ここで打ち切る(1本も振らない)**。
                 // 空振りしたまま全画面スワイプへ黙って退化すると、カード上のボタン等

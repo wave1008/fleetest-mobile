@@ -99,8 +99,13 @@ final class PostSwipeSnapshotFreshnessTests: XCTestCase {
             $0.contains("freshSnapshot(.afterSearch(swiped: searchSwiped))")
                 || $0.contains("freshSnapshot(.repoll(afterSearchSwiped: searchSwiped))")
         }
-        XCTAssertGreaterThanOrEqual(gated.count, 3,
-                                    "探索後の解決 snapshot は初回と再試行2経路(timeout 指定 / 既定3回)の"
-                                    + "計3箇所すべてを searchSwiped で迂回すること。現在 \(gated.count) 箇所")
+        // 再試行2経路(timeout 指定 / 既定3回)の撮り直し。ghost の救済(sendGhostRescue)の後の撮り直しは各経路の
+        // 次の周回が受け持つ(救済の中では撮らない)ので、この2箇所。初回の解決は三項で書くので下で別に見る
+        XCTAssertGreaterThanOrEqual(gated.count, 2,
+                                    "探索後の再試行の解決 snapshot は2経路(timeout 指定 / 既定3回)とも"
+                                    + "searchSwiped で迂回すること。現在 \(gated.count) 箇所")
+        // 初回の解決: 自前の動きの後でなければ探索の後として迂回する(`.afterSearch(swiped: searchSwiped)`)
+        XCTAssertTrue(body.contains { $0.contains("? .afterOwnMove : .afterSearch(swiped: searchSwiped)") },
+                      "探索後の初回の解決が searchSwiped で迂回していない")
     }
 }

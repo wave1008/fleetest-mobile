@@ -66,7 +66,7 @@ function summaryRow(row) {
   // 列の順序は monitorHtml.ts renderDashboardPanel() の #table-summary の見出しと1:1
   // (位置で対応するので片方だけ並べ替えると値が別の見出しの下に出る)
   tr.append(
-    scenarioIdCell(row.scenarioID),
+    scenarioIdCell(row.scenarioID, row.platform),
     td(row.platform),
     tdMid(typeof row.lastPassed === 'boolean' ? passFailMark(row.lastPassed) : '–'),
     td(formatLocalDateTime(row.lastRunAt)),
