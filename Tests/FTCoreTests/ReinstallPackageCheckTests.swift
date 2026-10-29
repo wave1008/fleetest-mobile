@@ -71,4 +71,24 @@ final class ReinstallPackageCheckTests: XCTestCase {
             XCTAssertFalse(code.contains("AppPackageReader.open("), "\(file) が同期の AppPackageReader.open を呼んでいる")
         }
     }
+
+    /// バンドル名に角括弧がある .ipa も読める(unzip はメンバー名をワイルドカードとして読むので、逃がさないと読めず「読めない」で断る)
+    func testIPAWhoseBundleNameHasBracketsIsReadable() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent("ft-ipa-brackets-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let app = dir.appendingPathComponent("Payload/MyApp[Dev].app")
+        try FileManager.default.createDirectory(at: app, withIntermediateDirectories: true)
+        let plist: [String: Any] = ["CFBundleIdentifier": "com.example.app", "DTPlatformName": "iphoneos"]
+        try PropertyListSerialization.data(fromPropertyList: plist, format: .xml, options: 0)
+            .write(to: app.appendingPathComponent("Info.plist"))
+        let zip = Process()
+        zip.executableURL = URL(fileURLWithPath: "/usr/bin/zip")
+        zip.arguments = ["-qr", "app.ipa", "Payload"]
+        zip.currentDirectoryURL = dir
+        try zip.run()
+        zip.waitUntilExit()
+        XCTAssertEqual(zip.terminationStatus, 0)
+        XCTAssertEqual(ReinstallPackageCheck.inspect(path: dir.appendingPathComponent("app.ipa").path,
+                                                     expectedBundleID: "com.example.app"), .ok)
+    }
 }

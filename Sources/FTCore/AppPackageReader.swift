@@ -78,10 +78,21 @@ public struct AppPackageReader {
         case .ipa(let path, let prefix, let entries):
             let entry = prefix + relative
             guard entries.contains(entry),
-                  let result = try? Shell.runData(["unzip", "-p", path, entry], timeout: 120),
+                  let result = try? Shell.runData(["unzip", "-p", path, Self.unzipLiteral(entry)], timeout: 120),
                   result.status == 0 else { return nil }
             return result.data
         }
+    }
+
+    /// `unzip` はメンバー名をワイルドカードとして読む(`[` `]` `*` `?`)。名前どおりに取り出すため `\` で逃がす
+    /// (逃がさないと `Payload/MyApp[Dev].app/Info.plist` が「filename not matched」になり、正しいパッケージを読めないと断る)
+    public static func unzipLiteral(_ entry: String) -> String {
+        var escaped = ""
+        for character in entry {
+            if "[]*?\\".contains(character) { escaped.append("\\") }
+            escaped.append(character)
+        }
+        return escaped
     }
 
     /// plist(binary / XML / 旧形式の .strings)を辞書として読む

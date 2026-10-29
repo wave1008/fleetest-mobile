@@ -363,10 +363,10 @@ enum ApiRun {
             .appendingPathComponent("fleetest-dryrun-\(UUID().uuidString)", isDirectory: true)
     }
 
-    /// 実行プロファイルが既定(プロジェクトの reports/)と違うレポート先を持つならそれ(= JSON の `reportDir` で書いた。nil = 書いていない)。
-    /// ResolvedProfile は未指定でも既定のパスを持つので、既定と比べて「書いた」を見分ける
+    /// 実行プロファイルが `reportDir` を書いていればその置き場(nil = 書いていない)。**パスの一致で見ない** ——
+    /// 既定と同じ `reports` を明記したプロファイルを「書いていない」と読むと、明示した置き場の dry-run を捨てる
     static func declaredProfileReportDir(_ resolved: ResolvedProfile, project: TestProject) -> URL? {
-        resolved.reportDir.standardizedFileURL == project.reportsDir.standardizedFileURL ? nil : resolved.reportDir
+        resolved.reportDirDeclared ? resolved.reportDir : nil
     }
 
     /// 明示されたレポート先を**本物の run と同じ規則で**解いたパス(両方の同時指定は入口が既に断る)。

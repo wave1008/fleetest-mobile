@@ -1034,6 +1034,10 @@ public struct ResolvedProfile: Sendable {
     public var teardownHook: RunHook? = nil
     /// 解決中に出た警告(スキップしたデバイス・未知キー等)。呼び出し側が表示する
     public let warnings: [String]
+    /// プロファイル(か `--set reportDir=`)が `reportDir` を書いたか。`reportDir` は未指定でも既定のパスを持つので、
+    /// 「書いた」はパスの一致ではなくこの印で見る(既定と同じ `reports` を明記したプロファイルも書いた側。dry-run の置き場の判断)。
+    /// **既定値付きの `var`**(memberwise init を直に呼ぶ既存テストのため)
+    public var reportDirDeclared = false
 
     public var iosDevices: [ResolvedDevice] { devices.filter { $0.platform == "ios" } }
     /// platform を宣言していないシナリオをどちらの OS で走らせるか(iOS のデバイスがあれば ios)。**唯一の規則** ——
@@ -1669,7 +1673,8 @@ public enum ProfileResolver {
             workspaceRoot: workspaceRoot,
             setupHook: setupHook,
             teardownHook: teardownHook,
-            warnings: warnings)
+            warnings: warnings,
+            reportDirDeclared: runDoc.reportDir != nil)
     }
 
     /// 実機デバイスの整合検査。enabled のデバイスにのみ適用する

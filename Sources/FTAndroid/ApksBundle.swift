@@ -130,7 +130,8 @@ public enum ApksBundle {
 
     /// zip の1エントリを展開して md5(展開先を作らずストリームで受ける)
     public static func entryMD5(apksPath: String, entry: String) -> String? {
-        guard let (status, data) = try? Shell.runData(["unzip", "-p", apksPath, entry]),
+        // メンバー名はワイルドカードとして読まれるので逃がす(AppPackageReader.unzipLiteral)
+        guard let (status, data) = try? Shell.runData(["unzip", "-p", apksPath, AppPackageReader.unzipLiteral(entry)]),
               status == 0, !data.isEmpty else { return nil }
         return Insecure.MD5.hash(data: data).map { String(format: "%02x", $0) }.joined()
     }

@@ -1,5 +1,5 @@
 import XCTest
-import FTCore
+@testable import FTCore
 @testable import fleetest
 
 /// dry-run のレポート: 明示が無ければ一時フォルダへ捨て、`scenarioFinished` に消えるパスを載せない(拡張のモニターが消えたファイルを
@@ -29,6 +29,25 @@ final class DryRunReportPathTests: XCTestCase {
     func testProfileDeclaredReportDirIsHonouredInDryRun() {
         XCTAssertNil(ApiRun.dryRunDiscardDir(dryRun: true, reportDirFlag: nil, setOverrides: [],
                                              profileReportDir: URL(fileURLWithPath: "/tmp/custom")))
+    }
+
+    /// 既定と同じ `reports` を明記したプロファイルも「書いた」側(パスの一致で「書いていない」と読まない)
+    func testProfileThatSpellsOutTheDefaultReportDirCountsAsDeclared() {
+        let project = TestProject(name: "dummy", rootURL: URL(fileURLWithPath: "/tmp/dummy"))
+        func profile(declared: Bool) -> ResolvedProfile {
+            var resolved = ResolvedProfile(
+                project: project, runName: "P", appName: "app", apps: [:], devices: [], fm: FMConfig(), heal: false,
+                reportDir: project.reportsDir, defaultTimeout: nil, scenarioTimeout: nil, wipeDataOnBloat: true,
+                updateWebView: false, wipeDataThresholdGB: 8, recoverCpuFallbackToGpu: false, locale: "ja_JP",
+                iosPreActionPing: true, containerInference: true, ocrTextVisibilityCheck: true,
+                preferCheckStateClassifier: true, enableAnimations: false, responseMeasurement: false, responseRepeat: 5,
+                homeOnStart: true, playProtectBypass: true, record: false, recordFailuresOnly: false,
+                recordBitrateKbps: 1500, recordFullResolution: false, warnings: [])
+            resolved.reportDirDeclared = declared
+            return resolved
+        }
+        XCTAssertEqual(ApiRun.declaredProfileReportDir(profile(declared: true), project: project), project.reportsDir)
+        XCTAssertNil(ApiRun.declaredProfileReportDir(profile(declared: false), project: project))
     }
 
     /// 相対の `--set reportDir=` は本物の run と同じ規則で解く: プロファイルありならプロジェクトの root 基準・なしなら素の値(cwd 基準)
