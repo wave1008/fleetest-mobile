@@ -429,6 +429,14 @@ final class FakeAppDriver: AppDriver {
         log.entries.append("\(name).hideKeyboard")
         afterHideKeyboard?()
     }
+
+    /// false = キーボードが出ていない台本(Android のドライバと同じく何も送らずに false。投げる設定が先に効く)
+    var keyboardShownForHide = true
+    func hideKeyboardIfShown() async throws -> Bool {
+        if hideKeyboardError == nil, !keyboardShownForHide { return false }
+        try await hideKeyboard()
+        return true
+    }
     /// hideKeyboard() の後に呼ぶ(キーボードが閉じて窓が戻る形を表すのに使う)
     var afterHideKeyboard: (() -> Void)?
 }

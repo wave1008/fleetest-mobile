@@ -1194,6 +1194,21 @@ final class MCPRefGuardTests: XCTestCase {
         XCTAssertTrue(actions.contains { $0.hasPrefix("tap") }, "拒否ではなく警告して撃つこと")
     }
 
+    /// **アプリ内アラートのボタンには「別アプリ」の推論を当てない**。実機 SE3 の SwiftUI `.alert` のボタンは
+    /// `/hittable` が引き当てられないことがあり(5/5)、押せば届いて閉じたのに「did not reach the app」と言っていた
+    func testTapOnAnInAppAlertButtonDoesNotClaimTheAppIsGone() async throws {
+        driver.snapshotResponse = screen([
+            element(ref: 1, type: "button", id: "btn_back", label: "戻る", x: 16, y: 60, depth: 2),
+            element(ref: 2, type: "alert", label: "クラッシュ確認", x: 60, y: 300, w: 270, h: 180, depth: 1),
+            element(ref: 3, type: "button", id: "btn_crash_cancel", label: "やめる", x: 60, y: 430, w: 135, h: 44, depth: 2),
+        ])
+        driver.hitTestAnswer = .unresolvable
+        _ = try await server.call(tool: "ft_snapshot", args: [:])
+        let text = Self.text(try await server.call(tool: "ft_tap", args: ["ref": 3]))
+        XCTAssertFalse(text.contains("no longer the one being queried"), text)
+        XCTAssertTrue(actions.contains { $0.hasPrefix("tap") }, text)
+    }
+
     /// **引き当てられたときは黙る**(検出器が常時発火していないこと)
     func testTapStaysQuietWhenThePlatformResolvesTheElement() async throws {
         driver.snapshotResponse = screen([

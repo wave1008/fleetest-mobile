@@ -29,10 +29,10 @@ function validPayload(overrides = {}) {
       },
     ],
     summary: [
-      { scenarioID: "Login", runs: 5, successRate: 80.0, avgDurationMs: 1200, medianDurationMs: 1100, lastRunAt: "2026-07-16T00:00:00Z", lastPassed: true },
+      { scenarioID: "Login", platform: "ios", runs: 5, successRate: 80.0, avgDurationMs: 1200, medianDurationMs: 1100, lastRunAt: "2026-07-16T00:00:00Z", lastPassed: true },
     ],
     flaky: [
-      { scenarioID: "Checkout", runs: 8, failureRate: 25.0, flakinessScore: 0.42, recentResults: [true, false, true, true] },
+      { scenarioID: "Checkout", platform: "ios", runs: 8, failureRate: 25.0, flakinessScore: 0.42, recentResults: [true, false, true, true] },
     ],
     deviceHealth: [
       {

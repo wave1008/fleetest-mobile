@@ -92,6 +92,9 @@ final class MCPDraftCoverageTests: XCTestCase {
             }
             // ft_scroll_to は木を読むので、探す対象を先に見せておく
             if tool == "ft_scroll_to" { _ = try await server.call(tool: "ft_snapshot", args: [:]) }
+            // ft_hide_keyboard は何も送らなかった回(キーボードが出ていない)を下書きに残さない。偽ドライバの iOS の木には
+            // キーボードが無いので、Android(偽ドライバの hideKeyboardIfShown は既定で「出ていた = 送った」)で撃つ
+            if tool == "ft_hide_keyboard" { server.bridges[MCPServer.sessionKey([:])] = "android" }
             do {
                 _ = try await server.call(tool: tool, args: entry.args)
             } catch {

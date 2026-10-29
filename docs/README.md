@@ -73,7 +73,7 @@
 | [maintainer-notes/042-056.md](maintainer-notes/042-056.md) | 記録 | 規則を緩めたく/消したくなったとき・同じ型の判断をするとき(MN-42〜56) |
 | [maintainer-notes/057-073.md](maintainer-notes/057-073.md) | 記録 | 規則を緩めたく/消したくなったとき・同じ型の判断をするとき(MN-57〜73) |
 | [maintainer-notes/074-088.md](maintainer-notes/074-088.md) | 記録 | 規則を緩めたく/消したくなったとき・同じ型の判断をするとき(MN-74〜88) |
-| [maintainer-notes/089-106.md](maintainer-notes/089-106.md) | 記録 | 規則を緩めたく/消したくなったとき・同じ型の判断をするとき(MN-89〜106) |
+| [maintainer-notes/089-107.md](maintainer-notes/089-107.md) | 記録 | 規則を緩めたく/消したくなったとき・同じ型の判断をするとき(MN-89〜107) |
 | [remote-runner/README.md](remote-runner/README.md) | 索引 | リモート実行の設計の節を探すとき |
 | [remote-runner/records.md](remote-runner/records.md) | 記録 | リモート実行の未検証事項・作業計画・初期の罠を確かめるとき |
 | [design/history.md](design/history.md) | 記録 | 設計の経緯や過去に踏んだ実装の罠を確かめるとき |

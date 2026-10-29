@@ -19,7 +19,7 @@ struct ApiResultsCommand: AsyncParsableCommand {
     @Option(help: "Test project name (defaults to the only one in TestProjects/, or the default project)")
     var project: String?
 
-    @Option(help: "Start of the period: a duration (e.g. 90s/30m/2h/30d), a date (YYYY-MM-DD) or an epoch (@1757280000)")
+    @Option(help: "Start of the period: a duration (e.g. 90s/30m/2h/30d), a date (YYYY-MM-DD, UTC midnight) or an epoch (@1757280000)")
     var since: String = "90d"
 
     @Option(help: "Number of entries to include in runs (descending by runID)")
@@ -49,8 +49,9 @@ struct ApiResultsCommand: AsyncParsableCommand {
     func run() throws {
         let testProject = try ScenarioHost.project(named: project)
         let resultsDir = RunResultsStore.resultsDir(projectRoot: testProject.rootURL)
-        guard let sinceDate = RunResultsQuery.parseSince(since) else {
-            throw ValidationError(TimeBoundParse.rejection(option: "--since", raw: since))
+        let now = Date()  // 解析と断りの文面で同じ基準時刻を使う(範囲の境目で文面が逆にならない)
+        guard let sinceDate = RunResultsQuery.parseSince(since, referenceDate: now) else {
+            throw ValidationError(TimeBoundParse.rejection(option: "--since", raw: since, now: now))
         }
         let isoFormatter = ISO8601DateFormatter()
         let generatedAt = isoFormatter.string(from: Date())
@@ -126,7 +127,7 @@ struct ApiResultsCommand: AsyncParsableCommand {
                 records, minRuns: minRuns, recentRuns: RunResultsQuery.recentScenarioRunsWindow),
             deviceHealth: RunResultsQuery.deviceHealth(runs: runs, records: records),
             machineHealth: machineHealth,
-            slow: RunResultsQuery.slowTests(records, limit: 10),
+            slow: RunResultsQuery.slowTests(records, limit: 10, recentRuns: RunResultsQuery.recentScenarioRunsWindow),
             insights: RunResultsQuery.insights(records: records, runs: runs,
                                                definedClasses: definedScenarioClasses(of: testProject)),
             performance: RunResultsQuery.performanceReport(records: records, runs: runs),

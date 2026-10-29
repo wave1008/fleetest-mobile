@@ -71,6 +71,7 @@ final class KeyboardDismissPointTests: XCTestCase {
         XCTAssertLessThan(try XCTUnwrap(driver.coordinateTaps.first).y, keyboard.y, "キーボードの上を叩くはず")
         XCTAssertFalse(log.entries.contains { $0.hasPrefix("primary.hideKeyboard") }, "iOS はブリッジの hideKeyboard を撃たない")
         XCTAssertTrue(outcome.driverFallback?.contains("above the keyboard") == true, outcome.driverFallback ?? "nil")
+        XCTAssertFalse(executor.hideKeyboardFoundNoKeyboard, "閉じたのに「出ていなかった」の印を立てた")
     }
 
     /// 当たり判定に答えないブリッジ(XCUITest だけ)は木だけで決めて叩き、確かめていないことを注記に出す

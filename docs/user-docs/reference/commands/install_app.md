@@ -36,10 +36,13 @@ removeApp()
   onboarding or first-run permission flows.
 - A physical iPhone has no way to clear only the app's data, so `clearAppData()` **reinstalls the app** there (it takes
   as long as an install; note `reinstalled-to-clear-data`). Set a device build in the app profile's `appPathPhysical`
-  as the source to reinstall from, and run with `--profile`. If it cannot reinstall, it fails without uninstalling.
+  as the source to reinstall from, and run with `--profile`. If it cannot reinstall — no source, a different app
+  (another bundle ID), or a Simulator build (which a physical device rejects) — it fails without uninstalling.
 - `clearAppData()` clears `NSUserDefaults` / `SharedPreferences`, but **does not clear the
   Keychain (iOS) / Keystore (Android)**. If an app stores its "has been onboarded" flag there,
   first-run cannot be reproduced this way.
+- **fleetest's own bridge cannot be the target.** Passing the bridge's ID (Android `com.example.ftbridge`, or the iOS runner whose ID ends in `.ftrunner`, `.ftrunner.uitests` or `.ftrunner.uitests.xctrunner`) to `removeApp` / `clearAppData`
+  fails without sending anything — removing or wiping it would stop the bridge the run drives the device through.
 - **Removing the app under test breaks the rest of the run** — call `removeApp()` on your own
   test target only when you mean to end the scenario there.
 - **On Android (physical devices and Emulators alike), `adb install` verification (Play

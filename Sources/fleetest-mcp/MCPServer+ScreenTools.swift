@@ -47,7 +47,7 @@ extension MCPServer {
             } else {
                 let explain = firstTime("waitMissExplained")
                 waitNote = Self.waitMissHeadline(waitFor, seconds: seconds, quietStopAfter: waited.quietStopAfter,
-                                                 explain: explain)
+                                                 explain: explain, canWaitForChange: true)
                     + Self.appearedPromptNote(before: previousRead, now: snapshot)
                     + " — this is the screen as it is now\(Self.truncationHint(snapshot))"
                     + (waited.partialSeenAfter.map { seenAfter in

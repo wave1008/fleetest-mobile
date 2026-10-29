@@ -329,6 +329,89 @@
   注入口(`FT_FAKE_OCR_DEAD=1`)のデバイス実行で、外枠 120 秒の中で約 118 秒待ってから両方の事実を言って落ちることを確かめた。
   読み手が戻った回に緑になることは単体テストだけで、デバイスでは確かめていない(故障を意図して起こせない)
 
+## 探索的テスト(2026-10-29)で見つかり、まだ直していないもの
+
+5 担当の探索(Simulator・実機 SE3・Emulator・実機 Pixel 4a/3a・CLI)で出た所見のうち、直していないもの。経緯は MN-107。
+
+### OI-39 画面より大きい要素への ref タップが届いたのに「almost certainly did nothing」と言う(観測とコードの読みが食い違う)
+- 状態: 再現済み
+- 確認: 7ac53b33(2026-10-29)
+- 経緯: 発見: 10-29 の探索(実機 SE3)
+
+- 症状: SwiftUI の SUT(E2E-iOS テキスト入力画面)で欄に 500 文字入れると、`#btn_input_submit` が `(-1819,277 2003x62)` になる。
+  ft_tap ×2・ft_long_press ×1 の3回とも「its centre (-818, 308) is outside the visible screen, so this almost certainly did nothing」と
+  言ったが、直後の木で `submitted=…` = 送信は実行されていた
+- 食い違い: ランナーの `resolvePoint` は ref でも `refFrames` の枠の中心(`frame.midX/midY`)を叩く = (-818, 308) は画面の外のはず。
+  届いた理由はコードの経路では説明がつかない(XCUICoordinate が画面外の点をどう扱うかを確かめていない)
+- 手がかり: 実機で同じボタンを撃ち、ランナーのログに出る座標と、XCTest が実際に合成したタッチの位置を見る。**説明がつくまで判定は変えない**
+  (「XCUITest は見えている部分を叩く」と決めて警告を抑えた修正は、前提がコードで否定されて取り消した = MN-107)
+
+### OI-40 Flutter の数字だけの欄に英字を打つと、置き換え入力が ok になる(画面の欄は空なのに木の value が打った文字列のまま)
+- 状態: 再現済み
+- 確認: 7ac53b33(2026-10-29)
+- 経緯: 発見: 10-29 の探索(Android Emulator・E2EX-Flutter の入力の種類画面 `#field_number`)
+
+- 症状: `type '#field_number >> .textField' 'xyz' replace: true` は DSL / ft_batch で ok。ft_type の replace は警告する(ツール間で食い違う)。
+  直後の木の value は `xyz` のまま、画面の欄は空
+- 見立て: Flutter のセマンティクスが、欄が捨てた入力で更新されない。注入(ACTION_SET_TEXT)の読み返しが更新されない value を信じる
+- 手がかり: 読み返しの後に画面(OCR)で欄の中身を確かめるか、Flutter の欄だけ読み返しの根拠を変えるか。誤った緑なので、どちらも
+  実データ(他の Flutter の欄)で誤検知を測ってから
+
+### OI-41 一覧の外に描かれた行(容器の外の残像)への MCP の ref タップが、背景が空白だと無警告で空振りする
+- 状態: 再現済み
+- 確認: 7ac53b33(2026-10-29)
+- 経緯: 発見: 10-29 の探索(Simulator・E2EY-CMP の反転チャット / 実機 SE3)
+
+- 症状: 容器 `#list_chat (0,268 402x498)` の外(上)に `#msg_48`〜`#msg_50` が印なしで並び、ft_tap は「done」+ 汎用の「変わらなかったかも」
+  だけで空振り。同じ画面の DSL の `tap('#msg_04')` は「容器の外」と判定して送り直してから押す
+- 場所: MCP の印(`RefGuard.isUntappableGhost`)は誤検知5形の対策で「中心に覆いがある」を条件にしている = 中心の下が空白の残像には付かない
+- 手がかり: 条件を緩めるなら、実アプリのコーパス(`Tests/Fixtures/RealAppSnapshots/`)で誤検知を数えてから
+
+### OI-42 Pixel 4a(Android 13)でアプリ切り替え画面を出している間も、木がアプリの画面のまま返る
+- 状態: 再現済み
+- 確認: 7ac53b33(2026-10-29)
+- 経緯: 発見: 10-29 の探索(実機 Pixel 4a・ジェスチャナビ)
+
+- 症状: ft_navigate appSwitcher の後も木はアプリの画面のまま(`dumpsys window` の mCurrentFocus もアプリ)。ref のタップは
+  「done (selector: …)」で Recents に吸われ、中央のカードの別アプリが開いたこともある。Pixel 3a(Android 12)は
+  `no-active-window-root` で正しく「読めない」と言う
+- 手がかり: Android 13 で Recents が前面のときにブリッジが見ている窓(アクティブウィンドウの根)を調べる
+
+### OI-43 CLI の `fleetest tap --ref` が、画面が変わった後の古い ref をそのまま撃つ
+- 状態: 経路確定
+- 確認: 7ac53b33(2026-10-29)
+- 経緯: 発見: 10-29 の探索(CLI・Android Emulator・E2EX-RN)
+
+- 症状: `snapshot` → `tap --ref 1`(戻る)→ `tap --ref 8`(前の画面の ref)が別の画面の3行目を押して ✅・exit 0。MCP の ft_tap は同じ状況を検査する
+- 場所: CLI は呼び出しをまたぐ木の控えを持たない(1回ごとに別プロセス)= 撃つ前に ref が同じ要素かを確かめる材料が無い
+- 手がかり: ブリッジの期待値の照合(`RefExpectation`)を CLI からも渡せるよう、直前の snapshot の要素を控えに残すか
+
+### OI-44 ft_draft_scenario で下書きを作るデバイスを選べない(いつも最後に操作したデバイス)
+- 状態: 経路確定
+- 確認: 7ac53b33(2026-10-29)
+- 経緯: 発見: 10-29 の /code-review(8回目)
+
+- 症状: Simulator A を操作し、続いて Android の B を操作してから `platform: "ios", udid: A` で ft_draft_scenario を呼ぶと、B の手と
+  「A の手は外した」の注記が返る。A の下書きは A をもう一度操作しないと作れない
+- 場所: 下書きの台は `InteractionLog.latestDevice` だけで決め、呼び出しの udid / serial / profile を見ない(MCPServer+Draft.swift)
+- 手がかり: 宛先の引数が渡されたらその台の鍵(`MCPServer.sessionKey`)で `scope(all:device:)` を引く。渡されなければ今どおり最後の台
+
+### OI-45 Compose の iOS で Return でキーボードを閉じると画面の下端が切れたまま残り、XCUITest のタップが黙って空振りする
+- 状態: 再現済み
+- 確認: コミット未記録(2026-10-29)
+- 経緯: 発見: 10-29 の sut-ec-mobile チェックアウトの xcuitest モードの赤の調査(HEAD でも同じ)
+
+- 症状: xcuitest モードで `pressEnter`(XCTest の `typeText("\n")`)がキーボードを閉じた後、欄の焦点は残り、Compose は画面の下 約 70pt を
+  切ったまま描く(空白)。**キーボードの種類に依らない**(数字パッドでも、Return のあるかなキーボードでも起きた)。木の枠もスクロール容器も
+  切られないまま報告され(容器は 0〜874)、XCTest は保存ボタンを hittable と答え、in-app の UIKit は `keyboardShown: false`。
+  ボタンの中心(y=813)へのタップは成功を返して何も起こさず、上端(y=795)は通る。in-app ブリッジは同じ点を「スクロール容器に切られて
+  描かれていない」と見分ける。inapp-boost モードは Enter が in-app を通り、この状態にならない(緑)。sut-ec-mobile の
+  `チェックアウトできること`・`注文履歴に確定した注文が並ぶこと` は xcuitest モードでこの形で落ちる(住所・支払いの保存が空振り)
+- 場所: XCUITest ランナーのタップは要素の枠の中心を撃つ(`resolvePoint`)。木に切れの材料が無い
+- 手がかり: 失敗の文面には空振りした tap が出る(操作の対象が解決できない失敗にも「画面を変えなかった前の tap」を添えた =
+  `StepExecutor.unresolvedActionTapHint`)。残るのは空振りそのもの —— 切れの高さを XCUITest 側で得る手段(Compose のホストビューの枠)は
+  見つかっていない。数字パッドだけを警告する案は前提(数字パッドでだけ起きる)が否定されたので取り消した
+
 ## 設計判断で据え置いているもの(直さないと決めた。症状が出たら見直す)
 
 ### OI-22 描画崩壊の判定は自前描画とフレームワーク不明のアプリだけ

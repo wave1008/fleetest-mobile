@@ -159,6 +159,7 @@ public final class FastLaunchDriver: AppDriver {
     public func pressEnter() async throws { try await base.pressEnter() }
     public func clearInput(ref: Int?) async throws { try await base.clearInput(ref: ref) }
     public func hideKeyboard() async throws { try await base.hideKeyboard() }
+    public func hideKeyboardIfShown() async throws -> Bool { try await base.hideKeyboardIfShown() }
     public func back() async throws { try await base.back() }
     public func swipe(_ direction: FTSwipeDirection) async throws { try await base.swipe(direction) }
     // 包むドライバは 用途つき版も必ず素通しする(既定実装は自分の swipe(_:) を呼ぶので

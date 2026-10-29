@@ -143,7 +143,7 @@ extension MCPServer {
             deviceSession: deviceSession, settings: ScenarioExecutionSettings(fm: FMConfig(enabled: false)),
             reportDir: tempDir.path, dryRun: true,
             appPath: nil, appName: nil, appBundleID: nil, registerChildProcess: nil) {
-            lines.append(ScenarioHost.describe(outcome))
+            lines.append(ScenarioHost.describe(outcome.droppingReportPath(true)))
         }
         for outcome in await ScenarioHost.runAfterAlls(
             project: project, shared: deviceSession.shared,
@@ -152,7 +152,7 @@ extension MCPServer {
                 appPath: nil, appName: nil, appBundleID: nil) },
             settings: ScenarioExecutionSettings(fm: FMConfig(enabled: false)),
             reportDir: tempDir.path, dryRun: true, registerChildProcess: nil) {
-            lines.append(ScenarioHost.describe(outcome))
+            lines.append(ScenarioHost.describe(outcome.droppingReportPath(true)))
         }
         // レポートは一時ディレクトリに書かれ、この関数を抜けると消える。
         // 案内すると開けないパスを渡すことになるので落とす(dry-run に証跡は要らない)

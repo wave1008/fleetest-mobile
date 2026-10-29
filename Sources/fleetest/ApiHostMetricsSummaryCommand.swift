@@ -25,27 +25,34 @@ struct ApiHostMetricsSummaryCommand: ParsableCommand {
     var runArg = "latest"
 
     @Option(name: .customLong("since"),
-            help: "Start of the window: a duration (e.g. 90s/30m/2h/30d), a date (YYYY-MM-DD) or an epoch (@1757280000). Defaults to everything")
+            help: "Start of the window: a duration (e.g. 90s/30m/2h/30d), a date (YYYY-MM-DD, UTC midnight) or an epoch (@1757280000). Defaults to everything")
     var since: String?
 
     @Option(name: .customLong("until"),
-            help: "End of the window: a duration (e.g. 90s/30m/2h/30d), a date (YYYY-MM-DD) or an epoch (@1757280000). Defaults to now")
+            help: "End of the window: a duration (e.g. 90s/30m/2h/30d), a date (YYYY-MM-DD, UTC midnight) or an epoch (@1757280000). Defaults to now")
     var until: String?
 
     func run() throws {
         // --since/--until のパースは TimeBoundParse.parse が唯一の実装(呼び出しはこの2箇所だけ
         // なので共有ラッパーは作らない。作ると「どちらを直すか」の入口が増える)
+        let now = Date()  // 解析と断りの文面で同じ基準時刻を使う(範囲の境目で文面が逆にならない)
         let sinceEpoch = try since.map { raw -> Double in
-            guard let date = TimeBoundParse.parse(raw) else {
-                throw ValidationError(TimeBoundParse.rejection(option: "--since/--until", raw: raw))
+            guard let date = TimeBoundParse.parse(raw, now: now) else {
+                throw ValidationError(TimeBoundParse.rejection(option: "--since/--until", raw: raw, now: now))
             }
             return date.timeIntervalSince1970
         }
         let untilEpoch = try until.map { raw -> Double in
-            guard let date = TimeBoundParse.parse(raw) else {
-                throw ValidationError(TimeBoundParse.rejection(option: "--since/--until", raw: raw))
+            guard let date = TimeBoundParse.parse(raw, now: now) else {
+                throw ValidationError(TimeBoundParse.rejection(option: "--since/--until", raw: raw, now: now))
             }
             return date.timeIntervalSince1970
+        }
+
+        // 逆転した窓(--since が --until より後)は必ず標本 0 になる。「その時間は記録していない」と
+        // 区別が付かないので打ち間違いとして断る
+        if let sinceEpoch, let untilEpoch, sinceEpoch > untilEpoch {
+            throw ValidationError("--since must not be later than --until")
         }
 
         let (resolvedLogPath, resolvedRunID) = try resolveLogPath()

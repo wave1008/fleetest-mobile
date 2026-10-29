@@ -59,7 +59,14 @@ public final class ActionCountingDriver: AppDriver {
     public func tap(x: Double, y: Double) async throws { try await counted { try await base.tap(x: x, y: y) } }
     public func type(ref: Int?, text: String) async throws { try await counted { try await base.type(ref: ref, text: text) } }
     public func clearInput(ref: Int?) async throws { try await counted { try await base.clearInput(ref: ref) } }
-    public func hideKeyboard() async throws { try await counted { try await base.hideKeyboard() } }
+    /// 送ったときだけ数える(Android の hideKeyboard は出ていなければ何も送らない = hideKeyboardIfShown と同じ数え方)
+    public func hideKeyboard() async throws { _ = try await hideKeyboardIfShown() }
+    /// **送ったとき(true)だけ数える**(出ていなくて何も送らなかった回 = 画面に触れていないので数えない)
+    public func hideKeyboardIfShown() async throws -> Bool {
+        let sent = try await base.hideKeyboardIfShown()
+        if sent { counter.increment() }
+        return sent
+    }
     public func openURL(_ url: String, bundleID: String?) async throws {
         try await counted { try await base.openURL(url, bundleID: bundleID) }
     }

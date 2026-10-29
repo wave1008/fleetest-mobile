@@ -44,6 +44,11 @@ struct Launch: AsyncParsableCommand {
     func validate() throws { try driverOptions.rejectDeviceTargetMismatch() }
 
     func run() async throws {
+        // ブリッジ自身は起動しない(撃つとブリッジが自滅する。判定は MCP・DSL・ライブ操作と共有)
+        if BridgeSelfApps.isBridgeItself(bundleID) {
+            throw ValidationError("\(bundleID) is fleetest's own bridge, not an app under test — launching it would stop"
+                + " the bridge itself. Nothing was sent. Pass your app's bundle ID / package.")
+        }
         let driver = try await driverOptions.makeDriver()
         try await Self.refuseIfNotInstalled(bundleID: bundleID, driver: driver,
                                             isAndroid: driverOptions.resolvedPlatform == "android")

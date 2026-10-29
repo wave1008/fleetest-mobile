@@ -205,6 +205,14 @@ extension MCPServer {
     func ftHideKeyboard(_ args: [String: Any]) async throws -> [[String: Any]] {
         let hideDriver = try await driver(args)
         let (isAndroid, uiFramework) = await resolveExecutorHints(hideDriver, args: args)
+        // **何も送らなかったときは OS に依らず同じ答えにし、下書きにも残さない**
+        // 何も送っていないので操作前の木と比べない(比べると「操作が効かなかったかも」と矛盾する注記を出し、待ちも払う)
+        // Android は送らなかった回も木からキーボードが消えるのを待つ(dumpsys は閉じても木は数秒残す = 次の ft_tap が下端を見失う)
+        func notShownReply() async -> [[String: Any]] {
+            let treeNote = isAndroid ? await awaitKeyboardLeftTree(hideDriver) : ""
+            return text("The keyboard was not shown; nothing was sent.\(treeNote)" + waitForWithoutSnapshotAfterNote(args)
+                + (await snapshotAfterBody(args, outsideTheAppTree: true)))
+        }
         let executor = StepExecutor(driver: hideDriver, releasesScrollTouch: !isAndroid,
                                     isAndroid: isAndroid, tunables: RunTunables(), uiFramework: uiFramework)
         executor.hideKeyboardFallsBackToEnter = false
@@ -219,6 +227,7 @@ extension MCPServer {
                 : " — ft_type pressEnter: true may close it, but Return also fires the field's action"
                     + " (submit, search or moving to the next field)"))
         }
+        if executor.hideKeyboardFoundNoKeyboard { return await notShownReply() }
         recordInteraction(action: "hideKeyboard", resolvedRef: nil, args: args)
         var note = outcome.driverFallback.map { " (\($0))" } ?? ""
         if isAndroid { note += await awaitKeyboardLeftTree(hideDriver) }

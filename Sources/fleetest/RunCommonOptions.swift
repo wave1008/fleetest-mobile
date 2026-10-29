@@ -160,10 +160,36 @@ extension RunCommonOptions {
         if profile == nil, !hasFleet, let target = runner, !MachineDispatch.isExplicitLocal(target) {
             throw ValidationError("--runner requires --profile")
         }
+        // `--device` / `--device-machine` は実行プロファイルのデバイスを絞る口。プロファイル無しでは絞る相手が無く、
+        // 黙って無視するとユーザーの指したデバイスと別のデバイスで回る(`--fleet` の各エントリは自分の --profile を持つ)
+        if profile == nil, !hasFleet, !devices.isEmpty || deviceMachine != nil {
+            throw ValidationError("\(deviceScopeDescription()) requires --profile")
+        }
         if let message = RunDeviceMachineAmbiguity.allMachinesConflictMessage(
             allMachines: allMachines, runner: runner, deviceMachine: deviceMachine) {
             throw ValidationError(message)
         }
+    }
+
+    /// `--device` / `--device-machine` の指定を、エラー文言に出す形へ整える
+    func deviceScopeDescription() -> String { Self.deviceScopeDescription(devices: devices, deviceMachine: deviceMachine) }
+
+    static func deviceScopeDescription(devices: [String], deviceMachine: String?) -> String {
+        [devices.isEmpty ? nil : "--device \(devices.joined(separator: ", "))",
+         deviceMachine.map { "--device-machine \($0)" }]
+            .compactMap { $0 }.joined(separator: " ")
+    }
+
+    /// 絞り込みを指定したのに合致が0台のときの断り(`run` の dry-run・本実行前の検査と `api run` が共有する)。
+    /// 指定していないのに0台なのはプロファイル自体の誤りで、resolve が自分の言葉で報告する
+    /// **`devices` / `deviceMachine` は実際に絞った値**(`--runner local` が機械の枠へ絞った実効の値 = フラグそのままではない。
+    /// フラグで組むと、ツールが絞った回の文面の頭が空になる)
+    func rejectDeviceFilterMatchingNothing(profile: String, resolvedAll: ResolvedProfile, filtered: ResolvedProfile,
+                                           devices: [String], deviceMachine: String?) throws {
+        guard filtered.devices.isEmpty, !devices.isEmpty || deviceMachine != nil else { return }
+        throw ValidationError(
+            "\(Self.deviceScopeDescription(devices: devices, deviceMachine: deviceMachine)) matched no device in run profile \(profile)"
+            + " (available: \(resolvedAll.devices.map(\.name).joined(separator: ", ")))")
     }
 
     /// `--work-queue` は実行プロファイルの経路(ProfileRunner / api run のワーカー構築)でだけ効く。

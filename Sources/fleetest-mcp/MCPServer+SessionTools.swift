@@ -71,7 +71,8 @@ extension MCPServer {
         let includeSystem = args["includeSystem"] as? Bool ?? (appsFilter != nil)
         if let android = appsDriver as? AndroidDriver {
             return text(DeviceInventory.appsText(
-                packages: try android.listPackages(includeSystem: includeSystem),
+                packages: try android.listPackages(includeSystem: includeSystem)
+                    .filter { !BridgeSelfApps.isBridgeItself($0.id) },
                 includeSystem: includeSystem, filter: appsFilter))
         }
         let deviceName = try await appsDriver.status().device
@@ -81,18 +82,8 @@ extension MCPServer {
         // bootedSimulatorUDID は udid の出所がどこであれ必ず throw する。候補 udid を先に
         // 揃えてから実機かどうかを確かめ、実機でなければ初めてシミュレータ側へ素通しする。
         //
-        // 候補は3段(先に見つかったものを使う): ①呼び出し引数の `udid:`(利用者の直接指定。
-        // `udids[key]` は port: だけの呼び出しでは埋まらないことがあるので、まずこちらを見る)/
-        // ②このセッションが既に記憶している udid(`udids[key]`。profile 経由は
-        // BridgeProvisioner が実機の udid をそのまま `udids[key]` に載せるのでここで拾える)/
-        // ③実機専用のポート記録(`.fleetest/bridge-<port>.device`。`port:` だけで実機を指した
-        // ときの唯一の手がかり —— ExploreDriverResolver は SimulatorCatalog しか見ないため、
-        // 実機では udids[key] がここまで来ても nil のまま)
-        let candidateUDID = (args["udid"] as? String).flatMap { $0.isEmpty ? nil : $0 }
-            ?? udids[appsKey].flatMap { $0 }
-            ?? connectedPorts[appsKey].flatMap { port in
-                (try? RepoRoot.find()).flatMap { BridgeDeviceRecord.load(port: port, repoRoot: $0) }
-            }
+        // 候補 udid の3段は iosTargetUDID の doc
+        let candidateUDID = iosTargetUDID(key: appsKey, args: args)
         // **実機は simctl ではなく devicectl**(欠陥⑤): udid の形はどちらも同じなので、
         // simctl へ素通しすると "Invalid device" で失敗する。実機かどうかは
         // IOSPhysicalDeviceCatalog の一覧に居るかで判定する(判定できなければ
@@ -102,11 +93,13 @@ extension MCPServer {
            physicalDevices.contains(where: { $0.udid == candidateUDID || $0.deviceCtlIdentifier == candidateUDID }) {
             let apps = try IOSPhysicalAppCatalog.apps(udid: candidateUDID)
             return text(DeviceInventory.renderAppLines(
-                apps.map { DeviceInventory.AppRow(id: $0.id, name: $0.name, isUser: $0.isUser) },
+                apps.filter { !BridgeSelfApps.isBridgeItself($0.id) }
+                    .map { DeviceInventory.AppRow(id: $0.id, name: $0.name, isUser: $0.isUser) },
                 includeSystem: includeSystem, filter: appsFilter, systemAppsCounted: true))
         }
         let udid = try candidateUDID ?? SimulatorAppCatalog.bootedSimulatorUDID(named: deviceName)
-        return text(DeviceInventory.appsText(apps: try SimulatorAppCatalog.apps(udid: udid),
+        return text(DeviceInventory.appsText(apps: try SimulatorAppCatalog.apps(udid: udid)
+                                                .filter { !BridgeSelfApps.isBridgeItself($0.id) },
                                              includeSystem: includeSystem, filter: appsFilter))
     }
 
@@ -164,9 +157,22 @@ extension MCPServer {
     }
 
     func ftInstall(_ args: [String: Any]) async throws -> [[String: Any]] {
-        let packagePath = try Self.requiredStringArgument(args, "packagePath")
+        let rawPackagePath = try Self.requiredStringArgument(args, "packagePath")
+        // 相対パスはどの OS でも断る(MCP プロセスの cwd から解決される = 宛先に依らない)
+        if let refusal = Self.relativePackagePathRefusal(rawPackagePath) { throw MCPError(refusal) }
+        // **以降は `~` を展開したパスだけを使う**(devicectl / simctl / adb は `~` を展開しない。入れ直し元の控えにも
+        // 展開後を置く = 後の ft_clear_app_data が読める)
+        let packagePath = InstallPackagePath.expanded(rawPackagePath)
         let installKey = Self.sessionKey(args)
-        let installNote = try await driver(args).install(packagePath: packagePath)
+        let installDriver = try await driver(args)
+        // **存在の確認は実機の iOS だけ**(devicectl の失敗は原因が出力の末尾にしか出ない。simctl / adb は先頭で言う)。
+        // Simulator 用ビルドの断りは実機の install が必ず通る BridgeClient.install の1箇所(ここで重ねて読まない)
+        if !(installDriver is AndroidDriver), await isPhysicalIOSDevice(key: installKey, args: args) {
+            guard InstallPackagePath.exists(packagePath) else {
+                throw MCPError("packagePath: package not found at \(packagePath)")
+            }
+        }
+        let installNote = try await installDriver.install(packagePath: packagePath)
         // ft_clear_app_data が実機で uninstall+install に化けるときの再インストール元
         // (installedPackagePaths 参照)
         installedPackagePaths[installKey] = packagePath
@@ -181,9 +187,28 @@ extension MCPServer {
         return text("Installed: \(packagePath)" + (installNote.map { "\n\($0)" } ?? ""))
     }
 
+    /// 相対パスの拒否(どの OS の ft_install も撃つ前に通す)。**スキーマ(packagePath: 絶対パス)に反する** ——
+    /// MCP プロセスの cwd から解決されて別の場所を指す。`~` は展開してから見る。
+    /// 存在の確認は実機の分岐だけ(devicectl へ直送すると原因が十数行の出力の末尾にしか出ない)
+    static func relativePackagePathRefusal(_ raw: String) -> String? {
+        guard !InstallPackagePath.expanded(raw).hasPrefix("/") else { return nil }
+        return "packagePath must be an absolute path (got \(raw)) — a relative path would be resolved against"
+            + " this MCP server's working directory, not yours."
+    }
+
+    /// ブリッジ自身(Android の ftbridge・iOS の XCUITest ランナー)は操作の対象にしない(`BridgeSelfApps`)。
+    /// 起動・データ消去・終了はブリッジを自分で殺す(ホスト側で撃つ前に断る。ブリッジ側は触らない)
+    static func bridgeSelfRefusal(tool: String, bundleID: String) -> String? {
+        guard BridgeSelfApps.isBridgeItself(bundleID) else { return nil }
+        return "\(bundleID) is fleetest's own bridge (the process this server drives the device through), not an app"
+            + " under test — \(tool) on it would stop the bridge itself. Nothing was sent."
+            + " Pass your app's bundle ID / package (ft_list_apps shows the installed apps)."
+    }
+
     func ftLaunch(_ args: [String: Any]) async throws -> [[String: Any]] {
         resetOnceNotes(forScope: noteScope)   // 新しい探索の始まり = 初出の注記を数え直す(resetOnceNotes の doc)
         let bundleID = try Self.requiredStringArgument(args, "bundleId")
+        if let refusal = Self.bridgeSelfRefusal(tool: "ft_launch", bundleID: bundleID) { throw MCPError(refusal) }
         let launchKey = Self.sessionKey(args)
         let launchDriver = try await driver(args)
         let springBoardNote = await recheckXCUITestRunnerBeforeLaunch(args: args)
@@ -201,6 +226,13 @@ extension MCPServer {
         if case .unknown(let reason) = installVerdict {
             Self.logStderr(Self.uncheckedNote(bundleID: bundleID, reason: reason))
         }
+        // resume は「走っているアプリを前面へ戻す」約束。止まっていれば activate は新規起動になる(XCUIApplication.activate は
+        // 未起動なら起動する)ので、**撃つ前に走っていたか**を見て文言と下書きの記録を分ける
+        // **SpringBoard への ft_launch は attach**(何も起動しない)= 起動の記録・「走っていたか」の対象外
+        let attachesToSpringBoard = bundleID == MCPServer.springboardBundleID
+        let wasRunningBeforeResume: Bool? = resumes && !attachesToSpringBoard
+            ? await appWasRunning(bundleID: bundleID, driver: launchDriver, key: launchKey, args: args) : nil
+        let startedFresh = wasRunningBeforeResume == false
         SlowCallWatchdog.mark(resumes ? "activating the app" : "launching the app")
         if resumes {
             try await launchDriver.activate(bundleID: bundleID)
@@ -216,7 +248,7 @@ extension MCPServer {
         // 次の ft_snapshot で一度だけ system alert を確かめる(systemAlertProbePending 参照)。
         // **springboard 自身への attach では立てない** —— そちらはアラートを読みに行く
         // 正規の経路そのものなので、覆いとして扱ってはいけない
-        if bundleID != "com.apple.springboard" {
+        if !attachesToSpringBoard {
             systemAlertProbePending.insert(launchKey)
         }
         // 前面が入れ替わったので、古い木を起点にした覆い探針の記憶は使い回さない(F 節)
@@ -226,16 +258,112 @@ extension MCPServer {
         // ScenarioCodeGen は scene 0 の condition に無条件で launchApp() を出すので、
         // 実際には状態を保ったまま activate しただけの手順が「新規起動」に化けて嘘になる
         recordAction(InteractionLog.Entry(
-            step: nil, unresolved: nil, isLaunch: !resumes, bundleID: bundleID,
+            step: nil, unresolved: nil, isLaunch: !attachesToSpringBoard && (!resumes || startedFresh), bundleID: bundleID,
             platform: launchDriver is AndroidDriver ? "android" : "ios",
-            summary: resumes ? "activate \(bundleID) (resumed, not relaunched)"
-                              : "launch \(bundleID)"), args: args)
+            summary: !resumes ? "launch \(bundleID)"
+                : startedFresh ? "launch \(bundleID) (resume asked, but it was not running)"
+                // 走っていたかを確かめられなかった回は、返答と同じく断定しない
+                : wasRunningBeforeResume == nil && !attachesToSpringBoard
+                    ? "activate \(bundleID) (resume asked; whether it was already running could not be checked)"
+                : "activate \(bundleID) (resumed, not relaunched)"), args: args)
         // snapshotAfter の読みは system alert の予約(上)を消費するので、立てた後に読む。
         // **操作前の木と比べない**(outsideTheAppTree: true): 起動し直しは前と同じ最初の画面に着くのが普通で、resume は背面から
         // 戻した木と前面だった頃の木を比べることになる。どちらも一致して「効かなかったかも」と出て、撃ち直しを誘っていた(実測)
-        return text(springBoardNote + (resumes ? "Activated: \(bundleID) (resumed without relaunching)"
-                             : "Launched: \(bundleID)")
+        // SpringBoard は常に走っていて attach するだけ = 走っていたかを確かめない分の「起動し直したかも」を言わない
+        return text(springBoardNote + (resumes && !attachesToSpringBoard
+                                       ? Self.resumeSummary(bundleID: bundleID, wasRunning: wasRunningBeforeResume)
+                                       : resumes ? "Activated: \(bundleID)" : "Launched: \(bundleID)")
             + waitForWithoutSnapshotAfterNote(args) + (await snapshotAfterBody(args, outsideTheAppTree: true)))
+    }
+
+    /// ft_launch resume: true の応答の1行目。**走っていたかで言い分けを変える**(止まっていたのに「relaunch せず」と言うと、
+    /// 保たれていない状態を保たれたと読ませる)。nil = 確かめられなかった(断定しない)
+    static func resumeSummary(bundleID: String, wasRunning: Bool?) -> String {
+        switch wasRunning {
+        case true?: return "Activated: \(bundleID) (resumed without relaunching)"
+        case false?:
+            return "Started: \(bundleID) was NOT running, so resume could not keep any state — activating it started it"
+                + " fresh (a cold launch, same as ft_launch without resume)"
+        case nil:
+            return "Activated: \(bundleID) (could not check whether it was already running — if it was not, this"
+                + " started it fresh and no earlier state was kept)"
+        }
+    }
+
+    /// このデバイスの記録に、そのアプリの launch / 手があるか。**別の台で操作したアプリを「このセッションで操作した」と
+    /// 言わない**(記録は台ごとに絞る = InteractionLog.scope)
+    func appWasDrivenOnThisDevice(_ bundleID: String, args: [String: Any]) -> Bool {
+        interactions.scope(all: true, device: draftDeviceKey(args)).contains { $0.bundleID == bundleID }
+    }
+
+    /// ft_terminate が XCUITest ランナーの 409(セッションが無い)を受けたときの文。**このセッションで起動したかで言い分ける** ——
+    /// 起動していたのに「起動していない」と言うと、止めたいアプリを起動し直させる
+    static func terminateNoSessionRefusal(bundleID: String, launchedHere: Bool) -> String {
+        launchedHere
+            ? "nothing to terminate: the XCUITest runner lost its session on \(bundleID), which was launched in this"
+                + " session — the app may have crashed or been stopped already, or may still be running (the runner can lose"
+                + " its session without the app stopping, and on a physical device this cannot be checked)."
+                + " This session no longer tracks it, so ft_snapshot will not bring it back: ft_launch it if you need it again."
+            : "nothing to terminate: the XCUITest runner has no session on \(bundleID) — it was not launched through"
+                + " ft_launch in this session (or was already terminated). ft_launch it first if it is running and you need"
+                + " to stop it."
+    }
+
+    /// この呼び出しの iOS の宛先 udid。候補は3段(先に見つかったもの): ①引数の `udid:` ②セッションの記憶(`udids[key]`。
+    /// port: だけの呼び出しでは埋まらないことがある)③実機専用のポート記録(`.fleetest/bridge-<port>.device`。port: だけで
+    /// 実機を指したときの唯一の手掛かり)。ft_list_apps・ft_install・resume の判定が共有する(別々に持つと port: だけの実機を片方だけ見落とす)
+    func iosTargetUDID(key: String, args: [String: Any]) -> String? {
+        (args["udid"] as? String).flatMap { $0.isEmpty ? nil : $0 }
+            ?? udids[key].flatMap { $0 }
+            ?? connectedPorts[key].flatMap { port in
+                (try? RepoRoot.find()).flatMap { BridgeDeviceRecord.load(port: port, repoRoot: $0) }
+            }
+    }
+
+    /// udid → 実機か(答えが出た回だけ控える。udid の実機/Simulator はプロセスの生存中に変わらない)
+    private static let physicalIOSUDIDMemo = LockedValue<[String: Bool]>([:])
+    /// 実機の udid → インストール済みアプリの控え(resume の「走っていたか」用。`IOSPhysicalRunningApps.running` の doc =
+    /// 一覧は滅多に変わらないので呼び手が控えを渡す)。入れ直しで実行ファイルのパスが変わりうるので、控えで「居ない」と
+    /// 出た回だけ取り直して確かめる(`appWasRunning`)
+    private static let physicalAppsMemo = LockedValue<[String: [IOSPhysicalAppCatalog.App]]>([:])
+
+    /// この呼び出しの宛先が実機の iOS か。判らなければ false(断定しない側)。
+    /// 実機の記録(`BridgeDeviceRecord`。実機の経路でだけ書かれる)があれば外部コマンドを撃たない。無ければ
+    /// `SimulatorCatalog.isPhysical`(simctl の一覧を先に見る = Simulator なら devicectl を撃たない。どちらも同期の外部コマンド
+    /// → 協調プールの外)に訊き、答えが出たら udid ごとに控える(判らない = nil は控えない)
+    func isPhysicalIOSDevice(key: String, args: [String: Any]) async -> Bool {
+        guard let udid = iosTargetUDID(key: key, args: args) else { return false }
+        if let repoRoot = try? RepoRoot.find(), BridgeDeviceRecord.isRecorded(udid: udid, repoRoot: repoRoot) { return true }
+        if let known = Self.physicalIOSUDIDMemo.withLock({ $0[udid] }) { return known }
+        guard let found = await Self.runOffCooperativePool(name: "fleetest-mcp-is-physical",
+                                                           { SimulatorCatalog.isPhysical(udid: udid) })
+        else { return false }
+        Self.physicalIOSUDIDMemo.withLock { $0[udid] = found }
+        return found
+    }
+
+    /// resume の直前に、対象アプリのプロセスが居るか。**読めなければ nil**(居ないとは言わない)。
+    /// Android = pidof / Simulator = launchctl list / 実機 = devicectl の processes(どれも同期の外部コマンド = 協調プールの外で撃つ)
+    func appWasRunning(bundleID: String, driver: AppDriver, key: String, args: [String: Any]) async -> Bool? {
+        if let android = driver as? AndroidDriver {
+            // **撃つ相手のドライバの serial を先に使う**(引数・控えが空だと -s なしの adb になり、複数台で別の台に訊くか失敗する)
+            let serial = android.serial ?? (args["serial"] as? String) ?? connectedAndroidSerials[key]
+            return await Self.runOffCooperativePool(name: "fleetest-mcp-was-running") { AndroidAppProcessEvidenceQuery.query(package: bundleID, serial: serial)?.running }
+        }
+        guard let udid = iosTargetUDID(key: key, args: args) else { return nil }
+        let isPhysical = await isPhysicalIOSDevice(key: key, args: args)
+        guard isPhysical else {
+            return await Self.runOffCooperativePool(name: "fleetest-mcp-was-running") { SimulatorAppProcess.isRunning(udid: udid, bundleID: bundleID) }
+        }
+        return await Self.runOffCooperativePool(name: "fleetest-mcp-was-running") { () -> Bool? in
+            func check(_ apps: [IOSPhysicalAppCatalog.App]) -> Bool? {
+                (try? IOSPhysicalRunningApps.running(udid: udid, apps: apps)).map { $0.contains(bundleID) }
+            }
+            if let cached = Self.physicalAppsMemo.withLock({ $0[udid] }), check(cached) == true { return true }
+            guard let apps = try? IOSPhysicalAppCatalog.apps(udid: udid) else { return nil }
+            Self.physicalAppsMemo.withLock { $0[udid] = apps }
+            return check(apps)
+        }
     }
 
     func ftOpenUrl(_ args: [String: Any]) async throws -> [[String: Any]] {
@@ -316,6 +444,7 @@ extension MCPServer {
     func ftClearAppData(_ args: [String: Any]) async throws -> [[String: Any]] {
         resetOnceNotes(forScope: noteScope)
         let bundleID = try Self.requiredStringArgument(args, "bundleId")
+        if let refusal = Self.bridgeSelfRefusal(tool: "ft_clear_app_data", bundleID: bundleID) { throw MCPError(refusal) }
         let clearAppDataDriver = try await driver(args)
         let springBoardNote = await recheckXCUITestRunnerBeforeLaunch(args: args)
         let clearAppDataKey = Self.sessionKey(args)
@@ -328,16 +457,20 @@ extension MCPServer {
             // **先に消す前に入れ直せることを確かめる**(reinstallSource) —— 記憶したパスは
             // 再ビルドや DerivedData の掃除で消えており、確かめずに uninstall すると
             // 端末からアプリだけ消えて戻せなくなる
+            // packagePath は ft_install と同じく `~` を展開し、相対パスは断る(撃つ前・消す前)
+            let rawExplicit = args["packagePath"] as? String
+            if let rawExplicit, let refusal = Self.relativePackagePathRefusal(rawExplicit) { throw MCPError(refusal) }
             let path: String
-            switch Self.reinstallSource(explicit: args["packagePath"] as? String,
+            switch Self.reinstallSource(explicit: rawExplicit.map(InstallPackagePath.expanded),
                                         remembered: installedPackagePaths[clearAppDataKey],
                                         exists: { FileManager.default.fileExists(atPath: $0) }) {
             case .success(let resolved): path = resolved
             case .failure(let error): throw error
             }
+            // **消す前に**: 判定は DSL の clearAppData と同じ FTCore.ReinstallPackageCheck(文言だけここで持つ)
             if let refusal = Self.reinstallPackageRefusal(
                 bundleID: bundleID, path: path, explicit: args["packagePath"] is String,
-                packageBundleID: AppPackageReader.open(path: path)?.infoPlist?["CFBundleIdentifier"] as? String) {
+                verdict: await ReinstallPackageCheck.inspectOffPool(path: path, expectedBundleID: bundleID)) {
                 throw MCPError(refusal)
             }
             try await clearAppDataDriver.uninstall(bundleID: bundleID)
@@ -380,6 +513,9 @@ extension MCPServer {
         // しか言わない(Android は currentPackage が無ければ何も撃たない)
         let terminateKey = Self.sessionKey(args)
         let explicitBundleID = try Self.stringArgument(args, "bundleId", emptyHint: Self.attachedAppEmptyHint)
+        if let explicitBundleID, let refusal = Self.bridgeSelfRefusal(tool: "ft_terminate", bundleID: explicitBundleID) {
+            throw MCPError(refusal)
+        }
         guard let terminateBundleID = explicitBundleID ?? launchedBundleIDs[terminateKey]
         else {
             throw MCPError("no known target to terminate — nothing was launched in this"
@@ -392,13 +528,33 @@ extension MCPServer {
         }
         let terminateUnverified = explicitBundleID != nil && launchedBundleIDs[terminateKey] == nil
         let terminateDriver = try await driver(args)
-        try await terminateDriver.terminate()
         // **シミュレータでは止まったことを simctl で確かめる**(ランナーの terminate はランナーのセッションが起動したアプリに
         // しか効かない = 止まっていないのに「Terminated」と言いうる。clearAppDataOnSimulator と同じ理由・同じ判定)
         // 宛先はセッションが特定した udid がシミュレータのときだけ(ドライバは包まれうるので型で見ない。実機は対象外)
-        if !(terminateDriver is AndroidDriver), let udid = udids[terminateKey] ?? nil,
-           ((try? SimulatorCatalog.devices()) ?? []).contains(where: { $0.udid == udid && !$0.physical }) {
-            try BridgeClient.stopOnSimulator(bundleID: terminateBundleID, target: udid, purpose: "on the simulator")
+        let isSimulator = isSimulatorUDID
+        let candidateUDID = terminateDriver is AndroidDriver ? nil : udids[terminateKey] ?? nil
+        let simulatorUDID: String? = await Self.runOffCooperativePool(name: "fleetest-mcp-terminate") {
+            candidateUDID.flatMap { isSimulator($0) ? $0 : nil }
+        }
+        var runnerHadNoSession = false
+        do {
+            try await terminateDriver.terminate()
+        } catch DriverError.badResponse(409, _) where !(terminateDriver is AndroidDriver) {
+            // XCUITest ランナーの 409 は「セッションが無い」(SessionRecoveryDriver の不変条件)。**アプリは生きていうる**
+            // (ランナーだけ起動し直した等)ので、シミュレータは下の simctl で止めて確かめる。確かめられない実機は断る。
+            // ランナー内部向けの文言(「ホストが /session で張り直す」)は MCP の読み手が取れる手段ではない。
+            // 起動の記録も消す(ドライバの控えは SessionRecoveryDriver.terminate が消す = 食い違わせない)
+            guard simulatorUDID != nil else {
+                let launchedHere = launchedBundleIDs[terminateKey] != nil
+                launchedBundleIDs[terminateKey] = nil
+                launchTimestamps[terminateKey] = nil
+                throw MCPError(Self.terminateNoSessionRefusal(bundleID: terminateBundleID, launchedHere: launchedHere))
+            }
+            runnerHadNoSession = true
+        }
+        if let simulatorUDID {
+            let stop = stopAppOnSimulator
+            try await BlockingWork.offPool(name: "fleetest-mcp-terminate") { try stop(terminateBundleID, simulatorUDID) }
         }
         // 意図して落としたので、以後の別アプリの木は「すり替わり」ではない
         launchedBundleIDs[terminateKey] = nil
@@ -410,11 +566,24 @@ extension MCPServer {
         // 下書きへ `terminateApp()` を残す(DSL の terminateApp は対象を取らない = セッションのアプリ)
         recordAction(InteractionLog.Entry(step: FlowStep(action: "terminate"), unresolved: nil,
                                           summary: "terminate \(terminateBundleID)"), args: args)
-        return text(terminateUnverified
+        // **Android は止めた後、前面に残った別のアプリへ session が移る**(兄弟アプリが見た目も #id も同じことがある)。
+        // launchedBundleIDs を落とした以上 switchedAppNote は黙るので、ここで前面を言う。
+        // 言うのは**このセッションで操作したアプリ**が前面に来たときだけ(ランチャーが前面なのは止めた後の普通の姿)
+        var terminateFrontNote = ""
+        if terminateDriver is AndroidDriver, !terminateUnverified,
+           let front = (try? await terminateDriver.foregroundAppID()) ?? nil, !front.isEmpty,
+           front != terminateBundleID, appWasDrivenOnThisDevice(front, args: args) {
+            terminateFrontNote = "\nnote: \(front) is in front now — the session follows it, so the next ft_snapshot shows"
+                + " \(front)'s tree, not \(terminateBundleID)'s (ft_launch your app to go back)."
+        }
+        // 409 を simctl で止めた回は、セッションで起動していなくても止まったことを確かめている = 未確認の文面にしない
+        return text(terminateUnverified && !runnerHadNoSession
             ? "Terminate sent for \(terminateBundleID) (nothing was launched in this session, so the"
                 + " driver stopped whichever app it is attached to — on Android nothing is stopped"
                 + " without a prior ft_launch; nothing about the result is checked)"
-            : "Terminated \(terminateBundleID)")
+            : "Terminated \(terminateBundleID)"
+                + (runnerHadNoSession ? " (the XCUITest runner had no session for it, so it was stopped on the simulator directly)" : "")
+                + terminateFrontNote)
     }
 
     func ftDoctor(_ args: [String: Any]) async throws -> [[String: Any]] {

@@ -65,9 +65,9 @@ public enum ResultsRendering {
 
     public static func summary(_ rows: [RunResultsQuery.ScenarioSummaryRow]) -> String {
         guard !rows.isEmpty else { return "No matching scenarios" }
-        let headers = ["scenario", "runs", "pass rate", "avg ms", "median ms", "last run", "last result"]
+        let headers = ["scenario", "platform", "runs", "pass rate", "avg ms", "median ms", "last run", "last result"]
         let tableRows = rows.map { row -> [String] in
-            [row.scenarioID, String(row.runs), String(format: "%.1f%%", row.successRate),
+            [row.scenarioID, row.platform, String(row.runs), String(format: "%.1f%%", row.successRate),
              row.avgDurationMs.map { String(format: "%.0f", $0) } ?? "-",
              row.medianDurationMs.map { String(format: "%.0f", $0) } ?? "-",
              row.lastRunAt.map(formatLocal) ?? "-",
@@ -82,9 +82,9 @@ public enum ResultsRendering {
         guard !rows.isEmpty else {
             return "No flaky scenarios (candidates need \(minRunsOption) \(minRuns)+ and mixed pass/fail)"
         }
-        let headers = ["scenario", "runs", "fail rate", "flip score", "recent results (new→old)"]
+        let headers = ["scenario", "platform", "runs", "fail rate", "flip score", "recent results (new→old)"]
         let tableRows = rows.map { row -> [String] in
-            [row.scenarioID, String(row.runs), String(format: "%.1f%%", row.failureRate),
+            [row.scenarioID, row.platform, String(row.runs), String(format: "%.1f%%", row.failureRate),
              String(format: "%.2f", row.flakinessScore),
              row.recentResults.map { $0 ? "✅" : "❌" }.joined()]
         }
@@ -93,11 +93,15 @@ public enum ResultsRendering {
 
     public static func trend(_ rows: [ScenarioRunRecord], scenario: String) -> String {
         guard !rows.isEmpty else { return "No run history for: \(scenario)" }
-        // バーはスキップ合成レコードを除いた最大 durationMs を 20 文字とした相対値
-        let maxDuration = rows.filter { !RunResultsQuery.isSkippedSynthetic($0) }
-            .map(\.durationMs).max() ?? 0
-        let headers = ["startedAt", "runID", "passed", "durationMs", "worker", "machine", "bar"]
+        // バーはスキップ合成レコードを除いた最大 durationMs を 20 文字とした相対値。
+        // **platform ごとに最大を取る**(両 OS で回すシナリオの別 OS の所要を同じ尺度に混ぜない)
+        var maxDurationByPlatform: [String: Int] = [:]
+        for record in rows where !RunResultsQuery.isSkippedSynthetic(record) {
+            maxDurationByPlatform[record.platform] = max(maxDurationByPlatform[record.platform] ?? 0, record.durationMs)
+        }
+        let headers = ["startedAt", "runID", "platform", "passed", "durationMs", "worker", "machine", "bar"]
         let tableRows = rows.map { record -> [String] in
+            let maxDuration = maxDurationByPlatform[record.platform] ?? 0
             let bar: String
             if RunResultsQuery.isSkippedSynthetic(record) || maxDuration == 0 {
                 bar = ""
@@ -105,7 +109,7 @@ public enum ResultsRendering {
                 let length = max(1, Int((Double(record.durationMs) / Double(maxDuration)) * 20))
                 bar = String(repeating: "█", count: length)
             }
-            return [formatLocal(record.startedAt), record.runID, record.passed ? "✅" : "❌",
+            return [formatLocal(record.startedAt), record.runID, record.platform, record.passed ? "✅" : "❌",
                     String(record.durationMs), record.worker ?? "-", record.host, bar]
         }
         return SimpleTable.render(headers: headers, rows: tableRows)
@@ -114,9 +118,9 @@ public enum ResultsRendering {
     public static func devices(_ report: RunResultsQuery.DevicesReport) -> String {
         guard !report.byWorker.isEmpty else { return "No matching runs" }
         let perWorker = SimpleTable.render(
-            headers: ["worker", "runs", "pass rate", "avg ms"],
+            headers: ["worker", "machine", "runs", "pass rate", "avg ms"],
             rows: report.byWorker.map { row in
-                [row.worker, String(row.runs), String(format: "%.1f%%", row.successRate),
+                [row.worker, row.host, String(row.runs), String(format: "%.1f%%", row.successRate),
                  row.avgDurationMs.map { String(format: "%.0f", $0) } ?? "-"]
             })
         let perPlatform = SimpleTable.render(

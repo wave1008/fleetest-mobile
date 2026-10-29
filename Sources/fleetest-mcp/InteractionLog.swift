@@ -31,6 +31,9 @@ struct InteractionLog {
         /// 刈り込みの一覧に出す1行。**記録時に作る** —— 生成時に組み直すと、番号付きで見せた
         /// 説明と実際に落ちる手がズレる(選んで捨てる機能では致命的)
         var summary: String = ""
+        /// 手を撃った宛先(`MCPServer.sessionKey`)。**下書きは1台分だけ** —— 1つのプロセスで
+        /// 2台を操作すると、別デバイスの手が1本のシナリオへ混ざる。nil は宛先を持たない記録(宣言など)で、どの台の下書きにも入る
+        var deviceKey: String?
     }
 
     private(set) var entries: [Entry] = []
@@ -54,10 +57,25 @@ struct InteractionLog {
         droppedFromFront = 0
     }
 
-    /// 既定の範囲 = **直近の ft_launch 以降**(F-3)。launch が無ければ全体
-    var sinceLastLaunch: [Entry] {
-        guard let index = entries.lastIndex(where: \.isLaunch) else { return entries }
-        return Array(entries[index...])
+    /// 下書きの材料を**1台分**に絞る(既定の範囲 = その台の直近の ft_launch 以降。launch が無ければその台の全体)。
+    /// 台は最後に記録した手の宛先(いま操作している台)。**台で絞らない範囲の口を置かない**(別の台の手が混ざる)。
+    /// 絞ってから「直近の launch 以降」を取る(他の台の launch が範囲の起点にならない)
+    func scope(all: Bool, device: String?) -> [Entry] {
+        let ofDevice = entries.filter { $0.deviceKey == nil || $0.deviceKey == device }
+        guard !all, let index = ofDevice.lastIndex(where: \.isLaunch) else { return ofDevice }
+        return Array(ofDevice[index...])
+    }
+
+    /// 最後に宛先付きで記録した手の台
+    var latestDevice: String? { entries.last { $0.deviceKey != nil }?.deviceKey }
+
+    /// 絞られて下書きに入らなかった別の台の手の数と、その台の一覧
+    /// **範囲に入りえた手だけを数える** = `scope` と同じ起点(その台の直近の launch。`all` なら全体)より後の手
+    func otherDevices(than device: String?, all: Bool) -> (count: Int, keys: [String]) {
+        let start = all ? 0
+            : (entries.lastIndex { $0.isLaunch && ($0.deviceKey == nil || $0.deviceKey == device) } ?? 0)
+        let others = entries[start...].compactMap(\.deviceKey).filter { $0 != device }
+        return (others.count, Array(Set(others)).sorted())
     }
 
     /// 刈り込み(F-8)。`lastN` で末尾だけに絞り、`drop` で 1 オリジンの番号を落とす。
@@ -78,11 +96,20 @@ struct InteractionLog {
         return (kept, valid.count, ignored)
     }
 
-    /// 生成対象のアプリ/プラットフォーム。範囲内の launch から採り、無ければ全体の最後から
-    func target(in scope: [Entry]) -> (app: String, platform: String?) {
-        let fromScope = scope.last { $0.bundleID != nil }
-        let fallback = entries.last { $0.bundleID != nil }
+    /// 生成対象のアプリ/プラットフォーム。範囲内の**最初の** launch から採り、無ければ全体の最後から
+    /// (condition の launchApp() が起こすのはこのアプリ = 範囲の先頭の手が動いていたアプリでなければならない。
+    /// all: true で複数アプリにまたがるとき、後の launch を採ると先頭の手が別アプリの上に並ぶ)。
+    /// **全体の最後も `device` の台に絞る**(絞らないと、その台で launch していない下書きが別の台のアプリ・OS で作られる)
+    /// **本当の launch(`isLaunch`)を resume(activate・bundleID だけ持つ)より先に採る** —— resume が先にあると、condition の
+    /// launchApp() が resume しただけのアプリを起こし、本当の launch に「起動し直した」の TODO が付く(unrenderedStepNote の範囲の最初の launch と揃える)
+    func target(in scope: [Entry], device: String?) -> (app: String, platform: String?) {
+        // SpringBoard への ft_launch は attach(アラートを読みに行く)= 対象アプリにも起動の起点にもしない
+        let candidates = scope.filter { $0.bundleID != nil && $0.bundleID != MCPServer.springboardBundleID }
+        let fromScope = candidates.first { $0.isLaunch } ?? candidates.first
+        let ofDevice = entries.filter { $0.bundleID != nil && $0.bundleID != MCPServer.springboardBundleID
+            && ($0.deviceKey == nil || $0.deviceKey == device) }
+        let fallback = ofDevice.last { $0.isLaunch } ?? ofDevice.last
         let chosen = fromScope ?? fallback
-        return (chosen?.bundleID ?? "", chosen?.platform)
+        return (chosen?.bundleID ?? "", chosen?.platform ?? scope.first { $0.platform != nil }?.platform)
     }
 }

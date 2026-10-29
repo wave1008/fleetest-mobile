@@ -341,12 +341,59 @@ struct ScenarioTimingTracker {
 /// `api run` が台数を決めるための本数の読み方(判断はここだけ。ApiRunExactScenarioCountTests)。
 /// この経路はシナリオ一覧をビルドと並行に解決するので、台数を決める時点では一覧が無い ——
 /// 確定しているのは `--scenario` の指定文字列だけ。**明示 ID(`Class.method`)は1つにつき高々1本**
-/// なので合計を上限に使える。クラス名指定や全件は本数が分からないので **0 = 絞らない**
+/// なので**重複を除いた数**を上限に使える(同じ ID の重複は `ScenarioSelection` が1回に畳む = 数えると余計に起こす)。
+/// クラス名指定や全件は本数が分からないので **0 = 絞らない**
 /// (そこは並列度が要る場面で、絞ると遅くなる)
 enum ApiRun {
     static func exactScenarioCount(_ selectors: [String]) -> Int {
         guard !selectors.isEmpty, selectors.allSatisfy({ $0.contains(".") }) else { return 0 }
-        return selectors.count
+        return Set(selectors).count
+    }
+
+    /// dry-run のレポートを捨てる一時フォルダ(呼び手が処理の終わりに消す)。ランナーは dry-run でもレポートを書く。
+    /// **レポート先を明示した dry-run(`--report-dir` / `--set reportDir=`)は nil = そこへ書く**(黙って効かない形にしない)。
+    /// 明示が無ければ reports/ に残すと results の集計と紛れるので一時フォルダへ。
+    /// **`fleetest run --dry-run` と `api run --dry-run` の両方がここを使う**(組み立てを写さない)。
+    /// 消えるパスなので、利用者へ渡す口(report 行・NDJSON の `reportPath`)には載せない(`withoutDiscardedReportPath`)
+    /// `profileReportDir` = 実行プロファイルに書かれたレポート先(`declaredProfileReportDir`)。書かれていればそこへ書く(明示と同じ)
+    static func dryRunDiscardDir(dryRun: Bool, reportDirFlag: String?, setOverrides: [String],
+                                 profileReportDir: URL?) -> URL? {
+        guard dryRun, reportDirFlag == nil, setReportDir(setOverrides) == nil, profileReportDir == nil else { return nil }
+        return FileManager.default.temporaryDirectory
+            .appendingPathComponent("fleetest-dryrun-\(UUID().uuidString)", isDirectory: true)
+    }
+
+    /// 実行プロファイルが既定(プロジェクトの reports/)と違うレポート先を持つならそれ(= JSON の `reportDir` で書いた。nil = 書いていない)。
+    /// ResolvedProfile は未指定でも既定のパスを持つので、既定と比べて「書いた」を見分ける
+    static func declaredProfileReportDir(_ resolved: ResolvedProfile, project: TestProject) -> URL? {
+        resolved.reportDir.standardizedFileURL == project.reportsDir.standardizedFileURL ? nil : resolved.reportDir
+    }
+
+    /// 明示されたレポート先を**本物の run と同じ規則で**解いたパス(両方の同時指定は入口が既に断る)。
+    /// `--report-dir` = 作業ディレクトリ基準 / `--set reportDir=` = プロファイルありならプロジェクトの root 基準
+    /// (`ProfileResolver.reportDirectory`)・プロファイルなしなら素の値(作業ディレクトリ基準。`noProfileSettings.reportDir` と同じ)。
+    /// 規則を別にすると、同じ指定で dry-run と本物の run が別の場所へ書く
+    static func explicitReportDir(flag: String?, setOverrides: [String], project: TestProject, withProfile: Bool) -> String? {
+        if let flag { return URL(fileURLWithPath: flag).path }
+        return setReportDir(setOverrides).map {
+            withProfile ? ProfileResolver.reportDirectory($0, project: project).path : URL(fileURLWithPath: $0).path
+        }
+    }
+
+    /// `--set reportDir=` の値。**`--set` の解析は `RunProfileSetOverride.parse` の1つだけ**(2つ目の解析器を作らない)。
+    /// 解析できない `--set` は入口が既に断っている
+    static func setReportDir(_ setOverrides: [String]) -> String? {
+        guard case .string(let value)? = (try? RunProfileSetOverride.parse(setOverrides))?["reportDir"] else { return nil }
+        return value
+    }
+
+    /// 一時フォルダへ捨てた dry-run の `scenarioFinished` から、処理の終わりに消えるパスを落とす
+    /// (残すと拡張のモニターが消えたファイルを開こうとする)。明示した置き場へ書いた回は残す
+    static func withoutDiscardedReportPath(_ event: ScenarioEvent, discarded: Bool) -> ScenarioEvent {
+        guard discarded, event.reportPath != nil else { return event }
+        var out = event
+        out.reportPath = nil
+        return out
     }
 
     /// dry-run は FM を丸ごと切る(`fleetest run --dry-run` / `ft_dry_run` と同じ)。

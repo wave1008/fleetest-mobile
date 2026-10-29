@@ -662,10 +662,15 @@ extension StepExecutor {
         if !isAndroid { return try await executeIOSHideKeyboard(step: step, phase: &phase) }
         let clock = ContinuousClock()
         let start = clock.now
-        try await driver.hideKeyboard()
+        // Android はドライバが出ているかを確かめてから送る = 送らなかった事実を印で返す(MCP が「送らなかった」と言う)
+        hideKeyboardFoundNoKeyboard = !(try await driver.hideKeyboardIfShown())
         phase.actionMs += Self.ms(clock.now - start)
-        // 木からキーボードが消えるのを待つのは次のロケータ操作の解決(pendingHideKeyboardWait の doc)
-        if isAndroid, !step.skipsSettle { pendingHideKeyboardWait = step.timeout ?? tunables.defaultTimeout }
+        // 木からキーボードが消えるのを待つのは次のロケータ操作の解決(pendingHideKeyboardWait の doc)。
+        // **何も送らなかった回も立てる** —— dumpsys が「出ていない」と答えても木はキーボードを数秒残す(doc の実測の形そのもの)。
+        // 木にキーボードが無ければ費用はゼロ
+        if isAndroid, !step.skipsSettle {
+            pendingHideKeyboardWait = step.timeout ?? tunables.defaultTimeout
+        }
         return StepOutcome(status: .passed)
     }
 
@@ -676,11 +681,14 @@ extension StepExecutor {
     /// 答えないブリッジは木だけで決め、木に載る最も上の要素より上は叩かない)。見つからなければ待って撮り直す(トーストが消えれば空きが出る)。
     /// 上限 = 検証の既定の待ち。叩いても閉じない・叩ける点が無いときは **Enter を送る**(ユーザー決定。欄の確定操作が走るので
     /// 注記に出す)。それでも閉じなければ失敗。**黙って成功にしない**: 叩いた点と、キーボード以外で画面が変わったかを注記に出す。
-    /// キーボードが出ていなければ何もしない(Android と同じく冪等)
+    /// キーボードが出ていなければ何もしない(Android と同じく冪等。`hideKeyboardFoundNoKeyboard` を立てるだけ)
     func executeIOSHideKeyboard(step: FlowStep, phase: inout PhaseAccumulator) async throws -> StepOutcome {
         let tried: String
+        // 印はステップの入口(StepExecutor.executeStep)が戻し済み
         switch try await closeKeyboardByTappingOutside(step: step, phase: &phase) {
-        case .notShown: return StepOutcome(status: .passed)
+        case .notShown:
+            hideKeyboardFoundNoKeyboard = true
+            return StepOutcome(status: .passed)
         case .closed(let note, _): return StepOutcome(status: .passed, driverFallback: note)
         case .notClosed(let what): tried = what
         }

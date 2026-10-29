@@ -17,6 +17,12 @@ final class ApiRunExactScenarioCountTests: XCTestCase {
     }
 
     /// クラス名が1つでも混ざれば「分からない」= 絞らない(0)
+    /// 同じ ID の重複は1回に畳まれる(ScenarioSelection)ので台数に数えない(数えると回らないデバイスまで起こす)
+    func testDuplicateIDsAreCountedOnce() {
+        XCTAssertEqual(ApiRun.exactScenarioCount(["A.m", "A.m", "A.m"]), 1)
+        XCTAssertEqual(ApiRun.exactScenarioCount(["A.m", "B.n", "A.m"]), 2)
+    }
+
     func testClassNameSelectorDisablesTheCap() {
         XCTAssertEqual(ApiRun.exactScenarioCount(["A"]), 0)
         XCTAssertEqual(ApiRun.exactScenarioCount(["A.S0010", "B"]), 0)

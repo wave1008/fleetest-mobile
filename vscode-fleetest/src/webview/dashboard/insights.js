@@ -8,6 +8,7 @@ import { t } from '../i18n.js';
 import { syncChildren } from '../monitor/rowSync.js';
 import { requestTrend } from './trend.js';
 import { hasWorkerRow, revealWorkerRow } from './deviceHealth.js';
+import { machineLabel } from './machineNames.js';
 
 const SEVERITY_ICON = { critical: '🔴', warn: '🟡', info: '🔵' };
 const SEVERITY_ORDER = ['critical', 'warn', 'info'];
@@ -29,7 +30,10 @@ function insightLine(insight) {
   const li = document.createElement('li');
   li.className = 'insight-item';
   // リスナー(requestTrend / revealWorkerRow)が捕まえるデータ + リンクの有無(hasWorkerRow)
-  li.dataset.sig = JSON.stringify([insight, Boolean(insight.worker && hasWorkerRow(insight.worker))]);
+  // host が付く行(deviceBias)は同名のデバイスが別の機械にも居うるので、その機械の行へ飛ぶ
+  const machine = insight.host ? machineLabel(insight.host) : undefined;
+  const hasRow = Boolean(insight.worker && hasWorkerRow(insight.worker, machine));
+  li.dataset.sig = JSON.stringify([insight, hasRow]);
   const icon = document.createElement('span');
   icon.className = 'insight-icon';
   icon.textContent = SEVERITY_ICON[insight.severity] || SEVERITY_ICON.info;
@@ -41,12 +45,15 @@ function insightLine(insight) {
   }
   li.append(icon, message);
   // deviceBias は scenarioID と worker の両方を持つので、デバイスへのリンクは本文と別に添える
-  if (insight.worker && hasWorkerRow(insight.worker)) {
+  if (hasRow) {
     const workerLink = document.createElement('span');
     workerLink.className = 'scenario-id-clickable insight-worker-link';
     workerLink.dataset.worker = insight.worker;
-    workerLink.textContent = t('wvDashboard.insights.showDevice', { worker: insight.worker });
-    workerLink.addEventListener('click', () => revealWorkerRow(insight.worker));
+    // 本文(CLI と同じ文言)は記録の生の host を言うので、リンクには登録名(machineLabel)を添えて対応を読めるようにする
+    workerLink.textContent = machine === undefined
+      ? t('wvDashboard.insights.showDevice', { worker: insight.worker })
+      : t('wvDashboard.insights.showDeviceOnMachine', { worker: insight.worker, machine });
+    workerLink.addEventListener('click', () => revealWorkerRow(insight.worker, machine));
     li.appendChild(workerLink);
   }
   return li;

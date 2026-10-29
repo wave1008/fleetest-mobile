@@ -29,17 +29,17 @@ suffix, so results from different machines/branches merge without conflicts.
 | Command | Description |
 |---|---|
 | `fleetest results list [--since <period>] [--limit <n>]` | List runs, newest first |
-| `fleetest results summary [--scenario <id>]` | Aggregate run count, pass rate and duration per scenario (lowest pass rate first). Scenarios that never started because you interrupted the run are left out of the pass rate |
-| `fleetest results flaky [--min-runs <n>]` | Scenarios that both pass and fail, most flaky first |
-| `fleetest results trend --scenario <id>` | One scenario's run history in chronological order |
-| `fleetest results devices` | Run count and pass rate per worker (device) and per platform |
-| `fleetest results slow [--limit <n>]` | Scenarios by average duration, slowest first |
+| `fleetest results summary [--scenario <id>]` | Aggregate run count, pass rate and duration per scenario (lowest pass rate first). Scenarios that never started because you interrupted the run are left out of the pass rate. `--scenario` takes a scenario ID or a class name (all of its scenarios). Like `flaky`, rows are per (scenario, platform) |
+| `fleetest results flaky [--min-runs <n>]` | Scenarios that both pass and fail, most flaky first (one row per scenario and platform) |
+| `fleetest results trend --scenario <id>` | One scenario's run history in chronological order (`--scenario` is a full scenario ID such as `Class.method`; bars are scaled per platform) |
+| `fleetest results devices` | Run count and pass rate per worker (device, per machine — the same device name on two machines is two rows) and per platform |
+| `fleetest results slow [--limit <n>]` | Scenarios by average duration, slowest first (over the whole `--since` window) |
 | `fleetest results response` | Per step of response-measurement runs (`responseMeasurement=true`): time to first frame (n, median, p90, busy count), time until the next action is possible (n, median, p90), and the change in time to first frame from the previous measurement run on the same host and device. Steps are keyed by scene, section, command, description and occurrence within the scenario; runs on a different host or device are never compared. See [Response measurement](./response_measurement.md) |
 | `fleetest results insights` | Ten checks over the run history — see [What `insights` detects](#what-insights-detects) |
 | `fleetest results log <runID> [--scenario <id>]` | A run's per-scenario execution log — see [Reading a scenario's execution log](#reading-a-scenarios-execution-log) |
 
 All of them accept `--project`, and (except `log`) `--since <period>` (a relative value like
-`30d`/`12h`, or `YYYY-MM-DD`; default `90d`) and `--json` for single-line JSON output. Run
+`30d`/`12h`, or `YYYY-MM-DD` — midnight **UTC** of that date, while the tables show local time; default `90d`) and `--json` for single-line JSON output. Run
 `fleetest results <subcommand> --help` for the exact flags.
 
 ## Reading a scenario's execution log
@@ -88,7 +88,7 @@ Every row that names a scenario (all of the above except `unfinishedRuns`/`retir
 scoped to one **(scenario, platform)** pair, not just the scenario ID. A project that runs the
 same scenario ID on both `ios` and `android` (for example a Compose Multiplatform suite) gets a
 separate row per platform — mixing the two would blend unrelated pass/fail and duration histories
-into one misleading trend. `fleetest results slow` scopes its rows the same way.
+into one misleading trend. `fleetest results slow` scopes its rows the same way. Devices are told apart per machine too: `deviceBias` treats the same device name on two machines as two devices, and `durationRegression` compares a scenario's history on one machine at a time (the message names the machine when records span several).
 
 ## Reading a failed run
 

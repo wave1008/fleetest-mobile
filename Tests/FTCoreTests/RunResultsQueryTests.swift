@@ -538,7 +538,7 @@ final class RunResultsQueryTests: XCTestCase {
             makeRecord(scenarioID: "Slow.b", passed: true, startedAt: "2026-01-02T00:00:00Z", durationMs: 200),
             makeRecord(scenarioID: "Slow.b", passed: true, startedAt: "2026-01-03T00:00:00Z", durationMs: 900),
         ]
-        let rows = RunResultsQuery.slowTests(records, limit: 10)
+        let rows = RunResultsQuery.slowTests(records, limit: 10, recentRuns: RunResultsQuery.recentScenarioRunsWindow)
         XCTAssertEqual(rows.map(\.scenarioID), ["Slow.b", "Fast.a"])
         XCTAssertEqual(rows[0].runs, 3)
         XCTAssertEqual(rows[0].avgDurationMs, 400, accuracy: 0.001)
@@ -559,7 +559,7 @@ final class RunResultsQueryTests: XCTestCase {
                 startedAt: String(format: "2026-01-%02dT00:00:00Z", i + 1),
                 durationMs: i < 3 ? 1000 : 100)
         }
-        let rows = RunResultsQuery.slowTests(records, limit: 10)
+        let rows = RunResultsQuery.slowTests(records, limit: 10, recentRuns: RunResultsQuery.recentScenarioRunsWindow)
         XCTAssertEqual(rows[0].runs, 10, "runs は集計に使った run 数を名乗る")
         XCTAssertEqual(rows[0].avgDurationMs, 100, accuracy: 0.001)
         XCTAssertEqual(rows[0].p90DurationMs, 100)
@@ -579,7 +579,7 @@ final class RunResultsQueryTests: XCTestCase {
         let steady = [
             makeRecord(scenarioID: "Now.b", passed: true, startedAt: "2026-02-01T00:00:00Z", durationMs: 500)
         ]
-        let rows = RunResultsQuery.slowTests(slowPast + steady, limit: 10)
+        let rows = RunResultsQuery.slowTests(slowPast + steady, limit: 10, recentRuns: RunResultsQuery.recentScenarioRunsWindow)
         XCTAssertEqual(rows.map(\.scenarioID), ["Now.b", "Past.a"])
         XCTAssertEqual(rows[1].slowestScene, "New", "scene の集計も窓の中だけで行う")
     }
@@ -607,10 +607,10 @@ final class RunResultsQueryTests: XCTestCase {
                 steps: StepCountsRecord(total: 1, skipped: 1)),
             makeRecord(scenarioID: "Foo.b", passed: true, startedAt: "2026-01-01T00:00:00Z", durationMs: 500),
         ]
-        let rows = RunResultsQuery.slowTests(records, limit: 1)
+        let rows = RunResultsQuery.slowTests(records, limit: 1, recentRuns: RunResultsQuery.recentScenarioRunsWindow)
         XCTAssertEqual(rows.count, 1)
         XCTAssertEqual(rows[0].scenarioID, "Foo.b")
-        let fooA = RunResultsQuery.slowTests(records, limit: 10).first { $0.scenarioID == "Foo.a" }
+        let fooA = RunResultsQuery.slowTests(records, limit: 10, recentRuns: RunResultsQuery.recentScenarioRunsWindow).first { $0.scenarioID == "Foo.a" }
         XCTAssertEqual(fooA?.runs, 1, "スキップ合成レコードは runs から除外")
     }
 
@@ -620,7 +620,7 @@ final class RunResultsQueryTests: XCTestCase {
                 scenarioID: "Foo.a", passed: true,
                 startedAt: String(format: "2026-01-0%dT00:00:00Z", i + 1), durationMs: 100)
         }
-        let rows = RunResultsQuery.slowTests(records, limit: 10)
+        let rows = RunResultsQuery.slowTests(records, limit: 10, recentRuns: RunResultsQuery.recentScenarioRunsWindow)
         XCTAssertNil(rows[0].deltaPct)
     }
 
@@ -631,7 +631,7 @@ final class RunResultsQueryTests: XCTestCase {
                 scenarioID: "Foo.a", passed: true,
                 startedAt: String(format: "2026-01-0%dT00:00:00Z", i + 1), durationMs: i < 2 ? 100 : 200)
         }
-        let increasingRows = RunResultsQuery.slowTests(increasing, limit: 10)
+        let increasingRows = RunResultsQuery.slowTests(increasing, limit: 10, recentRuns: RunResultsQuery.recentScenarioRunsWindow)
         XCTAssertEqual(try XCTUnwrap(increasingRows[0].deltaPct), 100, accuracy: 0.001)
 
         // 前半 [200, 200] avg=200 / 後半 [100, 100] avg=100 → -50%
@@ -640,7 +640,7 @@ final class RunResultsQueryTests: XCTestCase {
                 scenarioID: "Foo.b", passed: true,
                 startedAt: String(format: "2026-01-0%dT00:00:00Z", i + 1), durationMs: i < 2 ? 200 : 100)
         }
-        let decreasingRows = RunResultsQuery.slowTests(decreasing, limit: 10)
+        let decreasingRows = RunResultsQuery.slowTests(decreasing, limit: 10, recentRuns: RunResultsQuery.recentScenarioRunsWindow)
         XCTAssertEqual(try XCTUnwrap(decreasingRows[0].deltaPct), -50, accuracy: 0.001)
     }
 
@@ -653,7 +653,7 @@ final class RunResultsQueryTests: XCTestCase {
                     SceneResultRecord(scene: 2, title: "Checkout", passed: true, durationMs: 200),
                 ]),
         ]
-        let rows = RunResultsQuery.slowTests(records, limit: 10)
+        let rows = RunResultsQuery.slowTests(records, limit: 10, recentRuns: RunResultsQuery.recentScenarioRunsWindow)
         XCTAssertEqual(rows[0].slowestScene, "Checkout")
         XCTAssertEqual(rows[0].slowestSceneAvgMs, 200)
     }
@@ -662,7 +662,7 @@ final class RunResultsQueryTests: XCTestCase {
         let records = [
             makeRecord(scenarioID: "Foo.a", passed: true, startedAt: "2026-01-01T00:00:00Z", durationMs: 100),
         ]
-        let rows = RunResultsQuery.slowTests(records, limit: 10)
+        let rows = RunResultsQuery.slowTests(records, limit: 10, recentRuns: RunResultsQuery.recentScenarioRunsWindow)
         XCTAssertNil(rows[0].slowestScene)
         XCTAssertNil(rows[0].slowestSceneAvgMs)
     }
@@ -682,7 +682,7 @@ final class RunResultsQueryTests: XCTestCase {
                 startedAt: String(format: "2026-01-0%dT00:00:00Z", i + 1), durationMs: 900,
                 platform: "ios")
         }
-        let rows = RunResultsQuery.slowTests(android + ios, limit: 10)
+        let rows = RunResultsQuery.slowTests(android + ios, limit: 10, recentRuns: RunResultsQuery.recentScenarioRunsWindow)
         XCTAssertEqual(rows.count, 2, "同じ scenarioID でも platform ごとに別行になる")
         XCTAssertEqual(rows.first { $0.platform == "android" }?.avgDurationMs, 100)
         XCTAssertEqual(rows.first { $0.platform == "ios" }?.avgDurationMs, 900,

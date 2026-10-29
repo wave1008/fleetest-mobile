@@ -269,6 +269,24 @@ final class MCPToolCallTests: XCTestCase {
         XCTAssertTrue(text.contains("ft_clear_app_data stopped it"), text)
     }
 
+    /// 相対パスの拒否は実機の iOS に限らない(Simulator でも MCP プロセスの cwd から解決されて別の場所を指す)
+    func testInstallRefusesARelativePathOnASimulatorToo() async {
+        do {
+            _ = try await server.call(tool: "ft_install", args: ["packagePath": "build/App.app"])
+            XCTFail("相対パスなのに通った")
+        } catch {
+            XCTAssertTrue("\(error)".contains("must be an absolute path"), "\(error)")
+        }
+        XCTAssertFalse(driver.calls.contains { $0.hasPrefix("install") }, "\(driver.calls)")
+    }
+
+    /// `~` は展開してから渡す(simctl / devicectl / adb は `~` を展開しない)
+    func testInstallExpandsTheTilde() async throws {
+        _ = try await server.call(tool: "ft_install", args: ["packagePath": "~/build/App.app"])
+        let expanded = ("~/build/App.app" as NSString).expandingTildeInPath
+        XCTAssertTrue(driver.calls.contains("install(\(expanded))"), "\(driver.calls)")
+    }
+
     /// 同じ規律を ft_install(上書きインストール)にも適用する
     func testSnapshotAfterReinstallDoesNotSuspectACrash() async throws {
         _ = try await server.call(tool: "ft_launch", args: ["bundleId": "com.example.app"])

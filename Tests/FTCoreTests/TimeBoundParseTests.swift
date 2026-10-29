@@ -81,4 +81,24 @@ final class TimeBoundParseTests: XCTestCase {
     func testRelativeDurationSubtractsFromNow() {
         XCTAssertEqual(TimeBoundParse.parse("90d", now: now), now.addingTimeInterval(-90 * 86400))
     }
+
+    /// 範囲の両端の日付は受理する(下限の 0001-01-01 は暦の数え方次第で下限より前に読まれていた)
+    func testRangeEndDatesAreAccepted() {
+        XCTAssertEqual(TimeBoundParse.parse("0001-01-01", now: now), TimeBoundParse.earliestSupported)
+        XCTAssertNotNil(TimeBoundParse.parse("9999-12-31", now: now))
+        XCTAssertEqual(TimeBoundParse.parse("2026-09-01", now: now), ISO8601DateFormatter().date(from: "2026-09-01T00:00:00Z"))
+        XCTAssertEqual(TimeBoundParse.parse("2024-02-29", now: now), ISO8601DateFormatter().date(from: "2024-02-29T00:00:00Z"))
+        XCTAssertNil(TimeBoundParse.parse("2026-02-29", now: now), "閏年でない2月29日")
+        XCTAssertNil(TimeBoundParse.parse("2026-13-01", now: now))
+    }
+
+    /// 書式は正しいが範囲の外の値は、書式の誤りと言わずに範囲を名指しする
+    func testOutOfRangeRejectionNamesTheRangeNotTheFormat() {
+        XCTAssertNil(TimeBoundParse.parse("999999d", now: now))
+        let outOfRange = TimeBoundParse.rejection(option: "--since", raw: "999999d", now: now)
+        XCTAssertTrue(outOfRange.contains("outside the supported range"), outOfRange)
+        XCTAssertFalse(outOfRange.contains("must be a duration"), outOfRange)
+        let malformed = TimeBoundParse.rejection(option: "--since", raw: "30x", now: now)
+        XCTAssertTrue(malformed.contains("must be a duration"), malformed)
+    }
 }

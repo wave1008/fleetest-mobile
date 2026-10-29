@@ -484,12 +484,12 @@ extension MCPServer {
         nextCallID += 1
         let watchdog = SlowCallWatchdog.start(callID: callID, tool: tool)
         defer { watchdog.finish() }
-        return try await Self.$currentCallID.withValue(callID) {
+        return try await Self.$currentCallID.withValue(callID) { try await Self.$currentTool.withValue(tool) {
             // **全呼び出しの段階の内訳を記録へ残す**(応答に出すのは `elapsedBreakdownSeconds` 以上だけ)。
             // 15 秒未満の差(iOS の ft_launch 6.3 秒 / Android 1.2 秒)の理由を測る材料が無かった
             defer { if rpcTraceEnabled { Self.tracePhases(tool: tool, callID: callID) } }
             return try await callBody(tool: tool, args: args)
-        }
+        } }
     }
 
     /// `.fleetest/mcp-rpc.log` へ「phases call#N <tool> <段階> <秒> · …」を1行。`currentCallID` の中で呼ぶ
@@ -1095,18 +1095,26 @@ extension MCPServer {
     /// 入れ直しのパッケージが、消そうとしているアプリのものか。**消す前に断る**(uninstall の後では戻せない)。
     /// 控え(`installedPackagePaths`)はデバイスごとに「最後に ft_install したもの」で bundle ID と対応しないので、
     /// `ft_install A.ipa` の後の `ft_clear_app_data bundleId: B` は B を消して A を入れていた。
-    /// 読めないとき: 控えなら断る(確かめられないなら撃たない)/ 明示の packagePath なら呼び手の申告を信じる
+    /// 止めるかは `ReinstallPackageCheck.blocksUninstall`(DSL と共有。読めないときは控えなら断る / 明示の packagePath なら
+    /// 申告を信じる)。ここは文言だけを持つ
     static func reinstallPackageRefusal(bundleID: String, path: String, explicit: Bool,
-                                        packageBundleID: String?) -> String? {
-        if let packageBundleID {
-            guard packageBundleID != bundleID else { return nil }
+                                        verdict: ReinstallPackageCheck) -> String? {
+        guard verdict.blocksUninstall(packageNamedByCaller: explicit) else { return nil }
+        switch verdict {
+        case .ok: return nil
+        case .simulatorBuild:
+            // Simulator 用ビルドは実機へ入らない(0xe8008014)—— uninstall の後で失敗すると端末からアプリだけ消える
+            return "The app was NOT uninstalled. The reinstall source \(path) is a Simulator build (iphonesimulator SDK),"
+                + " which a physical device cannot install (invalid signature) — wiping the data by reinstalling it would"
+                + " leave the app removed from the device. Pass packagePath: <a device build (.app/.ipa signed for this device)>."
+        case .differentApp(let packageBundleID):
             return "The app was NOT uninstalled. The reinstall source \(path) is \(packageBundleID), not"
                 + " \(bundleID) — wiping \(bundleID) would leave a different app installed in its place."
                 + " Pass packagePath: <the .app/.ipa of \(bundleID)>."
+        case .unreadable:
+            return "The app was NOT uninstalled. Could not read the bundle ID of the remembered reinstall source"
+                + " \(path), so it is not known to be \(bundleID). Pass packagePath: <the .app/.ipa of \(bundleID)>."
         }
-        guard !explicit else { return nil }
-        return "The app was NOT uninstalled. Could not read the bundle ID of the remembered reinstall source"
-            + " \(path), so it is not known to be \(bundleID). Pass packagePath: <the .app/.ipa of \(bundleID)>."
     }
 
     /// 操作した要素を**シナリオで再現するためのセレクタ**(E)。

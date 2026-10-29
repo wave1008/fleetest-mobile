@@ -791,13 +791,7 @@ extension MCPServer {
     static func runOffCooperativePool<T: Sendable>(
         name: String, _ work: @escaping @Sendable () -> T
     ) async -> T {
-        await withCheckedContinuation { (continuation: CheckedContinuation<T, Never>) in
-            let thread = Thread {
-                continuation.resume(returning: work())
-            }
-            thread.name = name
-            thread.start()
-        }
+        await BlockingWork.offPool(name: name, work)
     }
 
     /// `candidatePorts` の結果に上限を掛ける(純粋関数・テスト用)。昇順にしてから切るので

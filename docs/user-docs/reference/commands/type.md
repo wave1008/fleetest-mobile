@@ -41,6 +41,8 @@ field.type("alice")                // same as type("#login_id", "alice")
   trailing newline is likewise sent as Enter. If the intent is to commit (search/submit), use
   [`pressEnter()`](./press_enter_hide_keyboard.md) instead — `type("watch\n")` does not tell the
   reader whether a newline or a submit was intended.
+  On iOS in the `xcuitest` mode (where the XCUITest bridge types), text with a newline in the middle is typed in one go
+  and is not read back; the step's note says so. To have each line checked, split it: `type("a")`, `pressEnter()`, `type("b")`.
 - **On Android, the next action waits for the soft keyboard.** `type` returns before the keyboard is shown, so the
   next action waits up to 1.5 seconds for it to appear before resolving its target (otherwise the layout can move
   after the target was resolved). If it does not appear, the action proceeds as usual.

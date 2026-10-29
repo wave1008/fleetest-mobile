@@ -141,10 +141,12 @@ extension MCPServer {
     /// 逃げ道は払った場所で言う(`SnapshotTruncation.remedy` と同じ規律)
     /// waitFor が外れたときの見出し(ft_snapshot・snapshotAfter・ft_batch が共有)。**切り上げたなら、そう言う** ——
     /// 黙って「現れなかった」とだけ言うと、読み込みの遅い画面で誤った「無い」として読まれる
+    /// `canWaitForChange`: 呼び手が waitForChange を引数に持つか。**ft_batch は持たない**ので false を渡す
+    /// (勧めずに ft_snapshot へ誘導する。既定を置かない = 新しい呼び手の渡し忘れをコンパイルで止める)
     /// `explain`: 逃げ道の説明(waitForChange・waitSeconds)を付けるか。**デバイスごとに初回だけ**(呼び手が
     /// `firstTime("waitMissExplained")` を渡す。同じ長文が1計測で3回出ていた)
     static func waitMissHeadline(_ waitFor: String, seconds: Double, quietStopAfter: Double?,
-                                 explain: Bool = true) -> String {
+                                 explain: Bool = true, canWaitForChange: Bool) -> String {
         guard let stopped = quietStopAfter else {
             return "waitFor \"\(waitFor)\" did not appear within \(secondsText(seconds))"
                 + (explain ? waitTimeoutRemedy : "")
@@ -152,7 +154,10 @@ extension MCPServer {
         return "waitFor \"\(waitFor)\" did not appear — the screen had not changed for"
             + " \(secondsText(waitForQuietCutoffSeconds)), so the wait stopped after \(secondsText(stopped))"
             + " instead of running to the \(secondsText(seconds)) cap"
-            + (explain ? " (if it is still loading without changing the screen, wait with waitForChange: true)" : "")
+            + (explain ? (canWaitForChange
+                ? " (if it is still loading without changing the screen, wait with waitForChange: true)"
+                : " (if it is still loading without changing the screen, read it again with ft_snapshot waitForChange: true)")
+                : "")
     }
 
     /// **待ちが外れたとき、前面に新しく出たものを名指しする**(待ちは足さない = 外れた応答に事実を足すだけ)。

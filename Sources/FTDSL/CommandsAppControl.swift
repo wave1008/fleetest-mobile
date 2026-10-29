@@ -8,6 +8,36 @@ import FTCore
 
 // MARK: - アプリ制御
 
+/// ブリッジ自身(`BridgeSelfApps`)を起動・データ消去・アンインストールの対象に指定したシナリオを、撃つ前に断る(撃つとブリッジが自滅する)。
+/// app ID を取って操作する DSL コマンド(launchApp・restartApp・clearAppData・removeApp)は全部ここを通す
+func refuseBridgeItself(command: String, bundleID: String) throws {
+    guard BridgeSelfApps.isBridgeItself(bundleID) else { return }
+    throw FTCommandError.message(
+        "\(command): \(bundleID) is fleetest's own bridge, not an app under test — launching, wiping or removing it would"
+        + " stop the bridge itself. Nothing was sent. Pass your app's bundle ID / package.")
+}
+
+/// 実機の clearAppData(入れ直し)を断る文言。nil = 通す。**止めるかは MCP と同じ判定(`blocksUninstall`)**で決め、ここは文言だけ
+/// (MCP の `reinstallPackageRefusal` と同じ形)。入れ直し元はプロファイルの記録(呼び手が名指ししたものではない)= packageNamedByCaller: false
+func clearAppDataReinstallRefusal(_ verdict: ReinstallPackageCheck, path: String, bundle: String) -> String? {
+    guard verdict.blocksUninstall(packageNamedByCaller: false) else { return nil }
+    switch verdict {
+    case .ok: return nil
+    case .simulatorBuild:
+        return "clearAppData: the app was NOT uninstalled. The reinstall source \(path) is a Simulator build"
+            + " (iphonesimulator SDK), which a physical device cannot install (invalid signature) — wiping"
+            + " the data by reinstalling it would leave the app removed from the device. Set"
+            + " \"appPathPhysical\" in the app profile to a device build."
+    case .differentApp(let packageBundleID):
+        return "clearAppData: the app was NOT uninstalled. The reinstall source \(path) is \(packageBundleID),"
+            + " not \(bundle) — wiping \(bundle) would leave a different app installed in its place."
+            + " Fix \"appPathPhysical\" in the app profile."
+    case .unreadable:
+        return "clearAppData: the app was NOT uninstalled. Could not read the bundle ID of the reinstall"
+            + " source \(path), so it is not known to be \(bundle). Fix \"appPathPhysical\" in the app profile."
+    }
+}
+
 /// アプリを起動する(引数省略時は実行プロファイルのアプリ)。url を渡すと「起動 → URL 配送」を
 /// 1ステップで行う(driver.openURL が再起動直後の warm な状態へそのまま届く)。
 /// **配送は最初の画面が描かれてから**(`StepExecutor.awaitInteractiveUI` / LaunchURLReadiness): in-app の
@@ -26,6 +56,7 @@ public func launchApp(_ appID: String? = nil, url: String? = nil,
                            return driver.lastLaunchTiming?.activatedBeforeForeground == true
                                ? .launchActivatedBeforeForeground : nil
                        }) {
+        try refuseBridgeItself(command: "launchApp", bundleID: bundle)
         try await driver.launch(bundleID: bundle)
         if let url {
             deliveredBeforeUI = try await !core.executor.awaitInteractiveUI(
@@ -58,6 +89,7 @@ public func restartApp(_ appID: String? = nil,
                            driver.lastLaunchTiming?.activatedBeforeForeground == true
                                ? .launchActivatedBeforeForeground : nil
                        }) {
+        try refuseBridgeItself(command: "restartApp", bundleID: bundle)
         try? await driver.terminate()
         try await driver.launch(bundleID: bundle)
     }
@@ -84,6 +116,7 @@ public func clearAppData(_ appID: String? = nil,
     core.performCustom(description: "clearAppData \(bundle)", command: "clearAppData",
                        file: file, line: line,
                        note: { outcome.viaReinstall ? .reinstalledToClearData : nil }) {
+        try refuseBridgeItself(command: "clearAppData", bundleID: bundle)
         do {
             try await driver.clearAppData(bundleID: bundle)
         } catch let error where ReinstallSource.isClearAppDataUnsupported(error) {
@@ -92,6 +125,11 @@ public func clearAppData(_ appID: String? = nil,
                 exists: { FileManager.default.fileExists(atPath: $0) }
             ) {
             case .usable(let path):
+                // **消す前に**: 実機へ入れられるパッケージか・消すアプリのものか(MCP の ft_clear_app_data と同じ判定)
+                if let refusal = clearAppDataReinstallRefusal(
+                    await ReinstallPackageCheck.inspectOffPool(path: path, expectedBundleID: bundle), path: path, bundle: bundle) {
+                    throw FTCommandError.message(refusal)
+                }
                 try await driver.uninstall(bundleID: bundle)
                 if let note = try await driver.install(packagePath: path) { core.emit(.log("⚠️ \(note)")) }
                 outcome.viaReinstall = true
@@ -158,8 +196,8 @@ public func installApp(_ appPackageFile: String? = nil,
                 + "(the scenario process only knows the app's bundle ID, not a package file path). "
                 + "Pass the path explicitly: installApp(\"/path/to/App.app\")")
         }
-        let expanded = (resolvedPath as NSString).expandingTildeInPath
-        guard FileManager.default.fileExists(atPath: expanded) else {
+        let expanded = InstallPackagePath.expanded(resolvedPath)
+        guard InstallPackagePath.exists(resolvedPath) else {
             throw FTCommandError.message("installApp: package not found at \(expanded)")
         }
         if let note = try await driver.install(packagePath: expanded) { core.emit(.log("⚠️ \(note)")) }
@@ -174,6 +212,7 @@ public func removeApp(_ appID: String? = nil,
     let driver = core.driver
     let target = appID ?? core.appBundleID
     core.performCustom(description: "removeApp \"\(target)\"", command: "removeApp", file: file, line: line) {
+        try refuseBridgeItself(command: "removeApp", bundleID: target)
         try await driver.uninstall(bundleID: target)
     }
 }

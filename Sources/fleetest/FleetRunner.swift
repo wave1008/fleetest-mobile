@@ -168,7 +168,9 @@ enum FleetRunner {
             throw ValidationError(
                 "no scenarios (add a @TestClass under TestProjects/\(project.name)/scenarios/)")
         }
-        var selected = try ScenarioSelection.resolve(scenarios, from: all)
+        let resolution = try ScenarioSelection.resolveReportingCollapsed(scenarios, from: all)
+        if let notice = ScenarioSelection.collapsedNotice(resolution.collapsed) { log(notice) }
+        var selected = resolution.selected
         if !folders.isEmpty {
             selected = try RunScenarios.filterByFolders(selected, folders: folders,
                                                          scenariosDir: project.scenariosDir)

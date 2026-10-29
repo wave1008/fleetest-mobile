@@ -30,7 +30,7 @@ struct ResultsQueryOptions: ParsableArguments {
     @Option(help: "Test project name (defaults to the only one in TestProjects/, or the default project)")
     var project: String?
 
-    @Option(help: "Start of the period: a duration (e.g. 90s/30m/2h/30d), a date (YYYY-MM-DD) or an epoch (@1757280000)")
+    @Option(help: "Start of the period: a duration (e.g. 90s/30m/2h/30d), a date (YYYY-MM-DD, UTC midnight) or an epoch (@1757280000)")
     var since: String = ResultsRendering.defaultSince
 
     @Flag(help: "Print the result as a single line of JSON")
@@ -40,8 +40,9 @@ struct ResultsQueryOptions: ParsableArguments {
     func resolve() throws -> (project: TestProject, resultsDir: URL, sinceDate: Date) {
         let testProject = try ScenarioHost.project(named: project)
         let resultsDir = RunResultsStore.resultsDir(projectRoot: testProject.rootURL)
-        guard let sinceDate = RunResultsQuery.parseSince(since) else {
-            throw ValidationError(TimeBoundParse.rejection(option: "--since", raw: since))
+        let now = Date()  // 解析と断りの文面で同じ基準時刻を使う(範囲の境目で文面が逆にならない)
+        guard let sinceDate = RunResultsQuery.parseSince(since, referenceDate: now) else {
+            throw ValidationError(TimeBoundParse.rejection(option: "--since", raw: since, now: now))
         }
         return (testProject, resultsDir, sinceDate)
     }
@@ -102,13 +103,13 @@ struct ResultsSummaryCommand: AsyncParsableCommand {
 
     @OptionGroup var options: ResultsQueryOptions
 
-    @Option(help: "Scenario ID to report on (defaults to all scenarios)")
+    @Option(help: "Scenario ID (Class.method) or a class name (every scenario of the class) to report on (defaults to all scenarios)")
     var scenario: String?
 
     func run() throws {
         let (_, resultsDir, sinceDate) = try options.resolve()
         let records = RunResultsStore.scanRecords(resultsDir: resultsDir, since: sinceDate)
-        let filtered = scenario.map { id in records.filter { $0.scenarioID == id } } ?? records
+        let filtered = scenario.map { id in records.filter { ScenarioSelection.selects(id, scenarioID: $0.scenarioID) } } ?? records
         // CLI は --since の窓をそのまま集計する(ダッシュボードだけが直近 N 回へ絞る)
         let rows = RunResultsQuery.scenarioSummary(filtered, recentRuns: .max)
 
@@ -159,6 +160,12 @@ struct ResultsTrendCommand: AsyncParsableCommand {
         let (_, resultsDir, sinceDate) = try options.resolve()
         let records = RunResultsStore.scanRecords(resultsDir: resultsDir, since: sinceDate)
         let rows = RunResultsQuery.trend(records, scenarioID: scenario)
+        // run の --scenario はクラス名で全メソッドを選べるが、trend は1シナリオの履歴なので
+        // クラス名だと不在と同じ「履歴なし」になって見分けが付かない。完全な ID を名指しして断る
+        if rows.isEmpty, let listing = RunResultsQuery.trendClassMemberListing(
+            selector: scenario, scenarioIDs: records.map(\.scenarioID)) {
+            throw ValidationError("--scenario \(scenario) is a class name; trend takes one scenario ID (Class.method): " + listing)
+        }
 
         if options.json {
             try printResultsJSON(rows)
@@ -172,7 +179,7 @@ struct ResultsTrendCommand: AsyncParsableCommand {
 
 struct ResultsDevicesCommand: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
-        commandName: "devices", abstract: "Aggregate run count and pass rate per worker (device) and per platform")
+        commandName: "devices", abstract: "Aggregate run count and pass rate per worker (device, per machine) and per platform")
 
     @OptionGroup var options: ResultsQueryOptions
 
@@ -205,7 +212,8 @@ struct ResultsSlowCommand: AsyncParsableCommand {
     func run() throws {
         let (_, resultsDir, sinceDate) = try options.resolve()
         let records = RunResultsStore.scanRecords(resultsDir: resultsDir, since: sinceDate)
-        let rows = RunResultsQuery.slowTests(records, limit: limit)
+        // CLI は --since の窓をそのまま集計する(summary / flaky と同じ。ダッシュボードだけが直近 N 回へ絞る)
+        let rows = RunResultsQuery.slowTests(records, limit: limit, recentRuns: .max)
 
         if options.json {
             try printResultsJSON(rows)

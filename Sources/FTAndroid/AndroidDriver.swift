@@ -14,7 +14,7 @@ import FTCore
 public final class AndroidDriver: AppDriver {
 
     public let adbPath: String
-    let serial: String?
+    public let serial: String?
 
     // 直近スナップショットの ref → 中心座標(iOS ランナーと同じ方式)。iOS と違い CLI プロセス内に
     // 住むため、呼び出しをまたぐ手動駆動用に一時ファイルへも永続化する(run は単一プロセスで不要だが無害)
@@ -747,20 +747,24 @@ public final class AndroidDriver: AppDriver {
     /// /hidekeyboard は撃っても IME が閉じない)ので、唯一効く BACK キーを使う。
     /// **BACK は出ていないときに撃つと画面が戻ってしまう**ため、必ず dumpsys で可視を確かめてから
     /// 撃つ(hideKeyboard は冪等が契約。出ていなければ no-op)
-    public func hideKeyboard() async throws {
+    public func hideKeyboard() async throws { _ = try await hideKeyboardIfShown() }
+
+    /// 出ていなければ何も送らずに false(AppDriver.hideKeyboardIfShown の doc)
+    public func hideKeyboardIfShown() async throws -> Bool {
         // **読めないを「出ていない」に畳まない**(デバイスが居ない・adb が詰まった回に成功を返していた)
         let dumpsys = try adbAnswering(["shell", "dumpsys", "window", "windows"])
         guard dumpsys.status == 0 else {
             throw DriverError.badResponse(status: Int(dumpsys.status),
                 body: "could not read whether the keyboard is showing (dumpsys window): \(dumpsys.tail)")
         }
-        guard AndroidForegroundWindows.keyboardVisible(dumpsys: dumpsys.output) else { return }
+        guard AndroidForegroundWindows.keyboardVisible(dumpsys: dumpsys.output) else { return false }
         let result = try adbAnswering(["shell", "input", "keyevent", "KEYCODE_BACK"])
         guard result.status == 0 else {
             throw DriverError.badResponse(status: Int(result.status),
                 body: "failed to hide the keyboard: \(result.tail)")
         }
         await settleViaBridge()
+        return true
     }
 
     /// ブリッジ snapshot の結果をホスト側 ref テーブルにも写す(CLI プロセス跨ぎの手動駆動を保つ)。internal = テストが表を置く口

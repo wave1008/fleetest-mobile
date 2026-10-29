@@ -74,6 +74,24 @@ final class MCPResultsToolTests: XCTestCase {
         XCTAssertEqual(out.split(separator: "\n").count, 4, "ヘッダ + 区切り + 2行: \(out)")
     }
 
+    /// `scenario` の照合は CLI の `results` と同じ: summary はクラス名で全メソッド・trend はクラス名を名指しして断る
+    /// (完全一致だけだと、同じ指定で CLI は行を出し MCP は「履歴なし」と言っていた)
+    func testScenarioClassNameMatchesLikeTheCLI() throws {
+        writeRun(offset: -60, passed: true)
+        let summary = try request(["query": "summary", "scenario": "Cart"]).render(project: project)
+        XCTAssertTrue(summary.contains("Cart.add"), summary)
+        XCTAssertThrowsError(try request(["query": "trend", "scenario": "Cart"]).render(project: project)) { error in
+            XCTAssertTrue("\(error)".contains("is a class name"), "\(error)")
+        }
+    }
+
+    /// 記録はあっても該当の行が無い(不安定なシナリオが無い)なら、数字の食い違いの注記を付けない
+    func testWindowNoteIsOmittedWhenThereAreNoRows() throws {
+        for _ in 0..<3 { writeRun(offset: -60, passed: true) }
+        let flaky = try request(["query": "flaky"]).render(project: project)
+        XCTAssertFalse(flaky.contains("the extension's dashboard counts only"), flaky)
+    }
+
     func testSummaryFlakyTrendDevicesSlowInsightsRenderFromRealRecords() throws {
         for (index, passed) in [true, false, true, false, true, false].enumerated() {
             writeRun(offset: TimeInterval(-600 + index * 60), passed: passed)
@@ -86,7 +104,10 @@ final class MCPResultsToolTests: XCTestCase {
         let trend = try request(["query": "trend", "scenario": "Cart.add"]).render(project: project)
         XCTAssertEqual(trend.split(separator: "\n").count, 8, "ヘッダ + 区切り + 6行: \(trend)")
         XCTAssertTrue(try request(["query": "devices"]).render(project: project).hasPrefix("[per worker]"))
-        XCTAssertTrue(try request(["query": "slow"]).render(project: project).contains("Cart.add"))
+        let slow = try request(["query": "slow"]).render(project: project)
+        XCTAssertTrue(slow.contains("Cart.add"), slow)
+        // CLI と同じく窓(since)の全 run を集計する = ダッシュボード(直近 N 本)と食い違いうることを言う
+        XCTAssertTrue(slow.contains("the extension's dashboard counts only each scenario's last"), slow)
         // 結果は書けているので「何もない」文言ではない(insights の中身は RunResultsQuery のテストの担当)
         XCTAssertFalse(try request(["query": "insights"]).render(project: project).isEmpty)
     }

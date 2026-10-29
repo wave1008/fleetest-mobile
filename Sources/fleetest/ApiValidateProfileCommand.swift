@@ -49,6 +49,8 @@ struct ApiValidateProfile: AsyncParsableCommand {
             }
         }
 
+        // **--name で合致が無くても exit 0 で空の results を返す**(拡張の profileDiagnostics.ts が保存したファイルを --name で検証し、
+        // 空 = 消えた・改名された として Problems の診断を消す契約。エラーにすると JSON が出ず古い診断が残る)
         if results.isEmpty {
             logStderr("⚠️ No profiles matched for validation"
                 + " (check the --kind/--name arguments)")

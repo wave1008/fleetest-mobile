@@ -35,10 +35,13 @@ removeApp()
   ダイアログが再び出るので、オンボーディングや初回起動の権限フローを検証したいときに使います。
 - iOS の実機にはデータだけを消す手段が無いので、`clearAppData()` は**アプリを入れ直して**消します(インストールの
   ぶん時間がかかります。注記 `reinstalled-to-clear-data`)。入れ直す元として、アプリプロファイルの `appPathPhysical` に
-  実機用のビルドを設定し、`--profile` で実行してください。入れ直せないときは、アンインストールせずに失敗します。
+  実機用のビルドを設定し、`--profile` で実行してください。入れ直せないとき(入れ直す元が無い・別のアプリ(bundle ID 違い)・
+  Simulator 用のビルド(実機は受け付けません))は、アンインストールせずに失敗します。
 - `clearAppData()` は `NSUserDefaults` / `SharedPreferences` を消しますが、**キーチェーン
   (iOS)/ Keystore(Android)に置いた値は消えません**。オンボーディング判定をそこに置いている
   アプリでは初回起動が再現しません。
+- **fleetest 自身のブリッジは対象にできません。** ブリッジの ID(Android の `com.example.ftbridge`、iOS の ID が `.ftrunner`・`.ftrunner.uitests`・`.ftrunner.uitests.xctrunner` で終わるランナー)を `removeApp` / `clearAppData` に渡すと、
+  何も送らずに失敗します。消すとブリッジ自身が止まり、デバイスを操作できなくなるためです。
 - **自分自身のテスト対象アプリを `removeApp()` で消すと、以降のシナリオ実行が壊れます** —
   そこでシナリオを終える意図があるときだけ呼んでください。
 - **Android では(実機・Emulator を問わず)、インストールの間だけ `adb install` の検証

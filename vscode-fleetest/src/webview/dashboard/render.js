@@ -246,9 +246,10 @@ export function renderFlakyTable(flaky) {
   const rows = [];
   for (const row of flaky) {
     const tr = document.createElement('tr');
-    tr.dataset.sig = JSON.stringify([row.scenarioID, row.recentResults]);
+    tr.dataset.sig = JSON.stringify([row.scenarioID, row.platform, row.recentResults]);
     tr.append(
       scenarioIdCell(row.scenarioID),
+      td(row.platform),
       // recentResults は新しい順: 先頭が「直近」列、残りが「履歴(新→旧)」列
       tdMid(recentResultsMarks(row.recentResults.slice(0, 1))),
       td(recentResultsMarks(row.recentResults.slice(1))),

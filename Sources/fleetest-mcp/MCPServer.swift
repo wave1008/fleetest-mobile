@@ -37,6 +37,8 @@ final class MCPServer {
     var pendingTypeKeyboardChecks: SessionMap<PendingTypeKeyboardCheck> { SessionMap(server: self, path: \.pendingTypeKeyboardCheck) }
     /// いま処理中のツール呼び出しの番号(0 = 呼び出しの外)。TaskLocal なので、並行する呼び出しが互いの番号を見ない
     @TaskLocal static var currentCallID = 0
+    /// いま処理中のツール名(空 = 呼び出しの外)。共有の文言がそのツールの引数だけを案内するのに使う(`toolDeclares`)
+    @TaskLocal static var currentTool = ""
     var nextCallID = 1
     /// ft_results の完了 run の解読結果(サーバの寿命のあいだ持つ。RunRecordMemo.swift)
     let resultsMemo = RunRecordMemo()
@@ -130,6 +132,16 @@ final class MCPServer {
     /// 変化待ちの `changeSettleRereads`(3)×`settleWaitSeconds`(0.4s)=1.2秒を流用すると、
     /// 実機 iPhone ではレイアウトが収まる前に予算が尽きる(別の文脈の定数を流用しない)
     var rotationSettleDeadlineSeconds: Double = RotationSettle.deadlineSeconds
+
+    /// ft_terminate が宛先を「シミュレータ」と決める口と、シミュレータでアプリを止める口(テストで差し替える。
+    /// ランナーの 409 の後に simctl で止める経路は実物では起こしにくく、ここを差し替えないと単体で通せない)。
+    /// どちらも同期の simctl を撃つので、呼び手は協調スレッドプールの外で呼ぶ(mcp.md)
+    var isSimulatorUDID: @Sendable (String) -> Bool = { udid in
+        ((try? SimulatorCatalog.devices()) ?? []).contains(where: { $0.udid == udid && !$0.physical })
+    }
+    var stopAppOnSimulator: @Sendable (_ bundleID: String, _ udid: String) throws -> Void = { bundleID, udid in
+        try BridgeClient.stopOnSimulator(bundleID: bundleID, target: udid, purpose: "on the simulator")
+    }
 
 
     init(write: @escaping (Data) -> Void = { ConsoleOut.out($0) },

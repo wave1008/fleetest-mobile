@@ -59,8 +59,8 @@ const RUN = {
 const PAYLOAD = {
   schemaVersion: 1, project: "P", generatedAt: "2026-09-01T00:02:00Z", since: "2026-06-03T00:00:00Z",
   runs: [RUN],
-  summary: [{ scenarioID: "Foo.S0010", runs: 4, successRate: 50, avgDurationMs: 100, medianDurationMs: 100 }],
-  flaky: [{ scenarioID: "Foo.S0010", runs: 4, failureRate: 50, flakinessScore: 0.5, recentResults: [true, false, true, false] }],
+  summary: [{ scenarioID: "Foo.S0010", platform: "ios", runs: 4, successRate: 50, avgDurationMs: 100, medianDurationMs: 100 }],
+  flaky: [{ scenarioID: "Foo.S0010", platform: "ios", runs: 4, failureRate: 50, flakinessScore: 0.5, recentResults: [true, false, true, false] }],
   deviceHealth: [],
   machineHealth: [],
   slow: [], insights: [],

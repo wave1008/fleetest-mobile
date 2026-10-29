@@ -61,6 +61,8 @@ export interface RunMetaRecord {
  *  窓を切らないので、同じシナリオでも数字は一致しない。 */
 export interface ScenarioSummaryRow {
   readonly scenarioID: string;
+  /** `ios` / `android`。同じ scenarioID でも platform ごとに別行(OS 別に束ねる = RunResultsQuery.scenarioSummary)。 */
+  readonly platform: string;
   /** 集計に使った run 数(窓の上限まで)。窓内の総実行回数ではない。 */
   readonly runs: number;
   /** 0-100 */
@@ -73,6 +75,8 @@ export interface ScenarioSummaryRow {
 
 export interface FlakyRow {
   readonly scenarioID: string;
+  /** `ios` / `android`。summary と同じく platform ごとに別行。 */
+  readonly platform: string;
   readonly runs: number;
   /** 0-100 */
   readonly failureRate: number;
@@ -259,6 +263,8 @@ export interface InsightRecord {
   readonly platform?: string | null;
   /** deviceBias のみ */
   readonly worker?: string | null;
+  /** 記録の鍵のマシン(host)。機械ごとに分けて出す行(deviceBias・durationRegression)だけ(表示は machineLabel で読み替える) */
+  readonly host?: string | null;
   readonly message: string;
   readonly count?: number | null;
   /** durationRegression のみ */
@@ -492,6 +498,7 @@ function isScenarioSummaryRow(value: unknown): value is ScenarioSummaryRow {
   if (!isRecord(value)) return false;
   return (
     typeof value.scenarioID === "string" &&
+    typeof value.platform === "string" &&
     typeof value.runs === "number" &&
     typeof value.successRate === "number" &&
     isOptNumber(value.avgDurationMs) &&
@@ -505,6 +512,7 @@ function isFlakyRow(value: unknown): value is FlakyRow {
   if (!isRecord(value)) return false;
   return (
     typeof value.scenarioID === "string" &&
+    typeof value.platform === "string" &&
     typeof value.runs === "number" &&
     typeof value.failureRate === "number" &&
     typeof value.flakinessScore === "number" &&
@@ -616,6 +624,7 @@ function isInsightRecord(value: unknown): value is InsightRecord {
     isOptString(value.scenarioID) &&
     isOptString(value.platform) &&
     isOptString(value.worker) &&
+    isOptString(value.host) &&
     typeof value.message === "string" &&
     isOptNumber(value.count) &&
     isOptNumber(value.deltaPct)

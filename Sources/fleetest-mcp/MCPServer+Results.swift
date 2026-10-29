@@ -76,8 +76,12 @@ struct MCPResultsRequest: Sendable, Equatable {
             return ResultsLogReport.text(sections)
         }
         guard let sinceDate = RunResultsQuery.parseSince(since, referenceDate: now) else {
-            throw MCPError(TimeBoundParse.rejection(option: "since", raw: since))
+            throw MCPError(TimeBoundParse.rejection(option: "since", raw: since, now: now))
         }
+        // summary / flaky / slow は CLI の `results` と同じく窓(since)の全 run を集計する。拡張のダッシュボードと
+        // `api results` はシナリオごとの直近 recentScenarioRunsWindow 本だけなので、数字が食い違ったときに理由が読めるよう言う
+        let windowNote = "\n(computed over every run since \(since); the extension's dashboard counts only each scenario's"
+            + " last \(RunResultsQuery.recentScenarioRunsWindow) runs, so its numbers can differ)"
         // **サーバで初めて引く回もディスクのパックを読む**(無いと起動のたびに 90 日ぶんの全ファイルを解読し直す。
         // E2E-CMP の約 8.4 万ファイルで 1 回目 8.3 秒・2 回目以降はプロセス内の控え(memo)で 3.8 秒)。置き場所は CLI と分ける
         let packCacheDir = RunRecordPack.cacheDir(stateDir: project.stateDir, program: .mcp)
@@ -93,25 +97,37 @@ struct MCPResultsRequest: Sendable, Equatable {
                 RunResultsQuery.recentRuns(runs, limit: limit ?? ResultsRendering.defaultListLimit))
         case "summary":
             let records = scannedEntries().map(\.record)
-            let filtered = scenario.map { id in records.filter { $0.scenarioID == id } } ?? records
-            return ResultsRendering.summary(RunResultsQuery.scenarioSummary(filtered, recentRuns: .max))
+            // 照合は CLI の `results summary --scenario` と同じ(クラス名で全メソッド = ScenarioSelection.selects)
+            let filtered = scenario.map { id in
+                records.filter { ScenarioSelection.selects(id, scenarioID: $0.scenarioID) }
+            } ?? records
+            let rows = RunResultsQuery.scenarioSummary(filtered, recentRuns: .max)
+            // 注記は数字の行があるときだけ(「該当なし」に数字の食い違いの話を付けない = 注記の予算)
+            return ResultsRendering.summary(rows) + (rows.isEmpty ? "" : windowNote)
         case "flaky":
             let records = scannedEntries().map(\.record)
             let minRuns = minRuns ?? ResultsRendering.defaultMinRuns
-            return ResultsRendering.flaky(
-                RunResultsQuery.flakyScenarios(records, minRuns: minRuns, recentRuns: .max),
-                minRuns: minRuns, minRunsOption: "minRuns")
+            let rows = RunResultsQuery.flakyScenarios(records, minRuns: minRuns, recentRuns: .max)
+            return ResultsRendering.flaky(rows, minRuns: minRuns, minRunsOption: "minRuns")
+                + (rows.isEmpty ? "" : windowNote)
         case "trend":
             let id = scenario ?? ""
-            let records = RunResultsStore.fullRecords(entries: scannedEntries(), scenarioID: id)
-            return ResultsRendering.trend(RunResultsQuery.trend(records, scenarioID: id), scenario: id)
+            let entries = scannedEntries()
+            let records = RunResultsStore.fullRecords(entries: entries, scenarioID: id)
+            let rows = RunResultsQuery.trend(records, scenarioID: id)
+            // クラス名は「履歴なし」と見分けが付かないので名指しして断る(CLI の `results trend` と同じ判定)
+            if rows.isEmpty, let listing = RunResultsQuery.trendClassMemberListing(
+                selector: id, scenarioIDs: entries.map(\.record.scenarioID)) {
+                throw MCPError("scenario \(id) is a class name; trend takes one scenario ID (Class.method): " + listing)
+            }
+            return ResultsRendering.trend(rows, scenario: id)
         case "devices":
             let records = scannedEntries().map(\.record)
             return ResultsRendering.devices(RunResultsQuery.deviceSummary(records))
         case "slow":
             let records = scannedEntries().map(\.record)
-            return ResultsRendering.slow(
-                RunResultsQuery.slowTests(records, limit: limit ?? ResultsRendering.defaultSlowLimit))
+            let rows = RunResultsQuery.slowTests(records, limit: limit ?? ResultsRendering.defaultSlowLimit, recentRuns: .max)
+            return ResultsRendering.slow(rows) + (rows.isEmpty ? "" : windowNote)
         case "insights":
             let scanned = RunResultsStore.scanRunsAndRecords(resultsDir: resultsDir, since: sinceDate,
                                                              packCacheDir: packCacheDir,

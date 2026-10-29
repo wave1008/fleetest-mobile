@@ -8,7 +8,7 @@
 
 | 関数 | 説明 |
 |---|---|
-| `scrollTo(sel, direction: .down, containerInference:, settle:, maxSwipes: 8)` | 要素が見つかるまでスクロールします(見つかったら成功。タップはしません)。 |
+| `scrollTo(sel, direction: .down, containerInference:, settle:, maxSwipes: 8)` | 要素が見つかるまでスクロールします(見つかったら成功。タップはしません)。探すのは `direction:` の向きだけです。端まで送っても見つからなかったときは、送りが行を飛び越した分を拾うために少しずつ戻して探し直します。最初から端にいて1度も動かなかったときは、反対側を探さずに失敗します。 |
 | `scrollDown(repeat: 1, settle:)` / `scrollUp` / `scrollRight` / `scrollLeft` | 1画面ぶんスクロールします(`repeat:` 回繰り返します)。 |
 | `scrollToBottom(settle:, maxSwipes: 50)` / `scrollToTop` / `scrollToRightEdge` / `scrollToLeftEdge` | 端まで送ります(画面が変化しなくなるまで)。`maxSwipes` は暴走を止める上限で、上限で打ち切るとステップに注記が付きます。 |
 | `withScrollDown { … }` / `withScrollUp` / `withScrollRight` / `withScrollLeft` | ブロック内の `tap` / `type` / `clearInput` / `select` / `exist` / `notExist` / `findImage` / `existImage` / `hold` を**すべてスクロール探索**にします(明示の `scroll:` があればそちらが優先)。**`notExist` は意味が変わります** —— 探索中に見つかった時点で失敗になります。 |

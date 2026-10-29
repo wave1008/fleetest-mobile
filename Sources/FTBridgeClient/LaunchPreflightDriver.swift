@@ -138,6 +138,7 @@ public final class LaunchPreflightDriver: AppDriver {
     public func pressEnter() async throws { try await base.pressEnter() }
     public func clearInput(ref: Int?) async throws { try await base.clearInput(ref: ref) }
     public func hideKeyboard() async throws { try await base.hideKeyboard() }
+    public func hideKeyboardIfShown() async throws -> Bool { try await base.hideKeyboardIfShown() }
     public func back() async throws { try await base.back() }
     public func swipe(_ direction: FTSwipeDirection) async throws { try await base.swipe(direction) }
     /// 用途つき版の素通し(FastLaunchDriver の注記と同じ理由)

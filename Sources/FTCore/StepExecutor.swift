@@ -786,6 +786,9 @@ public final class StepExecutor {
         let start = clock.now
         var phase = PhaseAccumulator()
         resetInterruptScope()
+        // 「hideKeyboard が何も送らなかった」はステップごと(**入口の1か所で戻す** = hideKeyboard の処理へ届く前に失敗した
+        // ステップにも前の値が残らない。MCP の ft_batch / ft_hide_keyboard が読む)
+        hideKeyboardFoundNoKeyboard = false
         // 探索の注記は段ごと(消さないと、探索しなかった後続の段にも前の段の注記が付き続けた)
         scrollSearchNote = nil
         suppressedInterruptionSeenThisStep = false
@@ -1109,6 +1112,11 @@ public final class StepExecutor {
     /// iOS の hideKeyboard が、背景を叩いても閉じないとき Enter まで送るか。DSL は送る(ユーザー決定)。MCP は送らない ——
     /// エージェントは「閉じたい」だけで送信・検索を起こしうる(Return は欄の確定操作)。要るなら Enter を明示して送る
     public var hideKeyboardFallsBackToEnter = true
+    /// 直前のステップの hideKeyboard が「キーボードが出ていなかった = 何も撃たなかった」で通ったか(ステップの入口で毎回戻す。iOS は実行機の確認・Android は
+    /// `AppDriver.hideKeyboardIfShown` の答え。MCP の ft_hide_keyboard が
+    /// 「送った」と言わずに済ませるため。DSL のレポートには出さない = 冪等の無操作に注記を付けない)。
+    /// **文言の一致で見分けない**(注記を言い換えた瞬間に黙って「送った」へ戻る)
+    public internal(set) var hideKeyboardFoundNoKeyboard = false
     /// 計測用: 緑の検証のたびに確かめる(`renderCollapseEveryAssertionKey`。正常な画面での誤検知を数えるデバイス実行だけで使う)
     public var renderCollapseEveryAssertion = false
     /// 陽性対照: 判定の答えを崩壊に差し替える(`renderCollapseInjectionKey`)
@@ -1249,6 +1257,9 @@ public final class StepExecutor {
     /// (古い順の呼び名)。tap / select 以外の操作が走ったら捨てる(`lastInteraction` と同じ「直前」の意味)。
     /// 追加の撮影はしない(比べるのは既に持っている木だけ)
     var unchangedEarlierTaps: [String] = []
+    /// この手の入口で控えた、まだ比べていない直前の tap と確定済みの無変化の tap(`unresolvedActionTapHint` だけが読む)。
+    /// 入口はタップ以外の手で上の記録を消すので、消す前に控えないと解決できなかった失敗で名指しできない
+    var tapEvidenceAtEntry: (pending: LastInteraction?, earlier: [String]) = (nil, [])
     /// 持ち越す件数の上限(同じ画面でタップを連打する台本で失敗文言が伸び続けないため。
     /// 実例の S0020 は 1 件で足りる)
     static let unchangedEarlierTapsLimit = 3
@@ -1478,11 +1489,27 @@ public final class StepExecutor {
     /// 次のタップの時点で画面が変わっていなかった、それより前のタップ(`unchangedEarlierTaps`)。
     /// 直前のタップの結果とは独立に添える —— 直前のタップが「画面を変えないのが正常」な操作でも、
     /// その前のタップが効いていなかった事実は消さない
-    private func earlierTapsHint() -> String {
-        guard !unchangedEarlierTaps.isEmpty else { return "" }
-        let names = unchangedEarlierTaps.joined(separator: ", then ")
-        return " (earlier, the screen was also unchanged between \(names) and the tap after it"
+    private func earlierTapsHint(_ taps: [String]? = nil, also: Bool = true, nextAction: String = "the tap") -> String {
+        let taps = taps ?? unchangedEarlierTaps
+        guard !taps.isEmpty else { return "" }
+        let names = taps.joined(separator: ", then ")
+        return " (earlier, the screen was\(also ? " also" : "") unchanged between \(names) and \(nextAction) after it"
             + " — that interaction may have been swallowed\(outOfAppCaveat))"
+    }
+
+    /// 操作の対象が解決できなかった失敗に添える(検証の失敗の `tapDiagnosisHint` と同じ証跡)。この手が tap なら直前の tap は
+    /// 手の入口で控えたもの(`tapEvidenceAtEntry`)を使い、まだ比べていない直前の tap は解決に使った木と比べて足す。**追加の撮影はしない・タップの記録は変えない**。
+    /// 名指しした回はステップの注記の印(`unchangedTapBeforeFailure`)を立てる = 失敗の文面を組むときだけ呼ぶ
+    /// (sut-ec-mobile: 保存の tap が空振り → 戻る → 次の tap が「解決できない」で、空振りした保存を名指しできなかった)
+    func unresolvedActionTapHint(_ elements: [ElementInfo]) -> String {
+        var taps = tapEvidenceAtEntry.earlier
+        if let pending = tapEvidenceAtEntry.pending, Self.sameContent(pending.before, elements) {
+            taps.append(pending.description)
+        }
+        guard !taps.isEmpty else { return "" }
+        noteCodesThisStep.insert(.unchangedTapBeforeFailure)
+        // 比べた相手は次のタップとは限らない(この手は type 等でありうる)= 「次の手」と言う
+        return earlierTapsHint(Array(taps.suffix(Self.unchangedEarlierTapsLimit)), also: false, nextAction: "the step")
     }
 
     /// iOS の木はアプリのプロセスだけ(in-app / XCUITest とも)。SpringBoard のアラート(権限の要求等)を
@@ -1671,6 +1698,7 @@ public final class StepExecutor {
     /// PT-3.16 / PT-3.18)。ステップごとに 1.0 へ戻す。
     /// **読むのは `scrollPath` の1箇所だけ** = `scrollFrame` を書いた経路でしか効かない
     var spanScale: Double = 1
-    /// 直前の `reverseSweep` が反対の端まで戻ったか(上限で止まったなら false。ScrollSearchResult.reverseSweepReachedEnd へ写す)
-    var reverseSweepReachedEnd = false
+    /// 直前の `reverseSweep` が実際に送ったドラッグの本数(0 = 最初の1本も撃てずに諦めた)。
+    /// 失敗文の「逆走査を撃った・画面を戻した位置のまま」は 1 本以上のときだけ言う(ScrollSearchResult.reverseSweepRan)
+    var reverseSweepDragsSent = 0
 }

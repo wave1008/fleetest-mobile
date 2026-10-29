@@ -275,12 +275,20 @@ public final class SessionRecoveryDriver: AppDriver {
     public func pressEnter() async throws { try await withRecovery { try await base.pressEnter() } }
     // ref を取らず古びる状態も無いので withRecovery でよい(clearInput 側の recoverAndRethrow は不要)
     public func hideKeyboard() async throws { try await withRecovery { try await base.hideKeyboard() } }
+    public func hideKeyboardIfShown() async throws -> Bool { try await withRecovery { try await base.hideKeyboardIfShown() } }
     /// terminate 後は回復対象にしない。ブリッジ側 handleTerminate も app=nil にするため以降は 409 に
     /// なるが、これは「意図してセッションを終わらせた」状態であって復旧すべき障害ではない。
     /// ここで lastBundleID を残すと、次の snapshot が activate で**アプリを勝手に起動し直し**、
     /// 明示的な terminateApp を黙って打ち消してしまう。
+    /// **409(アプリが既に落ちてセッションが無い)で失敗しても控えを消す** —— 残すと次の読みの回復が、止めようとしたアプリを
+    /// activate で起こし直す。届いたか分からない失敗(時間切れ・接続断)では消さない(アプリが生きていれば回復が要る)
     public func terminate() async throws {
-        try await base.terminate()
+        do {
+            try await base.terminate()
+        } catch {
+            if case DriverError.badResponse(409, _) = error { lastBundleID = nil }
+            throw error
+        }
         lastBundleID = nil
     }
 

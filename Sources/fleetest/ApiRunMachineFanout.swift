@@ -82,7 +82,9 @@ enum ApiRunMachineFanout {
                     throw ValidationError(
                         "no scenarios (add a @TestClass under TestProjects/\(project.name)/scenarios/)")
                 }
-                let selected = try ScenarioSelection.resolve(scenarios, from: all)
+                let resolution = try ScenarioSelection.resolveReportingCollapsed(scenarios, from: all)
+                if let notice = ScenarioSelection.collapsedNotice(resolution.collapsed) { logStderr(notice) }
+                let selected = resolution.selected
                 guard !selected.isEmpty else {
                     throw ValidationError("no scenarios to run after filtering")
                 }

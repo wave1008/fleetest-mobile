@@ -60,7 +60,14 @@ private final class FakeAppDriver: AppDriver {
     func press(x: Double, y: Double, duration: Double) async throws {}
     func screenshot() async throws -> Data { Data() }
     private(set) var terminateCallCount = 0
-    func terminate() async throws { terminateCallCount += 1 }
+    var terminateShouldFail = false
+    /// 非 nil なら terminate がこれを投げる(409 以外 = 届いたか分からない失敗の再現)
+    var terminateError: Error?
+    func terminate() async throws {
+        terminateCallCount += 1
+        if let terminateError { throw terminateError }
+        if terminateShouldFail { throw Self.sessionLost }
+    }
 
     private(set) var pressEnterCallCount = 0
     var pressEnterShouldFail: [Bool] = []
@@ -123,6 +130,31 @@ final class SessionRecoveryDriverTests: XCTestCase {
         }
         XCTAssertEqual(fake.activateCalls, [], "アプリを起動し直してはいけない")
         XCTAssertEqual(fake.snapshotCallCount, 1, "再試行してはいけない")
+    }
+
+    /// terminate が 409 で失敗しても(アプリが既に落ちていた)回復対象から外す。残すと次の snapshot の回復が
+    /// 止めようとしたアプリを activate で起こし直す
+    func testFailedTerminateAlsoStopsRecovery() async throws {
+        let fake = FakeAppDriver()
+        let driver = SessionRecoveryDriver(base: fake)
+        try await driver.launch(bundleID: "com.example.app")
+        fake.terminateShouldFail = true
+        do { try await driver.terminate(); XCTFail("409 は呼び手へ返るべき") } catch {}
+        fake.snapshotShouldFail = [true, false]
+        _ = try? await driver.snapshot()
+        XCTAssertEqual(fake.activateCalls, [], "止めようとしたアプリを起こし直してはいけない")
+    }
+
+    /// 届いたか分からない失敗(時間切れ)では控えを残す = アプリが生きていれば以後の 409 を回復できる
+    func testTerminateTimeoutKeepsRecovery() async throws {
+        let fake = FakeAppDriver()
+        let driver = SessionRecoveryDriver(base: fake)
+        try await driver.launch(bundleID: "com.example.app")
+        fake.terminateError = URLError(.timedOut)
+        do { try await driver.terminate(); XCTFail("時間切れは呼び手へ返るべき") } catch {}
+        fake.snapshotShouldFail = [true, false]
+        _ = try await driver.snapshot()
+        XCTAssertEqual(fake.activateCalls, ["com.example.app"], "時間切れの後も回復する")
     }
 
     func testTapRefDoesNotRetryButRecoversSessionAndRethrows() async throws {

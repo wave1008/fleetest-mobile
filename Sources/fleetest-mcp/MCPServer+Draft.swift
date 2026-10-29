@@ -19,8 +19,10 @@ extension MCPServer {
     /// ft_dry_run の「アサーションの無い expectation ブロック」検出に埋めさせる。
     /// **セレクタを解決できなかった手は TODO で残す**(F-4) —— 消すと手順と食い違う
     func draftScenario(_ args: [String: Any]) throws -> String {
-        let recorded = (args["all"] as? Bool == true)
-            ? interactions.entries : interactions.sinceLastLaunch
+        // **下書きは1台分**: 1つのプロセスで2台を操作した記録は、最後に操作した台の手だけを使う
+        // (混ぜると、別の台の画面にしか無いセレクタが1本のシナリオに並ぶ)。残りは header で言う
+        let draftDevice = interactions.latestDevice
+        let recorded = interactions.scope(all: args["all"] as? Bool == true, device: draftDevice)
         guard !recorded.isEmpty else {
             return "No interactions recorded yet. Drive the app with ft_launch / ft_tap / ft_type"
                 + " / ft_scroll_to first — this tool turns that sequence into a scenario draft."
@@ -39,7 +41,7 @@ extension MCPServer {
                 + " \(droppedCount) dropped). Call ft_draft_scenario again with a smaller"
                 + " drop list — the numbering is 1-based over the steps shown in the listing."
         }
-        let target = interactions.target(in: scope)
+        let target = interactions.target(in: scope, device: draftDevice)
         let unresolved = scope.compactMap(\.unresolved)
         let steps = scope.compactMap(\.step)
         // **解決できなかった手はその場に残す**。まとめて先頭へ出すと action の
@@ -49,6 +51,8 @@ extension MCPServer {
         // 一覧の番号(1 起点・刈り込み後)→ steps の位置。scenes: もこの対応で読む
         var stepIndexForListing: [Int] = []
         var resolved = 0
+        // 範囲で最初の launch(condition の launchApp() に写る)。先に宣言(irregularHandler)があっても位置 0 とは限らない
+        let firstLaunch = scope.firstIndex(where: \.isLaunch)
         for (position, entry) in scope.enumerated() {
             stepIndexForListing.append(resolved)
             if let described = entry.unresolved {
@@ -57,6 +61,11 @@ extension MCPServer {
                         + " (step \(position + 1) of the exploration)")
             } else if entry.step != nil {
                 resolved += 1
+            } else if let note = Self.unrenderedStepNote(entry, position: position, isFirstLaunch: position == firstLaunch,
+                                                         target: target.app) {
+                // **DSL の行にならない手も黙って捨てない**(launch / activate / 将来の step なしの記録)。
+                // 先頭の launch だけは condition の launchApp() に写る
+                notesBeforeStep[resolved, default: []].append(note)
             }
         }
         let sceneBreaks = (try Self.intArrayArgument(args, "scenes") ?? [])
@@ -85,6 +94,20 @@ extension MCPServer {
             + ".\nWrite it under TestProjects/<project>/scenarios/ and run ft_dry_run."
             + " **The expectation block is intentionally empty** — dry-run will report it,"
             + " and that is the signal to fill in what this scenario proves.\n"
+        let others = interactions.otherDevices(than: draftDevice, all: args["all"] as? Bool == true)
+        if others.count > 0 {
+            header += "⚠️ this draft covers only the device you drove last (\(draftDevice ?? "?")):"
+                + " \(others.count) recorded interaction(s) on other device(s)"
+                + " (\(others.keys.joined(separator: ", "))) were left out. A scenario runs on one device —"
+                + " draft the other one separately.\n"
+        }
+        // SpringBoard への attach はアプリの起動ではない(target と同じ扱い)
+        let launchedApps = Set(scope.compactMap(\.bundleID).filter { $0 != MCPServer.springboardBundleID })
+        if launchedApps.count > 1 {
+            header += "⚠️ the steps launch \(launchedApps.count) different apps"
+                + " (\(launchedApps.sorted().joined(separator: ", "))) but the class is written for"
+                + " \(target.app) — see the TODO comments where the app changes.\n"
+        }
         if interactions.droppedFromFront > 0 {
             header += "note: the \(interactions.droppedFromFront) oldest interaction(s) were"
                 + " dropped from the log (it keeps the most recent"
@@ -100,6 +123,32 @@ extension MCPServer {
                 + " is out of range (1…\(recorded.count)) and was ignored.\n"
         }
         return header + Self.pruningListing(scope) + "\n" + code
+    }
+
+    /// DSL の行を持たない記録(step も unresolved も無い)を、行の位置に残す TODO コメントへ直す。
+    /// 範囲で最初の launch(`isFirstLaunch`)が対象アプリなら `launchApp()`(condition)が担うので nil
+    /// (位置 0 で見ない = 先に irregularHandler の宣言があると誤って「起動し直した」と言う)。
+    /// **resume(activate)は DSL に対応が無い**ので、状態を保った前面化だったことを残す
+    static func unrenderedStepNote(_ entry: InteractionLog.Entry, position: Int, isFirstLaunch: Bool,
+                                   target: String) -> String? {
+        let what = entry.summary.isEmpty ? "(unnamed step)" : entry.summary
+        if entry.isLaunch {
+            if isFirstLaunch, entry.bundleID == target { return nil }
+            let app = entry.bundleID ?? target
+            return "TODO: the exploration launched the app again here (\(what)); a scenario starts it only"
+                + " once, in condition — if the restart is needed, add restartApp(\"\(app)\") here"
+                + " (it also terminates first)"
+        }
+        if entry.bundleID == MCPServer.springboardBundleID {
+            return "TODO: the exploration attached to SpringBoard here (\(what)) to act on the home screen or a"
+                + " system alert, not the app — in a scenario, close the alert with an irregular handler or drop these steps"
+        }
+        if let bundleID = entry.bundleID {
+            return "TODO: the exploration brought \(bundleID) to the front without relaunching"
+                + " (\(what)); the DSL has no activate — use appSwitcher() / home() or openURL(...) to get"
+                + " back, or drop this step"
+        }
+        return "TODO: no DSL line for \(what) (step \(position + 1) of the exploration)"
     }
 
     /// 実体は `FTCore.SelectorNaming.asWritten`(needsEscaping/computeGraded が使うため
@@ -158,6 +207,19 @@ extension MCPServer {
         return latest
     }
 
+    /// 下書きを台ごとに分ける鍵 = **解決した実体**(iOS の udid・Android の serial)。sessionKey は同じ台でも profile: と
+    /// udid:/port: で別の値になり、1台の探索が「別の台」に割れて launch や手が下書きから落ちる。実体が引けなければ sessionKey
+    func draftDeviceKey(_ args: [String: Any]) -> String {
+        let key = Self.sessionKey(args)
+        if Self.platformName(args) == "android" {
+            if let serial = (args["serial"] as? String).flatMap({ $0.isEmpty ? nil : $0 }) ?? connectedAndroidSerials[key] {
+                return "android:\(serial)"
+            }
+            return key
+        }
+        return iosTargetUDID(key: key, args: args).map { "ios:\($0)" } ?? key
+    }
+
     /// `interactions.record` の唯一の通し口: 記録と同時に、この sessionKey へ
     /// このセッションが何かを撃った回数(`sessionActionCounts`)も刻む。**素の
     /// `interactions.record` を直に呼ばない** —— そちらへ戻すと、その手だけ
@@ -165,7 +227,9 @@ extension MCPServer {
     func recordAction(_ entry: InteractionLog.Entry, args: [String: Any]) {
         sessionActionCounts[Self.sessionKey(args), default: 0] += 1
         lastActionCallIDs[Self.sessionKey(args)] = Self.currentCallID
-        interactions.record(entry)
+        var tagged = entry
+        if tagged.deviceKey == nil { tagged.deviceKey = draftDeviceKey(args) }
+        interactions.record(tagged)
     }
 
     func recordInteraction(action: String, resolvedRef: Int?, args: [String: Any],

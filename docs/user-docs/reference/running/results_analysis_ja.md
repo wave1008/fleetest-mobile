@@ -29,17 +29,17 @@ results/runs/<YYYY-MM>/<runID>/
 | コマンド | 説明 |
 |---|---|
 | `fleetest results list [--since <期間>] [--limit <n>]` | run を新しい順に一覧する |
-| `fleetest results summary [--scenario <id>]` | シナリオ別の実行回数・成功率・所要時間を集計する(成功率が低い順)。run を中断したせいで始まらなかったシナリオは成功率に入れない |
-| `fleetest results flaky [--min-runs <n>]` | 成功も失敗もするシナリオを、不安定な順に一覧する |
-| `fleetest results trend --scenario <id>` | 1シナリオの実行履歴を時系列で表示する |
-| `fleetest results devices` | ワーカー(デバイス)別・プラットフォーム別の実行回数と成功率を集計する |
-| `fleetest results slow [--limit <n>]` | シナリオを平均所要時間が長い順に一覧する |
+| `fleetest results summary [--scenario <id>]` | シナリオ別の実行回数・成功率・所要時間を集計する(成功率が低い順)。run を中断したせいで始まらなかったシナリオは成功率に入れない。`--scenario` にはシナリオ ID かクラス名(そのクラスの全シナリオ)を指定できる。`flaky` と同じく (シナリオ, プラットフォーム) ごとの行になる |
+| `fleetest results flaky [--min-runs <n>]` | 成功も失敗もするシナリオを、不安定な順に一覧する((シナリオ, プラットフォーム) ごとに1行) |
+| `fleetest results trend --scenario <id>` | 1シナリオの実行履歴を時系列で表示する(`--scenario` は `Class.method` の完全なシナリオ ID。バーはプラットフォームごとの尺度) |
+| `fleetest results devices` | ワーカー(デバイス。マシンごと —— 別のマシンの同名のデバイスは別の行)別・プラットフォーム別の実行回数と成功率を集計する |
+| `fleetest results slow [--limit <n>]` | シナリオを平均所要時間が長い順に一覧する(`--since` の窓の全体で集計) |
 | `fleetest results response` | レスポンス計測の run(`responseMeasurement=true`)のステップごとに、最初のフレームまでの時間(標本数・中央値・p90・busy 件数)と、次の操作ができるようになるまでの時間(標本数・中央値・p90)、同じマシン・同じデバイスの前回の計測 run からの最初のフレームまでの差を並べる。ステップはシナリオ内の (scene, section, command, description, 出現順) で同一視する。マシンかデバイスが違う run とは比べない。[レスポンス計測](./response_measurement_ja.md)参照 |
 | `fleetest results insights` | 実行履歴に対する10種の検査 —— [`insights` が検知するもの](#insights-が検知するもの)を参照 |
 | `fleetest results log <runID> [--scenario <id>]` | run のシナリオごとの実行ログ —— [シナリオの実行ログを読む](#シナリオの実行ログを読む)を参照 |
 
 すべて `--project` を受け付け、`log` 以外は `--since <期間>`(`30d`/`12h` のような相対値、または
-`YYYY-MM-DD`。既定 `90d`)と単一行 JSON で出す `--json` も受け付けます。正確なフラグは
+`YYYY-MM-DD` —— その日の **UTC** 0時。表の時刻はローカル時刻。既定 `90d`)と単一行 JSON で出す `--json` も受け付けます。正確なフラグは
 `fleetest results <サブコマンド> --help` で確認してください。
 
 ## シナリオの実行ログを読む
@@ -85,7 +85,7 @@ results/runs/<YYYY-MM>/<runID>/
 だけでなく**(シナリオ, platform)** の組ごとに出ます。同じシナリオ ID を `ios` と `android` の
 両方で回すプロジェクト(Compose Multiplatform の E2E 等)では platform ごとに別の行になります
 —— 混ぜると無関係な合否・所要時間の履歴が1つの誤った傾向に見えます。`fleetest results slow`
-も同じ単位で行を分けます。
+も同じ単位で行を分けます。デバイスはマシンごとにも区別します —— `deviceBias` は別のマシンの同名のデバイスを別のデバイスとして数え、`durationRegression` はシナリオの履歴を1台のマシンごとに比べます(記録が複数のマシンにまたがるときは文言にマシン名が付きます)。
 
 ## 失敗した run の読み方
 

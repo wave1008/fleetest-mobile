@@ -9,7 +9,7 @@ to an edge.
 
 | function | description |
 |---|---|
-| `scrollTo(sel, direction: .down, containerInference:, settle:, maxSwipes: 8)` | Scrolls until the element is found (found = success; does not tap it). |
+| `scrollTo(sel, direction: .down, containerInference:, settle:, maxSwipes: 8)` | Scrolls until the element is found (found = success; does not tap it). It searches only in the `direction:` given. If it reaches the end without finding the element, it steps back in small drags to pick up a row the scrolling skipped over. If the list was already at its end and nothing moved at all, it fails without searching the other side. |
 | `scrollDown(repeat: 1, settle:)` / `scrollUp` / `scrollRight` / `scrollLeft` | Scrolls one screenful (`repeat:` times to repeat). |
 | `scrollToBottom(settle:, maxSwipes: 50)` / `scrollToTop` / `scrollToRightEdge` / `scrollToLeftEdge` | Scrolls to the edge — until the screen stops changing. `maxSwipes` is a runaway guard; hitting it leaves a note on the step. |
 | `withScrollDown { … }` / `withScrollUp` / `withScrollRight` / `withScrollLeft` | Makes every `tap` / `type` / `clearInput` / `select` / `exist` / `notExist` / `findImage` / `existImage` / `hold` inside the block search by scrolling (an explicit `scroll:` on a command still wins). **`notExist` changes meaning** inside the block — it fails as soon as the element turns up while scrolling. |

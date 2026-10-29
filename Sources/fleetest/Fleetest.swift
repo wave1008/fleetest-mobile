@@ -478,14 +478,9 @@ struct RunScenarios: AsyncParsableCommand {
         let full = resolvedAll.filteringDevices(names: effectiveDeviceFilter, deviceMachine: effectiveDeviceHost)
         // 絞り込みを指定したときだけ「合致0」を言う(指定なしで0台はプロファイル自体の誤りで、
         // resolve / ProfileRunner.run が自分の言葉で報告する)。文言は ProfileRunner.run と同じ形
-        if full.devices.isEmpty, !effectiveDeviceFilter.isEmpty || effectiveDeviceHost != nil {
-            let scope = [common.devices.isEmpty ? nil : "--device \(common.devices.joined(separator: ", "))",
-                         common.deviceMachine.map { "--device-machine \($0)" }]
-                .compactMap { $0 }.joined(separator: " ")
-            throw ValidationError(
-                "\(scope) matched no device in run profile \(profile)"
-                + " (available: \(resolvedAll.devices.map(\.name).joined(separator: ", ")))")
-        }
+        try common.rejectDeviceFilterMatchingNothing(
+            profile: profile, resolvedAll: resolvedAll, filtered: full,
+            devices: effectiveDeviceFilter, deviceMachine: effectiveDeviceHost)
         // 計測は絞った後の台数で1台(機械をまたいで数える = 配る前。ResponseMeasurementPolicy の冒頭。api run と同じ)
         if full.responseMeasurement {
             try ResponseMeasurementPolicy.validateDevices(full.devices, run: full.runName)
@@ -743,7 +738,10 @@ struct RunScenarios: AsyncParsableCommand {
             throw ValidationError(
                 "no scenarios (add a @TestClass under TestProjects/\(testProject.name)/scenarios/)")
         }
-        var selected = try ScenarioSelection.resolve(scenarios, from: all, scenariosDir: testProject.scenariosDir)
+        let resolution = try ScenarioSelection.resolveReportingCollapsed(scenarios, from: all,
+                                                                         scenariosDir: testProject.scenariosDir)
+        var selected = resolution.selected
+        if let notice = ScenarioSelection.collapsedNotice(resolution.collapsed) { ConsoleOut.out(notice) }
         if scenarios.isEmpty {
             let deletedCount = all.filter(\.deleted).count
             if deletedCount > 0 {
@@ -759,7 +757,8 @@ struct RunScenarios: AsyncParsableCommand {
             selected = try Self.filterByFolders(selected, folders: folders,
                                                 scenariosDir: testProject.scenariosDir)
         }
-        if failed {
+        // **--folder で既に0本なら --failed の分岐へ入らない**(「前回の失敗は無い」で exit 0 にせず、下で folder の空を断る)
+        if failed, !(selected.isEmpty && !folders.isEmpty) {
             // (project, profile) 単位の記録。プロファイル無しの run は専用の区分
             // (LastResultsStore.noProfileKey)を読む。**リモート実行の分はここでは拾えない** ——
             // 手元でこの分岐へ来る時点でリモート/フリートへの分岐(dispatchToRemoteHost/
@@ -776,6 +775,15 @@ struct RunScenarios: AsyncParsableCommand {
             ConsoleOut.out("→ Re-running the \(selected.count) scenario(s) that failed last time")
         }
         guard !selected.isEmpty else {
+            // (存在しない --folder は filterByFolders が既に断る = ここへ来るのは実在するが合致が0本の場合)
+            if !folders.isEmpty {
+                let inFolders = (try? Self.filterByFolders(all, folders: folders,
+                                                           scenariosDir: testProject.scenariosDir)) ?? []
+                if let message = Self.emptyFolderSelectionError(folders: folders, scenarios: scenarios,
+                                                                inFolders: inFolders) {
+                    throw ValidationError(message)
+                }
+            }
             ConsoleOut.out("Nothing to run (every scenario is marked @Deleted or @Draft)")
             return
         }
@@ -790,6 +798,7 @@ struct RunScenarios: AsyncParsableCommand {
         if dryRun {
             var dryRunPlatform = resolvedPlatform
             var dryRunDevices: [CommandTargetCheck.Device] = []
+            var dryRunProfileReportDir: URL?
             if let profile = common.profile {
                 // **使わなくても実在は確かめる** —— `api run` は同じ打鍵を「run profile not found」で
                 // 断る(2実装で検査規則を揃える)。確かめないと打ち間違えたプロファイル名が dry-run を
@@ -803,12 +812,19 @@ struct RunScenarios: AsyncParsableCommand {
                 // iOS の ios { } を検証して緑になった(--profile と --platform は併用できないので既定の ios に倒れていた)
                 // **`--device` / `--device-machine` で絞った後のデバイスで決める**(`api run` の dry-run も絞った `full` から
                 // 決める。絞る前で決めると、混在プロファイルで Android の1台だけを指したときに CLI だけ ios を検証した)
-                let resolved = try ProfileResolver.resolve(
+                let resolvedAll = try ProfileResolver.resolve(
                     project: testProject, runName: profile,
                     workspaceOverride: common.workspace, overrides: try RunProfileSetOverride.parse(setOverrides))
+                let resolved = resolvedAll
                     .filteringDevices(names: common.devices, deviceMachine: common.deviceMachine)
+                // 本実行(validateProfileDevicesBeforeLock)・`api run` と同じ断り。0台は undeclaredScenarioPlatform が
+                // "android" に倒れ、打ち間違いの --device が android { } の検証で緑になっていた
+                try common.rejectDeviceFilterMatchingNothing(
+                    profile: profile, resolvedAll: resolvedAll, filtered: resolved,
+                    devices: common.devices, deviceMachine: common.deviceMachine)
                 dryRunPlatform = resolved.undeclaredScenarioPlatform
                 dryRunDevices = resolved.devices.map(CommandTargetCheck.Device.init)
+                dryRunProfileReportDir = ApiRun.declaredProfileReportDir(resolvedAll, project: testProject)
                 ConsoleOut.out("ℹ️ --dry-run touches no device; --profile decides that scenarios declaring no"
                       + " platform run their \(dryRunPlatform) { } blocks, and the commands they reach are checked"
                       + " against its devices' kind")
@@ -824,11 +840,11 @@ struct RunScenarios: AsyncParsableCommand {
                       + " (the scenarios are validated locally, from the same source every fleet entry would run)")
             }
             if !profileOverrides.isEmpty {
-                ConsoleOut.out("ℹ️ --dry-run touches no device, so --set is not used"
-                      + " (dry-run always runs with FM disabled)")
+                ConsoleOut.out("ℹ️ --dry-run touches no device, so --set is not used except reportDir"
+                      + " (dry-run always runs with FM disabled; reportDir decides where its reports go)")
             }
             let failedCount = await runDryRun(items, project: testProject, platform: dryRunPlatform,
-                                              devices: dryRunDevices)
+                                              devices: dryRunDevices, profileReportDir: dryRunProfileReportDir)
             ConsoleOut.out(failedCount == 0
                   ? "✅ All \(items.count) scenario(s) passed the dry-run"
                   : "❌ \(failedCount) of \(items.count) scenario(s) failed the dry-run")
@@ -1235,6 +1251,15 @@ struct RunScenarios: AsyncParsableCommand {
         }
     }
 
+    /// --folder が選択を空にしたときの断り文。nil = フォルダの中が @Deleted / @Draft だけ(従来どおり「Nothing to run」で
+    /// exit 0 = 理由を言い違えない)。それ以外(合致が0本・--scenario との積が空)は名指しの選択が空なので CI で拾えるよう非ゼロ
+    static func emptyFolderSelectionError(folders: [String], scenarios: [String],
+                                          inFolders: [ScenarioInfo]) -> String? {
+        if scenarios.isEmpty, !inFolders.isEmpty, inFolders.allSatisfy({ $0.deleted || $0.draft }) { return nil }
+        return "no scenario to run in --folder \(folders.joined(separator: ", "))"
+            + (scenarios.isEmpty ? "" : " together with --scenario \(scenarios.joined(separator: ", "))")
+    }
+
     /// --folder でシナリオを絞り込む(クラス名→ソースファイル→フォルダ名で照合)。
     /// 絞り込んだ結果が空、かつ未知のフォルダ名が含まれる場合はエラー
     static func filterByFolders(_ infos: [ScenarioInfo], folders: [String],
@@ -1305,10 +1330,14 @@ struct RunScenarios: AsyncParsableCommand {
 
     /// - devices: `--profile` のデバイス(空 = プロファイル無し。コマンドとデバイスの照合をしない)
     private func runDryRun(_ items: [ScenarioRunItem], project: TestProject, platform defaultPlatform: String,
-                           devices: [CommandTargetCheck.Device]) async -> Int {
-        let tempDir = FileManager.default.temporaryDirectory
-            .appendingPathComponent("fleetest-dryrun-\(UUID().uuidString)", isDirectory: true)
-        defer { try? FileManager.default.removeItem(at: tempDir) }
+                           devices: [CommandTargetCheck.Device], profileReportDir: URL?) async -> Int {
+        // レポート先を明示した(プロファイルに書いた)dry-run はそこへ書く(`api run --dry-run` と同じ。ApiRun.dryRunDiscardDir)
+        let tempDir = ApiRun.dryRunDiscardDir(dryRun: true, reportDirFlag: reportDir, setOverrides: setOverrides,
+                                              profileReportDir: profileReportDir)
+        defer { tempDir.map { try? FileManager.default.removeItem(at: $0) } }
+        let dryRunReportPath = tempDir?.path
+            ?? ApiRun.explicitReportDir(flag: reportDir, setOverrides: setOverrides, project: project,
+                                        withProfile: common.profile != nil) ?? profileReportDir?.path ?? project.reportsDir.path
 
         var failedCount = 0
         let deviceSession = RunDeviceSession()
@@ -1326,11 +1355,12 @@ struct RunScenarios: AsyncParsableCommand {
                 // **`enabled: false`(= 子へ --no-fm)**。デバイスも画面も無いので FM を引く経路を
                 // まとめて止める(個別に切ると残った経路が FM の直列化待ちを払う)
                 settings: ScenarioExecutionSettings(fm: FMConfig(enabled: false)),
-                reportDir: tempDir.path,
+                reportDir: dryRunReportPath,
                 dryRun: true, appBundleID: common.appID) { event in
                 if let step = DryRunTargetWarnings.step(from: event) { steps.append(step) }
+                // 消える一時フォルダへ書いた回だけ report 行を落とす(明示したレポート先は残る = api run の reportPath と同じ)
                 let lines = ScenarioLogFormatter.lines(for: event)
-                    .filter { !$0.contains("→ report:") }
+                    .filter { tempDir == nil || !$0.contains("→ report:") }
                 if quiet {
                     buffer.append(contentsOf: lines)
                 } else {
@@ -1351,9 +1381,9 @@ struct RunScenarios: AsyncParsableCommand {
         for outcome in await ScenarioHost.runDeviceTearDowns(
             project: project, connection: DriverConnection(platform: defaultPlatform),
             deviceSession: deviceSession, settings: ScenarioExecutionSettings(fm: FMConfig(enabled: false)),
-            reportDir: tempDir.path, dryRun: true,
+            reportDir: dryRunReportPath, dryRun: true,
             appPath: nil, appName: nil, appBundleID: common.appID, registerChildProcess: nil) {
-            ConsoleOut.out(ScenarioHost.describe(outcome))
+            ConsoleOut.out(ScenarioHost.describe(outcome.droppingReportPath(tempDir != nil)))
         }
         for outcome in await ScenarioHost.runAfterAlls(
             project: project, shared: deviceSession.shared,
@@ -1361,8 +1391,8 @@ struct RunScenarios: AsyncParsableCommand {
                 connection: DriverConnection(platform: platforms.sorted().first ?? defaultPlatform),
                 appPath: nil, appName: nil, appBundleID: common.appID) },
             settings: ScenarioExecutionSettings(fm: FMConfig(enabled: false)),
-            reportDir: tempDir.path, dryRun: true, registerChildProcess: nil) {
-            ConsoleOut.out(ScenarioHost.describe(outcome))
+            reportDir: dryRunReportPath, dryRun: true, registerChildProcess: nil) {
+            ConsoleOut.out(ScenarioHost.describe(outcome.droppingReportPath(tempDir != nil)))
         }
         return failedCount
     }

@@ -140,6 +140,122 @@ final class MCPDesignReviewFixesTests: XCTestCase {
         XCTAssertTrue(draft.contains("hideKeyboard()"), draft)
     }
 
+    /// Android でもキーボードが出ていない(ドライバが確かめて送らなかった)なら、iOS と同じ答えにし、下書きにも残さない
+    func testHideKeyboardOnAndroidWithNoKeyboardSendsNothing() async throws {
+        server.bridges[MCPServer.sessionKey([:])] = "android"
+        driver.keyboardShownForHide = false
+        let text = body(try await server.call(tool: "ft_hide_keyboard", args: [:]))
+        XCTAssertTrue(text.hasPrefix("The keyboard was not shown; nothing was sent."), text)
+        XCTAssertFalse(driver.calls.contains("hideKeyboard"), "\(driver.calls)")
+        let draft = body(try await server.call(tool: "ft_draft_scenario", args: ["all": true]))
+        XCTAssertFalse(draft.contains("hideKeyboard()"), draft)
+    }
+
+    /// Android は送らなかった回も、木からキーボードが消えるのを待つ(dumpsys は閉じても木は数秒残す)= 木を読みに行く
+    func testHideKeyboardWithNoKeyboardStillWaitsForTheTreeOnAndroid() async throws {
+        server.bridges[MCPServer.sessionKey([:])] = "android"
+        driver.keyboardShownForHide = false
+        let before = driver.calls.count
+        _ = try await server.call(tool: "ft_hide_keyboard", args: [:])
+        XCTAssertTrue(driver.calls.dropFirst(before).contains("snapshot"), "\(driver.calls)")
+    }
+
+    /// ft_launch は waitForChange を持たない = waitFor が外れても waitForChange を勧めない(持つツールでは従来どおり勧める)
+    func testLaunchWaitMissDoesNotSuggestAnArgumentItLacks() async throws {
+        let text = body(try await server.call(tool: "ft_launch", args: [
+            "bundleId": "com.example.app", "snapshotAfter": true, "waitFor": "#never_there",
+            "waitSeconds": MCPServer.waitForQuietCutoffSeconds + 2]))
+        // 画面が静かなまま待ちを早く打ち切った回(案内が出る経路)を通す
+        XCTAssertTrue(text.contains("the wait stopped after"), text)
+        XCTAssertFalse(text.contains("wait with waitForChange: true"), text)
+        XCTAssertTrue(MCPServer.toolDeclares("waitForChange", tool: "ft_tap"))
+        XCTAssertFalse(MCPServer.toolDeclares("waitForChange", tool: "ft_launch"))
+    }
+
+    /// SpringBoard への resume は attach するだけ = 「起動し直したかもしれない」と言わない
+    func testSpringBoardResumeDoesNotWarnAboutAFreshStart() async throws {
+        let text = body(try await server.call(tool: "ft_launch",
+                                              args: ["bundleId": MCPServer.springboardBundleID, "resume": true]))
+        XCTAssertTrue(text.contains("Activated: com.apple.springboard"), text)
+        XCTAssertFalse(text.contains("could not check"), text)
+    }
+
+    /// 何も送らなかった回は操作前の木と比べない(比べると「操作が効かなかったかも」と矛盾する注記が並ぶ)
+    func testHideKeyboardWithNoKeyboardDoesNotClaimTheActionMissed() async throws {
+        server.bridges[MCPServer.sessionKey([:])] = "android"
+        driver.keyboardShownForHide = false
+        _ = try await server.call(tool: "ft_snapshot", args: [:])
+        let text = body(try await server.call(tool: "ft_hide_keyboard", args: ["snapshotAfter": true]))
+        XCTAssertTrue(text.hasPrefix("The keyboard was not shown; nothing was sent."), text)
+        XCTAssertFalse(text.contains("looked unchanged"), text)
+    }
+
+    /// ft_terminate の 409(セッションが無い = アプリは既に落ちている)は起動の記録も消す。次の ft_terminate は同じ文を繰り返さない
+    func testTerminateNoSessionForgetsTheLaunch() async throws {
+        _ = try await server.call(tool: "ft_launch", args: ["bundleId": "com.example.app"])
+        driver.terminateError = DriverError.badResponse(status: 409, body: "no session")
+        do { _ = try await server.call(tool: "ft_terminate", args: [:]); XCTFail("409 は断るべき") } catch {}
+        do {
+            _ = try await server.call(tool: "ft_terminate", args: [:])
+            XCTFail("起動の記録が残っている")
+        } catch {
+            XCTAssertTrue("\(error)".contains("no known target to terminate"), "\(error)")
+        }
+    }
+
+    /// シミュレータでは、ランナーが 409(セッションが無い)を返してもアプリは生きていうるので simctl で止めて確かめ、成功として返す
+    func testTerminateNoSessionOnASimulatorStopsTheAppDirectly() async throws {
+        _ = try await server.call(tool: "ft_launch", args: ["bundleId": "com.example.app"])
+        server.udids[MCPServer.sessionKey([:])] = "SIM-UDID"
+        server.isSimulatorUDID = { $0 == "SIM-UDID" }
+        let stopped = LockedValue<[String]>([])
+        server.stopAppOnSimulator = { bundleID, udid in stopped.withLock { $0.append("\(bundleID)@\(udid)") } }
+        driver.terminateError = DriverError.badResponse(status: 409, body: "no session")
+        let text = body(try await server.call(tool: "ft_terminate", args: [:]))
+        XCTAssertTrue(text.hasPrefix("Terminated com.example.app"), text)
+        XCTAssertTrue(text.contains("stopped on the simulator directly"), text)
+        XCTAssertEqual(stopped.value, ["com.example.app@SIM-UDID"])
+    }
+
+    /// セッションで起動していないアプリでも、409 を simctl で止めた回は止まったことを確かめている = 未確認の文面にしない
+    func testTerminateNoSessionWithoutALaunchStillSaysTerminated() async throws {
+        _ = try await server.call(tool: "ft_snapshot", args: [:])
+        server.udids[MCPServer.sessionKey([:])] = "SIM-UDID"
+        server.isSimulatorUDID = { $0 == "SIM-UDID" }
+        server.stopAppOnSimulator = { _, _ in }
+        driver.terminateError = DriverError.badResponse(status: 409, body: "no session")
+        let text = body(try await server.call(tool: "ft_terminate", args: ["bundleId": "com.example.app"]))
+        XCTAssertTrue(text.hasPrefix("Terminated com.example.app"), text)
+        XCTAssertFalse(text.contains("nothing about the result is checked"), text)
+    }
+
+    /// 実機は止まったことを確かめる手段が無いので、409 は断る(simctl へは回さない)
+    func testTerminateNoSessionOnAPhysicalDeviceIsRefused() async throws {
+        _ = try await server.call(tool: "ft_launch", args: ["bundleId": "com.example.app"])
+        server.udids[MCPServer.sessionKey([:])] = "PHYS-UDID"
+        server.isSimulatorUDID = { _ in false }
+        let stopped = LockedValue(0)
+        server.stopAppOnSimulator = { _, _ in stopped.withLock { $0 += 1 } }
+        driver.terminateError = DriverError.badResponse(status: 409, body: "no session")
+        do {
+            _ = try await server.call(tool: "ft_terminate", args: [:])
+            XCTFail("実機の 409 は断るべき")
+        } catch {
+            XCTAssertTrue("\(error)".contains("may have crashed"), "\(error)")
+        }
+        XCTAssertEqual(stopped.value, 0)
+    }
+
+    /// ft_batch の hideKeyboard も、何も送らなかった回は ft_hide_keyboard と同じく「送らなかった」と言い、下書きに残さない
+    func testBatchHideKeyboardWithNoKeyboardIsNotDrafted() async throws {
+        server.bridges[MCPServer.sessionKey([:])] = "android"
+        driver.keyboardShownForHide = false
+        let text = body(try await server.call(tool: "ft_batch", args: ["steps": "hideKeyboard"]))
+        XCTAssertTrue(text.contains("the keyboard was not shown; nothing was sent"), text)
+        let draft = body(try await server.call(tool: "ft_draft_scenario", args: ["all": true]))
+        XCTAssertFalse(draft.contains("hideKeyboard()"), draft)
+    }
+
     /// iOS は背景を叩き、閉じなければ **Enter を送らずに**断る(エージェントが「閉じたい」だけで送信・検索を起こさない)。
     /// 代わりの手(ft_type pressEnter)と、その副作用を名指しする。下書きにも残さない
     func testHideKeyboardOnIOSDoesNotSendEnterWhenTappingDoesNotCloseIt() async throws {

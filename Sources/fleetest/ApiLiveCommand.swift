@@ -981,7 +981,17 @@ struct ApiLiveServe: AsyncParsableCommand {
             + " submit, search or moving to the next field)"
     }
 
+    /// ブリッジ自身(`BridgeSelfApps`)は起動・前面化・データ消去の対象にしない(撃つとブリッジが自滅し、ライブ操作が切れる)。
+    /// 判定は MCP・DSL と共有し、文言はライブ操作の読み手(拡張を触っている人)向けにここで持つ
+    static func refuseBridgeItself(_ bundle: String) throws {
+        guard BridgeSelfApps.isBridgeItself(bundle) else { return }
+        throw ServeCommandError.invalidArguments(
+            "\(bundle) is fleetest's own bridge, not your app — launching or wiping it would stop the bridge"
+            + " this live view runs on. Nothing was sent. Choose your app instead.")
+    }
+
     private func launchGuard(bundle: String, driver: AppDriver, ownAppBundleID: String?) async throws {
+        try Self.refuseBridgeItself(bundle)
         guard bundle != ownAppBundleID else { return }
         let isAndroid = driverOptions.resolvedPlatform == "android"
         let verdict = LaunchInstallVerdict.read(bundleID: bundle, driver: driver,
@@ -1176,6 +1186,7 @@ struct ApiLiveServe: AsyncParsableCommand {
         case "clearAppData":
             let bundle = try await resolveBundleForClearAppData(
                 command: command, driver: driver, follower: follower)
+            try Self.refuseBridgeItself(bundle)  // 追従が無いと launchGuard を通らないので、ここでも断る
             // clearAppData はホスト側で `terminate()`(= セッションのアプリ)を撃ってから
             // コンテナを消すので、対象のアプリへセッションを寄せてからでないと別のものを殺す。
             // 寄せるのは activate = 未インストールの bundle だとランナーが落ちるので launch と同じ門を先に通す

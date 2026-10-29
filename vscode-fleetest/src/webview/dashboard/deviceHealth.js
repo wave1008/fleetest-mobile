@@ -7,8 +7,9 @@
 // ("<platform>:<論理名>"。machine は含まない)。**モニターにしか居ないデバイス(事象0)・
 // 履歴にしか居ないデバイス(今は居ない)も行に出す**。欠けている値は「–」(0 で埋めない)。
 //
-// worker 行は insights.js の deviceBias リンクから revealWorkerRow() で参照される
-// (insight.worker は machine を持たないため、一致する行が複数機械にあれば最初の行へ飛ぶ)。
+// worker 行は insights.js の deviceBias リンクから revealWorkerRow(worker, machine) で参照される
+// (machine = insight.host の表示名。同名のデバイスが別の機械にも居うるので、渡されたらその機械の行だけを見る。
+// host を持たない行だけ worker で探し、複数機械にあれば最初の行へ飛ぶ)。
 //
 // モニターのデバイスの name は、そのデバイスが選択中の実行プロファイルに載っていない(registered:false)
 // ときだけ実体(iOS は Simulator 名・Android は AVD 名)になり、結果の記録の worker が使う
@@ -556,26 +557,32 @@ onMachineOrderChanged(() => {
 });
 
 /** insights.js が deviceBias のリンク可否を判断するための存在チェック(副作用なし)。 */
-export function hasWorkerRow(worker) {
-  return currentRows.some((r) => r.worker === worker);
+// machine(machineLabel 済み)を渡したらその機械の行だけ(insight の host が付く行 = 同名のデバイスが別の機械にも居うる)
+function matchesRow(r, worker, machine) {
+  return r.worker === worker && (machine === undefined || r.machine === machine);
+}
+
+export function hasWorkerRow(worker, machine) {
+  return currentRows.some((r) => matchesRow(r, worker, machine));
 }
 
 /** insights.js の deviceBias リンククリックから呼ぶ: 一致する最初の行までスクロールして
- * 一時的に強調する(insight.worker は machine を持たないため、複数機械に居れば最初の行)。
+ * 一時的に強調する(machine は insight.host の表示名。無ければ worker だけで探し、複数機械に居れば最初の行)。
  * 折りたたまれていれば展開してから探す。一致しなければ何もしない。 */
-export function revealWorkerRow(worker) {
+export function revealWorkerRow(worker, machine) {
   // 飛び先が「アクティブなデバイスを表示」で隠れているなら、絞り込みを外してから探す
-  if (activeOnlyToggle && activeOnlyToggle.checked && !visibleRows().some((r) => r.worker === worker)) {
+  if (activeOnlyToggle && activeOnlyToggle.checked && !visibleRows().some((r) => matchesRow(r, worker, machine))) {
     activeOnlyToggle.checked = false;
     renderRows();
   }
-  if (!expanded && visibleRows().findIndex((r) => r.worker === worker) >= COLLAPSE_LIMIT) {
+  if (!expanded && visibleRows().findIndex((r) => matchesRow(r, worker, machine)) >= COLLAPSE_LIMIT) {
     expanded = true;
     renderRows();
   }
   let target = null;
   for (const row of body.children) {
-    if (row.dataset.worker === worker) {
+    if (row.dataset.worker === worker
+        && (machine === undefined || row.dataset.rowKey === keyOf(machine, worker))) {
       target = row;
       break;
     }

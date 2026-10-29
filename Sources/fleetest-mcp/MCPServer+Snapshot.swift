@@ -697,7 +697,9 @@ extension MCPServer {
                     ? Self.waitForAppearedNote(waitFor, in: snapshot,
                                                collapsingBulk: effectiveArgs["expandBulk"] as? Bool != true)
                     : Self.waitMissHeadline(waitFor, seconds: seconds, quietStopAfter: waited.quietStopAfter,
-                                            explain: explainMiss)
+                                            explain: explainMiss,
+                                            // ft_launch は waitForChange を持たない = 持つツールでだけ案内する
+                                            canWaitForChange: Self.toolDeclares("waitForChange", tool: Self.currentTool))
                         + Self.appearedPromptNote(before: beforeAction, now: snapshot)
                         + " — this is the screen as it is now\(Self.truncationHint(snapshot))"
                         + (waited.partialSeenAfter.map { seenAfter in
@@ -899,9 +901,15 @@ extension MCPServer {
     /// 「アプリスイッチャーが開いている」という**誤った説明**を並べてしまう。
     /// 面が分かっているならそちらが正確なので、当たったほうだけを言う。
     /// 覆っているときは `hitTest` を聞かずに済むので往復も1つ減る
-    static func screenNotRepresentedWarning(_ found: ElementInfo, nativeRef: Int, driver: AppDriver) async -> String {
+    /// `insideInAppAlert`: 対象がアプリ内アラート(`AlertTreeScope.frontInAppAlert`)の部分木に居る。そのボタンは
+    /// `/hittable` が引き当てられないことがあり(実機 SE3・SwiftUI の `.alert` で 5/5。押せば届いて閉じた)、
+    /// 「アプリスイッチャー/別アプリ」と断じて撃ち直しを誘っていた。木がアラートを前面と言っている以上、
+    /// 問い合わせ対象が外れたという推論は成り立たないので聞かない(覆いは聞く)
+    static func screenNotRepresentedWarning(_ found: ElementInfo, nativeRef: Int, driver: AppDriver,
+                                            insideInAppAlert: Bool) async -> String {
         let covering = await systemUICoveringWarning(found, driver: driver)
         if !covering.isEmpty { return covering }
+        if insideInAppAlert { return "" }
         return await treeDoesNotMatchScreenWarning(found, nativeRef: nativeRef, driver: driver)
     }
 
@@ -930,8 +938,11 @@ extension MCPServer {
         if let memo = lastScreenProbe[key], memo.fingerprint == fingerprint {
             return memo.warning
         }
+        let insideAlert = AlertTreeScope.frontInAppAlert(in: fresh).map { alert in
+            AlertTreeScope.alertOnly(alert, in: fresh).elements.contains { $0.ref == found.ref }
+        } ?? false
         let warning = await Self.screenNotRepresentedWarning(found, nativeRef: nativeRef(found.ref, args: args),
-                                                             driver: driver)
+                                                             driver: driver, insideInAppAlert: insideAlert)
         lastScreenProbe[key] = (fingerprint, warning)
         return warning
     }

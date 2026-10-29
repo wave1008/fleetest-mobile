@@ -203,14 +203,9 @@ struct ApiRunCommand: AsyncParsableCommand {
         let full = resolvedAll.filteringDevices(names: effectiveDevices, deviceMachine: effectiveDeviceHost)
         // 絞り込みを指定したときだけ「合致0」を報告する。指定していないのに0台なのは
         // プロファイル自体の誤りで、それは resolve 側が自分の言葉で報告する
-        if full.devices.isEmpty, !effectiveDevices.isEmpty || effectiveDeviceHost != nil {
-            let scope = [common.devices.isEmpty ? nil : "--device \(common.devices.joined(separator: ", "))",
-                         common.deviceMachine.map { "--device-machine \($0)" }]
-                .compactMap { $0 }.joined(separator: " ")
-            throw ValidationError(
-                "\(scope) matched no device in run profile \(profile)"
-                + " (available: \(resolvedAll.devices.map(\.name).joined(separator: ", ")))")
-        }
+        try common.rejectDeviceFilterMatchingNothing(
+            profile: profile, resolvedAll: resolvedAll, filtered: full,
+            devices: effectiveDevices, deviceMachine: effectiveDeviceHost)
         // 計測は絞った後の台数で1台(機械をまたいで数える = 配る前。ResponseMeasurementPolicy の冒頭。run と同じ)
         if full.responseMeasurement {
             try ResponseMeasurementPolicy.validateDevices(full.devices, run: full.runName)
@@ -592,7 +587,10 @@ struct ApiRunCommand: AsyncParsableCommand {
             throw ValidationError(
                 "no scenarios (add a @TestClass under TestProjects/\(testProject.name)/scenarios/)")
         }
-        var selected = try ScenarioSelection.resolve(scenarios, from: all)
+        let resolution = try ScenarioSelection.resolveReportingCollapsed(scenarios, from: all)
+        var selected = resolution.selected
+        // 重なった指定を1回に畳んだことは言う(`fleetest run` と同じ1行。NDJSON の契約には足さない)
+        if let notice = ScenarioSelection.collapsedNotice(resolution.collapsed) { logStderr(notice) }
         guard !selected.isEmpty else {
             throw ValidationError("nothing to run (every scenario is marked @Deleted or @Draft)")
         }
@@ -886,7 +884,12 @@ struct ApiRunCommand: AsyncParsableCommand {
         let effectivePort = ports.first ?? BridgeAPI.defaultPort
         // `--report-dir`/`--default-timeout`/`--scenario-timeout` が優先(run() が両方指定を
         // 既にエラーにしている)。次点は `--set reportDir=`/`defaultTimeout=`/`scenarioTimeout=`
-        let reportDirPath = reportDir ?? noProfileSettings.reportDir ?? project.reportsDir.path
+        // レポート先を明示しない dry-run は一時ディレクトリへ書かせて捨てる(`fleetest run --dry-run` と同じ。ApiRun.dryRunDiscardDir)
+        let dryRunReportDir = ApiRun.dryRunDiscardDir(dryRun: dryRun, reportDirFlag: reportDir, setOverrides: setOverrides,
+                                                      profileReportDir: nil)
+        defer { dryRunReportDir.map { try? FileManager.default.removeItem(at: $0) } }
+        let reportDirPath = dryRunReportDir?.path
+            ?? reportDir ?? noProfileSettings.reportDir ?? project.reportsDir.path
         let effectiveDefaultTimeout = defaultTimeout ?? noProfileSettings.defaultTimeout
         let effectiveScenarioTimeout = scenarioTimeout ?? noProfileSettings.scenarioTimeout
 
@@ -967,7 +970,7 @@ struct ApiRunCommand: AsyncParsableCommand {
                 if event.kind == "scenarioFinished", event.notApplicableReason != nil {
                     declaredNotApplicable = true
                 }
-                writeLine(event.encodedLine())
+                writeLine(ApiRun.withoutDiscardedReportPath(event, discarded: dryRunReportDir != nil).encodedLine())
             }
             let scenarioEnd = Date()
             timing.recordSequential(start: scenarioStart, finish: scenarioEnd)
@@ -986,7 +989,7 @@ struct ApiRunCommand: AsyncParsableCommand {
                     settings: settings, reportDir: reportDirPath, dryRun: dryRun,
                     appPath: nil, appName: nil, appBundleID: common.appID,
                     registerChildProcess: { interruptState.registerChildProcess($0) }) {
-                    logStderr(ScenarioHost.describe(outcome))
+                    logStderr(ScenarioHost.describe(outcome.droppingReportPath(dryRunReportDir != nil)))
                 }
             }
             for outcome in await ScenarioHost.runAfterAlls(
@@ -1001,7 +1004,7 @@ struct ApiRunCommand: AsyncParsableCommand {
                 },
                 settings: settings, reportDir: reportDirPath, dryRun: dryRun,
                 registerChildProcess: { interruptState.registerChildProcess($0) }) {
-                logStderr(ScenarioHost.describe(outcome))
+                logStderr(ScenarioHost.describe(outcome.droppingReportPath(dryRunReportDir != nil)))
             }
         }
         return RunOutcome(passed: passedCount, failed: failedCount, skipped: skippedCount,
@@ -1029,7 +1032,11 @@ struct ApiRunCommand: AsyncParsableCommand {
         var fmForWarning = fm
         if dryRun { fmForWarning.enabled = false }
         await ProfileRunner.warnIfFMDegraded(fm: fmForWarning) { logStderr($0) }
-        let reportDirPath = (reportDir.map { URL(fileURLWithPath: $0) } ?? resolved.reportDir).path
+        let dryRunReportDir = ApiRun.dryRunDiscardDir(
+            dryRun: dryRun, reportDirFlag: reportDir, setOverrides: setOverrides,
+            profileReportDir: ApiRun.declaredProfileReportDir(resolved, project: project))
+        defer { dryRunReportDir.map { try? FileManager.default.removeItem(at: $0) } }
+        let reportDirPath = (dryRunReportDir ?? reportDir.map { URL(fileURLWithPath: $0) } ?? resolved.reportDir).path
 
         let triageBox = BlankTriageBox()
         var workers: [RunWorker] = []
@@ -1143,7 +1150,7 @@ struct ApiRunCommand: AsyncParsableCommand {
                     declaredNotApplicable = true
                 }
                 if dryRun, let step = DryRunTargetWarnings.step(from: event) { dryRunSteps.append(step) }
-                writeLine(event.encodedLine())
+                writeLine(ApiRun.withoutDiscardedReportPath(event, discarded: dryRunReportDir != nil).encodedLine())
             }
             if dryRun {
                 // `fleetest run --dry-run --profile` と同じ照合・同じ文(NDJSON の契約には足さない)
@@ -1173,7 +1180,7 @@ struct ApiRunCommand: AsyncParsableCommand {
                     appName: resolved.apps[target.platform]?.appName,
                     appBundleID: resolved.apps[target.platform]?.bundleID,
                     registerChildProcess: { interruptState.registerChildProcess($0) }) {
-                    logStderr(ScenarioHost.describe(outcome))
+                    logStderr(ScenarioHost.describe(outcome.droppingReportPath(dryRunReportDir != nil)))
                 }
             }
             for outcome in await ScenarioHost.runAfterAlls(
@@ -1192,7 +1199,7 @@ struct ApiRunCommand: AsyncParsableCommand {
                 settings: ApiRun.withDryRunFM(ScenarioExecutionSettings(resolved), dryRun: dryRun),
                 reportDir: reportDirPath, dryRun: dryRun,
                 registerChildProcess: { interruptState.registerChildProcess($0) }) {
-                logStderr(ScenarioHost.describe(outcome))
+                logStderr(ScenarioHost.describe(outcome.droppingReportPath(dryRunReportDir != nil)))
             }
         }
         return RunOutcome(passed: passedCount, failed: failedCount, skipped: skippedCount,

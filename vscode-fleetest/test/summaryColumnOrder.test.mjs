@@ -11,6 +11,7 @@ const ROOT = process.cwd();
 /** [i18n キー, そのセルが読むフィールド式の一部] の順序 */
 const EXPECTED = [
   ["colScenarioId", "row.scenarioID"],
+  ["colPlatform", "row.platform"],
   ["colLastResult", "row.lastPassed"],
   ["colLastRun", "row.lastRunAt"],
   ["colRuns", "row.runs"],

@@ -34,6 +34,8 @@ terminateApp()
   in-app ブリッジはテスト対象のアプリの中で動くので、別のアプリを駆動できないためです。別のアプリ(設定アプリ等)の手順は、
   そのアプリをアプリプロファイルに持つ実行プロファイルの別のシナリオに置いてください。そのシナリオは
   自動で XCUITest ブリッジ経由で動きます。
+- **fleetest 自身のブリッジは対象にできません。** ブリッジの ID(Android の `com.example.ftbridge`、iOS の ID が `.ftrunner`・`.ftrunner.uitests`・`.ftrunner.uitests.xctrunner` で終わるランナー)を `launchApp` / `restartApp` に渡すと、
+  何も送らずに失敗します。起動するとブリッジ自身が止まり、デバイスを操作できなくなるためです。
 - **既定アプリ**(`appID` を省略したとき。`launchApp` / `restartApp` / `terminateApp` /
   `removeApp` / `clearAppData` / `appIs` 共通)は実行プロファイルの
   `app` → アプリプロファイル → 実行中 platform の `ios.app` / `android.app` の順で決まります。

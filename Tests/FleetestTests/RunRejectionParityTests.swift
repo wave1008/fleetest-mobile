@@ -41,6 +41,11 @@ final class RunRejectionParityTests: XCTestCase {
         .init(label: "runner local without profile", arguments: ["--runner", "local"], rejected: false),
         .init(label: "runner with profile", arguments: ["--profile", "p", "--runner", "m1"], rejected: false),
 
+        // --device / --device-machine は実行プロファイルのデバイスを絞る口(プロファイル無しでは黙って無視されていた)
+        .init(label: "device without profile", arguments: ["--device", "d1"], rejected: true),
+        .init(label: "device-machine without profile", arguments: ["--device-machine", "m1"], rejected: true),
+        .init(label: "device with profile", arguments: ["--profile", "p", "--device", "d1"], rejected: false),
+
         // --all-machines(RunDeviceMachineAmbiguity.allMachinesConflictMessage)。--profile を
         // 添えて「--runner requires --profile」に先取りされないようにする(この表で見たいのは
         // その規則ではなく --all-machines との併用不可)

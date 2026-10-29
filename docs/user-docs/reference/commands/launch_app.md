@@ -33,6 +33,8 @@ terminateApp()
 - **On iOS in the default mode (inapp-boost), `launchApp` / `restartApp` of an app other than the scenario's own app
   fails in the middle of a scenario.** The in-app bridge runs inside the app under test and cannot drive another app.
   Put the steps on another app (such as Settings) in a separate scenario under a run profile whose app profile names that app; that scenario is driven through the XCUITest bridge automatically.
+- **fleetest's own bridge cannot be the target.** Passing the bridge's ID (Android `com.example.ftbridge`, or the iOS runner whose ID ends in `.ftrunner`, `.ftrunner.uitests` or `.ftrunner.uitests.xctrunner`) to `launchApp` / `restartApp`
+  fails without sending anything — launching it would stop the bridge the run drives the device through.
 - **Default app** (when `appID` is omitted, for `launchApp` / `restartApp` / `terminateApp` /
   `removeApp` / `clearAppData` / `appIs`): resolved from the run profile's `app`, then the app profile, then the current platform's `ios.app` /
   `android.app`. `@TestClass` has no `app:` argument (writing one is a compile error), so the same

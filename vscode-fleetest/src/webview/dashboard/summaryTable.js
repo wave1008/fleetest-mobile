@@ -19,6 +19,7 @@ const countEl = document.getElementById('summary-count');
 // 「失敗が先」で並ぶよう false=0/true=1/null=-1 にする(絞り込みチェックと同じ「失敗を先に」感覚)。
 const SORT_GETTERS = {
   scenarioID: (r) => r.scenarioID,
+  platform: (r) => r.platform,
   lastPassed: (r) => (r.lastPassed === true ? 1 : r.lastPassed === false ? 0 : -1),
   lastRunAt: (r) => r.lastRunAt || '',
   runs: (r) => r.runs,
@@ -66,6 +67,7 @@ function summaryRow(row) {
   // (位置で対応するので片方だけ並べ替えると値が別の見出しの下に出る)
   tr.append(
     scenarioIdCell(row.scenarioID),
+    td(row.platform),
     tdMid(typeof row.lastPassed === 'boolean' ? passFailMark(row.lastPassed) : '–'),
     td(formatLocalDateTime(row.lastRunAt)),
     tdNum(String(row.runs)),

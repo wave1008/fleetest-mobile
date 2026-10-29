@@ -103,8 +103,8 @@ final class ResultsRenderingTests: XCTestCase {
              record("Cart.add", passed: false, durationMs: 300)], recentRuns: .max)
         let out = lines(ResultsRendering.summary(rows))
         XCTAssertEqual(cells(out[0]),
-                       ["scenario", "runs", "pass rate", "avg ms", "median ms", "last run", "last result"])
-        XCTAssertEqual(cells(out[2]), ["Cart.add", "2", "50.0%", "200", "200", formatLocal(started), "❌"])
+                       ["scenario", "platform", "runs", "pass rate", "avg ms", "median ms", "last run", "last result"])
+        XCTAssertEqual(cells(out[2]), ["Cart.add", "ios", "2", "50.0%", "200", "200", formatLocal(started), "❌"])
         XCTAssertEqual(ResultsRendering.summary([]), "No matching scenarios")
     }
 
@@ -151,8 +151,8 @@ final class ResultsRenderingTests: XCTestCase {
         }
         let rows = RunResultsQuery.flakyScenarios(records, minRuns: 2, recentRuns: .max)
         let out = lines(ResultsRendering.flaky(rows, minRuns: 2))
-        XCTAssertEqual(cells(out[0]), ["scenario", "runs", "fail rate", "flip score", "recent results (new→old)"])
-        XCTAssertEqual(Array(cells(out[2]).prefix(3)), ["Cart.add", "4", "50.0%"])
+        XCTAssertEqual(cells(out[0]), ["scenario", "platform", "runs", "fail rate", "flip score", "recent results (new→old)"])
+        XCTAssertEqual(Array(cells(out[2]).prefix(4)), ["Cart.add", "ios", "4", "50.0%"])
         XCTAssertEqual(cells(out[2]).last, "❌✅❌✅")
         XCTAssertEqual(ResultsRendering.flaky([], minRuns: 5),
                        "No flaky scenarios (candidates need --min-runs 5+ and mixed pass/fail)")
@@ -166,10 +166,10 @@ final class ResultsRenderingTests: XCTestCase {
         let rows = [record("Cart.add", passed: true, durationMs: 50),
                     record("Cart.add", passed: false, durationMs: 100, worker: nil)]
         let out = lines(ResultsRendering.trend(rows, scenario: "Cart.add"))
-        XCTAssertEqual(cells(out[0]), ["startedAt", "runID", "passed", "durationMs", "worker", "machine", "bar"])
-        XCTAssertEqual(cells(out[2]), [formatLocal(started), "r1", "✅", "50", "iPhone", "h",
+        XCTAssertEqual(cells(out[0]), ["startedAt", "runID", "platform", "passed", "durationMs", "worker", "machine", "bar"])
+        XCTAssertEqual(cells(out[2]), [formatLocal(started), "r1", "ios", "✅", "50", "iPhone", "h",
                                        String(repeating: "█", count: 10)])
-        XCTAssertEqual(cells(out[3]), [formatLocal(started), "r1", "❌", "100", "-", "h",
+        XCTAssertEqual(cells(out[3]), [formatLocal(started), "r1", "ios", "❌", "100", "-", "h",
                                        String(repeating: "█", count: 20)])
         XCTAssertEqual(ResultsRendering.trend([], scenario: "X.y"), "No run history for: X.y")
     }
@@ -185,9 +185,9 @@ final class ResultsRenderingTests: XCTestCase {
         }
         XCTAssertEqual(trimmed, [
             "[per worker]",
-            "worker  runs  pass rate  avg ms",
-            "------  ----  ---------  ------",
-            "iPhone  2     50.0%      200",
+            "worker  machine  runs  pass rate  avg ms",
+            "------  -------  ----  ---------  ------",
+            "iPhone  h        2     50.0%      200",
             "",
             "[per platform]",
             "platform  runs  pass rate  avg ms",
@@ -202,7 +202,7 @@ final class ResultsRenderingTests: XCTestCase {
     func testSlowRendersPlatformAndRegressionColumns() {
         let rows = RunResultsQuery.slowTests(
             [record("Cart.add", passed: true, durationMs: 100), record("Cart.add", passed: true, durationMs: 300)],
-            limit: 5)
+            limit: 5, recentRuns: RunResultsQuery.recentScenarioRunsWindow)
         let out = lines(ResultsRendering.slow(rows))
         XCTAssertEqual(cells(out[0]),
                        ["scenario", "platform", "runs", "avg ms", "p90 ms", "regression", "slowest scene"])
@@ -215,7 +215,7 @@ final class ResultsRenderingTests: XCTestCase {
     func testInsightsRendersOneIconLinePerRowAndAnEmptyMessage() {
         func row(_ severity: String, _ message: String) -> RunResultsQuery.InsightRow {
             RunResultsQuery.InsightRow(kind: "k", severity: severity, scenarioID: nil, platform: nil,
-                                       worker: nil, message: message, count: nil, deltaPct: nil)
+                                       worker: nil, host: nil, message: message, count: nil, deltaPct: nil)
         }
         XCTAssertEqual(
             ResultsRendering.insights([row("critical", "a"), row("warn", "b"), row("info", "c")]),

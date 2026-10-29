@@ -43,6 +43,11 @@ private final class RecordingDriver: AppDriver {
     func type(ref: Int?, text: String) async throws { try record("type") }
     func clearInput(ref: Int?) async throws { try record("clearInput") }
     func hideKeyboard() async throws { try record("hideKeyboard") }
+    var keyboardShown = true
+    func hideKeyboardIfShown() async throws -> Bool {
+        try record("hideKeyboardIfShown")
+        return keyboardShown
+    }
     func pressEnter() async throws { try record("pressEnter") }
     func swipe(_ direction: FTSwipeDirection) async throws { try record("swipe") }
     func swipe(_ direction: FTSwipeDirection, intent: FTSwipeIntent, path: FTSwipePath?) async throws {
@@ -134,6 +139,28 @@ final class ActionCountingDriverTests: XCTestCase {
         XCTAssertEqual(counter.take(), 0)
         XCTAssertTrue(base.calls.contains("hitTest") && base.calls.contains("snapshot(bypassingCache)"),
                       "既定実装を持つ要件も中のドライバへ届く: \(base.calls)")
+    }
+
+    /// hideKeyboardIfShown は送ったとき(true)だけ数える(出ていなくて何も送らなかった回は画面に触れていない)
+    func testHideKeyboardIfShownCountsOnlyWhenSent() async throws {
+        let (driver, base, counter) = make()
+        base.keyboardShown = false
+        _ = try await driver.hideKeyboardIfShown()
+        XCTAssertEqual(counter.take(), 0)
+        base.keyboardShown = true
+        _ = try await driver.hideKeyboardIfShown()
+        XCTAssertEqual(counter.take(), 1)
+    }
+
+    /// hideKeyboard も同じ数え方(Android は出ていなければ何も送らない = 数えない)
+    func testHideKeyboardCountsOnlyWhenSent() async throws {
+        let (driver, base, counter) = make()
+        base.keyboardShown = false
+        try await driver.hideKeyboard()
+        XCTAssertEqual(counter.take(), 0)
+        base.keyboardShown = true
+        try await driver.hideKeyboard()
+        XCTAssertEqual(counter.take(), 1)
     }
 
     func testThrowingOperationsAreNotCounted() async {

@@ -28,7 +28,8 @@ final class MCPLaunchResumeTests: XCTestCase {
             tool: "ft_launch", args: ["bundleId": "com.example.app", "resume": true])
         XCTAssertEqual(driver.calls, ["activate(com.example.app)"])
         let message = try XCTUnwrap(result.first?["text"] as? String)
-        XCTAssertEqual(message, "Activated: com.example.app (resumed without relaunching)")
+        // 偽ドライバの宛先(udid / serial なし)では走っていたかを確かめられない = 断定しない文言(3通りの文言は SessionToolGuardsTests)
+        XCTAssertEqual(message, MCPServer.resumeSummary(bundleID: "com.example.app", wasRunning: nil))
     }
 
     /// resume を付けなければ従来どおり launch(退行が無いこと)

@@ -122,8 +122,15 @@ extension BridgeRouter {
         }
         ResponseMeasurement.noteInjection()
         app.typeText(req.text)
-        return nil
+        // **文中の改行で読み返しを飛ばした事実は言う**(黙ると「全部入った」に読める = 誤った緑)。
+        // 改行ごとに区切って読み返す形にしない: Return ごとの待ち・焦点の読み直しが /type の時間切れ(20s)を超え、
+        // 複数行の欄・焦点が移るフォームで誤った赤と遅さを生む。確かめたい書き手は改行を pressEnter() で分ける
+        return main.contains("\n") ? Self.multilineUnverifiedNote : nil
     }
+
+    /// 文中に改行を含む /type を読み返さずに送ったときの注記(ホストは driverFallback へ載せる)
+    static let multilineUnverifiedNote = "the text contains a newline in the middle, so it was typed in one go and not"
+        + " read back — whether every line landed was not checked (split it with pressEnter() to have each line verified)"
 
     /// `/type` の読み返しループ本体。ref 経路(`refElements` から引いた対象)・焦点経由
     /// (`matchFocusedElement` で特定した対象)の両方から呼ぶ共有実装。呼び手は `target` が

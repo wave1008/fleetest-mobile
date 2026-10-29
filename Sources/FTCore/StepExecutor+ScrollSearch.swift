@@ -68,23 +68,10 @@ extension StepExecutor {
         /// **この区別が無いと「stopped early」としか言えず**、末尾に着いただけの回を
         /// 「途中で諦めた」と読ませて maxSwipes の引き上げを繰り返させる
         var contentEverMoved: Bool = false
-        /// **逆走査(reverseSweep)が、見つけられなかった場合でも画面を動かしたか**。
-        ///
-        /// `contentEverMoved` は**順方向の比較でしか立たない**(reverseSweep は逆向きの
-        /// 独立したドラッグ+比較ループを持ち、その結果を呼び手へ返す手段が `found` の
-        /// 成否しか無かった)。探索の開始位置が既にその向きの端だった回は、順方向は1度も
-        /// 動かせず `contentEverMoved=false` のまま確定するが、その直後の逆走査は画面を
-        /// 動かして(見つけられずに)戻ってくることがある。ここを見ずに `contentEverMoved`
-        /// だけで文言を分岐すると「スワイプがスクロール領域に届いていない」と誤って
-        /// 断定する(実測: 逆走査でリストを先頭まで戻しているのに、その文言が出た)。
-        /// **`contentEverMoved` を流用しない** —— 「順方向で動いて端に着いた」と
-        /// 「開始位置が既に端で、逆走査でも見つからなかった」は次の一手が違う
-        /// (前者は maxSwipes を上げても無駄、後者はそもそもこの画面に無い)ので
-        /// 文言を分ける必要があり、同じ Bool には畳めない
-        var reverseSweepMoved: Bool = false
-        /// 逆走査が**反対の端まで戻った**(もう動かなくなった)か。false = 回数の上限(`reverseSweepMaxSwipes`)で止まった。
-        /// 「この画面には無い」と言えるのは端まで戻ったときだけ(上限で止まった回は、もっと先にあるかもしれない)
-        var reverseSweepReachedEnd: Bool = false
+        /// 逆走査(slowDrag 最大 `reverseSweepMaxSwipes` 本・`swipes` に数えない)を**1本以上撃てた**か(`reverseSweepDragsSent`。見つけた回は found が真なので
+        /// 文言は読まない)。失敗文が「after N scroll(s)」と言うだけだと、直後に反対向きへ遅いドラッグが走り画面が
+        /// 動いたこと・所要時間の大半がそれであることが読み手に見えない
+        var reverseSweepRan: Bool = false
         /// 端まで来ても見つからず、**逆向きの細刻みで拾い直した**回数(0 か 1。注記に載せる)
         var reverseSweeps: Int = 0
         /// 拾い直しに使った容器を**そのまま書けるセレクタ**にしたもの(nil = 名指しできない)。
@@ -106,7 +93,7 @@ extension StepExecutor {
         /// 1回はこの警告が出ないままだった
         var maxTruncatedDuringSearch: Int = 0
         /// `stoppedUnmoving` 判定時点の実効キーボード矩形(chrome 込み。`KeyboardOcclusion`)。
-        /// nil = キーボード非表示。**`!contentEverMoved && !reverseSweepMoved` のときだけ**
+        /// nil = キーボード非表示。**`!contentEverMoved` のときだけ**
         /// scrollNotFoundMessage が読む ——
         /// ソフトキーボードの上でスワイプすると始点がキー面に乗って「1度も動かなかった」に
         /// 見えるため(ScrollGeometry.viewport 参照)、その主因を名指しする
@@ -220,29 +207,24 @@ extension StepExecutor {
         // **「stopped early」と言わない**。旧文言は「途中で諦めた」としか
         // 読めず、実際には**リストの末尾に着いていた**回(iOS の設定アプリで実測)を欠陥と
         // 受け取らせ、maxSwipes を上げた再試行を誘っていた。上げても結果は変わらないので明言する。
-        // **3形を分ける**: `contentEverMoved`(順方向)が
-        // 「動いた末の停止」か「1度も動かなかった」かをまず分け、後者はさらに
-        // `reverseSweepMoved`(逆走査が画面を動かしたか)で分ける ——
-        // 逆走査が動かしていたなら**探索側は実際にスワイプを届かせている**ので、
-        // 「スワイプが届いていない」は事実に反する(ツール自身が逆走査でその領域を動かしている)。
-        // この形は maxSwipes を上げても scrollFrame を書いても解決しない(開始位置が既に端で、
-        // その画面にこの要素が無いだけ)ので、どちらの助言も出さない
+        // **2形を分ける**: `contentEverMoved`(順方向)で「動いた末の停止」か「1度も動かなかった」か。
+        // 後者では逆走査を撃たない(runScrollSearch の guard)ので、反対側は探していないと言う
         let stopped: String
         if result?.stoppedUnmoving == true {
             if result?.contentEverMoved == true {
                 stopped = " (the scroll area reached its end — the content stopped moving,"
                     + " so raising maxSwipes will not help)"
-            } else if result?.reverseSweepMoved == true, result?.reverseSweepReachedEnd == true {
-                stopped = " (the scroll area was already at its end when the search started"
-                    + " — sweeping back to the other end did not find it either, so this element is not on this screen)"
-            } else if result?.reverseSweepMoved == true {
-                // 逆走査は回数の上限で止まった(反対の端まで届いていない)= 「この画面に無い」とは言えない
-                stopped = " (the scroll area was already at its end in this direction when the search started"
-                    + " — sweeping back \(Self.reverseSweepMaxSwipes) slow steps did not reach the other end, so it may be"
-                    + " farther that way: search in the opposite direction)"
             } else {
-                stopped = " (nothing moved at all during the search — the swipes are not reaching a"
-                    + " scrolling area, so raising maxSwipes will not help)"
+                // 何も動かなかったとき、スワイプが領域に届いていないのか、既にその向きの端なのかは
+                // ツールには区別できない(どちらも木が変わらない)。帰属を断定せず両方を事実として言う
+                // 反対側は探していないので、向きを名指しして書き直せるようにする。`direction` は指の向き =
+                // 反対の**スクロールの向き**はその rawValue そのもの。引数名はコマンドで違う(scrollTo = `direction:` /
+                // tap・exist 等 = `scroll:`。MCP の ft_scroll_to は `direction`、ft_batch は DSL の行なので同じ名前で通じる)
+                let oppositeArgument = step.action == "scrollTo" ? "direction" : "scroll"
+                stopped = " (nothing moved at all during the search — either the swipes did not reach a"
+                    + " scrolling area or it was already at its end in this direction; the tool cannot tell which,"
+                    + " and raising maxSwipes will not help; the opposite direction was not searched — if the element"
+                    + " is on that side, search with \(oppositeArgument): .\(direction.rawValue))"
             }
         } else {
             stopped = ""
@@ -262,21 +244,41 @@ extension StepExecutor {
         // 埋まる(ScrollSearchResult.directionMatchedScrollFrameCandidate の doc)。
         // 画面に探索方向へ動かせそうな容器が申告されているのに、全画面スワイプだけを繰り返して
         // 「シートを広げろ」「端に着いた」と的外れに言っていた場合の案内
+        // **`scrollFrame:` を取るのは scrollTo だけ**(tap / exist の `scroll:` は取らず、書くと
+        // 「has no scrollFrame: parameter」で落ちる)。それ以外は withScroll*(scrollFrame:) { } を勧める
+        let takesScrollFrame = step.action == "scrollTo"
+        // 貼ってそのまま書けるブロック名(`direction` は指の向き = スクロールの向きはその逆。FTScrollDirection.swipe と対)
+        let withScrollBlock: String = switch direction {
+        case .up: "withScrollDown"
+        case .down: "withScrollUp"
+        case .left: "withScrollRight"
+        case .right: "withScrollLeft"
+        }
         let scrollFrameHint = result?.directionMatchedScrollFrameCandidate.map {
-            " A scroll area matching this direction is declared on screen (scrollFrame: \($0))"
-                + " — consider passing scrollFrame: to search inside it instead of the whole screen."
+            takesScrollFrame
+                ? " A scroll area matching this direction is declared on screen (scrollFrame: \(ScenarioCodeGen.literal($0)))"
+                    + " — consider passing scrollFrame: to search inside it instead of the whole screen."
+                : " A scroll area matching this direction is declared on screen (scrollFrame: \(ScenarioCodeGen.literal($0)))"
+                    + " — consider wrapping the step in \(withScrollBlock)(scrollFrame: \(ScenarioCodeGen.literal($0))) { }"
+                    + " to search inside it instead of the whole screen."
         } ?? ""
         // **キーボードが主因の可能性を名指しする**: swipe の始点は画面全体の固定比率で作られるため、
         // ソフトキーボードの上で振ると始点がキー面に乗って何も動かない(キーボードは常にタッチを
-        // 飲む)。**1度も動かなかった回にだけ出す**(`!contentEverMoved && !reverseSweepMoved`)——
-        // 末尾に着いた回・逆走査が画面を動かせた回はキーボードと無関係
+        // 飲む)。**1度も動かなかった回にだけ出す**(`!contentEverMoved`)——
+        // 末尾に着いた回はキーボードと無関係
         var keyboardHint = ""
         if result?.stoppedUnmoving == true, result?.contentEverMoved == false,
-           result?.reverseSweepMoved != true, let kb = result?.keyboardFrame {
+           let kb = result?.keyboardFrame {
             keyboardHint = ": the soft keyboard covers (\(Int(kb.x)),\(Int(kb.y))"
                 + " \(Int(kb.width))x\(Int(kb.height))); pass scrollFrame or close the keyboard"
         }
-        return "element not found after \(swipes) scroll(s)\(stopped): \(step.locatorSummary)"
+        // 逆走査を撃った失敗だけ(数に入らない遅いドラッグが走り、画面が戻されていることを見せる)。
+        // **「reached its end」「not reaching a scrolling area」を含めない**: 順方向の事実を言う別の分岐の語
+        let sweepNote = result?.reverseSweepRan == true
+            ? " — then a reverse sweep of up to \(Self.reverseSweepMaxSwipes) slow drags the opposite way"
+              + " (not counted in the \(swipes) above) also found nothing, so the screen is left at the swept-back position"
+            : ""
+        return "element not found after \(swipes) scroll(s)\(stopped)\(sweepNote): \(step.locatorSummary)"
             + sheetHint + keyboardHint + scrollFrameHint
     }
 
@@ -877,7 +879,10 @@ extension StepExecutor {
                                 Self.directionMatchedScrollFrameCandidate(in: confirmed.snapshot,
                                                                           vertical: vertical)
                         }
-                        guard recoverOnMiss, step.containerInference ?? true,
+                        // **順方向で1度も動かなかったら逆走査しない**: 逆走査は飛び越しの救済で、動いていなければ
+                        // 何も通り過ぎていない。撃つと指定と逆の向きを探す別の機能になり、`scrollTo(direction: .up)` が
+                        // 先頭から下の要素を見つけて成功する(「上にある」の確認にならない)
+                        guard contentEverMoved, recoverOnMiss, step.containerInference ?? true,
                               // 半開きシートで呼び手が展開・再試行するなら、逆走査はそちらの
                               // 再試行(全画面高)に譲る(defersPartialSheetRecovery の宣言参照)
                               !(defersPartialSheetRecovery && containerIsPartialHeight),
@@ -889,9 +894,11 @@ extension StepExecutor {
                         // 既定経路(scrollFrame 未指定)は刻みがブリッジ任せで縮められないので、
                         // ここでだけ推測した容器で細刻みの逆走査を掛ける
                         // (通常の送りには触らない = 2度撤回した「暗黙の座標化」にならない)
-                        if let recovered = try await reverseSweep(step: step, container: container,
-                                                                  searching: direction,
-                                                                  phase: &phase) {
+                        let recoveredBySweep = try await reverseSweep(step: step, container: container,
+                                                                      searching: direction, phase: &phase)
+                        // 撃てた本数で決める(最初の1本が撃てずに諦めた回に「逆走査した」と言わない)
+                        result.reverseSweepRan = reverseSweepDragsSent > 0
+                        if let recovered = recoveredBySweep {
                             result.found = true
                             result.fallback = recovered
                             result.reverseSweeps += 1
@@ -900,14 +907,6 @@ extension StepExecutor {
                             // 座標で名乗っても `scrollFrame:` には書けない)
                             result.suggestedScrollFrame = ScrollFrameCandidates.selector(
                                 matching: container, in: snapshot)
-                        } else {
-                            // **見つからなくても、画面を動かしたかは別に確かめる**
-                            // (ScrollSearchResult.reverseSweepMoved の doc)。reverseSweep は
-                            // found/not-found しか返さないので、直後に撮り直して比較する
-                            let after = try await freshSnapshot(.afterOwnMove)
-                            result.reverseSweepMoved = Self.contentSignature(after.elements)
-                                != Self.contentSignature(snapshot.elements)
-                            result.reverseSweepReachedEnd = reverseSweepReachedEnd
                         }
                         return result
                     }
@@ -953,16 +952,16 @@ extension StepExecutor {
         // 揺れ、「2周連続不変」の端判定に到達しないまま maxSwipes を使い切る形が RN の
         // 横カルーセルで 2/10 残った。既に通り過ぎている公算が高い局面で、失敗経路限定なので
         // 正常系のコストはゼロ。ゲートは stoppedUnmoving 側の逆走査と同じ)
-        // **見つからなくても画面を動かしたかは別に確かめる**(mid-loop 側の reverseSweepMoved と
-        // 同じ理由。ScrollSearchResult.reverseSweepMoved の doc)。ガード(recoverOnMiss 等)で
-        // reverseSweep 自体を撃たなかった回は false のまま = 「1度も動かなかった」に読める
-        var reverseSweepMoved = false
-        if recoverOnMiss, step.containerInference ?? true,
+        var reverseSweepRan = false
+        // 順方向で1度も動かなかったら撃たない(端で打ち切った側の guard と同じ理由)
+        if contentEverMoved, recoverOnMiss, step.containerInference ?? true,
            let latest = previousSnapshot,
            let container = (scrolledContainer ?? Self.overflowingContainer(in: latest))
                .flatMap({ ScrollGeometry.intersection($0, latest.screen) }) {
-            if let recovered = try await reverseSweep(step: step, container: container,
-                                                       searching: direction, phase: &phase) {
+            let recoveredBySweep = try await reverseSweep(step: step, container: container,
+                                                          searching: direction, phase: &phase)
+            reverseSweepRan = reverseSweepDragsSent > 0
+            if let recovered = recoveredBySweep {
                 var result = ScrollSearchResult(found: true, fallback: recovered,
                                                 viaXCUITest: viaXCUITest,
                                                 hintJumps: hintJumps, swipes: swipes,
@@ -972,15 +971,10 @@ extension StepExecutor {
                                                                              in: latest)
                 return result
             }
-            // **ここでは移動を測らない**: この経路(maxSwipes を使い切った弾切れ)の結果は
-            // `stoppedUnmoving` が false なので、`scrollNotFoundMessage` の3分岐(どれも
-            // `stoppedUnmoving` が前提)はどれも `reverseSweepMoved` を読まない。測っても
-            // 誰にも届かず、失敗経路で木を1枚余計に読むだけになる
-            // (端に着いて打ち切った側では上のループ内で測っている)
         }
         var exhausted = ScrollSearchResult(found: false, fallback: nil, viaXCUITest: viaXCUITest,
                                            hintJumps: hintJumps, swipes: swipes,
-                                           reverseSweepMoved: reverseSweepMoved,
+                                           reverseSweepRan: reverseSweepRan,
                                            maxTruncatedDuringSearch: truncatedDuringSearch)
         if step.scrollFrame == nil, let latest = previousSnapshot {
             exhausted.directionMatchedScrollFrameCandidate =

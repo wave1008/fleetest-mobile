@@ -258,7 +258,7 @@ function renderDashboardPanel(): string {
       <h2>${t("exploreHeal.dashboard.headingFlaky")}</h2>
       <table id="table-flaky" class="dash-table">
         <thead>
-          <tr><th>${t("exploreHeal.dashboard.colScenarioId")}</th><th class="mid">${t("exploreHeal.dashboard.colLatestResult")}</th><th>${t("exploreHeal.dashboard.colResultHistory")}</th></tr>
+          <tr><th>${t("exploreHeal.dashboard.colScenarioId")}</th><th>${t("exploreHeal.dashboard.colPlatform")}</th><th class="mid">${t("exploreHeal.dashboard.colLatestResult")}</th><th>${t("exploreHeal.dashboard.colResultHistory")}</th></tr>
         </thead>
         <tbody id="table-flaky-body"></tbody>
       </table>
@@ -296,7 +296,7 @@ function renderDashboardPanel(): string {
       </div>
       <table id="table-summary" class="dash-table">
         <thead>
-          <tr><th data-sort-key="scenarioID">${t("exploreHeal.dashboard.colScenarioId")}</th><th class="mid" data-sort-key="lastPassed">${t("exploreHeal.dashboard.colLastResult")}</th><th data-sort-key="lastRunAt">${t("exploreHeal.dashboard.colLastRun")}</th><th class="num" data-sort-key="runs">${t("exploreHeal.dashboard.colRuns")}</th><th class="num" data-sort-key="successRate">${t("exploreHeal.dashboard.colSuccessRate")}</th><th class="num" data-sort-key="avgDurationMs">${t("exploreHeal.dashboard.colAvgSec")}</th></tr>
+          <tr><th data-sort-key="scenarioID">${t("exploreHeal.dashboard.colScenarioId")}</th><th data-sort-key="platform">${t("exploreHeal.dashboard.colPlatform")}</th><th class="mid" data-sort-key="lastPassed">${t("exploreHeal.dashboard.colLastResult")}</th><th data-sort-key="lastRunAt">${t("exploreHeal.dashboard.colLastRun")}</th><th class="num" data-sort-key="runs">${t("exploreHeal.dashboard.colRuns")}</th><th class="num" data-sort-key="successRate">${t("exploreHeal.dashboard.colSuccessRate")}</th><th class="num" data-sort-key="avgDurationMs">${t("exploreHeal.dashboard.colAvgSec")}</th></tr>
         </thead>
         <tbody id="table-summary-body"></tbody>
       </table>

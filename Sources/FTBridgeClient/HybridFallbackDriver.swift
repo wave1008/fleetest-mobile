@@ -202,6 +202,9 @@ public final class HybridFallbackDriver: AppDriver {
     public func hideKeyboard() async throws {
         try await withFallback { try await $0.hideKeyboard() }
     }
+    public func hideKeyboardIfShown() async throws -> Bool {
+        try await withFallback { try await $0.hideKeyboardIfShown() }
+    }
     /// 409(一時的競合)でも回す(条件と理由は textInputFallbackWorthy)
     public func pressEnter() async throws {
         try await withFallback(isFallbackWorthy: Self.textInputFallbackWorthy) { try await $0.pressEnter() }

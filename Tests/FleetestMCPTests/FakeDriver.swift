@@ -326,6 +326,14 @@ final class FakeDriver: AppDriver, @unchecked Sendable {
         if let hideKeyboardError { throw hideKeyboardError }
     }
 
+    /// false = キーボードが出ていない台本(何も送らずに false を返す = Android のドライバと同じ)
+    var keyboardShownForHide = true
+    func hideKeyboardIfShown() async throws -> Bool {
+        guard keyboardShownForHide else { return false }
+        try await hideKeyboard()
+        return true
+    }
+
     func clearInput(ref: Int?) async throws {
         try record("clearInput(ref:\(ref.map(String.init) ?? "nil"))", "clearInput")
     }
@@ -343,7 +351,11 @@ final class FakeDriver: AppDriver, @unchecked Sendable {
     /// screenshot が順に返す台本。scriptedSnapshots と対になる(FakeDriver.snapshot 参照)
     var scriptedScreenshots: [Data] = []
 
+    /// 非 nil なら terminate がこれを投げる(XCUITest ランナーの 409 = セッションが無い、の再現)
+    var terminateError: Error?
+
     func terminate() async throws {
         try record("terminate", "terminate")
+        if let terminateError { throw terminateError }
     }
 }

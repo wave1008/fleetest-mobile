@@ -98,6 +98,9 @@ public enum RunResultsQuery {
 
     public struct ScenarioSummaryRow: Codable, Sendable, Equatable {
         public let scenarioID: String
+        /// `ios` / `android`。束ねる鍵は (scenarioID, platform)(ScenarioPlatformKey の doc)なので、
+        /// 同じ scenarioID を両 OS で回すプロジェクトでは platform の数だけ行が並ぶ
+        public let platform: String
         /// 集計に使った run 数(呼び手が渡した窓まで。窓内の総実行回数ではない)
         public let runs: Int
         /// 0-100
@@ -117,9 +120,10 @@ public enum RunResultsQuery {
         _ records: [ScenarioRunRecord], recentRuns: Int
     ) -> [ScenarioSummaryRow] {
         let window = max(1, recentRuns)
-        let grouped = Dictionary(grouping: records.filter { !isOutsideSuccessRate($0) },
-                                 by: \.scenarioID)
-        let rows = grouped.map { scenarioID, allRecords -> ScenarioSummaryRow in
+        let grouped = Dictionary(grouping: records.filter { !isOutsideSuccessRate($0) }) {
+            ScenarioPlatformKey(scenarioID: $0.scenarioID, platform: $0.platform)
+        }
+        let rows = grouped.map { key, allRecords -> ScenarioSummaryRow in
             let group = Array(
                 allRecords.sorted { date(from: $0.startedAt) < date(from: $1.startedAt) }.suffix(window))
             let passedCount = group.filter(\.passed).count
@@ -127,13 +131,13 @@ public enum RunResultsQuery {
             let durations = group.filter { !isSkippedSynthetic($0) }.map(\.durationMs)
             let latest = group.max { date(from: $0.startedAt) < date(from: $1.startedAt) }
             return ScenarioSummaryRow(
-                scenarioID: scenarioID, runs: group.count, successRate: successRate,
+                scenarioID: key.scenarioID, platform: key.platform, runs: group.count, successRate: successRate,
                 avgDurationMs: average(durations), medianDurationMs: median(durations),
                 lastRunAt: latest?.startedAt, lastPassed: latest?.passed)
         }
         return rows.sorted {
-            $0.successRate == $1.successRate ? $0.scenarioID < $1.scenarioID
-                                              : $0.successRate < $1.successRate
+            if $0.successRate != $1.successRate { return $0.successRate < $1.successRate }
+            return $0.scenarioID == $1.scenarioID ? $0.platform < $1.platform : $0.scenarioID < $1.scenarioID
         }
     }
 
@@ -146,6 +150,8 @@ public enum RunResultsQuery {
 
     public struct FlakyRow: Codable, Sendable, Equatable {
         public let scenarioID: String
+        /// `ios` / `android`(束ねる鍵は (scenarioID, platform)。ScenarioSummaryRow.platform と同じ)
+        public let platform: String
         /// 判定に使った run 数(呼び手が渡した窓まで)
         public let runs: Int
         /// 0-100
@@ -164,9 +170,10 @@ public enum RunResultsQuery {
         _ records: [ScenarioRunRecord], minRuns: Int, recentRuns: Int
     ) -> [FlakyRow] {
         let window = max(1, recentRuns)
-        let grouped = Dictionary(grouping: records.filter { !isInterruptedRecord($0) && !isDeclaredNotApplicable($0) },
-                                 by: \.scenarioID)
-        let rows = grouped.compactMap { scenarioID, allRecords -> FlakyRow? in
+        let grouped = Dictionary(grouping: records.filter { !isInterruptedRecord($0) && !isDeclaredNotApplicable($0) }) {
+            ScenarioPlatformKey(scenarioID: $0.scenarioID, platform: $0.platform)
+        }
+        let rows = grouped.compactMap { key, allRecords -> FlakyRow? in
             let group = Array(
                 allRecords.sorted { date(from: $0.startedAt) < date(from: $1.startedAt) }.suffix(window))
             guard group.count >= minRuns else { return nil }
@@ -184,13 +191,24 @@ public enum RunResultsQuery {
             let recentResults = chronological.reversed().prefix(flakyRecentResultsCap).map(\.passed)
 
             return FlakyRow(
-                scenarioID: scenarioID, runs: chronological.count, failureRate: failureRate,
+                scenarioID: key.scenarioID, platform: key.platform, runs: chronological.count, failureRate: failureRate,
                 flakinessScore: flakinessScore, recentResults: Array(recentResults))
         }
         return rows.sorted {
-            $0.flakinessScore == $1.flakinessScore ? $0.scenarioID < $1.scenarioID
-                                                    : $0.flakinessScore > $1.flakinessScore
+            if $0.flakinessScore != $1.flakinessScore { return $0.flakinessScore > $1.flakinessScore }
+            return $0.scenarioID == $1.scenarioID ? $0.platform < $1.platform : $0.scenarioID < $1.scenarioID
         }
+    }
+
+    // MARK: - scenario selector
+
+    /// trend にクラス名が渡されたとき、名指しする候補の一覧(重複なし・名前順・`NameListing.limit` 件まで + `...` と総数)。空 = クラス名ではない。
+    /// **CLI の `results trend` と MCP の ft_results が共有する**(列挙と打ち切りを別々に持たない。前後の文言だけ呼び手が持つ)
+    public static func trendClassMemberListing(selector: String, scenarioIDs: [String]) -> String? {
+        let members = Set(scenarioIDs.filter { ScenarioSelection.isMember($0, ofClass: selector) }).sorted()
+        guard !members.isEmpty else { return nil }
+        // 打ち切ったら総数を言う(NameListing の契約。呼び手の文面は数を持たない)
+        return NameListing.joined(members) + (members.count > NameListing.limit ? " (\(members.count) in all)" : "")
     }
 
     // MARK: - trend
@@ -204,7 +222,10 @@ public enum RunResultsQuery {
     // MARK: - devices
 
     public struct DeviceRow: Codable, Sendable, Equatable {
-        /// worker 未設定は "(worker不明)"
+        /// 記録の host(機械)。鍵は (host, worker) —— フリートでは同じ論理名のデバイスが機械ごとに居るので
+        /// worker だけで束ねると別の機械の同名デバイスを1台として数える
+        public let host: String
+        /// worker 未設定は "(unknown worker)"
         public let worker: String
         public let runs: Int
         public let successRate: Double
@@ -239,9 +260,15 @@ public enum RunResultsQuery {
             }
         }
 
-        let byWorker = aggregate(records) { $0.worker ?? unknownWorkerLabel }
-            .map { DeviceRow(worker: $0.0, runs: $0.1, successRate: $0.2, avgDurationMs: $0.3) }
-            .sorted { $0.worker < $1.worker }
+        struct DeviceKey: Hashable { let host: String; let worker: String }
+        let workerGroups: [(DeviceKey, Int, Double, Double?)] = aggregate(records) { (record: ScenarioRunRecord) -> DeviceKey in
+            DeviceKey(host: record.host, worker: record.worker ?? unknownWorkerLabel)
+        }
+        let byWorker: [DeviceRow] = workerGroups
+            .map { (g: (DeviceKey, Int, Double, Double?)) -> DeviceRow in
+                DeviceRow(host: g.0.host, worker: g.0.worker, runs: g.1, successRate: g.2, avgDurationMs: g.3)
+            }
+            .sorted { (a: DeviceRow, b: DeviceRow) -> Bool in a.worker == b.worker ? a.host < b.host : a.worker < b.worker }
 
         let byPlatform = aggregate(records) { $0.platform }
             .map { PlatformRow(platform: $0.0, runs: $0.1, successRate: $0.2, avgDurationMs: $0.3) }
@@ -386,11 +413,13 @@ public enum RunResultsQuery {
         /// scenarioID ごとに platform の数だけ行が並ぶ(scenarioID だけでは行を一意に
         /// 決められない)
         public let platform: String
-        /// 集計に使った run 数(上限は recentScenarioRunsWindow。窓内の総実行回数ではない)
+        /// 集計に使った run 数(上限は呼び手の `recentRuns`。拡張・`api results` は recentScenarioRunsWindow、
+        /// CLI の `results slow`・MCP の ft_results は `.max` = `--since` の窓の全 run)
         public let runs: Int
         public let avgDurationMs: Double
         public let p90DurationMs: Double
-        /// 窓の中で前半平均→後半平均の変化率(%)。窓の run が 4 回未満は nil
+        /// 集計に使った run の前半平均→後半平均の変化率(%)。4 回未満は nil。**機械を混ぜて比べる**
+        /// (機械ごとの比較は insights の durationRegression。`.max` で呼ぶと長い期間の記録をまとめて比べる)
         public let deltaPct: Double?
         /// scene 平均所要時間が最大の scene タイトルとその平均(scene データが無ければ nil)
         public let slowestScene: String?
@@ -402,7 +431,7 @@ public enum RunResultsQuery {
     /// 各行は直近 recentRuns 回(1 未満は 1 として扱う)だけで計算する ——
     /// avg/p90/runs/deltaPct/slowestScene のすべてが同じ窓に乗る(行の中で窓を混ぜない)
     public static func slowTests(
-        _ records: [ScenarioRunRecord], limit: Int, recentRuns: Int = recentScenarioRunsWindow
+        _ records: [ScenarioRunRecord], limit: Int, recentRuns: Int
     ) -> [SlowTestRow] {
         let window = max(1, recentRuns)
         let grouped = Dictionary(grouping: records.filter { !isSkippedSynthetic($0) }) {
@@ -521,6 +550,9 @@ public enum RunResultsQuery {
         /// 複数 platform で回すプロジェクトでは、これが無いと iOS/Android を混ぜた行に見える)
         public let platform: String?
         public let worker: String?
+        /// 記録の鍵のマシン(host)。**機械ごとに分けて出す行(deviceBias・durationRegression)だけ**付く ——
+        /// worker は論理名で、同名のデバイスが別の機械にも居ると worker だけでは行の対象を一意に決められない
+        public let host: String?
         public let message: String
         public let count: Int?
         public let deltaPct: Double?
@@ -569,20 +601,34 @@ public enum RunResultsQuery {
 
         // slowTests 自体が (scenarioID, platform) で束ねている(同じ理由。上の doc 参照)ので、
         // ここは行ごとの platform をそのまま運ぶだけでよい
-        for row in slowTests(records, limit: .max) {
-            guard let deltaPct = row.deltaPct, deltaPct >= durationRegressionPct else { continue }
-            rows.append(InsightRow(
-                kind: "durationRegression", severity: "warn", scenarioID: row.scenarioID,
-                platform: row.platform, worker: nil,
-                message: "\(scenarioLabel(row.scenarioID, row.platform)): duration regressed"
-                    + " (+\(String(format: "%.0f", deltaPct))% vs the first half of the last \(recentScenarioRunsWindow) runs)",
-                count: nil, deltaPct: deltaPct))
+        // **機械ごとに分けて**前半/後半を比べる(速さの違う機械の記録を混ぜると、機械の入れ替わりが
+        // 「所要の悪化」に見える)。**そのシナリオ(とプラットフォーム)の記録が複数の機械にまたがるときだけ**文言に機械名を
+        // 付ける(deviceBias の multiHost と同じ単位。入力全体で決めると、無関係なシナリオの記録で同じシナリオの文言が変わる)
+        let hostsInInput = Set(records.map(\.host))
+        var hostsPerScenario: [ScenarioPlatformKey: Set<String>] = [:]
+        for record in records where !isSkippedSynthetic(record) {  // slowTests と同じ記録で数える(合成の埋め合わせを機械に数えない)
+            hostsPerScenario[ScenarioPlatformKey(scenarioID: record.scenarioID, platform: record.platform), default: []]
+                .insert(record.host)
+        }
+        for host in hostsInInput.sorted() {
+            for row in slowTests(records.filter { $0.host == host }, limit: .max,
+                                     recentRuns: recentScenarioRunsWindow) {
+                guard let deltaPct = row.deltaPct, deltaPct >= durationRegressionPct else { continue }
+                let scenarioHosts = hostsPerScenario[ScenarioPlatformKey(scenarioID: row.scenarioID, platform: row.platform)]
+                let hostSuffix = (scenarioHosts?.count ?? 0) > 1 ? " on \(host)" : ""
+                rows.append(InsightRow(
+                    kind: "durationRegression", severity: "warn", scenarioID: row.scenarioID,
+                    platform: row.platform, worker: nil, host: host,
+                    message: "\(scenarioLabel(row.scenarioID, row.platform))\(hostSuffix): duration regressed"
+                        + " (+\(String(format: "%.0f", deltaPct))% vs the first half of the last \(recentScenarioRunsWindow) runs)",
+                    count: nil, deltaPct: deltaPct))
+            }
         }
 
         // **黙って落とさない**: 外した事実は出す(消えたシナリオの結果が残っていること自体が情報)
         if !retiredIDs.isEmpty {
             rows.append(InsightRow(
-                kind: "retiredScenarios", severity: "info", scenarioID: nil, platform: nil, worker: nil,
+                kind: "retiredScenarios", severity: "info", scenarioID: nil, platform: nil, worker: nil, host: nil,
                 message: "\(retiredIDs.count) scenario(s) have results but are no longer being run"
                     + " (excluded from the checks above): \(retiredIDs.prefix(3).joined(separator: ", "))"
                     + (retiredIDs.count > 3 ? ", …" : ""),
@@ -601,7 +647,7 @@ public enum RunResultsQuery {
             let runningNote = stillRunning.isEmpty ? ""
                 : "; \(stillRunning.count) more still running on this machine (not counted)"
             rows.append(InsightRow(
-                kind: "unfinishedRuns", severity: "info", scenarioID: nil, platform: nil, worker: nil,
+                kind: "unfinishedRuns", severity: "info", scenarioID: nil, platform: nil, worker: nil, host: nil,
                 message: "\(unfinishedCount) incomplete run(s) (possible crash or force-quit)\(runningNote)",
                 count: unfinishedCount, deltaPct: nil))
         }
@@ -613,7 +659,10 @@ public enum RunResultsQuery {
             if lhsCount != rhsCount { return lhsCount > rhsCount }
             if lhs.kind != rhs.kind { return lhs.kind < rhs.kind }
             if lhs.scenarioID != rhs.scenarioID { return (lhs.scenarioID ?? "") < (rhs.scenarioID ?? "") }
-            return (lhs.platform ?? "") < (rhs.platform ?? "")
+            if lhs.platform != rhs.platform { return (lhs.platform ?? "") < (rhs.platform ?? "") }
+            // 機械ごと・(機械, デバイス)ごとの行(durationRegression / deviceBias)は上の鍵が全部同じになる = 並びを決め切る
+            if lhs.host != rhs.host { return (lhs.host ?? "") < (rhs.host ?? "") }
+            return (lhs.worker ?? "") < (rhs.worker ?? "")
         }
     }
 
@@ -914,7 +963,7 @@ public enum RunResultsQuery {
         if streak.length >= consecutiveFailureThreshold {
             return [InsightRow(
                 kind: "consecutiveFailures", severity: "critical", scenarioID: scenarioID,
-                platform: platform, worker: nil,
+                platform: platform, worker: nil, host: nil,
                 message: "\(scenarioLabel(scenarioID, platform)): failed the last \(streak.length) run(s) in a row",
                 count: streak.length, deltaPct: nil)]
         }
@@ -922,7 +971,7 @@ public enum RunResultsQuery {
         let priorStreak = trailingStreak(chronological.dropLast().map(\.passed))
         guard priorStreak.passed, priorStreak.length >= newFailurePriorPassThreshold else { return [] }
         return [InsightRow(
-            kind: "newFailure", severity: "critical", scenarioID: scenarioID, platform: platform, worker: nil,
+            kind: "newFailure", severity: "critical", scenarioID: scenarioID, platform: platform, worker: nil, host: nil,
             message: "\(scenarioLabel(scenarioID, platform)): failed after \(priorStreak.length)"
                 + " consecutive passes (possible regression)",
             count: priorStreak.length, deltaPct: nil)]
@@ -947,7 +996,7 @@ public enum RunResultsQuery {
         guard infraFailures.count >= infraFailureMinCount else { return [] }
         let assertionCount = failedRecords.count - infraFailures.count
         return [InsightRow(
-            kind: "infraFailures", severity: "warn", scenarioID: scenarioID, platform: platform, worker: nil,
+            kind: "infraFailures", severity: "warn", scenarioID: scenarioID, platform: platform, worker: nil, host: nil,
             message: "\(scenarioLabel(scenarioID, platform)): \(infraFailures.count) failure(s)"
                 + " with a non-assertion signature (timed out, or ended without reaching a step)"
                 + " vs \(assertionCount) assertion failure(s)",
@@ -977,7 +1026,7 @@ public enum RunResultsQuery {
         let trend = deltaPct.map { "+\(String(format: "%.0f", $0))% per run" }
             ?? "newly appeared"
         return InsightRow(
-            kind: "selectorDecay", severity: "warn", scenarioID: scenarioID, platform: platform, worker: nil,
+            kind: "selectorDecay", severity: "warn", scenarioID: scenarioID, platform: platform, worker: nil, host: nil,
             message: "\(scenarioLabel(scenarioID, platform)): reliance on self-heal/fallback is growing"
                 + " (\(trend), \(total) time(s) total)",
             count: total, deltaPct: deltaPct)
@@ -1001,7 +1050,7 @@ public enum RunResultsQuery {
             .sorted { $0.key < $1.key }
             .map { selector, runs in
                 InsightRow(
-                    kind: "healReliance", severity: "warn", scenarioID: scenarioID, platform: platform, worker: nil,
+                    kind: "healReliance", severity: "warn", scenarioID: scenarioID, platform: platform, worker: nil, host: nil,
                     message: "\(scenarioLabel(scenarioID, platform)): \"\(selector)\" has been passing"
                         + " only via self-heal for \(runs) run(s) — apply the suggested selector",
                     count: runs, deltaPct: nil)
@@ -1055,7 +1104,7 @@ public enum RunResultsQuery {
             }.count ?? 0)
         }
         return InsightRow(
-            kind: "unsettledSteps", severity: "warn", scenarioID: scenarioID, platform: platform, worker: nil,
+            kind: "unsettledSteps", severity: "warn", scenarioID: scenarioID, platform: platform, worker: nil, host: nil,
             message: "\(scenarioLabel(scenarioID, platform)): the screen was still moving when"
                 + " \(steps) step(s) went ahead"
                 + " (in \(affected.count)/\(group.count) runs; a leading indicator of flakiness)",
@@ -1065,13 +1114,22 @@ public enum RunResultsQuery {
     private static func deviceBiasInsights(
         scenarioID: String, platform: String, group: [ScenarioRunRecord]
     ) -> [InsightRow] {
-        let byWorker = Dictionary(grouping: group.filter { $0.worker != nil }) { $0.worker! }
+        // 鍵は (host, worker)。同じ論理名のデバイスが別の機械に居ても1台に数えない
+        struct DeviceKey: Hashable { let host: String; let worker: String }
+        let byWorker = Dictionary(grouping: group.filter { $0.worker != nil }) {
+            DeviceKey(host: $0.host, worker: $0.worker!)
+        }
         guard byWorker.count >= deviceBiasMinWorkerKinds else { return [] }
+        let multiHost = Set(group.map(\.host)).count > 1
 
         let overallFailureRate = Double(group.filter { !$0.passed }.count) / Double(group.count)
         guard overallFailureRate > 0 else { return [] }
 
-        return byWorker.sorted { $0.key < $1.key }.compactMap { worker, workerRecords -> InsightRow? in
+        return byWorker.sorted {
+            $0.key.worker == $1.key.worker ? $0.key.host < $1.key.host : $0.key.worker < $1.key.worker
+        }.compactMap { key, workerRecords -> InsightRow? in
+            let worker = key.worker
+            let deviceLabel = multiHost ? "\(worker) on \(key.host)" : worker
             guard workerRecords.count >= deviceBiasMinRunsPerWorker else { return nil }
             let workerFailed = workerRecords.filter { !$0.passed }.count
             guard workerFailed >= deviceBiasMinFailures else { return nil }
@@ -1079,7 +1137,8 @@ public enum RunResultsQuery {
             guard workerFailureRate >= overallFailureRate * deviceBiasRatioMultiplier else { return nil }
             return InsightRow(
                 kind: "deviceBias", severity: "warn", scenarioID: scenarioID, platform: platform, worker: worker,
-                message: "\(scenarioLabel(scenarioID, platform)): failures cluster on \(worker) (its failure rate is "
+                host: key.host,
+                message: "\(scenarioLabel(scenarioID, platform)): failures cluster on \(deviceLabel) (its failure rate is "
                     + "\(String(format: "%.0f", workerFailureRate * 100))% vs overall "
                     + "\(String(format: "%.0f", overallFailureRate * 100))%)",
                 count: workerFailed, deltaPct: nil)

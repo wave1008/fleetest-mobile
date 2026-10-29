@@ -247,14 +247,14 @@ final class MCPClearAppDataPhysicalTests: XCTestCase {
     }
 
     /// 控えの bundle ID が読めなければ確かめられないので断る / 明示の packagePath なら申告を信じて通す
+    /// (止めるかは FTCore.ReinstallPackageCheck.blocksUninstall = DSL と共有)
     func testUnreadablePackageRefusesOnlyWhenTheSourceIsTheRememberedOne() {
-        XCTAssertNotNil(MCPServer.reinstallPackageRefusal(bundleID: "a", path: "/x", explicit: false,
-                                                          packageBundleID: nil))
-        XCTAssertNil(MCPServer.reinstallPackageRefusal(bundleID: "a", path: "/x", explicit: true,
-                                                       packageBundleID: nil))
+        XCTAssertNotNil(MCPServer.reinstallPackageRefusal(bundleID: "a", path: "/x", explicit: false, verdict: .unreadable))
+        XCTAssertNil(MCPServer.reinstallPackageRefusal(bundleID: "a", path: "/x", explicit: true, verdict: .unreadable))
         XCTAssertNotNil(MCPServer.reinstallPackageRefusal(bundleID: "a", path: "/x", explicit: true,
-                                                          packageBundleID: "b"), "明示でも別のアプリなら断る")
-        XCTAssertNil(MCPServer.reinstallPackageRefusal(bundleID: "a", path: "/x", explicit: false,
-                                                       packageBundleID: "a"))
+                                                          verdict: .differentApp(packageBundleID: "b")), "明示でも別のアプリなら断る")
+        XCTAssertNotNil(MCPServer.reinstallPackageRefusal(bundleID: "a", path: "/x", explicit: true, verdict: .simulatorBuild),
+                        "明示でも Simulator 用なら断る")
+        XCTAssertNil(MCPServer.reinstallPackageRefusal(bundleID: "a", path: "/x", explicit: false, verdict: .ok))
     }
 }

@@ -250,6 +250,10 @@ Android の入力欄は**容器**(Material の `TextInputLayout`)と**中身**(`
 **確定アクションを撃つ意図なら `pressEnter()` を使う**(意図が読み手に伝わる。
 `type("腕時計\n")` は「改行を入れたいのか送信したいのか」がコードから読めない)。
 モード(inapp-boost / xcuitest)によって結果が変わることはない(docs/design/)。
+**文中の改行を含む文は読み返さない**(XCUITest ランナー): 一発で送り、注記 "the text contains a newline in the middle, …
+not read back" を返す(読み返していないことを黙らない)。改行ごとに区切って読み返す形にしないのは、Return ごとの待ちと焦点の
+読み直しが /type の時間切れを超え、複数行の欄や焦点が移るフォームで誤った赤と遅さを生むため。各行を確かめたいなら
+`type("a"); pressEnter(); type("b")` と分けて書く。
 **Return キーを撃てなかったときは失敗する**(文字は入っている。Flutter で returnKey が
 action を持たない欄など)—— 黙って「全部入った」にはしない。その場合は `pressEnter()` を分けて書く。
 
@@ -300,7 +304,7 @@ action を持たない欄など)—— 黙って「全部入った」にはし�
 
 | コマンド | 説明 |
 |---|---|
-| `scrollTo(sel, direction: .down, containerInference:, settle:, maxSwipes: 8)` | 要素が見つかるまでスクロール(見つかったら成功。タップはしない)。`containerInference:` は下記「容器の推測に依存する補正」参照 |
+| `scrollTo(sel, direction: .down, containerInference:, settle:, maxSwipes: 8)` | 要素が見つかるまでスクロール(見つかったら成功。タップはしない)。**探すのは `direction:` の向きだけ**: 送って端に着いても見つからなかったときだけ、送りが行を飛び越した分を拾い直すため同じ容器を逆向きに細かく戻す(**逆走査**。注記 `found by sweeping back after overshooting it`)。**最初から端で1度も動かなかったときは逆走査しない** = 反対側は探さずに失敗する(文言 `the opposite direction was not searched`。`runScrollSearch` の guard)。`containerInference:` は下記「容器の推測に依存する補正」参照 |
 | `scrollDown(repeat: 1, settle:)` / `scrollUp` / `scrollRight` / `scrollLeft` | 1 画面ぶんスクロール(`repeat:` 回繰り返す)。**最初の1本の前に木の静止を待つ**(`scrollFrame:` の枠を静止した木から取る。遷移の直後に古い枠を払わないため。flick と同じ・注記 `settled-before-gesture`) |
 | `scrollFrame:` / `startMarginRatio:` / `endMarginRatio:`(`scroll*` / `scrollToBottom` 等 / `scrollTo` の引数。`withScroll*` は `scrollFrame:` のみ取る) | **スクロールさせたい領域**をセレクタ式で指定する。例: `scrollTo("#row_40", scrollFrame: "#list_rows")`。**どれが容器かは MCP の `ft_snapshot` が行末に出す `scroll` 印**で分かる(2つ以上あるときは先頭でも名指しする。ただし**印が無い = スクロールしない、ではない** —— Compose / Flutter は xcuitest モードでは申告できない(in-app は申告できる。**MCP の iOS は常に XCUITest なので、Compose / Flutter のアプリでは MCP からは印が出ない**))。**省略時は画面中央基準の全画面スワイプ**(マージン指定も無視)。**iOS の in-app ブリッジも同じく画面中央の下にあるスクロール容器だけを動かす**(画面の別の場所にあるカルーセル等は動かさない = XCUITest・Android と同じ結果)。**例外はソフトキーボードが出ている間だけ**: 全画面の固定比率で始点を作るとキーボード面に乗って何も動かないので(iPhone 13 実測: 始点 y=633 に対しキーボード上端 y=509)、`scrollTo` / `scroll*` / `scrollTo*Edge` はキーボードを除いた残りの画面を対象に始点・終点を作る(キーボードが無ければ従来どおり)。素の `swipe(.up)` / MCP の `ft_swipe` も同じ(キーボードが出ていれば残りの画面で振る)。`withScrollDown(scrollFrame:) { }` に渡すとブロック内の探索が継承する。**Compose / Flutter の in-app ブリッジは、指定した要素がスクロール容器(`ft_snapshot` の `scroll` 印。枠が一致する容器)のときだけ in-app で送る**(1回 = 1ページ。刻み幅は選べない)。**容器でない要素(固定ヘッダ等)を指定したときはXCUITest へ自動フォールバックする**(そのぶん遅い)。**スクロールできない領域を指定すると、スワイプは成功するが何も動かない** —— 気付けるようにステップへ注記が付く(`the specified scrollFrame is not scrollable` / margin で動かせる幅が潰れた場合は `resolved but leaves nothing to move`)。**半分開いたボトムシート(指定した容器が画面下端に接し、上端が画面の上 1/4 より下 = `SheetGeometry`)の中で、下へ送る探索が1度も動かずに止まったら、その容器の中で1回だけ容器の高さぶん速く払ってシートを広げてから探し直す**(探索の短く遅い送りはシートの伸び縮みに使われて戻ることがある。E2EY-CMP / E2EX-iOS の XCUITest。注記 `the sheet was expanded by a drag inside the scrollFrame first`。`StepExecutor.sheetExpandDrag`)。**画面に1件も無い scrollFrame を指定すると、スワイプを1本も送らずに失敗する**(`scrollTo` の探索だけでなく `scroll*` / `scrollTo*Edge` 系 / `flick*` / `withScroll*` 配下の探索も同じ。**`select` 系だけは例外**で、掴めなければ空要素を返す契約が優先し skipped になる。黙って全画面スワイプへ退化するとカード上のボタンを発火させるため。探索中に容器が木から消えた場合も失敗になる)。|
 | `scrollToBottom(settle:, maxSwipes: 50)` / `scrollToTop` / `scrollToRightEdge` / `scrollToLeftEdge` | 端まで送る(**画面が変化しなくなるまで**。maxSwipes は暴走を止める上限で、上限で打ち切ったときはステップに注記が付く)。**iOS の in-app ブリッジは1回で端まで寄せる** —— 下記「端送りの速さはブリッジで決まる」 |
@@ -811,6 +815,9 @@ inconclusive はシナリオを中断しない。レポート・ログには ❓
 `launchApp()` / `restartApp()` / `terminateApp()` / `removeApp()` / `clearAppData()` / `appIs()` が
 引数を省略したときの対象は、次の順で決まる:
 
+**ブリッジ自身(Android の `com.example.ftbridge`・iOS の XCUITest ランナー)は `launchApp` / `restartApp` / `clearAppData` / `removeApp` の対象にできない**
+(撃つ前に失敗する。起動・データ消去はブリッジを自分で止める。判定は `FTCore.BridgeSelfApps` で MCP と共有)。
+
 実行プロファイル(`runs/<name>.json` の `app`)→ アプリプロファイル(`apps/<name>.json`)→
 **実行中 platform の `ios.app` / `android.app`** の順で決まる。
 
@@ -832,7 +839,7 @@ inconclusive はシナリオを中断しない。レポート・ログには ❓
 | `terminateApp()` | 終了 |
 | `installApp(path?)` | アプリをインストール(iOS: `.app` / Android: `.apk` または `.apks`。`.apks` は bundletool が要る)。**実行はオーケストレータ(親プロセス)が行う**。パス省略時はアプリプロファイルの `<platform>.appPath` を親が解決する(明示引数 > プロファイル)。プロファイルにも `appPath` が無ければ明示エラー。Android で別の鍵の署名の同名パッケージが入っていて(`INSTALL_FAILED_UPDATE_INCOMPATIBLE`)入れ直すのは Emulator か debuggable ビルドのときだけ(アンインストールでデータが消えるため。物理端末のストア版・判別できないときは消さずに失敗し `adb uninstall` を案内。入れ直したことは1行の通知になり、run ではステップの `⚠️` ログ行(`installApp()`)とワーカーのログ行(自動インストール)・`ft_install` では応答の本文・`fleetest install` では stderr に出る。ライブ操作の install は応答に載せる口が無く stderr のみ。`ft_*` の自動インストール(プロファイルの autoInstall)は iOS だけの経路なのでこの通知は出ない)。iOS の inapp-boost モードでは simctl install で常駐ブリッジが道連れに終了するが、直後の `launchApp()` が再注入し直すので、続けて `launchApp()` を呼べば問題ない。オーケストレータ無しの単独実行(`fleetest-scenarios run` を直接叩く等)では従来どおり明示引数が必須(省略時は明示エラー) |
 | `removeApp(id?)` | アプリをアンインストール。省略時は起動中アプリの既定 bundleID/package(`launchApp()` 引数なしと同じ解決)。**入れ直しても権限は戻らない**(iOS シミュレータ実測): 削除→再インストールしても TCC(位置情報等)の許可が残り、許可ダイアログは**再び出ない**。実機の挙動とは違うので「入れ直せば初回状態」を前提にしたシナリオは書けない —— 権限から戻したいなら `clearAppData()`。**自分自身の SUT を消すと、以降のシナリオ実行と in-app ブリッジが壊れる**ので、テスト対象アプリに対して呼ぶのは慎重に |
-| `clearAppData(bundleID?)` | アプリは残しデータだけ消す(再インストール不要)。初回起動・オンボーディング・権限ダイアログの再現に使う。**権限(iOS の TCC / Android の実行時権限)も未許可へ戻す**ので、権限ダイアログが再び出る。**iOS の実機ではアプリを入れ直して消す**(データだけ消す手段が無いため。注記 `reinstalled-to-clear-data`。入れ直す元にアプリプロファイルの `appPathPhysical` が要り、入れ直せないときはアンインストールせずに失敗する)。Android は `pm clear` 相当。**NSUserDefaults / SharedPreferences は消える**(iOS は cfprefsd の入れ直しまで行う)。**キーチェーン(iOS)/ Keystore(Android)に置いた値は消えない** — オンボーディング判定をそこに置いているアプリは初回起動が再現しない |
+| `clearAppData(bundleID?)` | アプリは残しデータだけ消す(再インストール不要)。初回起動・オンボーディング・権限ダイアログの再現に使う。**権限(iOS の TCC / Android の実行時権限)も未許可へ戻す**ので、権限ダイアログが再び出る。**iOS の実機ではアプリを入れ直して消す**(データだけ消す手段が無いため。注記 `reinstalled-to-clear-data`。入れ直す元にアプリプロファイルの `appPathPhysical` が要り、入れ直せないとき —— 元が無い・別のアプリ(bundle ID 違い)・Simulator 用ビルド(`DTPlatformName` = iphonesimulator。実機へは署名違いで入らない)・Info.plist を読めない —— はアンインストールせずに失敗する。判定は `FTCore.ReinstallPackageCheck` で `ft_clear_app_data` と共有)。Android は `pm clear` 相当。**NSUserDefaults / SharedPreferences は消える**(iOS は cfprefsd の入れ直しまで行う)。**キーチェーン(iOS)/ Keystore(Android)に置いた値は消えない** — オンボーディング判定をそこに置いているアプリは初回起動が再現しない |
 | `home()` | ホーム画面へ |
 | `back(settle:)` | 前の画面へ戻る(Android = 戻るキー / iOS = **ナビゲーションバーの戻るボタン、無ければ左端エッジスワイプ**)。**Android はキーボードが開いていると1回目がキーボードを閉じるのに消費される**(OS 仕様)。**iOS で確実に戻れるのはシステムのナビゲーションバーを持つ画面だけ** —— UIKit/SwiftUI は戻るボタン(`BackButton`)を押すので決定的。持たない画面(Compose/Flutter の独自ナビ)はエッジスワイプに落ち、**interactive pop に対応していなければ戻れない**(そのときはアプリ内の戻るボタンを `tap` する)。エッジスワイプは成立しないと同じタッチが下の要素へ渡るので、**戻れない画面で撃たない** |
 | `appSwitcher()` | アプリスイッチャーを開く。**ホームボタンの iPhone(SE 等。画面の寸法がホームボタン機の4種のどれかで判定・`BridgeAPI.isHomeButtonPhoneScreen`)では撃たず、そのシナリオを「対象外(skipped)」で記録する**(失敗ではない)。スイッチャーはハードのダブルプレスで XCUITest から送れない(ブリッジは設計上 422)。理由は `appSwitcher is not available on a home-button iPhone (the switcher is a hardware double-press XCUITest cannot send)`。この step 以降は skipped・結果 JSON は `skipKind: notApplicable` + `skipReason`(`passed: true`)・JUnit は `<skipped>`・レポートの Result は skipped。Android は対象外(従来どおり) |

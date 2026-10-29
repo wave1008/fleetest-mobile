@@ -55,8 +55,11 @@ extension StepExecutor {
         // 一番ありふれた形で、落ちるのは textIs 側だから、ここで消すと肝心なときに証跡が無くなる
         // 掴むだけでデバイスを動かさないアクション(スクロールしない findImage / findImages も同じ)。
         // waitForSettle は待つだけで画面にも焦点にも触れないので同じ扱い(`tap → waitForSettle → 検証` で証跡を消さない)
+        // **ghost の救済(容器を送る)もこの集合には撃たない**(待ちの有無に依らない = 画面を動かさない)
         let grabsOnly = action == "select" || action == "waitForSettle"
             || (Self.isFindImageAction(action) && step.direction == nil)
+        // 解決できなかった失敗に添える証跡は、下で消す前に控える(タップ以外の手は記録を消すので、消した後では名指しできない)
+        tapEvidenceAtEntry = (pending: lastInteraction, earlier: unchangedEarlierTaps)
         if action == "tap" {
             previousTapTree = lastInteraction?.before
             // 前のタップは、このタップが解決に使う木と比べてから確定する(tapAwaitingNextTree の doc)
@@ -275,10 +278,50 @@ extension StepExecutor {
         var frameBeforeGhostSwipe: FTRect?
         // 送る前の木の全要素の矩形(対象が動いていなければ、食い違い = ほかの何かが動いた)
         var framesBeforeGhostSwipe: [FTRect] = []
+        // **比べるのは送った直後の1回だけ**(比べたら控えを捨てる)。待ち付きの分岐は送りの上限に達した後も読み直しを
+        // 続けるので、古い控えと比べ続けると無関係なアニメーション(スピナー等)で「対象だけ動かない」が立ち、待ちが早く終わる
         func stillUnmovedGhost() -> Bool {
+            defer { frameBeforeGhostSwipe = nil }
             guard let before = frameBeforeGhostSwipe, grabbedGhost(resolved), let now = resolved?.0.frame,
                   snapshot.elements.map(\.frame) != framesBeforeGhostSwipe else { return false }
             return ContainerGeometry.sameFrame(now, before)
+        }
+        // 救済の「送り」1回(2周目以降の再試行から呼ぶ。待ち付き・既定の両方の分岐で同じ救済を掛ける)。
+        // 送った後の撮り直し・再解決・打ち切り判定は呼び手の周回の末尾が受け持つ
+        func sendGhostRescue(_ element: ElementInfo, phase: inout PhaseAccumulator) async throws {
+            frameBeforeGhostSwipe = element.frame
+            framesBeforeGhostSwipe = snapshot.elements.map(\.frame)
+            let finger = FTSwipeDirection(rawValue: step.direction ?? "") ?? .up
+            let container = ContainerGeometry.clippingContainer(
+                of: element, in: snapshot.elements,
+                inferring: step.containerInference ?? true)
+            // **距離を測ってその分だけ動かす**(recoveryJump 参照)。全画面スワイプだと
+            // 100pt のずれに対して1ページ動いてしまい、**行き過ぎて往復する**。
+            // 容器が分かるときだけ使える手なので、駄目なら全画面スワイプへ落ちる
+            if let container,
+               let jump = Self.recoveryJump(for: element, container: container),
+               await hintDrag(jump: jump, container: container,
+                              viewport: snapshot.screen, phase: &phase) {
+                ghostSwipes += 1
+                ghostLeftInertia = true
+                _ = try await settledSignature(phase: &phase)
+                return
+            }
+            // **行き過ぎた側なら逆へ送る**(recoveryDirection 参照)。同じ向きに
+            // 送り続けると遠ざかるだけで、実測でも2回撃って外のままだった
+            var recovery = step
+            recovery.direction = (container
+                .map { Self.recoveryDirection(for: element, container: $0,
+                                              searching: finger) } ?? finger).rawValue
+            let swipedViaXCUITest = try await swipeWithFallback(
+                FTSwipeDirection(rawValue: recovery.direction ?? "") ?? finger,
+                intent: .search,
+                // **座標も逆向きで作り直す**(path は向きを内包している)
+                path: scrollPath(step: recovery, intent: .search, in: snapshot),
+                phase: &phase)
+            if !swipeLeavesNoInertia(swipedViaXCUITest: swipedViaXCUITest) { ghostLeftInertia = true }
+            ghostSwipes += 1
+            _ = try await settledSignature(phase: &phase)
         }
         if resolved == nil || grabbedGhost(resolved) {
             if let timeout = step.timeout {
@@ -286,10 +329,23 @@ extension StepExecutor {
                 if timeout > 0 {
                     let retryDeadline = clock.now.advanced(by: .seconds(timeout))
                     var backoff = PollBackoff()
+                    var attempt = 0
+                    // **「対象だけ動かない」でも待ちは打ち切らない**(送りをやめるだけ)。明示した待ちは書き手が「この間に
+                    // 落ち着く」と言っている = スピナー等で立った印で残りを捨てると、落ち着く前の残像を叩く
                     while resolved == nil || grabbedGhost(resolved), clock.now < retryDeadline {
                         start = clock.now
                         try await Task.sleep(for: backoff.nextDelay())
                         phase.waitMs += Self.ms(clock.now - start)
+                        // **待ち付きでも既定の再試行と同じ救済を掛ける**(待つだけだと容器の外のまま期限が尽き、
+                        // 画面外を撃って ok になる)。送る回数の上限は既定の再試行と同じ N-1 回(既定は attempt 1..N-1 で
+                        // 送る = 1周目は撮り直しだけ。待ちの長さで送り続けない・既定より多く送ると行き過ぎて容器の外へ押し戻す)
+                        if attempt > 0, !ghostDidNotMove, ghostSwipes < Self.defaultLocatorRetryAttempts - 1,
+                           !grabsOnly,
+                           grabbedGhost(resolved),
+                           let element = resolved?.0 {
+                            try await sendGhostRescue(element, phase: &phase)
+                        }
+                        attempt += 1
                         start = clock.now
                         // 探索後の再試行もキャッシュを捨てる。古い木は撮り直しても同じものが
                         // 返るので、素取得だと**再試行の予算をまるごと空振りに使う**
@@ -302,6 +358,7 @@ extension StepExecutor {
                         let previous = resolved
                         resolved = LocatorResolver.resolve(step: step, in: snapshot)
                         if previous != nil { ghostRetries += 1 }
+                        if stillUnmovedGhost() { ghostDidNotMove = true }
                     }
                 }
             } else {
@@ -318,50 +375,8 @@ extension StepExecutor {
                     // 持たないが、ghost は容器の外に居ることが分かっているので、戻す向きは
                     // `recoveryJump` / `recoveryDirection` が幾何から決められる(既定の finger は
                     // 「内側に居るとき」しか使われない)
-                    if attempt > 0, grabbedGhost(resolved),
-                       let element = resolved?.0 {
-                        frameBeforeGhostSwipe = element.frame
-                        framesBeforeGhostSwipe = snapshot.elements.map(\.frame)
-                        let finger = FTSwipeDirection(rawValue: step.direction ?? "") ?? .up
-                        let container = ContainerGeometry.clippingContainer(
-                            of: element, in: snapshot.elements,
-                            inferring: step.containerInference ?? true)
-                        // **距離を測ってその分だけ動かす**(recoveryJump 参照)。全画面スワイプだと
-                        // 100pt のずれに対して1ページ動いてしまい、**行き過ぎて往復する**。
-                        // 容器が分かるときだけ使える手なので、駄目なら全画面スワイプへ落ちる
-                        if let container,
-                           let jump = Self.recoveryJump(for: element, container: container),
-                           await hintDrag(jump: jump, container: container,
-                                          viewport: snapshot.screen, phase: &phase) {
-                            ghostSwipes += 1
-                            ghostLeftInertia = true
-                            _ = try await settledSignature(phase: &phase)
-                            start = clock.now
-                            snapshot = try await freshSnapshot(.repoll(afterSearchSwiped: searchSwiped))
-                            phase.snapshotMs += Self.ms(clock.now - start)
-                            try await dismissInterruption(in: &snapshot, phase: &phase)  // 再試行の読みと同じ
-                            let previous = resolved
-                            resolved = LocatorResolver.resolve(step: step, in: snapshot)
-                            if previous != nil { ghostRetries += 1 }
-                            if resolved != nil, !grabbedGhost(resolved) { break }
-                            if stillUnmovedGhost() { ghostDidNotMove = true; break }
-                            continue
-                        }
-                        // **行き過ぎた側なら逆へ送る**(recoveryDirection 参照)。同じ向きに
-                        // 送り続けると遠ざかるだけで、実測でも2回撃って外のままだった
-                        var recovery = step
-                        recovery.direction = (container
-                            .map { Self.recoveryDirection(for: element, container: $0,
-                                                          searching: finger) } ?? finger).rawValue
-                        let swipedViaXCUITest = try await swipeWithFallback(
-                            FTSwipeDirection(rawValue: recovery.direction ?? "") ?? finger,
-                            intent: .search,
-                            // **座標も逆向きで作り直す**(path は向きを内包している)
-                            path: scrollPath(step: recovery, intent: .search, in: snapshot),
-                            phase: &phase)
-                        if !swipeLeavesNoInertia(swipedViaXCUITest: swipedViaXCUITest) { ghostLeftInertia = true }
-                        ghostSwipes += 1
-                        _ = try await settledSignature(phase: &phase)
+                    if attempt > 0, !grabsOnly, grabbedGhost(resolved), let element = resolved?.0 {
+                        try await sendGhostRescue(element, phase: &phase)
                     }
                     start = clock.now
                     snapshot = try await freshSnapshot(.repoll(afterSearchSwiped: searchSwiped))
@@ -426,11 +441,12 @@ extension StepExecutor {
         var straddleNote: String?
         var ghostNote: String?
         if grabbedGhost(resolved) {
-            noteCodesThisStep.insert(.actedOutsideContainer)
+            // 掴むだけの手(select 等)は何も送らない = 「操作が飲まれたかも」と容器の外で撃った印を付けない
+            if !grabsOnly { noteCodesThisStep.insert(.actedOutsideContainer) }
             ghostNote = "the element is still reported outside its scroll container"
                 + " (\(ghostRetries) re-resolve(s), \(ghostSwipes) extra swipe(s))"
                 + (ghostDidNotMove ? " and did not move when the container was swiped, so no more swipes were sent" : "")
-                + "; the interaction may be swallowed"
+                + (grabsOnly ? "" : "; the interaction may be swallowed")
         } else if ghostRetries > 0 {
             ghostNote = "re-resolved \(ghostRetries) time(s)"
                 + (ghostSwipes > 0 ? " with \(ghostSwipes) extra swipe(s)" : "")
@@ -554,7 +570,8 @@ extension StepExecutor {
                     + Self.defaultWaitHint(step)
                     + Self.truncationHint(snapshot)
                     + Self.keyboardResizedHint(snapshot)
-                    + Self.webViewPathHint(snapshot)))
+                    + Self.webViewPathHint(snapshot)
+                    + unresolvedActionTapHint(snapshot.elements)))
         }
         resolvedElementThisStep = element
         // セレクタが2件以上に一致していたら数を控える(1件目を撃った。ft_batch が行に添える)。

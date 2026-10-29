@@ -475,6 +475,12 @@ public final class BridgeClient: AppDriver, Sendable {
     @discardableResult
     public func install(packagePath: String) async throws -> String? {
         if case .physical(let udid) = try await installTarget() {
+            // **実機の install はすべてここを通る**(DSL の installApp・プロファイル実行の供給・CLI・ライブ操作・MCP)。
+            // Simulator 用ビルドは入らず、原因(0xe8008014 invalid signature)が devicectl の出力の末尾に埋もれるので撃つ前に断る
+            if await ReinstallPackageCheck.isSimulatorBuildOffPool(path: packagePath) {
+                throw DriverError.badResponse(status: 400, body: "\(packagePath) is a Simulator build (iphonesimulator SDK)"
+                    + " — a physical device cannot install it. Use the device build (the app profile's appPathPhysical).")
+            }
             let result = try Shell.run(
                 ["xcrun", "devicectl", "device", "install", "app",
                  "--device", udid, packagePath], timeout: Timeout.physicalInstall)

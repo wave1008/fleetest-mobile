@@ -634,7 +634,18 @@ extension MCPServer {
         let name = RefGuard.describe(field)
         guard let value = field.value.map(FlowMatchMode.normalizeInvisibleCharacters), !value.isEmpty
         else { return " (into \(name); its value could not be read back)" }
-        guard let expected, !value.contains(expected) else {
+        // expected も同じ正規化をかける(replaceVerificationNote と同じ。無いとゼロ幅文字入りの入力が
+        // 正しく入っていても「landed していない」と警告する)
+        guard let expected else {
+            return " (into \(name), which now reads \"\(SnapshotRenderer.truncate(value, 40))\")"
+        }
+        let normalizedExpected = FlowMatchMode.normalizeInvisibleCharacters(expected)
+        // **見えない文字だけの入力は確かめようがない**(正規化すると空 = どんな値も「含む」になり、入らなくても入ったと言う)
+        guard !normalizedExpected.isEmpty else {
+            return " (into \(name), which now reads \"\(SnapshotRenderer.truncate(value, 40))\"; the text was only invisible"
+                + " characters, so whether it landed was not checked)"
+        }
+        guard !value.contains(normalizedExpected) else {
             return " (into \(name), which now reads \"\(SnapshotRenderer.truncate(value, 40))\")"
         }
         return " (warning: it went into \(name), but that field reads"

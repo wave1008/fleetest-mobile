@@ -149,6 +149,39 @@ test("insights: scenarioID を持つ行は本文クリックで実行履歴、wo
   assert.ok(workerRow.classList.contains("row-highlight"), "一致する worker 行を一時的に強調する");
 });
 
+test("insights: host の付く deviceBias は、同名のデバイスが別の機械にも居るとき、その機械の行へ飛ぶ", (t) => {
+  const { window, sendToWebview } = createWebview();
+  t.after(() => window.close());
+  showAllDevices(window);
+  const health = (host) => ({
+    host, worker: "ios:iPhone 15", removed: 1, removedByCause: {}, requeued: 0,
+    preRunExcluded: 0, preRunRepaired: 0, recovered: 0, recoveredByKind: {}, appCrashes: 0,
+  });
+  const payload = basePayload({
+    deviceHealth: [health("H1"), health("H2")],
+    insights: [
+      { kind: "deviceBias", severity: "warn", scenarioID: "Bar.S0010", platform: "ios", worker: "ios:iPhone 15",
+        host: "H2", message: "bias on H2" },
+      { kind: "deviceBias", severity: "warn", scenarioID: "Baz.S0010", platform: "ios", worker: "ios:iPhone 15",
+        host: "H9", message: "bias on a machine without a row" },
+    ],
+  });
+  sendToWebview({ type: "dashboard", message: { type: "data", payload } });
+  const items = [...window.document.querySelectorAll("#insights-list .insight-item")];
+  const onH2 = items.find((li) => li.textContent.includes("bias on H2"));
+  const onH9 = items.find((li) => li.textContent.includes("without a row"));
+  assert.equal(onH9.querySelector(".insight-worker-link"), null, "その機械の行が無ければ別の機械の同名の行へリンクしない");
+  const rows = [...window.document.querySelectorAll("#table-device-health-body tr")]
+    .filter((tr) => tr.dataset.worker === "ios:iPhone 15");
+  assert.equal(rows.length, 2);
+  assert.ok(onH2.querySelector(".insight-worker-link").textContent.includes("H2"),
+    "リンクにマシン名を添える(本文の生の host と行の登録名を対応づける)");
+  onH2.querySelector(".insight-worker-link").click();
+  const highlighted = rows.filter((tr) => tr.classList.contains("row-highlight"));
+  assert.equal(highlighted.length, 1);
+  assert.ok(highlighted[0].dataset.rowKey.startsWith("H2"), highlighted[0].dataset.rowKey);
+});
+
 test("insights: 0件なら空メッセージを出す", (t) => {
   const { window, sendToWebview } = createWebview();
   t.after(() => window.close());
@@ -1062,15 +1095,15 @@ test("flaky: 最新の結果は「直近」列、それ以前は「履歴(新→
   const { window, sendToWebview } = createWebview();
   t.after(() => window.close());
   const flaky = [
-    { scenarioID: "A", runs: 7, failureRate: 14.3, flakinessScore: 0.3, recentResults: [false, true, false, true] },
-    { scenarioID: "B", runs: 1, failureRate: 0, flakinessScore: 0, recentResults: [true] },
+    { scenarioID: "A", platform: "ios", runs: 7, failureRate: 14.3, flakinessScore: 0.3, recentResults: [false, true, false, true] },
+    { scenarioID: "B", platform: "ios", runs: 1, failureRate: 0, flakinessScore: 0, recentResults: [true] },
   ];
   sendToWebview({ type: "dashboard", message: { type: "data", payload: basePayload({ flaky }) } });
   const rows = [...window.document.querySelectorAll("#table-flaky-body tr")].map((tr) => [...tr.children].map((c) => c.textContent));
-  assert.deepEqual(rows, [["A", "❌", "✅❌✅"], ["B", "✅", ""]]);
+  assert.deepEqual(rows, [["A", "ios", "❌", "✅❌✅"], ["B", "ios", "✅", ""]]);
   const headers = [...window.document.querySelectorAll("#table-flaky thead th")].map((th) => th.textContent);
-  assert.equal(headers.length, 3);
-  assert.deepEqual(headers.slice(1), ["直近", "履歴(新→旧)"]);
+  assert.equal(headers.length, 4);
+  assert.deepEqual(headers.slice(2), ["直近", "履歴(新→旧)"]);
 });
 
 function sendRunDetail(sendToWebview, scenarios) {

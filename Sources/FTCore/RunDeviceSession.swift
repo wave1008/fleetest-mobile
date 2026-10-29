@@ -303,9 +303,17 @@ public struct DeviceTearDownOutcome: Sendable {
     /// false = 走らせなかった(走らせるデバイスが無かった。理由は failure)
     public var ran = true
     public let passed: Bool
-    public let reportPath: String?
+    public var reportPath: String?
     /// 最初に落ちたステップの説明と理由(passed なら nil)
     public let failure: String?
+
+    /// レポートのパスを落とした写し(dry-run が一時フォルダへ捨てたレポート = 処理の終わりに消えるパスを行に載せない)
+    public func droppingReportPath(_ drop: Bool) -> DeviceTearDownOutcome {
+        guard drop else { return self }
+        var out = self
+        out.reportPath = nil
+        return out
+    }
 }
 
 extension ScenarioHost {

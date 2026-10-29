@@ -133,6 +133,10 @@ export const webviewDashboardStrings = {
     ja: "→ デバイスの健全性で見る({worker})",
     en: "→ show in Device Health ({worker})",
   },
+  "wvDashboard.insights.showDeviceOnMachine": {
+    ja: "→ デバイスの健全性で見る({worker}・{machine})",
+    en: "→ show in Device Health ({worker} on {machine})",
+  },
 
   // headlineDiff.js
   "wvDashboard.headlineDiff.newFailuresHeading": {

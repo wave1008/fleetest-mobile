@@ -279,6 +279,7 @@ public final class WebViewDelegatingDriver: AppDriver {
         try await delegated.clearInput(ref: nil)
     }
     public func hideKeyboard() async throws { try await screenDriver.hideKeyboard() }
+    public func hideKeyboardIfShown() async throws -> Bool { try await screenDriver.hideKeyboardIfShown() }
     public func swipe(_ direction: FTSwipeDirection) async throws {
         try await screenDriver.swipe(direction)
     }

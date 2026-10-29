@@ -714,9 +714,13 @@ extension MCPServer {
                 // 同じ宣言は記録を1つにする(1回ごとの宣言なので、呼び出しのたびに書かれる。
                 // 下書きでは冒頭に1回あれば足りる)。**recordAction を通さない** —— 画面を変えない宣言を操作回数に
                 // 数えると、古い ref の注記が「このセッション自身の操作が原因」と誤って言う
-                if !interactions.sinceLastLaunch.contains(where: {
+                // **宛先の台の印を付け、重複もその台の範囲で見る**(印が無いと scope(all:device:) がどの台の下書きにも残し、
+                // 別の台の同じ宣言がこの台の宣言を落とす)
+                let device = draftDeviceKey(args)
+                if !interactions.scope(all: false, device: device).contains(where: {
                     $0.step?.action == "irregularHandler" && $0.summary == plan.summary }) {
-                    interactions.record(InteractionLog.Entry(step: plan.step, unresolved: nil, summary: plan.summary))
+                    interactions.record(InteractionLog.Entry(step: plan.step, unresolved: nil, summary: plan.summary,
+                                                             deviceKey: device))
                 }
                 lines.append("\(index + 1). \(plan.summary) — declared (a later step of this call closes it"
                     + " if it is showing before that step acts; not carried over to the next call)")
@@ -730,8 +734,12 @@ extension MCPServer {
             // なので、記録されるのも解決後のセレクタを持つ step(ref は下書きに書けない)。
             // 失敗した手も記録する: draft には失敗が残っていたほうが「何を試して止まったか」が
             // 追える(InteractionLog は成否を持たず落とさない)
-            recordAction(InteractionLog.Entry(step: plan.step, unresolved: nil,
-                                              summary: plan.summary), args: args)
+            // **キーボードが出ておらず何も送らなかった hideKeyboard は記録しない**(ft_hide_keyboard と同じ答え・同じ下書き)
+            let sentNothing = plan.step.action == "hideKeyboard" && executor.hideKeyboardFoundNoKeyboard
+            if !sentNothing {
+                recordAction(InteractionLog.Entry(step: plan.step, unresolved: nil,
+                                                  summary: plan.summary), args: args)
+            }
             let refNote = index == 0 ? (refResolutionNote ?? "") : ""
             guard StepExecutor.isSuccess(outcome.status) else {
                 let reason: String
@@ -775,6 +783,7 @@ extension MCPServer {
                 okLine += " (warning: the selector matched \(count) elements — the first one was used\(used);"
                     + " narrow it with #id, a type, or [n])"
             }
+            if sentNothing { okLine += " (the keyboard was not shown; nothing was sent)" }
             okLine += refNote
             lines.append(okLine)
             // 無効な要素への touch は撃った上で ok(DSL と同じ = 失敗にはしない)。結論で名指す
@@ -806,7 +815,7 @@ extension MCPServer {
                 ? Self.waitForAppearedNote(waitFor, in: final,
                                            collapsingBulk: treeArgs["expandBulk"] as? Bool != true)
                 : Self.waitMissHeadline(waitFor, seconds: seconds, quietStopAfter: waited.quietStopAfter,
-                                        explain: explainMiss)
+                                        explain: explainMiss, canWaitForChange: false)
                     // alert は batchAlertAppearedNote が先に言う(重ねない)
                     + (Self.batchAlertAppearedNote(beforeBatch: beforeBatch, final: final).isEmpty
                        ? Self.appearedPromptNote(before: beforeBatch, now: final) : "")
