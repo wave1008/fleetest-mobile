@@ -30,6 +30,8 @@ public enum WorkerAnomalyCause: String, Codable, Sendable {
     case accessibilityFault
     /// 接続できない(status に応答しない)
     case noResponse
+    /// 描画の状態(白紙・文字消え。`DeviceScreenState`)
+    case rendering
 }
 
 /// `WorkerAnomalyRecord.recovery`(任意。kind == "recovered" のときだけ持つ)の値の集合。
@@ -56,7 +58,8 @@ public struct WorkerAnomalyRecord: Codable, Sendable {
     /// "retryLimit"(振り直しの上限に達し、失敗として記録した)/ "circuitHeld"(連続失敗中だが
     /// 他レーンが1本も通っていないためレーンを保持した)/ "preRunExcluded"(run 前の blank 判定で
     /// 除外)/ "preRunRepaired"(run 前の blank 判定で修復して復帰)/ "recovered"(run 中の回復操作を
-    /// 1回実行した)
+    /// 1回実行した)/ "renderingHeld"(描画の状態を報告したがレーンを切り離さず結果を残した)/
+    /// "rebootAdvised"(デバイスの再起動で戻らなかったのでマシンの再起動を案内した)
     public var kind: String
     /// ScenarioRunRecord.worker と**同じ規則**("<platform>:<デバイス論理名>")。
     /// 論理名を持たない経路(--port 等)では nil = label だけで照合する
@@ -83,6 +86,14 @@ public struct WorkerAnomalyRecord: Codable, Sendable {
         self.reason = reason
         self.cause = cause?.rawValue
         self.recovery = recovery?.rawValue
+    }
+
+    /// マシンの再起動の案内の記録(kind "rebootAdvised")。**測った事実だけ** —— デバイスの再起動で戻らなかった(原因は書かない)
+    public static func rebootAdvice(_ worker: RunWorker, state: DeviceScreenState) -> WorkerAnomalyRecord {
+        WorkerAnomalyRecord(
+            kind: "rebootAdvised", worker: RunOrchestrator.workerID(worker), label: worker.label,
+            reason: "restarting the device did not bring the screen back (\(state.rawValue)); restarting the machine is recommended",
+            cause: .rendering)
     }
 
     /// run **前**の blank triage(`BlankWorkerTriage.excludeBlankScreenWorkers` /

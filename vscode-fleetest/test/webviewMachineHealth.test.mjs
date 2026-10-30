@@ -457,7 +457,7 @@ test("Rendering 列: 0 の種類は出さず、全部 0 なら空欄。種類ご
   t.after(() => window.close());
   send({ type: "hostMetricsMachines", machines: ["m2", "m3"] });
   const device = (id, machine, spec) => ({ id, name: id, platform: "android", state: "connected", detail: "",
-    kind: "virtual", recording: false, registered: true, machine, frozen: false, screenState: null, ...spec });
+    kind: "virtual", recording: false, registered: true, machine, frozen: false, screenState: null, rebootAdvised: false, ...spec });
   send({ type: "devices", devices: [
     device("a", "m2", { frozen: true }),
     device("b", "m2", { screenState: "blank" }), device("c", "m2", { screenState: "blank" }),

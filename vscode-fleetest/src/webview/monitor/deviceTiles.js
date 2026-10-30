@@ -8,7 +8,7 @@
 import { t, withCliTranslation } from '../i18n.js';
 import { setDevicesWaiting } from './waitingNote.js';
 import { vscode } from './vscodeApi.js';
-import { grid, banner, btnUp, btnDown, deviceOpMenu, deviceOpMenuItemBtn, deviceOpMenuItemLabel, deviceOpMenuGpuBtn, deviceOpMenuSep, deviceOpMenuSelectAllBtn, deviceOpMenuSelectOnlyBtn, deviceOpMenuDeselectAllBtn, btnSelectAll, btnRestart, btnRunTests, projectSelect, profileSelect, tilePane, tileMarquee, lineViewSelection, platformFilterBadges } from './domRefs.js';
+import { grid, banner, rebootAdvice, btnUp, btnDown, deviceOpMenu, deviceOpMenuItemBtn, deviceOpMenuItemLabel, deviceOpMenuGpuBtn, deviceOpMenuSep, deviceOpMenuSelectAllBtn, deviceOpMenuSelectOnlyBtn, deviceOpMenuDeselectAllBtn, btnSelectAll, btnRestart, btnRunTests, projectSelect, profileSelect, tilePane, tileMarquee, lineViewSelection, platformFilterBadges } from './domRefs.js';
 import { updateLaneVisibility, syncLanesToDevices, runningWorkers, relayoutPreviewsForResize } from './laneLog.js';
 import { createH264Renderer } from './h264Decoder.js';
 import { clampMenuPosition } from './menu.js';
@@ -20,7 +20,7 @@ import {
 // 「起動中のデバイス」の判定はホストと**同じ1つの定義**を通す(複製すると、どの state を
 // 起動中と見るかが2箇所で食い違う)。この .ts は拡張と webview の両バンドルに入るので
 // vscode を引き込む import を足さないこと(runBoardModel.ts と同じ制約)。
-import { filterMonitorDevices } from '../../monitorDeviceModel';
+import { filterMonitorDevices, rebootAdviceSummary } from '../../monitorDeviceModel';
 
 // bridgeWatch(拡張ホストの自動修復ウォッチドッグ、契約は main.js の 'bridgeWatch' ケース参照)の
 // phase→footer表示。'ok'はここに含めず通常表示へフォールバックさせる。
@@ -1659,7 +1659,21 @@ export function applyDevices(devices, filter) {
   lastDevices = devices;
   deviceStateFilter = filter === 'running' ? 'running' : 'all';
   applyVisibleDevices(tileDevices());
+  renderRebootAdvice(devices);
   notifyMonitorDevicesChanged();
+}
+
+// 表示フィルタの前の全台から数える(絞り込みで案内が消えない)。毎周期呼ばれるので、中身の鍵が前回と同じなら触らない
+// (要素を作り直さない・説明文だけ setHoverTip で書く = 周期的な点滅を避ける)
+let rebootAdviceKey = '';
+function renderRebootAdvice(devices) {
+  const summary = rebootAdviceSummary(devices);
+  const key = summary ? summary.count + '\n' + summary.names.join('\n') : '';
+  if (key === rebootAdviceKey) { return; }
+  rebootAdviceKey = key;
+  rebootAdvice.textContent = summary ? t('wvMonitor.rebootAdvice.text', { count: summary.count }) : '';
+  rebootAdvice.classList.toggle('visible', summary !== null);
+  setHoverTip(rebootAdvice, summary ? summary.names.join('\n') : '');
 }
 
 /** タイルに出すデバイス(= 表示フィルタを両方通したもの)。run ボードのツリーは通さない。 */

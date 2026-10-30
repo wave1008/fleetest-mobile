@@ -572,6 +572,7 @@ public final class FTDriveCore {
                     DeviceScreenStateStore.publish(stateDir: stateDir, key: key, state: state)
                 } else {
                     DeviceScreenStateStore.clear(stateDir: stateDir, key: key)
+                    UnrecoveredDeviceStore.clear(stateDir: stateDir, key: key)
                 }
             }
         }

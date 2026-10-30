@@ -389,6 +389,7 @@ function renderDevicesPanel(): string {
     </div>
 
     <div id="banner" class="banner"></div>
+    <div id="reboot-advice" class="reboot-advice" role="status"></div>
 
     <!-- 「実行中」と「デバイス」を分ける仕切り(ユーザー決定)。見た目も挙動も実行ログ
          ビューの上の #splitter-log と同じ(.splitter)—— 下げると run ボードが伸びる(splitter.js)。

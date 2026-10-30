@@ -12,6 +12,14 @@ enum RunDeviceState: Hashable {
         default: return nil
         }
     }
+
+    var screenState: DeviceScreenState? {
+        switch self {
+        case .blank: return .blank
+        case .textless: return .textless
+        case .frozen: return nil
+        }
+    }
 }
 
 /// run 進捗の記帳(DS-18。段1・2)。RunLeaseLedger と同じ形 —— 書き手の実体

@@ -278,6 +278,9 @@ struct ApiMonitorDeviceInfo: Codable {
     /// アプリの描画の状態(`DeviceScreenStateStore`。凍結とは別)。**無いときも `null` を書く**(拡張は必須欄として読む)。
     /// 契約は vscode-fleetest/src/monitorDeviceModel.ts の MonitorDevice.screenState
     var screenState: MonitorScreenState = .none
+    /// このデバイスは再起動しても描画が戻らなかった(`UnrecoveredDeviceStore`。マシンの再起動かこのデバイスの緑の確かめで消える)。
+    /// 拡張はモニター上部の案内(マシンの再起動のおすすめ)に数える。契約は vscode-fleetest/src/monitorDeviceModel.ts の MonitorDevice.rebootAdvised
+    var rebootAdvised: Bool = false
     /// iOS 実機の USB 接続か(devicectl の transportType == "wired")。仮想・Android・不明は nil。
     /// mergedDevices が WiFi 越しの分身の抑制に使う(拡張は読まない)。
     let wired: Bool?

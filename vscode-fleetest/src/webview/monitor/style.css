@@ -1169,6 +1169,9 @@ select:disabled { opacity: 0.5; cursor: default; }
 /* 自動では消えない(deviceTiles.js の showBanner)ので、閉じられることを見せる */
 .banner { cursor: pointer; }
 .banner-text { flex: 1 1 auto; }
+.reboot-advice { display: none; flex: 0 0 auto; margin: 8px 12px 0 12px; padding: 6px 10px; border-radius: 3px; font-size: 12px;
+  background-color: var(--vscode-inputValidation-warningBackground, #352a05); border: 1px solid var(--vscode-inputValidation-warningBorder, #b89500); }
+.reboot-advice.visible { display: block; }
 .banner-copy { flex: 0 0 auto; font-size: 11px; padding: 2px 8px; }
 .tile-pane {
   /* 高さは JS が inline style で設定・クランプする(padding は持たず、余白は

@@ -108,6 +108,9 @@ export interface MonitorDevice {
   readonly frozen: boolean;
   /** アプリの描画の状態(Sources/fleetest の MonitorScreenState。無いときも null を送る)。 */
   readonly screenState: "blank" | "textless" | null;
+  /** 再起動しても描画が戻らなかったデバイスか(Sources/fleetest の ApiMonitorDeviceInfo.rebootAdvised)。
+   * モニター上部の「マシンの再起動をおすすめします」の1行に数える。 */
+  readonly rebootAdvised: boolean;
   /** このデバイスが居る機械(登録名。手元は undefined)。**`host` はブリッジ宛先の IP で別物**。
    * モニターは手元のデバイスしか触れないので、リモートのタイルは状態を観測できない ——
    * タイルにホスト名を出して「どの機械のデバイスか」を分かるようにする
@@ -408,6 +411,7 @@ function isMonitorDevice(value: unknown): value is MonitorDevice {
     typeof value.recording === "boolean" &&
     typeof value.registered === "boolean" &&
     typeof value.frozen === "boolean" &&
+    typeof value.rebootAdvised === "boolean" &&
     (value.screenState === null || value.screenState === "blank" || value.screenState === "textless") &&
     (value.bridgeRunning === undefined || typeof value.bridgeRunning === "boolean") &&
     typeof value.storageMeasuring === "boolean" &&
@@ -745,4 +749,19 @@ export function disabledMachineSet(
     result.add("local");
   }
   return result;
+}
+
+/** モニター上部の「再起動しても戻らないデバイス」案内の中身。台が無ければ null(行を出さない)。
+ * names は machine 付きの表示名(ホバー用)。手元は machine 無し。 */
+export function rebootAdviceSummary(
+  devices: readonly Pick<MonitorDevice, "name" | "machine" | "rebootAdvised">[],
+): { readonly count: number; readonly names: readonly string[] } | null {
+  const advised = devices.filter((device) => device.rebootAdvised === true);
+  if (advised.length === 0) {
+    return null;
+  }
+  return {
+    count: advised.length,
+    names: advised.map((device) => (device.machine ? `${device.name} (${device.machine})` : device.name)),
+  };
 }

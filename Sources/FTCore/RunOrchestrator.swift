@@ -964,6 +964,17 @@ public final class RunOrchestrator: Sendable {
     /// シナリオの境目で「表示が止まっていないか」を確かめる(FTAndroid.DisplayFreezeWatch。判定は DisplayFreezeDetector)。
     /// 確定したレーンは .frozen と同じ扱い(直前の結果を捨てて振り直し・離脱・revive)。isDeviceFrozen と同じ理由で注入
     private let checkLaneDisplay: LaneDisplayCheck?
+    /// 描画の状態(白紙・文字消え)で離脱したレーンのデバイスへ、revive の前に回復を1回撃つ(OI-88。実体は
+    /// FTAndroid.ScreenRenderingRecoverer。1台1回の台帳と効いたかの測定はあちらの責務)。nil = 撃たない(離脱と振り直しは行う)
+    private let recoverRendering: RenderingRecovery?
+    /// run の最後のログに出す「再起動では戻らなかった台」の名前(マシンごとの公表 `UnrecoveredDeviceStore`。run の前の分も含む)
+    private let unrecoveredDeviceNames: (@Sendable () -> [String])?
+    /// 切り離しの判定帳(`RenderingLaneBook`)。判定と記録を1回のロックで行う
+    private let renderingBook = LockedValue<RenderingLaneBook>(RenderingLaneBook())
+    /// 描画の状態で離脱し、回復待ちのレーン(レーン key → 状態)。superviseWorker が離脱後に1回だけ引く
+    private let renderingPending = LockedValue<[String: DeviceScreenState]>([:])
+    /// 切り離しを許すか。broadcast は各レーンが同じセットを1回ずつ回すのが目的で、振り直し先が無い
+    private let detachesRendering = LockedValue<Bool>(true)
     /// 各シナリオを子へ渡す直前に、画面に残ったシステムアラートを消す(`ResidualSystemAlertClearing`)。
     /// 戻り値はレーンへ出す1行(nil = 何もしなかった)。**init に既定値を置かない**(呼び手の渡し忘れを
     /// コンパイルで止める。消せない経路は警告だけを返す口を明示して渡す)
@@ -980,6 +991,8 @@ public final class RunOrchestrator: Sendable {
     private let recheckRunner: RunnerRecheck?
     /// シナリオの境目の表示の確認。log はそのレーンの実行ログへ
     /// 第 2 引数はそのプラットフォームの SUT の bundle ID / パッケージ名(確認の home の後に前面へ戻す。分からなければ nil)
+    public typealias RenderingRecovery = @Sendable (RunWorker, DeviceScreenState, _ log: @escaping @Sendable (String) -> Void) async
+        -> RenderingRecoveryOutcome
     public typealias LaneDisplayCheck = @Sendable (RunWorker, String?, _ log: @escaping @Sendable (String) -> Void) async
         -> LaneDisplayCheckOutcome
 
@@ -1090,7 +1103,7 @@ public final class RunOrchestrator: Sendable {
     }
 
     /// シナリオ記録(ScenarioRunRecord.worker)と join できる形。論理名が無い経路では nil
-    static func workerID(_ worker: RunWorker) -> String? {
+    public static func workerID(_ worker: RunWorker) -> String? {
         worker.logicalName.map { "\(worker.platform):\($0)" }
     }
 
@@ -1116,6 +1129,8 @@ public final class RunOrchestrator: Sendable {
                 cleanupRetiredWorker: (@Sendable (RunWorker) async -> Void)? = nil,
                 reviveWorker: (@Sendable (RunWorker) async -> RunWorker?)? = nil,
                 checkLaneDisplay: LaneDisplayCheck? = nil,
+                recoverRendering: RenderingRecovery? = nil,
+                unrecoveredDeviceNames: (@Sendable () -> [String])? = nil,
                 recheckRunner: RunnerRecheck? = nil,
                 lateWorkers: (platforms: Set<String>, provider: @Sendable () async -> [RunWorker])? = nil,
                 installHandler: (@Sendable (RunWorker, String?) async
@@ -1154,6 +1169,8 @@ public final class RunOrchestrator: Sendable {
         self.cleanupRetiredWorker = cleanupRetiredWorker
         self.reviveWorker = reviveWorker
         self.checkLaneDisplay = checkLaneDisplay
+        self.recoverRendering = recoverRendering
+        self.unrecoveredDeviceNames = unrecoveredDeviceNames
         self.clearResidualSystemAlert = clearResidualSystemAlert
         self.recheckRunner = recheckRunner
         self.lateWorkers = lateWorkers
@@ -1277,6 +1294,7 @@ public final class RunOrchestrator: Sendable {
                     dispatch: ScenarioDispatch = .shared) async -> RunSummary {
         // Vision の特徴量の救済用の補助プロセス(run / api run / リモートのランナー機の run が共有する唯一の入口。
         // デバッグ実行では起こさない)。見本を持たないプロジェクトでは何も起こらない(VisionHelperHost)
+        if case .broadcast = dispatch { detachesRendering.withLock { $0 = false } }
         let visionHelper = debug == nil ? VisionHelperHost.acquire(project: project) : nil
         defer { visionHelper?.release() }
         var failed = 0
@@ -1566,6 +1584,9 @@ public final class RunOrchestrator: Sendable {
         }
 
         await progressState?.finish()
+        if let notice = UnrecoveredDeviceStore.closingNotice(names: unrecoveredDeviceNames?() ?? []) {
+            continuation.yield(.workerLog(worker: "run", message: notice))
+        }
 
         let summary = RunSummary(total: isPulled ? handedOut.value : total, failed: failed, skipped: await runSkipped.snapshot(),
                                  degradedWorkers: await degraded.snapshot(),
@@ -1653,6 +1674,30 @@ public final class RunOrchestrator: Sendable {
                 // ウェッジしたブリッジプロセスの停止は復帰の有無に関係なく必ず行う(プロパティ宣言の
                 // コメント参照)。復帰する場合も、供給前に旧プロセスを止めておく方が安全
                 await cleanupRetiredWorker?(retired)
+                // 描画の状態で離脱したデバイスは、revive の前に回復を1回撃つ(テスト中ではない)。revive できない離脱
+                // (キューが空・復帰未注入・上限)では撃たない = 起動し直しの数十秒を払うだけで、次の run の前の点検が同じ台帳で拾う
+                if let state = renderingPending.withLock({ $0.removeValue(forKey: Self.leaseKey(retired) ?? retired.label) }),
+                   let recoverRendering, revives < MAX_WORKER_REVIVES, reviveWorker != nil, await queue.hasItems() {
+                    let log: @Sendable (String) -> Void = { [continuation, label = retired.label] message in
+                        continuation.yield(.workerLog(worker: label, message: message))
+                    }
+                    switch await recoverRendering(retired, state, log) {
+                    case .recovered(let kind):
+                        await anomalies.add(WorkerAnomalyRecord(
+                            kind: "recovered", worker: Self.workerID(retired), label: retired.label,
+                            reason: "recovered a \(state.rawValue) screen", cause: .rendering, recovery: kind))
+                    case .notRecovered(let kind):
+                        await anomalies.add(WorkerAnomalyRecord(
+                            kind: "recovered", worker: Self.workerID(retired), label: retired.label,
+                            reason: "restarted after a \(state.rawValue) screen; the screen did not come back",
+                            cause: .rendering, recovery: kind))
+                        await anomalies.add(WorkerAnomalyRecord.rebootAdvice(retired, state: state))
+                    case .advised:
+                        await anomalies.add(WorkerAnomalyRecord.rebootAdvice(retired, state: state))
+                    case .notAttempted:
+                        break
+                    }
+                }
                 // queue が空/復帰未注入/復帰回数上限 のいずれかならこれ以上粘っても無駄なので諦める
                 guard revives < MAX_WORKER_REVIVES, await queue.hasItems(), let revive = reviveWorker else {
                     if let retiredKey { await runLeases.release(retiredKey) }
@@ -1734,8 +1779,14 @@ public final class RunOrchestrator: Sendable {
         await reportWorkerFailed(worker, "dropped out because of \(reason)", cause: cause)
         // このレーンはもう走らない(復帰できれば superviseWorker が新しい runWorker で laneJoined を呼び直す)
         await progressState?.laneLeft(key: progressLaneKey)
+        renderingBook.withLock { $0.leave(laneKey: progressLaneKey) }
         await stopRecording(worker, leaseKey: leaseKey)
         return .retired(failed: failed, worker: worker)
+    }
+
+    /// 描画の状態の報告から1つ選ぶ。両方出ていれば blank(白紙は文字消えを含む重い側)
+    static func reportedScreenState(_ states: Set<DeviceScreenState>) -> DeviceScreenState? {
+        states.contains(.blank) ? .blank : states.first
     }
 
     private func runWorker(_ worker: RunWorker, queue: ScenarioQueue, revived: Bool) async -> WorkerExit {
@@ -1761,6 +1812,7 @@ public final class RunOrchestrator: Sendable {
         // (--port 等 udid/serial の無い経路。この orchestrator では progressState 自体が
         // 未注入なので実質関係ない)でも記帳自体は続けられるよう label へ縮退する
         let progressLaneKey = leaseKey ?? worker.label
+        renderingBook.withLock { $0.join(laneKey: progressLaneKey, platform: worker.platform) }
         // compile-ocr の待ちがあるなら、レーンを見せる最初の記帳から段階を "compiling" にする(running を一瞬挟まない)
         let waitsForOCRCompile = ScenarioHost.isOCRModelCompileWaitPending
         if waitsForOCRCompile {
@@ -1817,10 +1869,11 @@ public final class RunOrchestrator: Sendable {
             await progressState?.scenarioStarted(laneKey: progressLaneKey, scenario: item.info.id,
                                                  at: Date())
             let slowestStep = SlowestStepSnapshot()
+            let observedScreenStates = LockedValue<Set<DeviceScreenState>>([])
             // **終了イベントは境目の表示の確認まで保留する**(確認が凍結を確定したら合否を失敗へ直して流す = Test Explorer などの
             // 読み手が「合格」を見たまま残らない。NDJSON は scenarioFinished を取り消す口を持たない)。確認を注入していなければ保留しない。
             // 保留の分だけ読み手の受け取り時刻が遅れるので、送った時刻は flowStartedAt / flowEndedAt で別に運ぶ(所要の集計が確認・回復の時間を含まない)
-            let holdsFinish = checkLaneDisplay != nil
+            let holdsFinish = checkLaneDisplay != nil || detachesRendering.withLock { $0 }
             let heldFinish = LockedValue<(event: RunEvent, at: Date)?>(nil)
             let outcome = await ScenarioRunner.runOne(
                 project: project, item: item, worker: worker,
@@ -1858,6 +1911,8 @@ public final class RunOrchestrator: Sendable {
                     }
                     if case .step(_, _, let result) = event {
                         let states = Set((result.notes ?? []).compactMap(RunDeviceState.init(note:)))
+                        let screenStates = states.compactMap(\.screenState)
+                        if !screenStates.isEmpty { observedScreenStates.withLock { $0.formUnion(screenStates) } }
                         if !states.isEmpty {
                             let laneKey = progressLaneKey
                             Task {
@@ -1895,15 +1950,43 @@ public final class RunOrchestrator: Sendable {
                    }) {
                 displayFreeze = (detail, recovery)
             }
+            // **描画の状態(白紙・文字消え)を報告したレーンの切り離し**(OI-88)。凍結が確定した回は凍結が先(同じレーンを二重に離脱させない)。
+            // 緑で終わった回も、画素で確かめられていない検証を含むので凍結と同じく結果を捨てる(invalidatesPassedRecord)
+            // **緑と素の赤だけ**(一過性の故障・ブリッジ不達は下の仕分けと事後プローブが先)・中断中は撃たない・ブリッジが答えないデバイスは消失の経路へ回す
+            var renderingDetach: DeviceScreenState?
+            if displayFreeze == nil, outcome == .passed || outcome == .failed, detachesRendering.withLock({ $0 }),
+               let state = Self.reportedScreenState(observedScreenStates.withLock { $0 }),
+               await !stoppedByUser(),
+               await withDeadline(seconds: 10, { try await worker.driver.status() }) != nil {
+                switch renderingBook.withLock({ $0.decide(laneKey: progressLaneKey, platform: worker.platform,
+                                                           scenarioID: item.info.id, state: state) }) {
+                case .detach:
+                    renderingDetach = state
+                case .keepNoOtherLane:
+                    let message = "the screen was reported as \(state.rawValue), but no other \(worker.platform) lane is running —"
+                        + " keeping the lane (a lane is detached only when another one can take its scenarios)"
+                    continuation.yield(.workerLog(worker: worker.label, message: "⚠️ \(message)"))
+                    await anomalies.add(WorkerAnomalyRecord(
+                        kind: "renderingHeld", worker: Self.workerID(worker), label: worker.label,
+                        scenarioID: item.info.id, reason: message, cause: .rendering))
+                case .keepReportedByOtherLane(let lane):
+                    let message = "the screen was reported as \(state.rawValue) on \(lane) as well for this scenario —"
+                        + " keeping the lane and the result"
+                    continuation.yield(.workerLog(worker: worker.label, message: "⚠️ \(message)"))
+                    await anomalies.add(WorkerAnomalyRecord(
+                        kind: "renderingHeld", worker: Self.workerID(worker), label: worker.label,
+                        scenarioID: item.info.id, reason: message, cause: .rendering))
+                }
+            }
             // 保留した終了イベントを流す(凍結が確定したら失敗として。振り直しの requeued はこの後に続く = 凍結の失敗と同じ並び)
             if let held = heldFinish.withLock({ $0 }),
                case .flowFinished(let heldWorker, let heldURL, _, _, _, _, _) = held.event {
                 continuation.yield(.flowEndedAt(worker: heldWorker, flowURL: heldURL, at: held.at))
-                continuation.yield(displayFreeze == nil ? held.event : Self.failedFinish(held.event))
+                continuation.yield(displayFreeze == nil && renderingDetach == nil ? held.event : Self.failedFinish(held.event))
             }
             await videoRecording?.scenarioFinished(
                 workerLabel: worker.label, at: scenarioEndedAt,
-                passed: displayFreeze == nil && (outcome == .passed || outcome == .notApplicable))
+                passed: displayFreeze == nil && renderingDetach == nil && (outcome == .passed || outcome == .notApplicable))
             if let displayFreeze {
                 if let recovery = displayFreeze.recovery {
                     await anomalies.add(WorkerAnomalyRecord(
@@ -1913,6 +1996,13 @@ public final class RunOrchestrator: Sendable {
                 }
                 return await retireUnusable(item, worker: worker, queue: queue,
                                             reason: "a frozen display (\(displayFreeze.detail))", cause: .frozen,
+                                            failed: failed, progressLaneKey: progressLaneKey, leaseKey: leaseKey,
+                                            invalidatesPassedRecord: outcome == .passed)
+            }
+            if let state = renderingDetach {
+                renderingPending.withLock { $0[progressLaneKey] = state }
+                return await retireUnusable(item, worker: worker, queue: queue,
+                                            reason: "a \(state.rawValue) screen", cause: .rendering,
                                             failed: failed, progressLaneKey: progressLaneKey, leaseKey: leaseKey,
                                             invalidatesPassedRecord: outcome == .passed)
             }
@@ -1941,6 +2031,7 @@ public final class RunOrchestrator: Sendable {
                         // 直前のシナリオは緑で記録済み(振り直さない)。このレーンだけ離脱する
                         await reportWorkerFailed(worker, "dropped out because of \(reason)", cause: .noResponse)
                         await progressState?.laneLeft(key: progressLaneKey)
+                        renderingBook.withLock { $0.leave(laneKey: progressLaneKey) }
                         await stopRecording(worker, leaseKey: leaseKey)
                         return .retired(failed: failed, worker: worker)
                     }
@@ -2078,6 +2169,8 @@ public final class RunOrchestrator: Sendable {
             await progressState?.scenarioFinished(laneKey: progressLaneKey, passed: false)
             failed += 1
         }
+        // もうシナリオを取らないので、切り離しの判定で「引き取れるレーン」に数えない(片付けの間も含めて)
+        renderingBook.withLock { $0.leave(laneKey: progressLaneKey) }
         // キューを掃き切ったデバイスだけが片付ける(離脱は上で return 済み・中断中は新しい子を起こさない。
         // 遅延参加の中止では片付ける = 利用者が止めたのではない)
         if await !stoppedByUser() {

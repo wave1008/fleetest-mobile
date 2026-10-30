@@ -443,6 +443,13 @@ extension ApiMonitorCommand {
         return DeviceScreenStateStore.current(stateDir: stateDir, key: key, now: now)
     }
 
+    /// 再起動しても描画が戻らなかったデバイスか(`UnrecoveredDeviceStore`)。接続状態は問わない
+    /// (案内の消え方はマシンの再起動かこのデバイスの緑の確かめ。落ちている間も「戻らなかった」事実は変わらない)
+    static func rebootAdvised(key: String?, stateDir: URL?, bootTime: Date? = MachineBoot.time()) -> Bool {
+        guard let key, let stateDir else { return false }
+        return UnrecoveredDeviceStore.isPublished(stateDir: stateDir, key: key, bootTime: bootTime)
+    }
+
     /// pause したまま resume が来ない場合に自動的に resume 扱いにするまでの秒数(安全弁)
     static let pauseSafetyValveSeconds: TimeInterval = 120
     /// pause 中、resume(または安全弁)を検知するためのポーリング間隔(秒)

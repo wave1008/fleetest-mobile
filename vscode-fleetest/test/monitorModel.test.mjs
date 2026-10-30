@@ -22,6 +22,7 @@ import {
   deviceOpMenuItem,
   enqueueDeviceLifecycleJob,
   filterMonitorDevices,
+  rebootAdviceSummary,
   disabledMachineSet,
   hasDeviceLifecycleJobFor,
   isDeviceLifecycleQueueBusy,
@@ -39,7 +40,7 @@ import {
 } from "../src/monitorModel";
 
 // CLI(ApiMonitorDeviceInfo)が必ず送る欄。欠けた行は不正として弾く(下の「欠落は false」のテスト)
-const REQ = { kind: "virtual", inRun: false, inSession: false, inMCP: false, recording: false, registered: true, frozen: false, screenState: null, storageMeasuring: false };
+const REQ = { kind: "virtual", inRun: false, inSession: false, inMCP: false, recording: false, registered: true, frozen: false, screenState: null, rebootAdvised: false, storageMeasuring: false };
 
 // ---- isMonitorEvent: 正常3種 ----
 
@@ -1545,3 +1546,15 @@ test("isMonitorFromWebviewMessage: runProfileDevicesSync は add 要素が不正
   );
 });
 
+
+test("rebootAdviceSummary: 戻らなかった台だけを数え、機械付きの名前を返す(無ければ null)", () => {
+  assert.equal(rebootAdviceSummary([{ name: "a", rebootAdvised: false }]), null);
+  assert.deepEqual(
+    rebootAdviceSummary([
+      { name: "a", rebootAdvised: true },
+      { name: "b", machine: "M1Max", rebootAdvised: true },
+      { name: "c", rebootAdvised: false },
+    ]),
+    { count: 2, names: ["a", "b (M1Max)"] },
+  );
+});

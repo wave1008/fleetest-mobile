@@ -5,6 +5,7 @@ export const toolbar = document.getElementById('toolbar');
 export const grid = document.getElementById('grid');
 export const emptyMessage = document.getElementById('empty');
 export const banner = document.getElementById('banner');
+export const rebootAdvice = document.getElementById('reboot-advice');
 export const btnUp = document.getElementById('btn-devices-up');
 export const btnDown = document.getElementById('btn-devices-down');
 export const btnRestart = document.getElementById('btn-restart');

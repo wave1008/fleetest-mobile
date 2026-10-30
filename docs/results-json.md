@@ -323,13 +323,13 @@ FM を呼ぶ構成だったかは `fmTextVisibilityCheck || screenLooksLike` で
 
 | フィールド | 型 | 意味 |
 |---|---|---|
-| kind | String | `degraded`(劣化・離脱)/ `requeued`(振り直し。その回の `scenarios/*.json` は消える。**Android のドライバ不達(ブリッジ断)も 2026-09-16 よりここに入る**)/ `retryLimit`(上限到達。**最後の失敗記録はそのまま残る** —— `failedSteps` / `errorLogs` / `timeline` を持つ実物で、合成の skipped 記録には置き換えない)/ `circuitHeld`(連続失敗が閾値に達したが、その間に他のレーンが1本も通っていないので離脱させなかった。streak ごとに1件)/ `preRunExcluded`(run **前**の点検で除外した。2026-09-27 より。点検は blank 判定と、Android Emulator のホストへの経路(2026-10-19 より)。**理由は `reason` に台ごと**)/ `preRunRepaired`(run **前**の点検で修復して復帰させた。2026-09-27 より)/ `recovered`(run **中**の回復操作を1回実行した。効いたかは判定しない。2026-09-27 より) |
+| kind | String | `degraded`(劣化・離脱)/ `requeued`(振り直し。その回の `scenarios/*.json` は消える。**Android のドライバ不達(ブリッジ断)も 2026-09-16 よりここに入る**)/ `retryLimit`(上限到達。**最後の失敗記録はそのまま残る** —— `failedSteps` / `errorLogs` / `timeline` を持つ実物で、合成の skipped 記録には置き換えない)/ `renderingHeld`(白紙・文字消えを報告したが、同じプラットフォームに他のレーンが居ない・同じシナリオが別のレーンでも同じ状態を報告した、のどちらかでレーンを切り離さず結果を残した。cause `rendering`。reason に事実だけ)/ `rebootAdvised`(デバイスの再起動で戻らなかった、または今回のマシンの起動以降すでに再起動した台で同じ状態をまた見つけた = 再起動を繰り返さず、マシンの再起動を案内した。cause `rendering`。**マシンの再起動はツールが撃たない**)/ `circuitHeld`(連続失敗が閾値に達したが、その間に他のレーンが1本も通っていないので離脱させなかった。streak ごとに1件)/ `preRunExcluded`(run **前**の点検で除外した。2026-09-27 より。点検は blank 判定と、Android Emulator のホストへの経路(2026-10-19 より)。**理由は `reason` に台ごと**)/ `preRunRepaired`(run **前**の点検で修復して復帰させた。2026-09-27 より)/ `recovered`(run **中**の回復操作を1回実行した。効いたかは判定しない。2026-09-27 より) |
 | worker | String? | `"<platform>:<デバイス論理名>"`。**`scenarios/*.json` の `worker` と同じ規則 = join できる** |
 | label | String | 表示用の識別子(`degradedWorkers` の1行と同一) |
 | scenarioID | String? | `requeued` / `retryLimit` / `circuitHeld` の対象 |
 | reason | String | 英語・人間可読 |
-| cause | String? | **`degraded`/`requeued`/`retryLimit`/`circuitHeld` だけ持つ**理由の分類(生成箇所が型から決める。`reason` の文字列を後から解析しない)。値は `frozen`(画面の凍結)/ `deviceGone`(デバイスが消えた。offline/not found)/ `bridgeUnreachable`(ブリッジに届かない)/ `bridgeTakenOver`(ブリッジが別のデバイスのものになった)/ `consecutiveFailures`(連続失敗)(**前の run から引き継いだ連続失敗を含むことがある**。`reason` に「including N carried over from earlier runs」と出る。台帳は `<repo>/.fleetest/lane-streak-<platform:デバイス論理名>.json`。通ると消え(離脱では消さない)、中断で終わった失敗は持ち越さない)/ `accessibilityFault`(一時的なアクセシビリティ異常)/ `noResponse`(接続できない・status に応答しない)。**写像できない reason は省略**(2026-09-27 より前の記録には無い) |
-| recovery | String? | **`recovered` だけ持つ**回復の種類。値は `runnerRestart`(XCUITest ランナーを同じポートで起動し直した)/ `displayServerRestart`(全面が黒い Simulator の backboardd を起こし直して戻した)/ `workerRevive`(離脱したワーカーの論理デバイスを復帰させた)/ `displaySleepWake`(止まった表示を sleep/wake で戻した。Android Emulator だけ。2026-10-18 より)/ `deviceRestart`(止まった表示のデバイスを再起動した = Emulator はゲストの再起動か停止→起動・Simulator は shutdown→boot。2026-10-18 より)。`displayServerRestart` と後の 2 つは**シナリオの境目の表示の確認**(`DisplayFreezeWatch`。同じ絵が 60 秒以上返り、home を押しても変わらなかった)が撃ったもので、同じ事象の `requeued`/`degraded`(cause `frozen`・reason「a frozen display (…)」)と対で出る(下記の注記参照) |
+| cause | String? | **`degraded`/`requeued`/`retryLimit`/`circuitHeld` だけ持つ**理由の分類(生成箇所が型から決める。`reason` の文字列を後から解析しない)。値は `frozen`(画面の凍結)/ `deviceGone`(デバイスが消えた。offline/not found)/ `bridgeUnreachable`(ブリッジに届かない)/ `bridgeTakenOver`(ブリッジが別のデバイスのものになった)/ `rendering`(描画の状態 = 白紙・文字消えを報告したレーンの切り離し。OI-88)/ `consecutiveFailures`(連続失敗)(**前の run から引き継いだ連続失敗を含むことがある**。`reason` に「including N carried over from earlier runs」と出る。台帳は `<repo>/.fleetest/lane-streak-<platform:デバイス論理名>.json`。通ると消え(離脱では消さない)、中断で終わった失敗は持ち越さない)/ `accessibilityFault`(一時的なアクセシビリティ異常)/ `noResponse`(接続できない・status に応答しない)。**写像できない reason は省略**(2026-09-27 より前の記録には無い) |
+| recovery | String? | **`recovered` だけ持つ**回復の種類。値は `runnerRestart`(XCUITest ランナーを同じポートで起動し直した)/ `displayServerRestart`(全面が黒い Simulator の backboardd を起こし直して戻した)/ `workerRevive`(離脱したワーカーの論理デバイスを復帰させた)/ `displaySleepWake`(止まった表示を sleep/wake で戻した。Android Emulator だけ。2026-10-18 より)/ `deviceRestart`(止まった表示のデバイスを再起動した = Emulator はゲストの再起動か停止→起動・Simulator は shutdown→boot。2026-10-18 より)。`rendering` の `recovered`/`requeued` は、白紙・文字消えを報告したレーンを離脱させて回復を1回撃った記録(下記「描画の状態の手当て」)。`displayServerRestart` と後の 2 つは**シナリオの境目の表示の確認**(`DisplayFreezeWatch`。同じ絵が 60 秒以上返り、home を押しても変わらなかった)が撃ったもので、同じ事象の `requeued`/`degraded`(cause `frozen`・reason「a frozen display (…)」)と対で出る(下記の注記参照) |
 
 **`degradedWorkers` と `workerAnomalies` は同じ事象**(前者が人向けの1行、後者が機械可読)。
 片方だけ増えることはない。
@@ -790,3 +790,15 @@ machineHealth の行しか要らないので、**プロジェクトごとの行*
 - **間引き**は月ディレクトリごと(`git rm -r '<project>/results/runs/2026-07'`)。月単位以外の部分削除はしない
 - `reportPath` が指す Markdown レポート・PNG は **gitignore のまま**なので他マシンからは開けない。
   失敗調査の一次情報は `failedSteps` / `errorLogs`(このページの欄)にする
+
+
+### 描画の状態の手当て(OI-88)
+
+シナリオの間に `screen-blank` / `screen-textless` の注記が出たレーンの扱い。**事実だけ**を残し、環境かアプリかの分類は記録しない。
+
+- **切り離し**: 同じプラットフォームに他のレーンが居れば、シナリオの終わりでそのレーンを離脱させ(結果は捨てて振り直し。緑で終わった回も画素で確かめられていない検証を含むので捨てる)、残りのレーンへ回す。`requeued`/`degraded` の cause は `rendering`。振り直しの上限は他の離脱と同じで、上限の回は失敗として記録する
+- **切り離さない**: ①他のレーンが居ない(全レーンが同時にその状態でも全滅させない) ②同じシナリオが別のレーンでも同じ状態を報告した(アプリ側の事実として結果を残す)。どちらも `renderingHeld`。broadcast の run は切り離さない
+- **回復**: 離脱したデバイスへ、revive の前(テストしていない間)に既存の修復を1回撃つ(`recovered` + `recovery`。凍結の回復と同じ関数)。**1台につきマシンの1回の起動に1回**(`.fleetest/screen-recovery-<デバイス鍵>.json`。マシンの起動時刻より古い記録は数え直す = マシンの再起動で自然に消える)。実機は対象外(再起動も切り離しもしない)
+- **効いたかの測定**: 回復の直後に OS 側の絵が全面一様でないことを確かめる。戻らなければ、または同じ状態を再び見つけたら撃たずに `rebootAdvised` を残す。アプリの白紙・文字消えそのものが消えたかは次の検出が決める
+- **run の前**: 描画の状態が公表されたまま残る Simulator / Emulator は、使う前に同じ手順で1回回復する。戻らなかった台は使わず run を続ける(全台がそうなら使う)。`preRunExcluded`(reason「restarting the device did not bring the screen back」)と `rebootAdvised`
+- **案内**: 戻らなかった台は `.fleetest/screen-unrecovered-<デバイス鍵>.json` に公表され(マシンの再起動かそのデバイスの緑の確かめで消える)、モニターの `devices[].rebootAdvised` で配られて拡張が上部に1行出す。run の最後のログにも1行出る

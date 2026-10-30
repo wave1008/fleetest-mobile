@@ -1380,7 +1380,9 @@ public enum ProfileWorkerFactory {
     /// 呼び手ごとに持っていた頃に1経路だけ入れて穴を空けている(`BlankWorkerRecoveryWiringTests`)
     public static func recoverFrozenIOSWorkers(
         labels: [String], workers: [RunWorker], resolved: ResolvedProfile, repoRoot: URL,
-        apps: [String: ResolvedAppTarget], triesDisplayServer: Bool, log: @escaping @Sendable (String) -> Void
+        apps: [String: ResolvedAppTarget], triesDisplayServer: Bool,
+        onDisplayServerRestored: @escaping @Sendable (String) -> Void = { _ in },
+        log: @escaping @Sendable (String) -> Void
     ) async -> [RunWorker]? {
         let targets = frozenIOSTargets(labels: labels, workers: workers)
         guard !targets.isEmpty else {
@@ -1398,7 +1400,10 @@ public enum ProfileWorkerFactory {
                         // (実測・3周とも一致: 96.5s → 34.6s)。
                         // 止めるのは**この udid のブリッジだけ**(他機・他セッションは巻き込まない)
                         _ = BridgeLauncher.stopMatching(udid: udid, repoRoot: repoRoot)
-                        if triesDisplayServer, await restartSimulatorDisplayServer(udid: udid, label: label, log: log) { return }
+                        if triesDisplayServer, await restartSimulatorDisplayServer(udid: udid, label: label, log: log) {
+                            onDisplayServerRestored(udid)
+                            return
+                        }
                         log("→ \(label): rebooting the simulator (shutdown → boot)")
                         _ = try? Shell.run(["xcrun", "simctl", "shutdown", udid])
                         // boot 完了まで待つ(待たずに注入すると launch が失敗する)。同時起動の枠もここで掛かる

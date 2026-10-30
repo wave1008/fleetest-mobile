@@ -169,6 +169,10 @@ export const webviewMonitorAStrings = {
   "wvMonitor.profile.running": { ja: "(起動中のデバイス)", en: "(Running devices)" },
   // バナーは自動では消えない(読む前に消えるため)。閉じ方を示す
   "wvMonitor.banner.dismissTip": { ja: "クリックで閉じる", en: "Click to dismiss" },
+  "wvMonitor.rebootAdvice.text": {
+    ja: "⚠️ 再起動しても戻らないデバイスがあります({count}台)。マシンの再起動をおすすめします",
+    en: "⚠️ {count} device(s) did not recover after a restart. Restarting the machine is recommended",
+  },
   "wvMonitor.banner.copy": { ja: "コピー", en: "Copy" },
   "wvMonitor.banner.copied": { ja: "コピーしました", en: "Copied" },
   "wvMonitor.banner.copyTip": {

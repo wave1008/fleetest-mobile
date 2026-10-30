@@ -61,6 +61,15 @@ enum ProfileSupplyLanes {
             workers, stateDir: stateDir, log: log)
         triage.add(repaired: blank.repaired, excluded: blank.excluded, anomalies: blank.anomalies)
         workers = blank.workers
+        // 描画の状態(白紙・文字消え)が公表されたまま残る Emulator は、使う前に1回だけ回復する(台帳を通す)
+        if let stateDir {
+            let screen = await ScreenRenderingRecoverer.prepareBeforeRun(
+                workers, stateDir: stateDir, locale: resolved.locale, repoRoot: stateDir.deletingLastPathComponent(),
+                recoverIOS: { _, _, _ in nil }, log: log)
+            triage.add(repaired: screen.repairedWorkers.map(\.label), excluded: screen.excludedWorkers.map(\.label),
+                       anomalies: screen.anomalies)
+            workers = screen.workers
+        }
         // **実機は上の triage の対象外**(閾値がエミュレータ較正で、誤判定すると健全な実機へ `adb reboot` を撃つ)。
         // 観測と無害な修復(画面の sleep/wake)だけを通す
         await BlankWorkerTriage.observePhysicalScreens(
@@ -139,6 +148,18 @@ enum ProfileSupplyLanes {
                        anomalies: WorkerAnomalyRecord.preRunTriage(
                            excluded: recovered.excludedWorkers, repaired: recovered.repairedWorkers))
             ws = recovered.workers
+            // 描画の状態(白紙・文字消え)が公表されたまま残る Simulator は、使う前に1回だけ回復する(台帳を通す。
+            // 再起動とブリッジの張り直しは凍結の回復と同じ関数)
+            let screen = await ScreenRenderingRecoverer.prepareBeforeRun(
+                ws, stateDir: stateDir, locale: resolved.locale, repoRoot: repoRoot,
+                recoverIOS: { @Sendable labels, current, restored in
+                    await ProfileWorkerFactory.recoverFrozenIOSWorkers(
+                        labels: labels, workers: current, resolved: resolved, repoRoot: repoRoot,
+                        apps: resolved.apps, triesDisplayServer: true, onDisplayServerRestored: restored, log: log)
+                }, log: log)
+            triage.add(repaired: screen.repairedWorkers.map(\.label), excluded: screen.excludedWorkers.map(\.label),
+                       anomalies: screen.anomalies)
+            ws = screen.workers
             // 録画ありの run では、端末側に録画セッションが残ったデバイスを再起動して解く(HostRecordingProbe)
             ws = await ProfileWorkerFactory.recoverStaleRecordingIOSWorkers(
                 workers: ws, resolved: resolved, repoRoot: repoRoot, apps: resolved.apps, log: log)

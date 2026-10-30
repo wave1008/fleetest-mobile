@@ -226,6 +226,16 @@ public enum AndroidHealthProbe {
                               blackApartFromBottomStrip: BlankFrameDetector.isBlackApartFromBottomStrip(pngData: cap.data))
     }
 
+    /// 回復の直後の確かめ: **撮れて**どのサンプルでも一様でない。撮れないときは false(`isBlankObserved` と違い健全に倒さない =
+    /// 別の serial で上がった・落ちたままのデバイスを「戻った」と言わない)
+    public static func isDrawingObserved(serial: String, samples: Int = 4, intervalMs: UInt64 = 2_000) async -> Bool {
+        for i in 0..<max(samples, 1) {
+            guard let frame = await probeFrame(serial: serial), !frame.uniform else { return false }
+            if i < samples - 1 { try? await Task.sleep(nanoseconds: intervalMs * 1_000_000) }
+        }
+        return true
+    }
+
     /// `isPersistentlyBlank` の、一様に加えて下端を除く黒も見る版(窓の判定は `PersistentBlank.fold`)。
     /// 一様の答えは `isPersistentlyBlank` と同じ(全サンプル一様のときだけ uniform)。どちらも成り立たなく
     /// なった時点で抜ける = 健全機は1サンプル
