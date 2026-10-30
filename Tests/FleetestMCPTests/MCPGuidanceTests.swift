@@ -525,6 +525,10 @@ final class MCPGuidanceTests: XCTestCase {
                 calls.append(line.trimmingCharacters(in: .whitespaces))
             }
         }
-        XCTAssertEqual(calls, [#"+ iosModeHint("Compose Multiplatform", frameworkKey: .compose, "double tap", args: args)"#])
+        // ft_double_tap と ft_batch の doubleTap の2か所。どちらも Compose のダブルタップだけ
+        XCTAssertEqual(calls.count, 2, "\(calls)")
+        XCTAssertTrue(calls.allSatisfy {
+            $0.contains(#"iosModeHint("Compose Multiplatform", frameworkKey: .compose, "double tap", args: args)"#)
+        }, "\(calls)")
     }
 }

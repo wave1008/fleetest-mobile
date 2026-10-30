@@ -125,4 +125,29 @@ final class CLIAfternoonFixesTests: XCTestCase {
         XCTAssertEqual(result.value, "proceed")
         XCTAssertEqual("\(control.checkpoint(file: "a.swift", line: 3, onPause: {}))", "proceed")
     }
+
+    /// 止まっている間に step が先に届き、起き上がる前に detach が来ても、次のステップで止まり直さない(再開させる者が居ない)
+    func testStepPendingBeforeDetachDoesNotPauseAgain() {
+        let control = ScenarioDebugControl(breakpoints: [], pauseOnStart: true)
+        let paused = expectation(description: "paused")
+        let finished = expectation(description: "checkpoint returned")
+        let thread = Thread {
+            _ = control.checkpoint(file: "a.swift", line: 1, onPause: {
+                // 起き上がる前に step と detach を続けて入れる(待ち手はまだ pendingAction を読んでいない)
+                control.apply(line: #"{"cmd":"step"}"#)
+                control.apply(line: #"{"cmd":"detach"}"#)
+                paused.fulfill()
+            })
+            finished.fulfill()
+        }
+        thread.start()
+        wait(for: [paused, finished], timeout: 5)
+        // 止まり直したら失敗を記録し、テストが返らなくならないよう自分で再開させる
+        let pausedAgain = LockedValue(false)
+        _ = control.checkpoint(file: "a.swift", line: 2, onPause: {
+            pausedAgain.withLock { $0 = true }
+            control.forceResumeForTest()
+        })
+        XCTAssertFalse(pausedAgain.value, "detach の後に止まり直した")
+    }
 }

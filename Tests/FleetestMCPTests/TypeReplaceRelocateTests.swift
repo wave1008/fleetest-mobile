@@ -55,6 +55,27 @@ final class TypeReplaceRelocateTests: XCTestCase {
         XCTAssertTrue(driver.calls.contains("type(ref:7,text:abc)"), "\(driver.calls)")
     }
 
+    /// replace の消去の後に type が断られても、DriverError の種類から決まる案内(ここではアラートを先に処理せよ)を消さない
+    /// (MCPError で包み直すと種類が消え、消去済みの一言しか残らなかった)
+    func testReplaceFailureKeepsTheDriverErrorHint() async throws {
+        let driver = FakeDriver()
+        let server = MCPServer(write: { _ in }, makeDriver: { _ in driver }, recordSnapshot: { _, _, _ in })
+        let screen = FTRect(x: 0, y: 0, width: 402, height: 874)
+        let tree = SnapshotResponse(sessionBundleID: "com.example.app", screen: screen,
+                                    elements: [field(2, id: "name_field", y: 310)], truncatedCount: 0)
+        driver.snapshotResponse = tree
+        _ = try await server.call(tool: "ft_snapshot", args: [:])
+        driver.typeError = DriverError.systemAlertBlocked(detail: "alert \"Allow?\" is in front")
+        do {
+            _ = try await server.call(tool: "ft_type", args: ["text": "abc", "ref": 2, "replace": true])
+            XCTFail("type の失敗が通った")
+        } catch {
+            let message = error.localizedDescription
+            XCTAssertTrue(message.contains("the field had already been cleared"), message)
+            XCTAssertTrue(message.contains("Handle the alert first"), message)
+        }
+    }
+
     /// id が無く枠も動いた欄(アラートの入力欄)は placeholder の一致で引き直す
     func testRelocatesByPlaceholderWhenTheFieldWithoutIdMoved() {
         var before = field(303, id: nil, y: 400)

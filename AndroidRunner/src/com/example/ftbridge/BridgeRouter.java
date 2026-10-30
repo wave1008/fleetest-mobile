@@ -5,11 +5,14 @@
 package com.example.ftbridge;
 
 import android.app.Instrumentation;
+import android.app.KeyguardManager;
+import android.content.Context;
 import android.app.UiAutomation;
 import android.graphics.Bitmap;
 import android.graphics.Rect;
 import android.os.Build;
 import android.os.ParcelFileDescriptor;
+import android.os.PowerManager;
 import android.os.SystemClock;
 import android.view.accessibility.AccessibilityNodeInfo;
 
@@ -383,7 +386,7 @@ final class BridgeRouter implements BridgeHttpServer.Handler {
             // resource-id を渡す: キーボードの開閉で座標がズレても同じ要素を追跡し直すため
             InputInjector.setTextAppendingAt(ua(), center[0], center[1], refIds.get(ref), text, TEXT_INPUT_CONFIRM_BUDGET_MS);
         } else {
-            InputInjector.tapFocusedEditableIfImeHidden(ua());
+            InputInjector.tapFocusedEditableIfImeHidden(ua(), instrumentation.getContext());
             InputInjector.setTextAppending(ua(), text);
         }
         settle();
@@ -410,7 +413,7 @@ final class BridgeRouter implements BridgeHttpServer.Handler {
             tapUnlessAlreadyFocused(center, refIds.get(ref));
             InputInjector.clearTextAt(ua(), center[0], center[1], refIds.get(ref), TEXT_INPUT_CONFIRM_BUDGET_MS);
         } else {
-            InputInjector.tapFocusedEditableIfImeHidden(ua());
+            InputInjector.tapFocusedEditableIfImeHidden(ua(), instrumentation.getContext());
             InputInjector.clearFocused(ua(), TEXT_INPUT_CONFIRM_BUDGET_MS);
         }
         settle();
@@ -1191,13 +1194,24 @@ final class BridgeRouter implements BridgeHttpServer.Handler {
         String home = resolveHomePackage();
         String stoppedForeground = null;   // 応答に載せる事実(前面に居座ったアプリを止めたとき)
         if ("com.android.systemui".equals(stuck)) {
-            // 起動の途中で画面が消えた/キーガードが出た形。systemui は殺さない(通知・アラーム・ジョブを落とす)。
-            // 起こしてキーガードを外し、再試行で前面に出す。それでも出なければ原因を言って失敗
-            shell("input keyevent KEYCODE_WAKEUP");
-            shell("wm dismiss-keyguard");
+            // systemui は殺さない(通知・アラーム・ジョブを落とす)。**測った状態で手を分ける**: 画面が消えている/キーガードなら
+            // 起こして外す。点いていて鍵も無い(通知のシェード・電源メニュー・システムのダイアログ)ならシェードを閉じる。
+            // どちらも1回だけ再試行し、失敗の文には測った事実だけを書く(推測の帰属を書かない)
+            Context context = instrumentation.getContext();
+            PowerManager power = (PowerManager) context.getSystemService(Context.POWER_SERVICE);
+            KeyguardManager keyguard = (KeyguardManager) context.getSystemService(Context.KEYGUARD_SERVICE);
+            Boolean interactive = power == null ? null : power.isInteractive();
+            Boolean locked = keyguard == null ? null : keyguard.isKeyguardLocked();
+            if (Boolean.FALSE.equals(interactive) || Boolean.TRUE.equals(locked)) {
+                shell("input keyevent KEYCODE_WAKEUP");
+                shell("wm dismiss-keyguard");
+            } else {
+                shell("cmd statusbar collapse");
+            }
             if (attemptLaunch(bundleID)) return ok();
             throw new BridgeException(500, "the app never came to the foreground: " + bundleID
-                    + " (the screen is showing com.android.systemui — the screen went off or the device is locked during the launch)");
+                    + " (com.android.systemui stayed in front; screen on: " + interactive
+                    + ", keyguard locked: " + locked + "; it was not force-stopped)");
         }
         if (stuck != null && !stuck.equals(bundleID) && !stuck.equals(self) && !stuck.equals(home)) {
             shell("am force-stop " + stuck);

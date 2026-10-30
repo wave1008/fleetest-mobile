@@ -605,6 +605,14 @@ struct MCPError: Error, LocalizedError {
     var errorDescription: String? { message }
 }
 
+/// **元のエラーを抱えたまま文を足す失敗**。MCPError で包み直すと DriverError の種類が消え、dispatcher の案内
+/// (接続断・システムアラート・a11y 停止など。`MCPServer.call` の catch)が出なくなる。案内は `underlying` から決める
+struct MCPAnnotatedError: Error, LocalizedError {
+    let underlying: Error
+    let suffix: String
+    var errorDescription: String? { underlying.localizedDescription + suffix }
+}
+
 /// **中身(文・画像)を持ったまま `isError: true` で返す失敗**。MCPError は文字列1本に畳まれるので、
 /// 失敗の報告に証跡(画像)を載せたい呼び手はこちらを投げる(ft_run_scenario の不合格)。
 /// 中身は JSON へ直列化するだけで共有しない(`[String: Any]` は Sendable でない)

@@ -38,6 +38,8 @@ public final class ScenarioDebugControl: @unchecked Sendable {
     private var pauseAtNextStep: Bool
     /// 停止中でないときに stop を受けた(次の checkpoint で即中断)
     private var stopRequested = false
+    /// detach の後は二度と止まらない(制御の口が閉じた = 再開させる者が居ない)。先に届いた step の再停止の予約も無効にする
+    private var detached = false
     private var paused = false
     private var pendingAction: ResumeAction?
 
@@ -62,7 +64,7 @@ public final class ScenarioDebugControl: @unchecked Sendable {
             condition.unlock()
             return .abort
         }
-        guard pauseAtNextStep || hitsBreakpoint(file: file, line: line) else {
+        guard !detached, pauseAtNextStep || hitsBreakpoint(file: file, line: line) else {
             condition.unlock()
             return .proceed
         }
@@ -102,6 +104,7 @@ public final class ScenarioDebugControl: @unchecked Sendable {
         case "stop":
             if paused { resumeLocked(.stop) } else { stopRequested = true }
         case "detach":
+            detached = true
             breakpoints = []
             pauseAtNextStep = false
             resumeLocked(.continueRun)
@@ -111,6 +114,13 @@ public final class ScenarioDebugControl: @unchecked Sendable {
         default:
             break
         }
+    }
+
+    /// テスト専用: 止まっている checkpoint を続行させる(detach の後に止まり直した退行でテストが返らなくならないため)
+    func forceResumeForTest() {
+        condition.lock(); defer { condition.unlock() }
+        pendingAction = .continueRun
+        condition.signal()
     }
 
     private func resumeLocked(_ action: ResumeAction) {

@@ -366,11 +366,14 @@ final class InputInjector {
     /** ref なしの入力・消去の前: 焦点のある欄があるのに IME の窓が前に無ければ、その欄の中心を1回タップして入力接続を
      *  張り直させる(`isFocusedEditable` と同じ理由: IME アクションの後の Flutter は焦点を残したままキーボードを閉じ、
      *  SET_TEXT がセマンティクスの値だけを書き換えて画面の欄に届かない)。焦点の欄が無い・読めないときは何もしない */
-    static void tapFocusedEditableIfImeHidden(UiAutomation ua) {
+    static void tapFocusedEditableIfImeHidden(UiAutomation ua, android.content.Context context) {
         try {
             AccessibilityNodeInfo root = SnapshotBuilder.waitForRoot(ua, FOCUS_ROOT_WAIT_MS);
             AccessibilityNodeInfo focus = root == null ? null : focusedEditable(root);
             if (focus == null || !focus.refresh() || imeWindowVisible(ua)) return;
+            // 押すと取り消せない実タップになるので、押す根拠が無いときは押さない: 見えていない欄(帯の下・画面外)と、
+            // IME がもともと出ない構成(物理キーボードが有効 = IME の窓が無いのは入力接続の切れではない)
+            if (!focus.isVisibleToUser() || hardKeyboardSuppressesIme(context)) return;
             Rect bounds = new Rect();
             focus.getBoundsInScreen(bounds);
             if (bounds.isEmpty()) return;
@@ -378,6 +381,16 @@ final class InputInjector {
         } catch (RuntimeException e) {
             // 読めない = 今までどおりそのまま撃つ
         }
+    }
+
+    /** 物理キーボードが有効で、かつ「物理キーボードがあっても IME を出す」が切られているか(この間は IME の窓が出ないのが正常)。
+     *  hw.keyboard=yes の Emulator は既定で show_ime_with_hard_keyboard=1 = IME が出るので、ここでは押す側に残る */
+    private static boolean hardKeyboardSuppressesIme(android.content.Context context) {
+        android.content.res.Configuration config = context.getResources().getConfiguration();
+        boolean hardKeyboard = config.keyboard != android.content.res.Configuration.KEYBOARD_NOKEYS
+                && config.hardKeyboardHidden == android.content.res.Configuration.HARDKEYBOARDHIDDEN_NO;
+        return hardKeyboard && android.provider.Settings.Secure.getInt(
+                context.getContentResolver(), "show_ime_with_hard_keyboard", 0) == 0;
     }
 
     /** id で引いた欄が今フォーカスを持ち、かつ IME が前面か(読めない・取り直せないときは false = 今までどおり撃つ) */

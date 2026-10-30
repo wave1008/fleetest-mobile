@@ -116,7 +116,9 @@ final class MCPResultsToolTests: XCTestCase {
         XCTAssertEqual(try request(["query": "list"]).render(project: project), "No matching runs")
         XCTAssertEqual(try request(["query": "summary"]).render(project: project), "No matching scenarios")
         XCTAssertEqual(try request(["query": "devices"]).render(project: project), "No matching runs")
-        XCTAssertEqual(try request(["query": "insights"]).render(project: project), "Nothing needs attention")
+        // run が1件も無い期間は「何も確かめていない」と言う(「Nothing needs attention」は確かめた上での答え)
+        XCTAssertEqual(try request(["query": "insights"]).render(project: project),
+                       "No runs in the period — nothing was checked")
         XCTAssertEqual(try request(["query": "trend", "scenario": "X.y"]).render(project: project),
                        "No run history for: X.y")
         // 空のときの文言は MCP の引数名(--min-runs ではない)で言う

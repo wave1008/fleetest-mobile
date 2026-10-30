@@ -78,6 +78,21 @@ final class DraftArgumentAndSpringBoardTests: XCTestCase {
         XCTAssertFalse(text.contains("tap(\"#FT E2E RN\""), text)
     }
 
+    /// 長押し(ref の ft_long_press は action "press" で記録される)も SpringBoard の上なら行にしない
+    func testLongPressOnSpringBoardBecomesATodo() async throws {
+        let server = server()
+        server.interactions.record(launch("com.example.app"))
+        server.interactions.record(launch(MCPServer.springboardBundleID, isLaunch: false))
+        var entry = tap("#FT E2E RN")
+        entry.step?.action = "press"
+        server.interactions.record(entry)
+        let text = try await draft(server)
+        XCTAssertTrue(text.contains("tapAppIcon(\"FT E2E RN\")"), text)
+        // 長押しの行の書式に依らず、TODO 以外の行にアイコンのセレクタが残らないこと
+        let code = try XCTUnwrap(text.range(of: "import FTDSL").map { String(text[$0.lowerBound...]) }, text)
+        XCTAssertFalse(code.split(separator: "\n").contains { !$0.contains("TODO") && $0.contains("#FT E2E RN") }, text)
+    }
+
     func testNoEffectWarningLeavesATodoBeforeTheStep() async throws {
         let server = server()
         server.interactions.record(launch("com.example.app"))

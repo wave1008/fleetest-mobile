@@ -296,25 +296,6 @@ public enum ScrollGeometry {
         return FTRect(x: left, y: top, width: right - left, height: bottom - top)
     }
 
-    /// 送りの前後で**スクロールしている中身が実際にずれたか**(逆走査の門。署名の差だけでは足りない)。
-    /// 署名にはラベル・値が入るので、位置表示の文字や端のバウンスの数 pt でも「動いた」になり、端から動かなかった探索が
-    /// 逆走査(遅いドラッグ最大 8 本)へ入っていた。id を持つ要素があれば: id の集合が変わった(行の出入り)か、
-    /// 共通の id が軸の向きに `SettleMotion.restThresholdPt` を超えて動いたときだけ true。id が1つも無い木は署名の差で言う
-    static func contentShifted(before: [ElementInfo], after: [ElementInfo], vertical: Bool) -> Bool {
-        let old = Dictionary(before.compactMap { e in e.identifier.flatMap { $0.isEmpty ? nil : ($0, e) } },
-                             uniquingKeysWith: { first, _ in first })
-        let new = Dictionary(after.compactMap { e in e.identifier.flatMap { $0.isEmpty ? nil : ($0, e) } },
-                             uniquingKeysWith: { first, _ in first })
-        if old.isEmpty && new.isEmpty {
-            return StepExecutor.contentSignature(before) != StepExecutor.contentSignature(after)
-        }
-        if Set(old.keys) != Set(new.keys) { return true }
-        return new.contains { id, element in
-            guard let previous = old[id] else { return false }
-            let delta = vertical ? element.frame.y - previous.frame.y : element.frame.x - previous.frame.x
-            return abs(delta) > SettleMotion.restThresholdPt
-        }
-    }
 
     static func clampMargin(_ ratio: Double) -> Double {
         guard ratio.isFinite else { return 0 }

@@ -527,11 +527,14 @@ final class MCPVersionGateTests: XCTestCase {
 
     /// **全操作系が失敗する**(ft_status だけ通しても、エージェントは次のツールを呼ぶ)
     func testEveryDeviceToolRefusesOnASkewedBridge() async {
+        // 操作の道具は未知の引数を撃つ前に断るので、道具ごとに受け付ける引数だけを渡す(版ガードの前に断られないように)
+        let argsByTool: [String: [String: Any]] = [
+            "ft_snapshot": [:], "ft_tap": ["ref": 1], "ft_type": ["ref": 1, "text": "a"],
+            "ft_swipe": ["finger": "up"], "ft_launch": ["bundleId": "com.example.app"], "ft_screenshot": [:],
+        ]
         for tool in ["ft_snapshot", "ft_tap", "ft_type", "ft_swipe", "ft_launch", "ft_screenshot"] {
             do {
-                _ = try await server.call(tool: tool, args: ["ref": 1, "text": "a",
-                                                            "finger": "up",
-                                                            "bundleId": "com.example.app"])
+                _ = try await server.call(tool: tool, args: argsByTool[tool] ?? [:])
                 XCTFail("\(tool) が版ズレのまま通った")
             } catch {
                 XCTAssertTrue(error.localizedDescription.contains("bridge protocol mismatch"),

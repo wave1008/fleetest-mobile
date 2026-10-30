@@ -373,6 +373,8 @@ final class MCPBatchTests: XCTestCase {
                        ElementInfo(ref: 2, type: "button", identifier: "done", label: "Done", value: nil, placeholder: nil,
                                    enabled: false, frame: FTRect(x: 10, y: 300, width: 100, height: 40), depth: 1)],
             truncatedCount: 0)
+        // 本物では launch したアプリが前面に居る(FakeDriver の launch は前面を記録しない)
+        driver.foregroundBundleID = "com.example.app"
         let result = body(try await server.call(tool: "ft_batch",
                                                 args: ["steps": "tap '#next'; tap '#done'", "launch": "com.example.app"]))
         XCTAssertTrue(result.contains("step(s) 2 may have done nothing"), result)

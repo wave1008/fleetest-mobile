@@ -17,7 +17,7 @@ final class TypeReplaceRelocateKindTests: XCTestCase {
         let before = field(513, type: "textField", id: "field_password")
         let after = [field(530, type: "secureTextField", id: "field_password")]
         XCTAssertEqual(MCPServer.relocateAfterClear(before, in: after)?.ref, 530)
-        XCTAssertEqual(StepExecutor.relocateByIdentifier(before, id: "field_password", in: after)?.ref, 530)
+        XCTAssertEqual(ClearedFieldRelocation.byIdentifier(before, id: "field_password", in: after)?.ref, 530)
     }
 
     func testSameTypeIsPreferredAndNonInputsAreNotAdopted() {

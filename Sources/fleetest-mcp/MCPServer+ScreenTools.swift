@@ -221,7 +221,7 @@ extension MCPServer {
                 var afterClear = try? await typeDriver.snapshot(bypassingCache: typeDriver.supportsCacheBypass)
                 var refoundField = afterClear.flatMap { Self.relocateAfterClear(priorElement, in: $0.elements) }
                 if refoundField == nil, let shown = afterClear, KeyboardWait.isShown(shown),
-                   (try? await typeDriver.hideKeyboardIfShown()) == true {
+                   await closeKeyboardWithoutEnter(typeDriver, args: args) {
                     // キーボードが欄を押し下げて木から消す形(横向き・全画面 IME・CMP)。DSL と同じく閉じて一度だけ引き直す
                     afterClear = try? await typeDriver.snapshot(bypassingCache: typeDriver.supportsCacheBypass)
                     refoundField = afterClear.flatMap { Self.relocateAfterClear(priorElement, in: $0.elements) }
@@ -332,8 +332,8 @@ extension MCPServer {
                 }
                 if wantsReplace {
                     // 失敗の文言は「何も送っていない」だが、replace の消去は済んでいる(欄は空)
-                    throw MCPError(error.localizedDescription
-                        + " — replace: the field had already been cleared before this failure")
+                    throw MCPAnnotatedError(underlying: error,
+                                            suffix: " — replace: the field had already been cleared before this failure")
                 }
                 throw error
             }
@@ -419,7 +419,7 @@ extension MCPServer {
     static func relocateAfterClear(_ element: ElementInfo, in elements: [ElementInfo]) -> ElementInfo? {
         func only(_ matches: [ElementInfo]) -> ElementInfo? { matches.count == 1 ? matches[0] : nil }
         if let id = element.identifier, !id.isEmpty {
-            return StepExecutor.relocateByIdentifier(element, id: id, in: elements)
+            return ClearedFieldRelocation.byIdentifier(element, id: id, in: elements)
         }
         if let same = only(elements.filter { $0.type == element.type && $0.frame == element.frame }) { return same }
         // id が無く枠も動いた欄(キーボードで持ち上がるアラートの入力欄)は、空でない placeholder / ラベルが同じ1つ

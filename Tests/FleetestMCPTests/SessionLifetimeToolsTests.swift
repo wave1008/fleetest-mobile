@@ -35,4 +35,17 @@ final class SessionLifetimeToolsTests: XCTestCase {
         XCTAssertTrue(source.contains(".isPersistentPackage(bundleID: terminateBundleID)"))
         XCTAssertTrue(source.contains("bundleID.hasPrefix(\"com.apple.\")"))
     }
+
+    /// iOS(Android 以外のドライバ)では Apple のアプリと SpringBoard を撃つ前に断り、普通のアプリは通す。
+    /// `com.apple.` の接頭辞で断るのは Android 以外だけ(Android では普通のパッケージ名)= 分岐が AndroidDriver の外にあること
+    func testAppleSystemAppRefusalIsIOSOnly() async {
+        let server = MCPServer(write: { _ in }, makeDriver: { _ in FakeDriver() }, recordSnapshot: { _, _, _ in })
+        let fake = FakeDriver()
+        let refused = await server.clearAppDataSystemTargetRefusal("com.apple.mobilesafari", driver: fake, args: [:])
+        XCTAssertTrue(refused?.contains("Apple system app") == true, refused ?? "nil")
+        let springBoard = await server.clearAppDataSystemTargetRefusal(MCPServer.springboardBundleID, driver: fake, args: [:])
+        XCTAssertNotNil(springBoard)
+        let plain = await server.clearAppDataSystemTargetRefusal("com.example.app", driver: fake, args: [:])
+        XCTAssertNil(plain)
+    }
 }

@@ -235,8 +235,12 @@ final class FakeDriver: AppDriver, @unchecked Sendable {
     var typedTextVerified = false
     var verifiesTypedText: Bool { typedTextVerified }
 
+    /// type が投げるエラー(呼び出しは calls に積んでから投げる)。DriverError の種類で案内が変わる経路のテスト用
+    var typeError: Error?
+
     func type(ref: Int?, text: String) async throws {
         try record("type(ref:\(ref.map(String.init) ?? "nil"),text:\(text))", "type")
+        if let typeError { throw typeError }
     }
 
     func swipe(_ direction: FTSwipeDirection) async throws {

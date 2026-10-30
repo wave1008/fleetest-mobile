@@ -699,12 +699,14 @@ extension MCPServer {
         } catch {
             // run がデバイスを使っている最中は失敗しやすい(アプリの起こし直し・ブリッジの起動し直し)ので、失敗にも言う
             let runNote = Self.toolAcceptsDeviceTarget(tool) ? markDeviceInUse(args: resolved) : nil
-            let hint = await connectionLostHint(error, args: resolved, tool: tool)
+            // 案内は元のエラーの種類から決める(呼び手が文を足した MCPAnnotatedError でも消さない)
+            let cause = (error as? MCPAnnotatedError)?.underlying ?? error
+            let hint = await connectionLostHint(cause, args: resolved, tool: tool)
                 + Self.setTextRefusedHint(tool: tool, args: resolved,
-                                          message: error.localizedDescription)
-                + Self.noReadableWindowHint(error)
-                + Self.systemAlertBlockedHint(error)
-                + Self.accessibilityOutageHint(error)
+                                          message: cause.localizedDescription)
+                + Self.noReadableWindowHint(cause)
+                + Self.systemAlertBlockedHint(cause)
+                + Self.accessibilityOutageHint(cause)
                 + (runNote.map { " " + $0 } ?? "")
                 + (unknownArgumentNote.isEmpty ? "" : " " + unknownArgumentNote)
             let note = bridgeStarted.started ? Self.bridgeStartedForUDIDNote + "\n" : ""

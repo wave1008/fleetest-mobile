@@ -101,7 +101,6 @@ extension StepExecutor {
     /// 容器は推測なので `containerInference` で切れる(呼び出し側で判定済み)
     func reverseSweep(step: FlowStep, container: FTRect,
                               searching finger: FTSwipeDirection,
-                              maxDrags: Int = StepExecutor.reverseSweepMaxSwipes,
                               phase: inout PhaseAccumulator) async throws -> FlowLocator?? {
         let back: FTSwipeDirection = switch finger {
         case .up: .down
@@ -123,7 +122,7 @@ extension StepExecutor {
 
         var previous: String?
         reverseSweepDragsSent = 0
-        for _ in 0..<maxDrags {
+        for _ in 0..<Self.reverseSweepMaxSwipes {
             guard await slowDrag(jump: jump, container: container, vertical: vertical,
                                  phase: &phase) else { return nil }
             reverseSweepDragsSent += 1

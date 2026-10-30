@@ -38,8 +38,10 @@ final class MCPClearAppDataPhysicalTests: XCTestCase {
 
     private static func writeInfoPlist(bundleID: String, into app: String) {
         let data = try? PropertyListSerialization.data(
-            fromPropertyList: ["CFBundleIdentifier": bundleID], format: .xml, options: 0)
+            fromPropertyList: ["CFBundleIdentifier": bundleID, "CFBundleExecutable": "App"], format: .xml, options: 0)
         FileManager.default.createFile(atPath: app + "/Info.plist", contents: data)
+        // 入れ直しの前に中身のある .app か(実行ファイルの実体)も確かめる(ReinstallPackageCheck.emptyPackageReason)
+        FileManager.default.createFile(atPath: app + "/App", contents: Data([0xCF, 0xFA, 0xED, 0xFE]))
     }
 
     override func tearDown() {
@@ -65,6 +67,8 @@ final class MCPClearAppDataPhysicalTests: XCTestCase {
         XCTAssertEqual(driver.calls, [
             "install(\(appA!))", "launch(com.example.app)",
             "clearAppData(com.example.app)", "uninstall(com.example.app)", "install(\(appA!))",
+            // 入れ直しでプロセスが消えたので、セッションのアプリならランナーのセッションも閉じる(次の木が「落ちたかも」と言わない)
+            "status", "terminate",
         ])
         XCTAssertTrue(message.contains("Reinstalled com.example.app from \(appA!)"), message)
         XCTAssertNil(server.launchedBundleIDs[key])
@@ -91,6 +95,7 @@ final class MCPClearAppDataPhysicalTests: XCTestCase {
 
         XCTAssertEqual(driver.calls, [
             "clearAppData(com.example.app)", "uninstall(com.example.app)", "install(\(appB!))",
+            "status", "terminate",
         ])
         XCTAssertTrue(message.contains("Reinstalled com.example.app from \(appB!)"), message)
     }

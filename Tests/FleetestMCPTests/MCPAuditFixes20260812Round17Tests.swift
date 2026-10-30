@@ -615,6 +615,7 @@ final class MCPAuditFixes20260812Round17Tests: XCTestCase {
         _ = try await server.call(tool: "ft_snapshot", args: [:])
         driver.scriptedSnapshots = [
             Self.textFieldScreen(value: "old"),   // verifiedRef の撮り直し
+            Self.textFieldScreen(value: ""),      // 消去の後に欄を見つけ直す読み(relocateAfterClear)
             Self.textFieldScreen(value: "new"),   // 検証と snapshotAfter で共有する1回
         ]
         let callsBefore = driver.calls.count
@@ -623,8 +624,9 @@ final class MCPAuditFixes20260812Round17Tests: XCTestCase {
         let text = try XCTUnwrap(content.first?["text"] as? String)
         XCTAssertTrue(text.contains("(replaced the field's prior content)"), text)
         let snapshotCallsDuringFtType = driver.calls[callsBefore...].filter { $0.hasPrefix("snapshot") }
-        XCTAssertEqual(snapshotCallsDuringFtType.count, 2,
-                       "3回目の読みが発生している: \(driver.calls[callsBefore...])")
+        // 撮り直し・消去の後の見つけ直し・検証と snapshotAfter の共有の3回(4回目が無い)
+        XCTAssertEqual(snapshotCallsDuringFtType.count, 3,
+                       "4回目の読みが発生している: \(driver.calls[callsBefore...])")
     }
 
     /// **(4) の対照**: pressEnter を伴う replace は最適化の対象外 —— Enter の前後で状態が
@@ -638,6 +640,7 @@ final class MCPAuditFixes20260812Round17Tests: XCTestCase {
         _ = try await server.call(tool: "ft_snapshot", args: [:])
         driver.scriptedSnapshots = [
             Self.textFieldScreen(value: "old"),   // verifiedRef の撮り直し
+            Self.textFieldScreen(value: ""),      // 消去の後に欄を見つけ直す読み
             Self.textFieldScreen(value: "new"),   // replace 検証(Enter 前)
             Self.textFieldScreen(value: "new"),   // snapshotAfter(Enter 後)
         ]
@@ -648,6 +651,6 @@ final class MCPAuditFixes20260812Round17Tests: XCTestCase {
         let text = try XCTUnwrap(content.first?["text"] as? String)
         XCTAssertTrue(text.contains("(replaced the field's prior content)"), text)
         let snapshotCallsDuringFtType = driver.calls[callsBefore...].filter { $0.hasPrefix("snapshot") }
-        XCTAssertEqual(snapshotCallsDuringFtType.count, 3, "\(driver.calls[callsBefore...])")
+        XCTAssertEqual(snapshotCallsDuringFtType.count, 4, "\(driver.calls[callsBefore...])")
     }
 }

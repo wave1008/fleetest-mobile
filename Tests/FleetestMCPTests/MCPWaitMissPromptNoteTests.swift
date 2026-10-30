@@ -269,7 +269,7 @@ final class MCPWaitMissPromptNoteTests: XCTestCase {
         let target = el(5, "button", "交通機関", id: "TransitButton")
         let alertScreen = tree([ElementInfo(ref: 10, type: "alert", identifier: nil, label: "安全に目的地に到達するために",
                                             value: nil, placeholder: nil, enabled: true,
-                                            frame: FTRect(x: 40, y: 300, width: 320, height: 200), depth: 1),
+                                            frame: FTRect(x: 10, y: 300, width: 360, height: 200), depth: 1),
                                 el(11, "button", "OK", depth: 2, y: 440)])
         let message = RefGuard.goneMessage(ref: 5, target: target,
                                            inAppAlert: MCPServer.frontInAppAlertWithButtons(alertScreen))

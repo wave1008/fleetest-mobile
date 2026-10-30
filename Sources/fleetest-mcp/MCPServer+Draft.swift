@@ -184,7 +184,7 @@ extension MCPServer {
         return scope.map { entry in
             if let bundleID = entry.bundleID { onSpringBoard = bundleID == springboardBundleID }
             guard onSpringBoard, let step = entry.step,
-                  ["tap", "doubleTap"].contains(step.action ?? "") else { return entry }
+                  ["tap", "doubleTap", "press"].contains(step.action ?? "") else { return entry }
             let name = step.locator?.id ?? step.locator?.label
             var todo = entry
             todo.step = nil

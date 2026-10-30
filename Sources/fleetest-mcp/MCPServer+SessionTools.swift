@@ -461,27 +461,32 @@ extension MCPServer {
             + " com.apple.springboard`, tap its button by ref, then `ft_launch` your app again)"
     }
 
+    /// テスト対象でないシステムのアプリは撃つ前に断る(nil = 撃ってよい)。**iOS の Apple のアプリ**(`com.apple.*`・SpringBoard)は
+    /// データを消せず入れ直しもできない。**Android のシステムのパッケージ**は連絡先・メッセージ等の利用者データを1回の承認で消せる
+    /// ので、このセッションが起動したもの(テスト対象)以外を断る。`com.apple.` は Android では普通のパッケージ名(Apple Music 等)
+    func clearAppDataSystemTargetRefusal(_ bundleID: String, driver: AppDriver, args: [String: Any]) async -> String? {
+        guard let android = driver as? AndroidDriver else {
+            guard bundleID == MCPServer.springboardBundleID || bundleID.hasPrefix("com.apple.") else { return nil }
+            return "\(bundleID) is an Apple system app (the home screen, Safari, Settings …), not an app under test —"
+                + " its data cannot be wiped by this tool and it cannot be reinstalled. Nothing was sent."
+        }
+        guard launchedBundleIDs[Self.sessionKey(args)] != bundleID else { return nil }
+        let box = UncheckedTransfer(android)
+        let probe = await Self.runOffCooperativePool(name: "fleetest-mcp-clear-app-data") {
+            (box.value.isPersistentPackage(bundleID: bundleID), box.value.isSystemPackage(bundleID: bundleID))
+        }
+        guard probe.0 == true || probe.1 == true else { return nil }
+        return "\(bundleID) is a system package, not an app under test — its data was NOT cleared (wiping system"
+            + " apps can delete user data or break the device). If it really is the app under test, ft_launch it first."
+    }
+
     func ftClearAppData(_ args: [String: Any]) async throws -> [[String: Any]] {
         resetOnceNotes(forScope: noteScope)
         let bundleID = try Self.requiredStringArgument(args, "bundleId")
         if let refusal = Self.bridgeSelfRefusal(tool: "ft_clear_app_data", bundleID: bundleID) { throw MCPError(refusal) }
-        if bundleID == MCPServer.springboardBundleID || bundleID.hasPrefix("com.apple.") {
-            throw MCPError("\(bundleID) is an Apple system app (the home screen, Safari, Settings …), not an app under test —"
-                + " its data cannot be wiped by this tool and it cannot be reinstalled. Nothing was sent.")
-        }
         let clearAppDataDriver = try await driver(args)
-        // **Android のシステムのパッケージは撃つ前に断る**(連絡先・メッセージ等の利用者データを1回の承認で消せる)。
-        // このセッションが起動したものはテスト対象として扱う。入っていないものは `pm clear` が自分で断る
-        if let android = clearAppDataDriver as? AndroidDriver,
-           launchedBundleIDs[Self.sessionKey(args)] != bundleID {
-            let box = UncheckedTransfer(android)
-            let probe = await Self.runOffCooperativePool(name: "fleetest-mcp-clear-app-data") {
-                (box.value.isPersistentPackage(bundleID: bundleID), box.value.isSystemPackage(bundleID: bundleID))
-            }
-            if probe.0 == true || probe.1 == true {
-                throw MCPError("\(bundleID) is a system package, not an app under test — its data was NOT cleared (wiping system"
-                    + " apps can delete user data or break the device). If it really is the app under test, ft_launch it first.")
-            }
+        if let refusal = await clearAppDataSystemTargetRefusal(bundleID, driver: clearAppDataDriver, args: args) {
+            throw MCPError(refusal)
         }
         let springBoardNote = await recheckXCUITestRunnerBeforeLaunch(args: args)
         let clearAppDataKey = Self.sessionKey(args)

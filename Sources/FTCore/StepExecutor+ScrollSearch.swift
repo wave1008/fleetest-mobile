@@ -107,8 +107,6 @@ extension StepExecutor {
         /// 明示 scrollFrame の容器が**探索の軸と違う軸にしか動かない**(横の一覧を縦に払った等)と木から言える。
         /// `stoppedUnmoving` の文が縦の逆向きを勧める誤誘導を避けるためだけに持つ(`scrollFrameRunsOtherAxis`)
         var scrollFrameOtherAxis: Bool = false
-        /// 逆走査に許した遊びドラッグの本数(`reverseSweepDragBudget`)。失敗文が「up to N」と言う
-        var reverseSweepBudget: Int?
         /// 見つけた要素(found のときだけ)。scrollTo が「掴んだ要素」として返す
         /// (無いと DSL の `scrollTo` が lastElement を空で上書きしていた)
         var element: ElementInfo? = nil
@@ -286,7 +284,7 @@ extension StepExecutor {
         // 逆走査を撃った失敗だけ(数に入らない遅いドラッグが走り、画面が戻されていることを見せる)。
         // **「reached its end」「not reaching a scrolling area」を含めない**: 順方向の事実を言う別の分岐の語
         let sweepNote = result?.reverseSweepRan == true
-            ? " (then a reverse sweep of up to \(result?.reverseSweepBudget ?? Self.reverseSweepMaxSwipes) slow drags the opposite way"
+            ? " (then a reverse sweep of up to \(Self.reverseSweepMaxSwipes) slow drags the opposite way"
               + " (not counted in the \(swipes) above) also found nothing, so the screen is left at the swept-back position)"
             : ""
         // 入れ子で外側の一覧が動いた失敗(動かなかった形は上の stopped が言う)。払いが届いたのは scrollFrame ではない
@@ -532,16 +530,6 @@ extension StepExecutor {
         }?.selector
     }
 
-    /// 逆走査の遊びドラッグの本数。**通り過ぎるのは最後の1本だけ**(動いた探索の後の逆走査の趣旨)なので、最後に動いた1本の移動量を
-    /// 1本のドラッグ(容器の `reverseSweepSpanRatio`)で戻せる本数 + 1 に限る。移動量が測れない(共通の id が無い = 容器を丸ごと
-    /// 飛び越した)ときは上限まで。上限は `reverseSweepMaxSwipes`
-    static func reverseSweepDragBudget(lastSwipeTravel: Double?, container: FTRect, vertical: Bool) -> Int {
-        let extent = vertical ? container.height : container.width
-        guard let travel = lastSwipeTravel, extent > 0 else { return reverseSweepMaxSwipes }
-        let perDrag = extent * reverseSweepSpanRatio
-        return min(reverseSweepMaxSwipes, max(1, Int((travel / perDrag).rounded(.up)) + 1))
-    }
-
     /// 明示 scrollFrame の容器が、探索の軸(`vertical`)と**違う軸にしか動かない**か。申告した向きがあればそれが全て、
     /// 無ければ中の子の並び(同じ段に横へ並ぶ = 横)で言う。**縦横比は使わない**(横向きの低い縦の一覧が横に見える)。
     /// 言い切れなければ false(従来の文言)
@@ -594,11 +582,6 @@ extension StepExecutor {
         var lastMoveAt: ContinuousClock.Instant?
         // 打ち切りの理由文を分けるためだけの記録(ScrollSearchResult.contentEverMoved 参照)
         var contentEverMoved = false
-        // 逆走査の門だけに使う「中身が実際にずれたか」(`ScrollGeometry.contentShifted`)。contentEverMoved は署名の差(ラベル・値の
-        // 変化・端のバウンスも含む)なので、これで逆走査を撃つと端から動かなかった探索が逆走査へ入る
-        var contentShiftedEver = false
-        // 直近に動いた1本の移動量(逆走査の本数の上限を決める。`reverseSweepDragBudget`)
-        var lastSwipeTravel: Double?
         // 明示 scrollFrame の容器が探索の軸と違う軸にしか動かないと最初の木から言えるか(入れ子で払いが外側へ伝わる形)。
         // 動いたのは外側の一覧なので、逆走査(容器の推測は外側になる)を撃たず、失敗文でこの事実を言う
         var frameOtherAxis = false
@@ -860,9 +843,6 @@ extension StepExecutor {
             if attempt == maxSwipes, let earlier = previousSnapshot,
                Self.contentSignature(earlier.elements) != Self.contentSignature(snapshot.elements) {
                 contentEverMoved = true
-                if ScrollGeometry.contentShifted(before: earlier.elements, after: snapshot.elements, vertical: vertical) {
-                    contentShiftedEver = true
-                }
                 previousSnapshot = snapshot
             }
             if attempt < maxSwipes {
@@ -915,8 +895,6 @@ extension StepExecutor {
                         let confirmed = try await settledSignature(phase: &phase)
                         if Self.contentSignature(confirmed.snapshot.elements)
                             != Self.contentSignature(snapshot.elements) {
-                            if ScrollGeometry.contentShifted(before: snapshot.elements, after: confirmed.snapshot.elements,
-                                                             vertical: vertical) { contentShiftedEver = true }
                             snapshot = confirmed.snapshot
                             previousSnapshot = snapshot
                             unmovedRounds = 0
@@ -988,7 +966,7 @@ extension StepExecutor {
                         // **順方向で1度も動かなかったら逆走査しない**: 逆走査は飛び越しの救済で、動いていなければ
                         // 何も通り過ぎていない。撃つと指定と逆の向きを探す別の機能になり、`scrollTo(direction: .up)` が
                         // 先頭から下の要素を見つけて成功する(「上にある」の確認にならない)
-                        guard contentShiftedEver, !frameOtherAxis, recoverOnMiss, step.containerInference ?? true,
+                        guard contentEverMoved, !frameOtherAxis, recoverOnMiss, step.containerInference ?? true,
                               // 半開きシートで呼び手が展開・再試行するなら、逆走査はそちらの
                               // 再試行(全画面高)に譲る(defersPartialSheetRecovery の宣言参照)
                               !(defersPartialSheetRecovery && containerIsPartialHeight),
@@ -1000,12 +978,8 @@ extension StepExecutor {
                         // 既定経路(scrollFrame 未指定)は刻みがブリッジ任せで縮められないので、
                         // ここでだけ推測した容器で細刻みの逆走査を掛ける
                         // (通常の送りには触らない = 2度撤回した「暗黙の座標化」にならない)
-                        let sweepBudget = Self.reverseSweepDragBudget(lastSwipeTravel: lastSwipeTravel, container: container,
-                                                                      vertical: vertical)
-                        result.reverseSweepBudget = sweepBudget
                         let recoveredBySweep = try await reverseSweep(step: step, container: container,
-                                                                      searching: direction, maxDrags: sweepBudget,
-                                                                      phase: &phase)
+                                                                      searching: direction, phase: &phase)
                         // 撃てた本数で決める(最初の1本が撃てずに諦めた回に「逆走査した」と言わない)
                         result.reverseSweepRan = reverseSweepDragsSent > 0
                         if let recovered = recoveredBySweep {
@@ -1026,11 +1000,6 @@ extension StepExecutor {
                     if let earlier = previousSnapshot {
                         contentEverMoved = true
                         lastMoveAt = clock.now
-                        if ScrollGeometry.contentShifted(before: earlier.elements, after: snapshot.elements, vertical: vertical) {
-                            contentShiftedEver = true
-                        }
-                        // 逆走査の本数の根拠: 最後に動いた1本の移動量(共通の id が無く測れなければ nil = 上限まで)
-                        lastSwipeTravel = Self.measuredTravel(before: earlier, after: snapshot, vertical: vertical)
                     }
                     unmovedRounds = 0
                 }
@@ -1068,18 +1037,13 @@ extension StepExecutor {
         // 横カルーセルで 2/10 残った。既に通り過ぎている公算が高い局面で、失敗経路限定なので
         // 正常系のコストはゼロ。ゲートは stoppedUnmoving 側の逆走査と同じ)
         var reverseSweepRan = false
-        var exhaustedSweepBudget: Int?
         // 順方向で1度も動かなかったら撃たない(端で打ち切った側の guard と同じ理由)
-        if contentShiftedEver, !frameOtherAxis, recoverOnMiss, step.containerInference ?? true,
+        if contentEverMoved, !frameOtherAxis, recoverOnMiss, step.containerInference ?? true,
            let latest = previousSnapshot,
            let container = (scrolledContainer ?? Self.overflowingContainer(in: latest))
                .flatMap({ ScrollGeometry.intersection($0, latest.screen) }) {
-            let sweepBudget = Self.reverseSweepDragBudget(lastSwipeTravel: lastSwipeTravel, container: container,
-                                                          vertical: direction == .up || direction == .down)
-            exhaustedSweepBudget = sweepBudget
             let recoveredBySweep = try await reverseSweep(step: step, container: container,
-                                                          searching: direction, maxDrags: sweepBudget,
-                                                          phase: &phase)
+                                                          searching: direction, phase: &phase)
             reverseSweepRan = reverseSweepDragsSent > 0
             if let recovered = recoveredBySweep {
                 var result = ScrollSearchResult(found: true, fallback: recovered,
@@ -1096,7 +1060,6 @@ extension StepExecutor {
                                            hintJumps: hintJumps, swipes: swipes,
                                            reverseSweepRan: reverseSweepRan,
                                            maxTruncatedDuringSearch: truncatedDuringSearch)
-        exhausted.reverseSweepBudget = reverseSweepRan ? exhaustedSweepBudget : nil
         exhausted.scrollFrameOtherAxis = frameOtherAxis
         if step.scrollFrame == nil, let latest = previousSnapshot {
             exhausted.directionMatchedScrollFrameCandidate =
