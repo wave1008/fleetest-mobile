@@ -130,6 +130,10 @@ struct ApiMonitorRunProgress: Codable, Equatable {
     let supply: [RunProgressSupply]
     /// 動画の切り出しの進み。台帳の値をそのまま運ぶ(切り出しの間だけ非 nil。ProtocolVersion 55)
     let videoClips: RunProgressVideoClips?
+    /// この run の中で凍結で離脱した・白紙を検出した・文字消えを検出したデバイスの数。台帳の値をそのまま運ぶ(ProtocolVersion 65)
+    let frozenDevices: Int
+    let blankDevices: Int
+    let textlessDevices: Int
 }
 
 /// monitorRuns イベント: フリート横断の run 進捗(DS-18.2)。**手元でも出す**
@@ -189,6 +193,24 @@ enum MonitorServicesReader {
             }
             // 並びを固定する(索引の列挙順に依らない = 変化の無い周期で emit しない)
             .sorted { ($0.project, $0.profile, $0.pid) < ($1.project, $1.profile, $1.pid) }
+    }
+}
+
+/// `devices[].screenState`。合成の Encodable は nil の欄を省くので、`null` を明示して書く専用の包み
+struct MonitorScreenState: Codable, Equatable {
+    var value: DeviceScreenState?
+    static let none = MonitorScreenState(value: nil)
+
+    init(value: DeviceScreenState?) { self.value = value }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        value = container.decodeNil() ? nil : try container.decode(DeviceScreenState.self)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        if let value { try container.encode(value) } else { try container.encodeNil() }
     }
 }
 
@@ -253,6 +275,9 @@ struct ApiMonitorDeviceInfo: Codable {
     /// ブリッジ不在)は最後の確定値を保つ(黙って false に戻すと凍結が画面から消える)。
     /// 契約は vscode-fleetest/src/monitorDeviceModel.ts の MonitorDevice.frozen
     let frozen: Bool
+    /// アプリの描画の状態(`DeviceScreenStateStore`。凍結とは別)。**無いときも `null` を書く**(拡張は必須欄として読む)。
+    /// 契約は vscode-fleetest/src/monitorDeviceModel.ts の MonitorDevice.screenState
+    var screenState: MonitorScreenState = .none
     /// iOS 実機の USB 接続か(devicectl の transportType == "wired")。仮想・Android・不明は nil。
     /// mergedDevices が WiFi 越しの分身の抑制に使う(拡張は読まない)。
     let wired: Bool?

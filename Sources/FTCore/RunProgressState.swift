@@ -1,5 +1,19 @@
 import Foundation
 
+/// run ボードに数える、デバイスで起きた状態(`RunProgressRecord.frozenDevices` 等)
+enum RunDeviceState: Hashable {
+    case frozen, blank, textless
+
+    /// ステップの注記(`StepNote` の rawValue)から。文言ではなく型(`StepNote`)で引く
+    init?(note: String) {
+        switch StepNote(rawValue: note) {
+        case .screenBlank: self = .blank
+        case .screenTextless: self = .textless
+        default: return nil
+        }
+    }
+}
+
 /// run 進捗の記帳(DS-18。段1・2)。RunLeaseLedger と同じ形 —— 書き手の実体
 /// (`RunProgressLedger.write/remove`)は fleetest ターゲットが注入する(FTCore は書き込み先の
 /// 生成規約を持つが、pid・プロセス起動の知識は呼び出し側に残す既存の注入規律に揃える)。
@@ -28,6 +42,8 @@ actor RunProgressState {
     /// が成立した回数をそのまま数えるだけ
     private var requeuedCount = 0
     private var laneDropoutsCount = 0
+    /// この run の中で状態を検出したデバイス(鍵 = レーンの鍵)。同じデバイスの再検出は数え直さない
+    private var devicesByState: [RunDeviceState: Set<String>] = [:]
     private var lanesByKey: [String: RunProgressLane] = [:]
     private var lastWritten: RunProgressRecord?
     private let write: (@Sendable (RunProgressRecord) -> Void)?
@@ -72,6 +88,12 @@ actor RunProgressState {
         flush()
     }
 
+    /// デバイスで状態を検出した(凍結で離脱・白紙・文字消え)。同じデバイスの同じ状態は1回しか数えない
+    func deviceStateObserved(deviceKey: String, state: RunDeviceState) {
+        guard devicesByState[state, default: []].insert(deviceKey).inserted else { return }
+        flush()
+    }
+
     /// 子の step / scenarioFinished が運んだ操作回数の増分を足す。0 以下は無視(書き込みも起こさない)
     func addActions(_ count: Int) {
         guard count > 0 else { return }
@@ -89,7 +111,10 @@ actor RunProgressState {
             etaSeconds: ocrCompileWaiters > 0 || videoClips != nil ? nil : currentEtaSeconds(),
             lanes: lanesByKey.values.sorted { $0.key < $1.key },
             phase: ocrCompileWaiters > 0 ? "compiling" : "running",
-            supply: supply?.snapshot() ?? [], videoClips: videoClips, owner: owner)
+            supply: supply?.snapshot() ?? [], videoClips: videoClips,
+            frozenDevices: devicesByState[.frozen]?.count ?? 0,
+            blankDevices: devicesByState[.blank]?.count ?? 0,
+            textlessDevices: devicesByState[.textless]?.count ?? 0, owner: owner)
         guard record != lastWritten else { return }
         let firstWrite = lastWritten == nil
         lastWritten = record

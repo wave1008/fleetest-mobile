@@ -603,6 +603,7 @@ struct RunScenario: AsyncParsableCommand {
                                homeScreenDriver: countedHomeScreenDriver,
                                deviceName: deviceName, deviceIdentifier: deviceIdentifier,
                                physical: physical,
+                               screenStateDirectory: (try? RepoRoot.find())?.appendingPathComponent(".fleetest"),
                                uiFramework: uiFrameworkHint,
                                emit: emit)
         // **defer で構造的に保証する**(手続きの末尾で1回呼ぶ手書きの並びに頼らない): この後

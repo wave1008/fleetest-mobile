@@ -397,4 +397,37 @@ final class RunProgressStateTests: XCTestCase {
         XCTAssertNil(RunProgressRecord.ownerFromEnvironment(["FT_STREAM_OWNER": ""]))
         XCTAssertNil(RunProgressRecord.ownerFromEnvironment([:]))
     }
+
+    /// 状態を検出したデバイスの数は run の中で重複なく数える。同じデバイスに複数の状態が起きたらそれぞれ数える
+    func testDeviceStatesCountDistinctDevicesPerState() async {
+        let journal = Journal()
+        let state = makeState(journal)
+        await state.laneJoined(key: "UDID-A", name: "A", platform: "ios")
+        XCTAssertEqual(journal.writes.last?.frozenDevices, 0)
+        await state.deviceStateObserved(deviceKey: "UDID-A", state: .blank)
+        await state.deviceStateObserved(deviceKey: "UDID-A", state: .blank)
+        await state.deviceStateObserved(deviceKey: "UDID-A", state: .textless)
+        await state.deviceStateObserved(deviceKey: "UDID-B", state: .blank)
+        await state.deviceStateObserved(deviceKey: "UDID-B", state: .frozen)
+        let last = journal.writes.last
+        XCTAssertEqual(last?.blankDevices, 2)
+        XCTAssertEqual(last?.textlessDevices, 1)
+        XCTAssertEqual(last?.frozenDevices, 1)
+    }
+
+    /// 同じデバイスの再検出は台帳を書き直さない
+    func testRepeatedDeviceStateDoesNotRewrite() async {
+        let journal = Journal()
+        let state = makeState(journal)
+        await state.deviceStateObserved(deviceKey: "UDID-A", state: .blank)
+        let count = journal.writes.count
+        await state.deviceStateObserved(deviceKey: "UDID-A", state: .blank)
+        XCTAssertEqual(journal.writes.count, count)
+    }
+
+    func testDeviceStateFromStepNotes() {
+        XCTAssertEqual(RunDeviceState(note: "screen-blank"), .blank)
+        XCTAssertEqual(RunDeviceState(note: "screen-textless"), .textless)
+        XCTAssertNil(RunDeviceState(note: "settle-capped"))
+    }
 }

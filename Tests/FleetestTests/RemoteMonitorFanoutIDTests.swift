@@ -15,7 +15,7 @@ final class RemoteMonitorFanoutIDTests: XCTestCase {
     /// 自分のデバイスは "local")。親が両方を埋める —— 埋め忘れるとタイルが特定できない/バッジが消える
     func testRemoteDevicesGetBothTheScopedIDAndTheMachineBadge() throws {
         let line = #"""
-        {"kind":"monitorDevices","devices":[{"id":"android:Pixel 3a","name":"Pixel 3a","platform":"android","state":"connected","detail":"S","udid":null,"serial":"S","health":null,"renderMode":null,"inRun":false,"inSession":false,"inMCP":false,"kind":"physical","host":null,"port":null,"recording":false,"registered":true,"frozen":false,"machine":null,"storageMeasuring":false}]}
+        {"kind":"monitorDevices","devices":[{"id":"android:Pixel 3a","name":"Pixel 3a","platform":"android","state":"connected","detail":"S","udid":null,"serial":"S","health":null,"renderMode":null,"inRun":false,"inSession":false,"inMCP":false,"kind":"physical","host":null,"port":null,"recording":false,"registered":true,"frozen":false,"screenState":null,"machine":null,"storageMeasuring":false}]}
         """#
         let fanout = RemoteMonitorFanout(machines: ["M1Ultra"], project: "P", profile: nil,
                                          interval: 2, maxWidth: 960,
@@ -50,7 +50,7 @@ final class RemoteMonitorFanoutIDTests: XCTestCase {
     /// (書き換えないと親の次の周期で古い「測定中」に戻る)
     func testStorageLineIsScopedAndPatchesTheHeldDevice() throws {
         let devicesLine = #"""
-        {"kind":"monitorDevices","devices":[{"id":"ios:iPhone 17","name":"iPhone 17","platform":"ios","state":"connected","detail":"","udid":"U","serial":null,"health":null,"renderMode":null,"inRun":false,"inSession":false,"inMCP":false,"kind":"virtual","host":null,"port":null,"recording":false,"registered":true,"frozen":false,"machine":null,"storageMeasuring":true,"storageRefreshId":7}]}
+        {"kind":"monitorDevices","devices":[{"id":"ios:iPhone 17","name":"iPhone 17","platform":"ios","state":"connected","detail":"","udid":"U","serial":null,"health":null,"renderMode":null,"inRun":false,"inSession":false,"inMCP":false,"kind":"virtual","host":null,"port":null,"recording":false,"registered":true,"frozen":false,"screenState":null,"machine":null,"storageMeasuring":true,"storageRefreshId":7}]}
         """#
         let storageLine = #"{"device":"ios:iPhone 17","kind":"monitorStorage","storage":{"carriedOver":false,"freeScope":"hostVolume","measuredAt":"t","usedBytes":123},"storageMeasuring":false,"storageRefreshId":7}"#
         let relayed = LockedLines()
@@ -164,7 +164,7 @@ final class RemoteMonitorFanoutIDTests: XCTestCase {
                                          interval: 2, maxWidth: 960,
                                          log: { _ in }, relayLine: { line in relayed.mutate { $0.append(line) } })
         fanout.ingest(
-            line: #"{"kind":"monitorRuns","observed":true,"runs":[{"pid":41233,"runID":"r1","runGroup":null,"issuer":"alice","mine":false,"project":"ec-mobile","profile":"ios-smoke","phase":"running","elapsedSeconds":10,"total":5,"done":1,"failed":0,"actions":0,"requeued":0,"laneDropouts":0,"etaSeconds":null,"lanes":[],"supply":[]}],"services":[{"project":"ec-mobile","profile":"ios-smoke","holder":"owner","pid":51200,"phase":"running","orphan":false}]}"#,
+            line: #"{"kind":"monitorRuns","observed":true,"runs":[{"pid":41233,"runID":"r1","runGroup":null,"issuer":"alice","mine":false,"project":"ec-mobile","profile":"ios-smoke","phase":"running","elapsedSeconds":10,"total":5,"done":1,"failed":0,"actions":0,"requeued":0,"laneDropouts":0,"frozenDevices":0,"blankDevices":0,"textlessDevices":0,"etaSeconds":null,"lanes":[],"supply":[]}],"services":[{"project":"ec-mobile","profile":"ios-smoke","holder":"owner","pid":51200,"phase":"running","orphan":false}]}"#,
             machine: "M1Ultra")
         let lines = relayed.value
         guard let line = lines.first, lines.count == 1 else {

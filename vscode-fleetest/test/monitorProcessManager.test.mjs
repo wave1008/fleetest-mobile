@@ -277,7 +277,7 @@ function feedMonitorDevices(proc, devices) {
     kind: "monitorDevices",
     devices: devices.map((device) => ({
       id: device.id, name: device.name, platform: "ios", state: device.state ?? "connected", detail: "",
-      inRun: false, inSession: false, inMCP: false, recording: false, registered: true, frozen: false, kind: "virtual", storageMeasuring: false,
+      inRun: false, inSession: false, inMCP: false, recording: false, registered: true, frozen: false, screenState: null, kind: "virtual", storageMeasuring: false,
       ...(device.machine ? { machine: device.machine } : {}),
     })),
   });
@@ -633,7 +633,7 @@ test("monitorStorage はその台の3欄だけ差し替えて、周期を待た�
   }), spawnFn);
   manager.startMonitorProcess();
   const device = (id) => ({ id, name: id, platform: "ios", state: "connected", detail: "", kind: "virtual",
-    inRun: false, inSession: false, inMCP: false, recording: false, registered: true, frozen: false, storageMeasuring: true, storageRefreshId: 7 });
+    inRun: false, inSession: false, inMCP: false, recording: false, registered: true, frozen: false, screenState: null, storageMeasuring: true, storageRefreshId: 7 });
   feedLine(procs[0], { kind: "monitorDevices", devices: [device("ios:A"), device("ios:B")] });
   posted.length = 0;
   notified.length = 0;
@@ -667,7 +667,7 @@ test("周期の一覧が古い「測定中」を持ってきても、同じ要�
   const manager = new MonitorProcessManager(makeDeps({ post: (message) => posted.push(message) }), spawnFn);
   manager.startMonitorProcess();
   const device = (id, extra) => ({ id, name: id, platform: "ios", state: "connected", detail: "", kind: "virtual",
-    inRun: false, inSession: false, inMCP: false, recording: false, registered: true, frozen: false, storageMeasuring: true, storageRefreshId: 7, ...extra });
+    inRun: false, inSession: false, inMCP: false, recording: false, registered: true, frozen: false, screenState: null, storageMeasuring: true, storageRefreshId: 7, ...extra });
   feedLine(procs[0], { kind: "monitorDevices", devices: [device("ios:A")] });
   feedLine(procs[0], { kind: "monitorStorage", device: "ios:A", storageMeasuring: false, storageRefreshId: 7,
     storage: { usedBytes: 5, freeScope: "hostVolume", measuredAt: "t2", carriedOver: false } });

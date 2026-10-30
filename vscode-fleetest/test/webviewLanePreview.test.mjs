@@ -67,6 +67,7 @@ function sendDevices(window, specs) {
     id: `d${i}`, name: `Dev ${i}`, platform: "ios", state: spec.state ?? "connected",
     detail: "", kind: "virtual", udid: `UDID-${i}`, recording: false, registered: true,
     ...(spec.inMCP === undefined ? {} : { inMCP: spec.inMCP }),
+    frozen: spec.frozen === true, screenState: spec.screenState,
   }));
   window.dispatchEvent(new window.MessageEvent("message", { data: { type: "devices", devices } }));
 }
@@ -134,6 +135,20 @@ const visiblePreviews = (document) =>
 const previewDeviceName = (el) => el.querySelector(".lane-preview-header .tile-name")?.textContent;
 const visiblePreviewNames = (document) => visiblePreviews(document).map(previewDeviceName);
 const logHeaderName = (laneEl) => laneEl.querySelector(".lane-header").textContent;
+
+test("画面の状態バッジはグリッドビューの絵の中にも出る(白紙・文字消え・凍結)", (t) => {
+  const { window, document } = createWebview();
+  t.after(() => window.close());
+  sendDevices(window, [{ screenState: "blank" }]);
+  clickTile(document, 0);
+  const badge = () => document.querySelector(".lane-preview-frame .badge-frozen");
+  assert.equal(badge()?.textContent, "○");
+  assert.notEqual(badge().style.display, "none");
+  sendDevices(window, [{}]);
+  assert.equal(badge().style.display, "none", "解けたら消す");
+  sendDevices(window, [{ frozen: true }]);
+  assert.equal(badge().textContent, "❄️");
+});
 
 test("選択が無い間はグリッドビューも実行ログビューも空にする", (t) => {
   const { window, document } = createWebview();

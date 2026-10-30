@@ -49,6 +49,8 @@ final class StepNoteTests: XCTestCase {
         XCTAssertEqual(StepNote.staleRefAtTap.rawValue, "stale-ref-at-tap")
         XCTAssertEqual(StepNote.inAppTapOutsideHitArea.rawValue, "inapp-tap-outside-hit-area")
         XCTAssertEqual(StepNote.inAppActivationPointOffCentre.rawValue, "inapp-activation-point-off-centre")
+        XCTAssertEqual(StepNote.screenBlank.rawValue, "screen-blank")
+        XCTAssertEqual(StepNote.screenTextless.rawValue, "screen-textless")
     }
 
     // MARK: - 永続化(results/ まで運ばれるか)

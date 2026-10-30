@@ -140,6 +140,11 @@ export const exploreHealStrings = {
     ja: "ハードウェアビデオエンコーダー(AVE = Apple Video Encoder)が使えるか。モニターの最新の観測で、観測できていない間は「不明」です(停止の理由はチップに載せます)",
     en: "Whether the hardware video encoder (AVE = Apple Video Encoder) works, from the monitor's latest observation. Unknown while nothing is observed (the reason for a stop is on the chip)",
   },
+  "exploreHeal.dashboard.colMhRendering": { ja: "Rendering", en: "Rendering" },
+  "exploreHeal.dashboard.colMhRenderingTitle": {
+    ja: "このマシンで今、凍結(❄️)・白紙(○)・文字消え(🫥)にあるデバイスの数。0 の種類は出しません。マウスを載せた数字ごとに説明が出ます",
+    en: "Devices on this machine that are right now frozen (❄️), blank (○) or missing text (🫥). Kinds with 0 are not shown. Hover a number for its explanation",
+  },
   "exploreHeal.dashboard.colMhFmDead": { ja: "FM 停止", en: "FM dead" },
   "exploreHeal.dashboard.colMhFmDeadTitle": {
     ja: "FM が停止していると記録された run の数(マウスを載せると最後の停止の時刻・経路・理由)",

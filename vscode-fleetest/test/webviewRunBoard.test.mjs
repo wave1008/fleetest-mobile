@@ -85,7 +85,7 @@ function monitorRunsMessage(overrides) {
     runs: [{
       pid: 41233, runID: "run-1", mine: true, phase: "running", requeued: 0, laneDropouts: 0, actions: 0, supply: [],
       project: "ec-mobile", profile: "ios-smoke",
-      elapsedSeconds: 261, total: 12, done: 7, failed: 2,
+      elapsedSeconds: 261, total: 12, done: 7, failed: 2, frozenDevices: 0, blankDevices: 0, textlessDevices: 0,
       lanes: [{ key: "UDID-1", name: "iPhone 17-01", platform: "ios", scenario: "05_検索",
                 scenarioElapsedSeconds: 72 }],
     }],
@@ -255,6 +255,7 @@ test("running でも供給が続いていれば、進捗はそのままに準備
   const counts = runRows(document)[0].querySelector(".run-board-counts");
   assert.equal(counts.firstChild.textContent, "7/12");
   assert.equal(counts.querySelector(".run-board-counts-failed").textContent, "❌2");
+  assert.equal(counts.querySelector(".run-board-counts-state"), null, "0 の種類は出さない");
   assert.equal(counts.querySelector(".run-board-counts-supply").textContent,
     "ブリッジを起動中");
   assert.notEqual(runRows(document)[0].querySelector(".run-board-progress").style.display, "none",
@@ -1199,4 +1200,18 @@ test("サーバー: 準備中の段階 services は「サーバーを起動中�
   post(window, monitorRunsMessage({ runs: [{ ...monitorRunsMessage().runs[0], phase: "preparing", lanes: [],
     supply: [{ name: "", step: "services" }] }] }));
   assert.equal(document.querySelector(".run-board-counts").textContent, "サーバーを起動中");
+});
+
+test("run ボード: ❌ の後ろに ❄️ ○ 🫥 の数を並べ(0 の種類は出さない)、種類ごとにホバーの説明が付く", (t) => {
+  const { window, document } = createWebview();
+  t.after(() => window.close());
+  post(window, monitorRunsMessage({ runs: [{
+    ...monitorRunsMessage().runs[0], frozenDevices: 1, blankDevices: 0, textlessDevices: 2,
+  }] }));
+  const counts = runRows(document)[0].querySelector(".run-board-counts");
+  const states = [...counts.querySelectorAll(".run-board-counts-state")];
+  assert.deepEqual(states.map((el) => el.textContent), ["❄️1", "🫥2"]);
+  assert.equal(counts.querySelector(".run-board-counts-failed").nextElementSibling, states[0], "❌ の直後に並ぶ");
+  assert.match(states[0].getAttribute("data-hover-tip") || "", /凍結/);
+  assert.match(states[1].getAttribute("data-hover-tip") || "", /文字消え/);
 });

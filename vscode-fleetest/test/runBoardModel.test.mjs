@@ -34,7 +34,7 @@ function run(overrides) {
   return {
     pid: 41233, runID: "run-1", issuer: undefined, mine: true, phase: "running", requeued: 0, laneDropouts: 0, actions: 0, supply: [],
     project: "ec-mobile", profile: "ios-smoke",
-    elapsedSeconds: 261, total: 12, done: 7, failed: 2,
+    elapsedSeconds: 261, total: 12, done: 7, failed: 2, frozenDevices: 0, blankDevices: 0, textlessDevices: 0,
     lanes: [lane()],
     ...overrides,
   };
@@ -92,6 +92,21 @@ test("runGroup を共有する run は1行に束ね、進捗と失敗数を合�
   assert.equal(g.elapsedSeconds, 150, "経過は束ねた中の最大");
   assert.equal(g.runs.length, 2);
   assert.deepEqual(g.runs.map((r) => r.machine), ["M1Max", "M1Ultra"], "machine 昇順");
+});
+
+test("検出したデバイスの数(凍結・白紙・文字消え)は束ねた run を合算する", () => {
+  let state = applyMonitorRunsEvent(new Map(), {
+    machine: "M1Max", observed: true,
+    runs: [run({ runID: "run-a", runGroup: "grp-1", frozenDevices: 1, blankDevices: 0, textlessDevices: 2 })],
+  });
+  state = applyMonitorRunsEvent(state, {
+    machine: "M1Ultra", observed: true,
+    runs: [run({ runID: "run-b", runGroup: "grp-1", frozenDevices: 2, blankDevices: 3, textlessDevices: 0 })],
+  });
+  const [g] = buildRunGroups(state);
+  assert.equal(g.frozenDevices, 3);
+  assert.equal(g.blankDevices, 3);
+  assert.equal(g.textlessDevices, 2);
 });
 
 test("束ねた段階は進んだ方: running > compiling > preparing > building", () => {
@@ -330,7 +345,7 @@ const wireEvent = {
     pid: 41233, runID: "run-1", runGroup: "grp-1", issuer: "alice@air", mine: false,
     project: "ec-mobile", profile: "ios-smoke", phase: "running", requeued: 0, laneDropouts: 0, actions: 0,
     supply: [{ name: "iPhone 17-01", platform: "ios", step: "booting" }],
-    elapsedSeconds: 261, total: 12, done: 7, failed: 2, etaSeconds: null,
+    elapsedSeconds: 261, total: 12, done: 7, failed: 2, frozenDevices: 1, blankDevices: 2, textlessDevices: 3, etaSeconds: null,
     lanes: [{ key: "UDID-1", name: "iPhone 17-01", platform: "ios", scenario: "05_検索",
               scenarioElapsedSeconds: 72 }],
   }],
@@ -341,6 +356,20 @@ test("isMonitorEvent: monitorRuns の生 NDJSON を受理し、etaSeconds:null �
   const value = structuredClone(wireEvent);
   assert.equal(isMonitorEvent(value), true);
   assert.equal(value.runs[0].etaSeconds, undefined);
+});
+
+test("isMonitorEvent: monitorRuns の frozenDevices / blankDevices / textlessDevices は必須(欠落・型不正は拒否)", () => {
+  const ok = structuredClone(wireEvent);
+  assert.equal(isMonitorEvent(ok), true);
+  assert.equal(ok.runs[0].blankDevices, 2);
+  for (const key of ["frozenDevices", "blankDevices", "textlessDevices"]) {
+    const missing = structuredClone(wireEvent);
+    delete missing.runs[0][key];
+    assert.equal(isMonitorEvent(missing), false, `${key} 欠落`);
+    const broken = structuredClone(wireEvent);
+    broken.runs[0][key] = "1";
+    assert.equal(isMonitorEvent(broken), false, `${key} 型不正`);
+  }
 });
 
 test("isMonitorEvent: videoClips は省略・null・{done,total} を受理し、型崩れは拒否する", () => {

@@ -1113,6 +1113,15 @@ public final class StepExecutor {
     var pixelsShowedTextThisStep = false
     /// 描画崩壊を確かめるか(Simulator の iOS だけ。FTRuntime が立てる。既定は確かめない)
     public var renderCollapseCheckEnabled = false
+    /// 描画の状態(白紙・文字消え)を公表する口(FTRuntime が `DeviceScreenStateStore` へ繋ぐ)。nil = 公表しない
+    /// (実機・dry-run)。引数 nil = 公表を消す。**赤にするかは `renderCollapseCheckEnabled` が決め、これは別**
+    public var screenStatePublisher: (@Sendable (DeviceScreenState?) -> Void)?
+    /// 画素で文字を確かめて公表を消した後か(検証のたびにファイルを消しに行かない)
+    var screenStateConfirmedDrawn = false
+    /// 直近の可視性検証の `notRendered` の絵(赤が確定した時点で判定する = `publishScreenStateAfterNotRendered`)
+    var lastNotRenderedFrame: (screenshot: Data, elements: [ElementInfo], screen: FTRect)?
+    /// 直近の `renderCollapseVerdict` が公表した状態の注記(区切りの失敗ステップへ FTRuntime が載せる)
+    public internal(set) var renderCollapseNotes: [StepNote] = []
     /// iOS の hideKeyboard が、背景を叩いても閉じないとき Enter まで送るか。DSL は送る(ユーザー決定)。MCP は送らない ——
     /// エージェントは「閉じたい」だけで送信・検索を起こしうる(Return は欄の確定操作)。要るなら Enter を明示して送る
     public var hideKeyboardFallsBackToEnter = true

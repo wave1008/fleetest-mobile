@@ -345,6 +345,15 @@ iOS Simulator ではアプリのプロセスの描画が壊れ、アプリを起
   失敗ステップを記録してシナリオを中断する。文言は事実だけ(一色 / N 個の文字要素のどれも描かれていない・1 秒あけた2枚・最後に描画を確認してから
   画面を見ずに通った検証 N 件の名前)
 - **費用**: 画素で文字を確認した検証が無い区間だけ、スクリーンショット1枚(Simulator で約 100〜115ms)。E2E の iOS 実行の 15%(直近3日)
+- **公表だけの構成(Android Emulator・iOS Simulator の自前描画以外)も同じ区間で木とスクリーンショットを1組読む**(見つかった回だけ 1 秒あけた撮り直し)。公表の判定は、緑の経路では区切りだけ、可視性検証では赤が確定した時点だけ(poll の途中の1枚で公表しない)
+- **状態の公表(警告。ユーザー決定)**: 白紙(`blank` = 一色)と文字消え(`textless`)は凍結(❄️)とは別の状態として
+  `FTCore.DeviceScreenStateStore`(`.fleetest/screen-state-<デバイス鍵>.json`。鍵は `DeviceFrozenStore` と同じ)に公表し、モニターが
+  `devices[].screenState` で配る。対象は **iOS Simulator と Android Emulator**(実機は対象外。`StepExecutor.publishesScreenState`)で、
+  赤にするかどうか(上の `checksRenderCollapse`)とは**独立** —— Android と iOS の自前描画でない画面は公表だけで、シナリオの合否を変えない。
+  写像は `RenderCollapse.screenState(of:)` の1箇所(`blankAppArea` → blank・`noTextDrawn` → textless・`wholeScreenBlank` は凍結の担当なので公表しない)。
+  公表する検査点は2つ: 上の検査点の確かめ(緑で異常が無ければその鍵の公表を消す)と、テキストの可視性検証の赤が `notRendered` で確定したとき
+  (poll の途中では判定しない。撮影は足さず、手元の絵と木を1回判定する)。**書いた時刻だけで鮮度を見る**(シナリオのプロセスは短命で pid の生死が使えない。
+  上限 `DeviceScreenStateStore.stalenessSeconds` = 30 分)。ステップの注記は `screen-blank` / `screen-textless`
 - **閾値 3 の根拠**: iOS の失敗スクリーンショット 2,453 枚(レポートの要素一覧 + PNG)の全数走査で、目視で崩壊と確かめた最小は文字要素 2 個、
   全てインク無しだが崩壊でなかった最大は 2 個(木と絵の取得時刻が違う)。向きの違う横長のスクリーンショットがもう一つの崩壊でない当たりで、向きの門の理由
 - **環境変数**(`FT_*` はシナリオの子に届く): `FT_RENDER_COLLAPSE_EVERY_ASSERTION=1`(計測用: 通る検証ごとに判定し、崩壊なら赤にする。

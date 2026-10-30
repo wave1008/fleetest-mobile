@@ -37,6 +37,13 @@ import {
   ACTIONS_PER_SECOND_PER_SEGMENT, ActionTachometer, easeToward, segmentLevel, segmentCount, METER_SEGMENTS, segmentTier,
 } from '../../actionTachometerModel';
 
+// run ボードの ❄️ ○ 🫥(RunBoardRun の欄名・絵文字・説明。説明の文言はタイルと同じ)
+const RUN_DEVICE_STATES = [
+  ['frozenDevices', 'wvMonitor.tile.frozen', 'wvMonitor.tile.frozenTitle'],
+  ['blankDevices', 'wvMonitor.tile.blank', 'wvMonitor.tile.blankTitle'],
+  ['textlessDevices', 'wvMonitor.tile.textless', 'wvMonitor.tile.textlessTitle'],
+];
+
 let runsByMachine = new Map();
 // 見出し行のタコメーター表示切替(既定 ON。値は monitorPanel.ts の showTachometer メッセージで届く)。
 // OFF でも数え続ける(ON に戻したとき数値とチャートが途切れない)。**モジュール冒頭に置く** —— 末尾の初回 render() が読む
@@ -782,6 +789,15 @@ function updateRow(row, run) {
       failedEl.className = 'run-board-counts-failed';
       failedEl.textContent = `❌${run.failed}`;
       row.countsEl.append(failedEl);
+    }
+    // この run の中で凍結で離脱した・白紙を検出した・文字消えを検出したデバイスの数。0 の種類は出さない。❌ の後ろに並べる
+    for (const [kind, markKey, titleKey] of RUN_DEVICE_STATES) {
+      if (!(run[kind] > 0)) continue;
+      const stateEl = document.createElement('span');
+      stateEl.className = 'run-board-counts-state';
+      stateEl.textContent = `${t(markKey)}${run[kind]}`;
+      setHoverTip(stateEl, t(titleKey));
+      row.countsEl.append(stateEl);
     }
     // 混在 run で iOS の供給が続いている間(最初のレーンが合流して phase は running)
     if (supplyText !== undefined) {

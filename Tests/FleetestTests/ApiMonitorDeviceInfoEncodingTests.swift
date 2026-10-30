@@ -1,6 +1,7 @@
 // devices[].foldable は true/false を書き、nil(未確定)は欄ごと省く(拡張は欠落を「まだ分からない」= ボタンを出さない側に読む)。
 // リモートの子の JSON を親が読み直して中継する(RemoteMonitorFanout)ので、往復で値が保たれること。
 
+import FTCore
 import XCTest
 
 @testable import fleetest
@@ -45,5 +46,33 @@ final class ApiMonitorDeviceInfoEncodingTests: XCTestCase {
             let decoded = try JSONDecoder().decode(ApiMonitorDeviceInfo.self, from: data)
             XCTAssertEqual(decoded.foldable, value)
         }
+    }
+
+    /// screenState は拡張が必須欄として読む(monitorDeviceModel.ts)ので、無いときも null を書く
+    func testScreenStateIsAlwaysWrittenAndRoundTrips() throws {
+        var info = make(foldable: nil)
+        let none = try json(info)
+        XCTAssertTrue(none.keys.contains("screenState"))
+        XCTAssertTrue(none["screenState"] is NSNull)
+        info.screenState = MonitorScreenState(value: .textless)
+        XCTAssertEqual(try json(info)["screenState"] as? String, "textless")
+        let decoded = try JSONDecoder().decode(ApiMonitorDeviceInfo.self, from: JSONEncoder().encode(info))
+        XCTAssertEqual(decoded.screenState.value, .textless)
+        let none2 = try JSONDecoder().decode(ApiMonitorDeviceInfo.self, from: JSONEncoder().encode(make(foldable: nil)))
+        XCTAssertNil(none2.screenState.value)
+    }
+
+    func testMonitorScreenStateReadsThePublication() throws {
+        let dir = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("ft-ss-\(UUID().uuidString)")
+        defer { try? FileManager.default.removeItem(at: dir) }
+        XCTAssertNil(ApiMonitorCommand.screenState(key: "K", stateDir: dir, deviceState: "connected"))
+        DeviceScreenStateStore.publish(stateDir: dir, key: "K", state: .blank)
+        XCTAssertEqual(ApiMonitorCommand.screenState(key: "K", stateDir: dir, deviceState: "connected"), .blank)
+        XCTAssertNil(ApiMonitorCommand.screenState(key: nil, stateDir: dir, deviceState: "connected"))
+        // 接続中でなければ出さない。booted は公表を残し、落ちた台は消す(印は描画のプロセスの状態)
+        XCTAssertNil(ApiMonitorCommand.screenState(key: "K", stateDir: dir, deviceState: "booted"))
+        XCTAssertEqual(DeviceScreenStateStore.current(stateDir: dir, key: "K"), .blank)
+        XCTAssertNil(ApiMonitorCommand.screenState(key: "K", stateDir: dir, deviceState: "offline"))
+        XCTAssertNil(DeviceScreenStateStore.current(stateDir: dir, key: "K"))
     }
 }

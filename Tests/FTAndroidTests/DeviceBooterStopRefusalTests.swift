@@ -190,7 +190,8 @@ final class DeviceBooterSweepRefusalTests: XCTestCase {
     func testMCPStopRefusalNamesTheSessionNotARun() throws {
         let message = try XCTUnwrap(DeviceBooter.mcpStopRefusal(
             deviceName: "iPhone 17", keys: ["U1"], force: false, mcpHolderPID: { _ in 4242 }))
-        XCTAssertTrue(message.contains("iPhone 17 is being driven by an MCP session (pid 4242)"), message)
+        // pid の直後は閉じない: 4242 が実在のプロセスに当たると親を失った旨の補足が続く
+        XCTAssertTrue(message.contains("iPhone 17 is being driven by an MCP session (pid 4242"), message)
         XCTAssertFalse(message.contains("fleetest run"), "run が使用中とは言わない: \(message)")
         XCTAssertTrue(message.contains("--force"), message)
         XCTAssertNil(DeviceBooter.mcpStopRefusal(

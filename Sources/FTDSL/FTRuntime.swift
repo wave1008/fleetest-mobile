@@ -527,6 +527,8 @@ public final class FTDriveCore {
                 deviceName: String? = nil,
                 deviceIdentifier: String? = nil,
                 physical: Bool = false,
+                // 描画の状態の公表先(`.fleetest/`。ツール本体側 = モニターが読む場所)。nil = 公表しない
+                screenStateDirectory: URL? = nil,
                 // StepExecutor の空打ちゲート(shouldEmptyDrag)へ渡す答え。呼び出し側
                 // (ScenarioRunnerMain)が AppUIFrameworkQuery で解決する。nil = 不明(撃たない側)
                 uiFramework: AppUIFramework? = nil,
@@ -563,9 +565,20 @@ public final class FTDriveCore {
                                      commandTimeoutSeconds: tunables.commandTimeout)
         executor.renderCollapseCheckEnabled = StepExecutor.checksRenderCollapse(
             platform: platform, physical: physical, framework: uiFramework)
-        executor.renderCollapseEveryAssertion = executor.renderCollapseCheckEnabled
+        if !dryRun, StepExecutor.publishesScreenState(platform: platform, physical: physical),
+           let stateDir = screenStateDirectory, let key = deviceIdentifier {
+            executor.screenStatePublisher = { state in
+                if let state {
+                    DeviceScreenStateStore.publish(stateDir: stateDir, key: key, state: state)
+                } else {
+                    DeviceScreenStateStore.clear(stateDir: stateDir, key: key)
+                }
+            }
+        }
+        let checksOrPublishes = executor.renderCollapseCheckEnabled || executor.screenStatePublisher != nil
+        executor.renderCollapseEveryAssertion = checksOrPublishes
             && ProcessInfo.processInfo.environment[StepExecutor.renderCollapseEveryAssertionKey] == "1"
-        executor.renderCollapseInjected = executor.renderCollapseCheckEnabled
+        executor.renderCollapseInjected = checksOrPublishes
             && ProcessInfo.processInfo.environment[StepExecutor.renderCollapseInjectionKey] == "1"
         self.scenarioID = scenarioID
         self.scenarioTitle = scenarioTitle
@@ -802,10 +815,18 @@ public final class FTDriveCore {
     /// 描画崩壊の区切り(StepExecutor.renderCollapseVerdict の doc)。崩壊していれば失敗のステップを1つ残してシナリオを止める
     public func renderCollapseCheckpoint(_ place: String) {
         guard !dryRun, !scenarioAborted, !deviceFrozen, !stoppedByUser else { return }
-        guard let message = FTSync.run({ [executor] in await executor.renderCollapseVerdict() }) ?? nil else { return }
+        let verdict = FTSync.run({ [executor] in await executor.renderCollapseVerdict() }) ?? nil
         let description = "screen rendering check (\(place))"
+        guard let message = verdict else {
+            // 赤にしない構成の検出もステップとして残す(run ボードの数え口は step の注記 = RunProgressState)
+            if !executor.renderCollapseNotes.isEmpty {
+                recordStep(description: description, status: .passed, file: "", line: 0,
+                           at: ISO8601Millis.string(from: Date()), notes: executor.renderCollapseNotes)
+            }
+            return
+        }
         recordStep(description: description, status: .failed(message), file: "", line: 0,
-                   at: ISO8601Millis.string(from: Date()))
+                   at: ISO8601Millis.string(from: Date()), notes: executor.renderCollapseNotes)
         handleFailure(stepDescription: description, reason: message)
     }
 

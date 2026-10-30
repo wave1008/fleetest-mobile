@@ -4,7 +4,7 @@
 // 判定そのもの(一様フレームの連続)は Swift 側(MonitorFrozenDebounce)の担当で、
 // ここが守るのは**受け取った frozen を落とさずに出すこと**だけ。
 // 凍結はタイルの絵を見ても分からない(凍結中も最後のフレームが残る)ので、この表示が
-// 消えると「モニターを見ていたのに気付かなかった」が起きる。表示はタイルのバッジのみ。
+// 消えると「モニターを見ていたのに気付かなかった」が起きる。表示は絵の真ん中(タイルと拡大表示)。
 
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
@@ -63,7 +63,7 @@ function sendDevices(window, specs) {
   const devices = specs.map((spec, i) => ({
     id: `d${i}`, name: `Dev ${i}`, platform: "ios", state: spec.state ?? "connected",
     detail: "", kind: "virtual", udid: `UDID-${i}`, recording: false, registered: true,
-    frozen: spec.frozen === true,
+    frozen: spec.frozen === true, screenState: spec.screenState,
   }));
   window.dispatchEvent(new window.MessageEvent("message", { data: { type: "devices", devices } }));
 }
@@ -76,6 +76,33 @@ test("凍結ゼロならバッジを出さない(通常時にノイズを出さ�
   t.after(() => window.close());
   sendDevices(window, [{}, {}]);
   assert.equal(visibleFrozenBadges(document), 0);
+});
+
+test("バッジはタイルの下部ではなく絵の枠の中にある", (t) => {
+  const { window, document } = createWebview();
+  t.after(() => window.close());
+  sendDevices(window, [{ frozen: true }]);
+  const badge = document.querySelector("#grid .badge-frozen");
+  assert.ok(badge.closest(".frame-wrap"));
+  assert.equal(badge.closest(".tile-footer"), null);
+});
+
+test("白紙・文字消えも同じ場所に出し、凍結を優先する", (t) => {
+  const { window, document } = createWebview();
+  t.after(() => window.close());
+  sendDevices(window, [{ screenState: "blank" }, { screenState: "textless" }, { frozen: true, screenState: "blank" }]);
+  const badges = [...document.querySelectorAll("#grid .frame-wrap .badge-frozen")];
+  assert.deepEqual(badges.map((el) => el.textContent), ["○", "🫥", "❄️"]);
+  assert.ok(badges.every((el) => el.style.display !== "none"));
+});
+
+test("画面が描き直されてもバッジが枠に残る", (t) => {
+  const { window, document } = createWebview();
+  t.after(() => window.close());
+  sendDevices(window, [{ frozen: true }]);
+  sendDevices(window, [{ frozen: true, state: "offline" }]);
+  sendDevices(window, [{ frozen: true }]);
+  assert.equal(visibleFrozenBadges(document), 1);
 });
 
 test("凍結した台にだけバッジが付く", (t) => {

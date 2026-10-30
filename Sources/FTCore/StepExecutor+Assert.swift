@@ -437,6 +437,9 @@ extension StepExecutor {
             guardFrameStaleThisEval = true
             return nil
         }
+        if v.state == TranscriptMatch.State.notRendered.rawValue {
+            lastNotRenderedFrame = (screenshot, elements, screen)
+        }
         // observedText は原因切り分けの鍵: 空なら「FM に画像が渡っていない/白紙を見た」
         // (SCA 劣化で添付が落ちる仮説・起動遷移画面)、期待どおりの文字列なら「読めたのに
         // 覆われていると答えた」= 純粋な判定誤り。これが無くて切り分けに窮した。
@@ -585,6 +588,9 @@ extension StepExecutor {
             if countsAsSkipped { noteCodesThisStep.insert(.visibilityGuardSkipped) }
             // FM の反転と同じ扱い(呼び出し側の poll が見えるまで撮り直し、尽きたら赤)
             consumeFirstFrameGate(visible: false, sd: ink, screenshot: screenshot, element: element, screen: screen)
+            if state == .notRendered {
+                lastNotRenderedFrame = (screenshot, elements, screen)
+            }
             let judgedBy = fmGaveNoVerdict ? "judged by OCR alone because FM gave no verdict" : "judged by OCR"
             return .failed("text visibility check failed (on screen, \(judgedBy)):"
                            + " present in the tree but not visually visible [\(state.rawValue)]"
@@ -1075,6 +1081,7 @@ extension StepExecutor {
         // timeout: 覆われ続けた occlusion があればそれを、無ければ未発見を返す
         if let lastOcclusion {
             if firstFrameExtended, firstFrameBlankObserved { noteCodesThisStep.insert(.firstFrameTimeout) }
+            publishScreenStateAfterNotRendered()
             return lastOcclusion
         }
         // 締め切りまで絵が古いままだった: 古い絵では判定できないので素通り(注記 stale-screenshot は立っている)
@@ -1264,6 +1271,7 @@ extension StepExecutor {
         }
         if let lastOcclusion {   // 覆われ続けた
             if firstFrameExtended, firstFrameBlankObserved { noteCodesThisStep.insert(.firstFrameTimeout) }
+            publishScreenStateAfterNotRendered()
             return lastOcclusion
         }
         // 締め切りまで絵が古いままだった: 素通り(exists と同契約)

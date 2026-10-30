@@ -106,6 +106,8 @@ export interface MonitorDevice {
    * **1サイクル遅れる**(devices イベントはフレーム取得より前に出る)。ヘッダの Frozen カウンタと
    * タイルのバッジが消費する。 */
   readonly frozen: boolean;
+  /** アプリの描画の状態(Sources/fleetest の MonitorScreenState。無いときも null を送る)。 */
+  readonly screenState: "blank" | "textless" | null;
   /** このデバイスが居る機械(登録名。手元は undefined)。**`host` はブリッジ宛先の IP で別物**。
    * モニターは手元のデバイスしか触れないので、リモートのタイルは状態を観測できない ——
    * タイルにホスト名を出して「どの機械のデバイスか」を分かるようにする
@@ -202,6 +204,10 @@ export interface MonitorRunEntry {
   readonly total: number;
   readonly done: number;
   readonly failed: number;
+  /** この run の中で凍結で離脱した・白紙を検出した・文字消えを検出したデバイスの数(RunProgressRecord と対)。 */
+  readonly frozenDevices: number;
+  readonly blankDevices: number;
+  readonly textlessDevices: number;
   /** 受信時点の残り見積もり秒。**当面いつも null(=undefined)** —— 実績の無い run は省く
    * (DS-18.4)。null は undefined に正規化する(isMonitorRunEntry)。 */
   readonly etaSeconds?: number;
@@ -402,6 +408,7 @@ function isMonitorDevice(value: unknown): value is MonitorDevice {
     typeof value.recording === "boolean" &&
     typeof value.registered === "boolean" &&
     typeof value.frozen === "boolean" &&
+    (value.screenState === null || value.screenState === "blank" || value.screenState === "textless") &&
     (value.bridgeRunning === undefined || typeof value.bridgeRunning === "boolean") &&
     typeof value.storageMeasuring === "boolean" &&
     (value.storage === undefined || isMonitorDeviceStorage(value.storage))
@@ -504,6 +511,9 @@ function isMonitorRunEntry(value: unknown): value is MonitorRunEntry {
     typeof value.total === "number" &&
     typeof value.done === "number" &&
     typeof value.failed === "number" &&
+    typeof value.frozenDevices === "number" &&
+    typeof value.blankDevices === "number" &&
+    typeof value.textlessDevices === "number" &&
     (value.etaSeconds === undefined || typeof value.etaSeconds === "number") &&
     typeof value.phase === "string" &&
     Array.isArray(value.supply) &&

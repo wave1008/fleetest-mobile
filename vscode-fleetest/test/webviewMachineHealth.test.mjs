@@ -103,11 +103,11 @@ test("行の集合は履歴とモニターの和集合で、local が先頭・�
   assert.deepEqual(rowsOf(document).map(labelOf), ["local", "alpha", "H", "zeta"]);
   const alpha = rowsOf(document)[1];
   assert.equal(alpha.children[1].textContent.includes("?"), true, "モニターに居ない行の FM は不明");
-  assert.equal(alpha.children[4].textContent, "–", "モニターに居ない行の負荷は「–」");
+  assert.equal(alpha.children[5].textContent, "–", "モニターに居ない行の負荷は「–」");
   const zeta = rowsOf(document)[3];
-  assert.equal(zeta.children[5].textContent, "–", "履歴に居ない行の実行は「–」");
-  assert.equal(zeta.children[12].textContent, "–");
-  assert.equal(zeta.children[6].textContent, "–");
+  assert.equal(zeta.children[6].textContent, "–", "履歴に居ない行の実行は「–」");
+  assert.equal(zeta.children[13].textContent, "–");
+  assert.equal(zeta.children[7].textContent, "–");
 });
 
 test("履歴の 0 と欠けている値(nil)を区別する", (t) => {
@@ -117,14 +117,14 @@ test("履歴の 0 と欠けている値(nil)を区別する", (t) => {
   loadData(send, payload([health("H", { runs: 0 }), health("X")]));
   const [h, x] = rowsOf(document).filter((tr) => ["H", "X"].includes(labelOf(tr)));
   for (const tr of [h, x]) {
-    assert.equal(tr.children[12].textContent, "0", "fmDeadRuns 0");
-    assert.equal(tr.children[10].textContent, "–", "fm が nil なら FM 失敗は「–」");
-    assert.equal(tr.children[11].textContent, "–", "guard が nil なら「–」");
-    assert.equal(tr.children[9].textContent, "–");
-    assert.equal(tr.children[7].textContent, "0", "注記は 0 件と表示");
-    assert.equal(tr.children[6].textContent, "–", "pacedSteps が nil なら「–」");
+    assert.equal(tr.children[13].textContent, "0", "fmDeadRuns 0");
+    assert.equal(tr.children[11].textContent, "–", "fm が nil なら FM 失敗は「–」");
+    assert.equal(tr.children[12].textContent, "–", "guard が nil なら「–」");
+    assert.equal(tr.children[10].textContent, "–");
+    assert.equal(tr.children[8].textContent, "0", "注記は 0 件と表示");
+    assert.equal(tr.children[7].textContent, "–", "pacedSteps が nil なら「–」");
   }
-  assert.equal(h.children[5].textContent, "0");
+  assert.equal(h.children[6].textContent, "0");
 });
 
 test("FM チップ: 生存・停止・不明を文字と記号で出し、停止は理由と確認時刻をツールチップに載せる", (t) => {
@@ -181,13 +181,13 @@ test("今の列: Vision の件数・失敗(>0 で警告色)・コンパイル中
   send(sample("", { visionCalls: 4, visionFailures: 1, ocrCompiling: 1 }));
   loadData(send, payload([]));
   const local = rowsOf(document)[0];
-  const vision = local.children[3];
+  const vision = local.children[4];
   assert.match(vision.textContent, /4/);
   assert.match(vision.textContent, /1/);
   assert.ok(vision.classList.contains("mh-warn"));
   assert.ok(vision.querySelector(".mh-chip-compiling"));
   assert.match(tipOf(vision), /1/, "窓の秒数");
-  assert.equal(local.children[4].textContent, "CPU 34% · MEM 61%");
+  assert.equal(local.children[5].textContent, "CPU 34% · MEM 61%");
 });
 
 test("今の列の数字は幅の決まった枠に入る(90% → 100% で列幅が組み直されて表が動かない)", (t) => {
@@ -197,11 +197,11 @@ test("今の列の数字は幅の決まった枠に入る(90% → 100% で列幅
   loadData(send, payload([]));
   const nums = (cell) => [...cell.querySelectorAll(".mh-num")].map((el) => [el.textContent, el.className]);
   const local = rowsOf(document)[0];
-  assert.deepEqual(nums(local.children[4]), [["90%", "mh-num mh-num-4"], ["61%", "mh-num mh-num-4"]]);
-  assert.deepEqual(nums(local.children[3]), [["7", "mh-num mh-num-4"], ["0", "mh-num mh-num-3"]]);
+  assert.deepEqual(nums(local.children[5]), [["90%", "mh-num mh-num-4"], ["61%", "mh-num mh-num-4"]]);
+  assert.deepEqual(nums(local.children[4]), [["7", "mh-num mh-num-4"], ["0", "mh-num mh-num-3"]]);
   send(sample("", { cpu: 1, visionCalls: 7, visionFailures: 0 }));
-  assert.equal(rowsOf(document)[0].children[4].textContent, "CPU 100% · MEM 61%");
-  assert.deepEqual(nums(rowsOf(document)[0].children[4])[0], ["100%", "mh-num mh-num-4"]);
+  assert.equal(rowsOf(document)[0].children[5].textContent, "CPU 100% · MEM 61%");
+  assert.deepEqual(nums(rowsOf(document)[0].children[5])[0], ["100%", "mh-num mh-num-4"]);
   const css = readFileSync(path.resolve("src/webview/dashboard/style.css"), "utf8");
   assert.match(css, /\.mh-num \{[^}]*display: inline-block;[^}]*font-variant-numeric: tabular-nums;/);
   assert.match(css, /\.mh-num-3 \{ min-width: 3ch; \}/);
@@ -228,27 +228,27 @@ test("集計期間の列: 失敗・停止・素通り・要注意の注記で警
   ]));
   const byLabel = Object.fromEntries(rowsOf(document).map((tr) => [labelOf(tr), tr]));
   const h = byLabel.H;
-  assert.ok(h.children[12].classList.contains("mh-warn"));
-  assert.match(tipOf(h.children[12]), /ane down/);
-  assert.equal(h.children[10].textContent, "2 / 20");
-  assert.ok(h.children[10].classList.contains("mh-warn"));
-  assert.match(tipOf(h.children[10]), /boom/);
-  assert.equal(h.children[11].textContent, "2 / 10");
+  assert.ok(h.children[13].classList.contains("mh-warn"));
+  assert.match(tipOf(h.children[13]), /ane down/);
+  assert.equal(h.children[11].textContent, "2 / 20");
   assert.ok(h.children[11].classList.contains("mh-warn"));
-  assert.equal(h.children[9].textContent, "2.5");
-  assert.equal(h.children[7].textContent, "5", "OCR 群の合計(未知の mystery は数えない)");
-  assert.ok(h.children[7].classList.contains("mh-warn"));
-  assert.match(tipOf(h.children[7]), /OCR の予算切れ: 3/);
-  assert.match(tipOf(h.children[7]), /OCR のコンパイルを待った: 2/);
-  assert.equal(h.children[8].textContent, "4");
-  assert.equal(h.children[8].classList.contains("mh-warn"), false, "情報の注記だけなら警告色にしない");
-  assert.equal(h.children[6].textContent, "5");
-  assert.match(tipOf(h.children[6]), /2\.5/);
+  assert.match(tipOf(h.children[11]), /boom/);
+  assert.equal(h.children[12].textContent, "2 / 10");
+  assert.ok(h.children[12].classList.contains("mh-warn"));
+  assert.equal(h.children[10].textContent, "2.5");
+  assert.equal(h.children[8].textContent, "5", "OCR 群の合計(未知の mystery は数えない)");
+  assert.ok(h.children[8].classList.contains("mh-warn"));
+  assert.match(tipOf(h.children[8]), /OCR の予算切れ: 3/);
+  assert.match(tipOf(h.children[8]), /OCR のコンパイルを待った: 2/);
+  assert.equal(h.children[9].textContent, "4");
+  assert.equal(h.children[9].classList.contains("mh-warn"), false, "情報の注記だけなら警告色にしない");
+  assert.equal(h.children[7].textContent, "5");
+  assert.match(tipOf(h.children[7]), /2\.5/);
 
   const quiet = byLabel.Quiet;
-  assert.equal(quiet.children[11].textContent, "0 / 5");
-  assert.equal(quiet.children[11].classList.contains("mh-warn"), false);
-  assert.equal(quiet.children[7].classList.contains("mh-warn"), false);
+  assert.equal(quiet.children[12].textContent, "0 / 5");
+  assert.equal(quiet.children[12].classList.contains("mh-warn"), false);
+  assert.equal(quiet.children[8].classList.contains("mh-warn"), false);
 });
 
 test("両方が届くまでは空の文言が「確認中」で、行が無ければ記録なしの文言になる", (t) => {
@@ -312,14 +312,14 @@ test("1Hz の更新では行を作り直さず「今」の列だけを同じセ�
   loadData(send, payload([health("H", { notes: { "vision-helper-rescued": 2 } })], [{ host: "H", machine: "local" }]));
   send(sample("", { cpu: 0.2 }));
   const tr = rowsOf(document)[0];
-  const notesCell = tr.children[8];
-  const loadCellEl = tr.children[4];
+  const notesCell = tr.children[9];
+  const loadCellEl = tr.children[5];
   assert.match(loadCellEl.textContent, /20%/);
   send(sample("", { cpu: 0.55 }));
   const after = rowsOf(document)[0];
   assert.equal(after, tr, "行は同じ要素のまま");
-  assert.equal(after.children[8], notesCell, "集計期間のセル(ホバー中かもしれない)は同じ要素のまま");
-  assert.equal(after.children[4], loadCellEl, "今の列も同じ td の中身だけを差し替える");
+  assert.equal(after.children[9], notesCell, "集計期間のセル(ホバー中かもしれない)は同じ要素のまま");
+  assert.equal(after.children[5], loadCellEl, "今の列も同じ td の中身だけを差し替える");
   assert.match(loadCellEl.textContent, /55%/);
 });
 
@@ -327,7 +327,7 @@ test("集計期間の列は発生順(実行 → 減速 → OCR → Vision → FM
   const { window, document } = createWebview();
   t.after(() => window.close());
   const heads = [...document.querySelectorAll("#table-machine-health thead tr:nth-child(2) th")].map((th) => th.textContent);
-  assert.deepEqual(heads.slice(4), ["実行", "減速", "OCR 注記", "Vision 注記", "FM 枠待ち", "FM 失敗", "判定の素通り", "FM 停止"]);
+  assert.deepEqual(heads.slice(5), ["実行", "減速", "OCR 注記", "Vision 注記", "FM 枠待ち", "FM 失敗", "判定の素通り", "FM 停止"]);
 });
 
 test("他のタブからダッシュボードへ切り替えたら取り直す(起動時・ダッシュボードのままの切り替えでは送らない)", (t) => {
@@ -450,4 +450,44 @@ test("行の並びは設定タブのマシン一覧の順に従い、並べ替�
   assert.deepEqual(rowsOf(document).map(labelOf), ["local", "zeta", "alpha"]);
   send({ type: "remoteConfig", hosts: [{ machine: "alpha", host: "u@a", dir: "" }, { machine: "zeta", host: "u@z", dir: "" }] });
   assert.deepEqual(rowsOf(document).map(labelOf), ["local", "alpha", "zeta"]);
+});
+
+test("Rendering 列: 0 の種類は出さず、全部 0 なら空欄。種類ごとに絵文字・数字・説明(リモートの行も同じ)", (t) => {
+  const { window, document, send } = createWebview();
+  t.after(() => window.close());
+  send({ type: "hostMetricsMachines", machines: ["m2", "m3"] });
+  const device = (id, machine, spec) => ({ id, name: id, platform: "android", state: "connected", detail: "",
+    kind: "virtual", recording: false, registered: true, machine, frozen: false, screenState: null, ...spec });
+  send({ type: "devices", devices: [
+    device("a", "m2", { frozen: true }),
+    device("b", "m2", { screenState: "blank" }), device("c", "m2", { screenState: "blank" }),
+    device("d", "m2", { screenState: "textless" }), device("e", "m2", { screenState: "textless" }),
+    device("f", "m2", { screenState: "textless" }),
+    device("g", "m3", { screenState: "blank" }),
+    device("h", "m3", { frozen: true, state: "offline" }),
+  ] });
+  send(sample("m2"));
+  send(sample("m3"));
+  send(sample(""));
+  loadData(send, payload([]));
+  const byLabel = Object.fromEntries(rowsOf(document).map((tr) => [labelOf(tr), tr]));
+  const cellOf = (label) => byLabel[label].children[3];
+  assert.equal(cellOf("local").textContent, "", "全部 0 なら空欄");
+  assert.equal(cellOf("m2").textContent, "❄️1○2🫥3");
+  assert.equal(cellOf("m3").textContent, "○1", "0 の種類と未接続の台は出さない");
+  const parts = [...cellOf("m2").querySelectorAll(".mh-rendering-part")];
+  assert.equal(parts.length, 3);
+  assert.deepEqual(parts.map((p) => p.querySelector(".mh-rendering-count").textContent), ["1", "2", "3"]);
+  assert.match(tipOf(parts[0]), /凍結/);
+  assert.match(tipOf(parts[1]), /白紙/);
+  assert.match(tipOf(parts[2]), /文字消え/);
+});
+
+test("Rendering 列の見出しは AVE と OCR・Vision の間にあり、現在の状態のグループは5列", (t) => {
+  const { window, document } = createWebview();
+  t.after(() => window.close());
+  const heads = [...document.querySelectorAll("#table-machine-health thead tr:nth-child(2) th")].map((th) => th.textContent.trim());
+  assert.equal(heads[1], "AVE");
+  assert.equal(heads[2], "Rendering");
+  assert.equal(document.querySelector("#table-machine-health thead .mh-group").getAttribute("colspan"), "5");
 });

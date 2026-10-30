@@ -471,7 +471,9 @@ struct ApiMonitorCommand: AsyncParsableCommand {
                 return state.info(health: confirmedIssues.isEmpty ? nil : confirmedIssues,
                                    renderMode: state.androidSerial.flatMap { renderModeCache[$0] },
                                    inRun: inRun, inSession: inSession, inMCP: inMCP, recording: recording, host: bridgeHost,
-                                   frozen: frozenVerdict.isFrozen, streamedByOther: streamedByOther,
+                                   frozen: frozenVerdict.isFrozen,
+                                   screenState: Self.screenState(key: leaseKey, stateDir: leaseStateDir, deviceState: state.state),
+                                   streamedByOther: streamedByOther,
                                    bridgeRunning: bridgeRunning,
                                    storage: leaseKey.flatMap { storageCache[$0] },
                                    storageMeasuring: leaseKey.map { storageMeasuring.contains($0) } ?? false,
@@ -720,7 +722,9 @@ struct ApiMonitorCommand: AsyncParsableCommand {
                             scenarioElapsedSeconds: lane.scenarioStartedAt.flatMap { elapsedSeconds(since: $0) },
                             expectedSeconds: lane.expectedSeconds)
                     },
-                    phase: record.phase, supply: record.supply, videoClips: record.videoClips)
+                    phase: record.phase, supply: record.supply, videoClips: record.videoClips,
+                    frozenDevices: record.frozenDevices, blankDevices: record.blankDevices,
+                    textlessDevices: record.textlessDevices)
             }
     }
 
@@ -959,7 +963,8 @@ struct DeviceRuntimeState {
     /// (list-devices は同じ情報を ApiDeviceEntry として別途組み立てる)
     func info(health: [String]?, renderMode: String?, inRun: Bool, inSession: Bool, inMCP: Bool,
                           recording: Bool, host: String? = nil,
-                          frozen: Bool = false, streamedByOther: Bool? = nil,
+                          frozen: Bool = false, screenState: DeviceScreenState? = nil,
+                          streamedByOther: Bool? = nil,
                           bridgeRunning: Bool? = nil,
                           storage: DeviceStorageInfo? = nil,
                           storageMeasuring: Bool = false,
@@ -973,7 +978,8 @@ struct DeviceRuntimeState {
                              host: host, port: iosPort,
                              recording: recording, registered: target.registered,
                              machine: MachineDispatch.normalize(target.spec.machine),
-                             frozen: frozen, wired: wired, streamedByOther: streamedByOther,
+                             frozen: frozen, screenState: MonitorScreenState(value: screenState),
+                             wired: wired, streamedByOther: streamedByOther,
                              bridgeRunning: bridgeRunning, storage: storage,
                              storageMeasuring: storageMeasuring, storageRefreshId: storageRefreshId,
                              foldable: foldable)

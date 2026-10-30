@@ -39,7 +39,7 @@ import {
 } from "../src/monitorModel";
 
 // CLI(ApiMonitorDeviceInfo)が必ず送る欄。欠けた行は不正として弾く(下の「欠落は false」のテスト)
-const REQ = { kind: "virtual", inRun: false, inSession: false, inMCP: false, recording: false, registered: true, frozen: false, storageMeasuring: false };
+const REQ = { kind: "virtual", inRun: false, inSession: false, inMCP: false, recording: false, registered: true, frozen: false, screenState: null, storageMeasuring: false };
 
 // ---- isMonitorEvent: 正常3種 ----
 
@@ -170,6 +170,7 @@ test("isMonitorEvent: monitorDevices は要素の platform が ios/android 以�
 test("isMonitorEvent: monitorDevices の必須欄(kind/inRun/inSession/inMCP/recording/registered/frozen/storageMeasuring)の欠落・型不正は false", () => {
   for (const key of Object.keys(REQ)) {
     for (const raw of [undefined, null, "true", 1]) {
+      if (key === "screenState" && raw === null) continue; // null は「状態なし」で正常
       const device = { ...REQ, id: "d1", name: "d1", platform: "ios", state: "connected", detail: "" };
       if (raw === undefined) {
         delete device[key];
@@ -178,6 +179,16 @@ test("isMonitorEvent: monitorDevices の必須欄(kind/inRun/inSession/inMCP/rec
       }
       assert.equal(isMonitorEvent({ kind: "monitorDevices", devices: [device] }), false, `${key}=${JSON.stringify(raw)}`);
     }
+  }
+});
+
+test("isMonitorEvent: screenState は blank / textless / null だけを受理する(欄の欠落も拒否)", () => {
+  const device = (screenState) => ({ ...REQ, id: "d1", name: "d1", platform: "ios", state: "connected", detail: "", screenState });
+  for (const ok of ["blank", "textless", null]) {
+    assert.equal(isMonitorEvent({ kind: "monitorDevices", devices: [device(ok)] }), true, String(ok));
+  }
+  for (const bad of ["frozen", "", 1, true]) {
+    assert.equal(isMonitorEvent({ kind: "monitorDevices", devices: [device(bad)] }), false, String(bad));
   }
 });
 

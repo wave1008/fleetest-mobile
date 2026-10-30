@@ -126,6 +126,19 @@ final class ApiMonitorRunProgressTests: XCTestCase {
         XCTAssertEqual(out.first?.supply, [])
     }
 
+    /// 状態を検出したデバイスの数は台帳の値がそのまま届く
+    func testDeviceStateCountsAreCarriedFromTheLedger() {
+        let withCounts = RunProgressRecord(
+            pid: 41233, runID: "r1", runGroup: nil, issuer: "alice@air", project: "ec-mobile",
+            profile: "ios-smoke", startedAt: "2026-09-20T10:03:12Z", total: 12, done: 7, failed: 2, actions: 0,
+            requeued: 0, laneDropouts: 0, etaSeconds: nil, lanes: [], phase: "running", supply: [], videoClips: nil,
+            frozenDevices: 1, blankDevices: 2, textlessDevices: 3, owner: nil)
+        let out = ApiMonitorCommand.monitorRuns(records: [withCounts], now: now, myIssuer: "bob@office")
+        XCTAssertEqual(out.first?.frozenDevices, 1)
+        XCTAssertEqual(out.first?.blankDevices, 2)
+        XCTAssertEqual(out.first?.textlessDevices, 3)
+    }
+
     /// 実績ゼロの run は台帳側が既に nil を書いているので、そのまま nil が届く
     func testEtaSecondsStaysNilWhenTheLedgerHasNoEstimate() {
         let noEstimate = RunProgressRecord(

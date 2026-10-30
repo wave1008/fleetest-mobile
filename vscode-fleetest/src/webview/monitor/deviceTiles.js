@@ -316,15 +316,13 @@ function createTile(device) {
   const recordingBadge = document.createElement('span');
   recordingBadge.className = 'badge badge-recording';
   recordingBadge.textContent = t('recordings.deviceBadge');
-  // 凍結バッジ。device.frozen(一様フレームが2サイクル連続)の間だけ表示(renderMeta が切替)。
+  // 画面の状態バッジ(凍結・白紙・文字消え)。凍結は device.frozen(一様フレームが2サイクル連続)(renderMeta が切替)。
   // **タイルの絵だけでは分からない** —— 凍結時も最後のフレームが残るので、白/黒ベタでなければ
   // 「普通の画面」に見える。ヘッダの Frozen カウンタと同じ判定(ApiMonitorCommand)
   const frozenBadge = document.createElement('span');
   frozenBadge.className = 'badge badge-frozen';
-  frozenBadge.textContent = t('wvMonitor.tile.frozen');
-  // バッジも絵文字1文字なので説明はホバーが唯一の手段。ネイティブ title(約1秒)ではなく
-  // タイルの他の説明と同じ自前ツールチップ(0.2秒)に揃える
-  setHoverTip(frozenBadge, t('wvMonitor.tile.frozenTitle'));
+  // 絵文字1文字なので説明はホバーが唯一の手段。ネイティブ title(約1秒)ではなく
+  // タイルの他の説明と同じ自前ツールチップ(0.2秒)に揃える(paintScreenBadge)
   // 未登録(どの実行プロファイルにも記載の無い合成デバイス)バッジ。device.state に関わらず常時対象なので
   // kindBadge と同じくヘッダーに置く(renderMode==='cpu' バッジは state==='connected' 限定だが
   // 表示切替の実装パターン=専用要素+専用 render 関数+style.display 切替は揃える)。
@@ -343,6 +341,7 @@ function createTile(device) {
 
   const frameWrap = document.createElement('div');
   frameWrap.className = 'frame-wrap';
+  frameWrap.append(frozenBadge);
   const img = document.createElement('img');
   // 既定のままだと画像を掴んだ時点でブラウザのドラッグが始まり、範囲選択のドラッグが途切れる
   img.draggable = false;
@@ -372,7 +371,7 @@ function createTile(device) {
   spacer.className = 'tile-footer-spacer';
   // renderBadge はフッター末尾に置く。spacer が flex:1 で伸びるため自動的に右端(=タイル右下)に寄る。
   // 実行中/キュー待ち/録画中のバッジはタイル左下(フッター先頭)。録画は実行中の右(ユーザー指定)。
-  footer.append(runningBadge, recordingBadge, frozenBadge, queuedBadge, stateBadge, spacer, renderBadge);
+  footer.append(runningBadge, recordingBadge, queuedBadge, stateBadge, spacer, renderBadge);
 
   // 点灯マーク(左上・マシン名の段の左端)。**段の中に入れない** —— 段はグリッドビューの見出しへ複製される
   // (renderMirrorHeader)ので、中に入れると拡大表示に二重に出る。絶対配置なので中央寄せの段を動かさない
@@ -458,6 +457,12 @@ function createTile(device) {
 }
 
 function renderFrame(entry) {
+  renderFrameContent(entry);
+  // 枠の中身は貼り直されるので、その後に足す
+  entry.frameWrapEl.appendChild(entry.frozenBadgeEl);
+}
+
+function renderFrameContent(entry) {
   entry.frameWrapEl.textContent = '';
   // ブリッジ不在の実機は未起動と同じ扱い(bridgeNotRunning のコメント参照)。フレームも出さない:
   // 残っているのはブリッジが死ぬ前の古い1枚で、生きた画面と見分けがつかない
@@ -593,6 +598,47 @@ function renderMirror(entry) {
   }
   renderMirrorLamp(entry, mirror);
   renderMirrorHeader(entry, mirror);
+  renderMirrorFrame(entry, mirror);
+  // 枠の中身は上で貼り直されるので、その後に足す
+  paintScreenBadge(mirror.frozenEl, entry.device);
+  mirror.frameEl.appendChild(mirror.frozenEl);
+}
+
+/**
+ * 絵の真ん中に出す画面の状態(タイルと拡大表示で共有)。未接続の機は出さない(Swift 側も接続断で記憶を捨てる)。
+ * 重なったら重いほう(デバイス全体 → アプリの領域 → 文字だけ)を出す
+ */
+function screenBadgeKeys(device) {
+  if (device.state !== 'connected') return null;
+  if (device.frozen) return ['wvMonitor.tile.frozen', 'wvMonitor.tile.frozenTitle'];
+  if (device.screenState === 'blank') return ['wvMonitor.tile.blank', 'wvMonitor.tile.blankTitle'];
+  if (device.screenState === 'textless') return ['wvMonitor.tile.textless', 'wvMonitor.tile.textlessTitle'];
+  return null;
+}
+
+function paintScreenBadge(el, device) {
+  const keys = screenBadgeKeys(device);
+  el.style.display = keys ? 'inline-block' : 'none';
+  if (keys && (el.textContent !== t(keys[0]) || el.dataset.tip !== t(keys[1]))) {
+    el.textContent = t(keys[0]);
+    el.dataset.tip = t(keys[1]);
+    setHoverTip(el, t(keys[1]));
+  }
+}
+
+/** マシンごとの「今」の数(ダッシュボードの Rendering 列)。**タイルの印と同じ判定** = 同じデバイスで表示が食い違わない */
+export function renderingCountsOf(machine) {
+  const counts = { frozen: 0, blank: 0, textless: 0 };
+  for (const entry of tiles.values()) {
+    if ((entry.device.machine || '') !== machine) continue;
+    const keys = screenBadgeKeys(entry.device);
+    if (keys === null) continue;
+    counts[keys[0].split('.').pop()] += 1;
+  }
+  return counts;
+}
+
+function renderMirrorFrame(entry, mirror) {
   if (entry.frameWrapEl.contains(entry.placeholderEl)) {
     // 中身が前回の複製と同じなら貼り直さない(devices サイクル・フレームのたびに呼ばれる。貼り直すと
     // マウスを載せている説明が点滅する)
@@ -780,9 +826,12 @@ export function attachDeviceMirror(deviceId, wrapEl) {
     const lampEl = document.createElement('span');
     lampEl.className = 'run-lamp';
     lampEl.dataset.on = '0';
+    // 絵の上のライブ操作を塞がない(pointer-events は CSS)
+    const frozenEl = document.createElement('span');
+    frozenEl.className = 'badge badge-frozen';
     wrapEl.textContent = '';
     wrapEl.append(headerEl, frameEl, lampEl);
-    mirror = { wrapEl, headerEl, frameEl, imgEl, canvasEl, lampEl };
+    mirror = { wrapEl, headerEl, frameEl, imgEl, canvasEl, lampEl, frozenEl };
     deviceMirrors.set(deviceId, mirror);
   }
   renderMirror(entry);
@@ -830,9 +879,7 @@ function renderMeta(entry) {
   entry.nameEl.className = 'tile-name tile-name-' + entry.device.platform;
   setHoverTip(entry.nameEl, entry.device.name + ' (' + entry.device.platform + ')');
   entry.recordingBadgeEl.style.display = entry.device.recording ? 'inline-block' : 'none';
-  // 接続中のときだけ出す(未接続の機は「凍結」ではない。Swift 側も接続断で記憶を捨てる)
-  entry.frozenBadgeEl.style.display =
-    entry.device.frozen && entry.device.state === 'connected' ? 'inline-block' : 'none';
+  paintScreenBadge(entry.frozenBadgeEl, entry.device);
   // 実機は署名・接続の前提がシミュレータ/エミュレータと違うので取り違えないよう明示する
   entry.kindBadgeEl.style.display = entry.device.kind === 'physical' ? 'inline-block' : 'none';
   // **手元も含めて必ず出す**(ユーザー決定)—— どの機械のデバイスかは全タイルで同じ形で

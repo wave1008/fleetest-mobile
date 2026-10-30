@@ -17,11 +17,53 @@ extension StepExecutor {
         platform == "ios" && !physical && (framework?.isSelfRendered ?? true)
     }
 
+    /// 描画の状態を公表するか。**Simulator / Emulator だけ**(実機は対象外)で、フレームワークは問わない
+    /// (赤にする `checksRenderCollapse` と別: 公表は警告であり、Android・SwiftUI 等では判定を変えない)
+    public static func publishesScreenState(platform: String, physical: Bool) -> Bool {
+        !physical && (platform == "ios" || platform == "android")
+    }
+
+    /// 義務を貯めて区切りで確かめるか(赤にする・公表するのどちらかが有効)
+    private var tracksRenderCollapse: Bool { renderCollapseCheckEnabled || screenStatePublisher != nil }
+
+    /// 判定を公表へ反映する。`finding` が nil(異常なし)なら `clearsWhenHealthy` のときだけ公表を消す。
+    /// 状態を持たない所見(全画面の一色 = 凍結の担当)は触らない。返り値は立てた注記
+    @discardableResult
+    func reflectScreenState(_ finding: RenderCollapse.Finding?, clearsWhenHealthy: Bool) -> StepNote? {
+        guard let publisher = screenStatePublisher else { return nil }
+        guard let finding else {
+            if clearsWhenHealthy { publisher(nil) }
+            return nil
+        }
+        guard let state = RenderCollapse.screenState(of: finding) else { return nil }
+        publisher(state)
+        screenStateConfirmedDrawn = false
+        let note: StepNote = state == .blank ? .screenBlank : .screenTextless
+        noteCodesThisStep.insert(note)
+        return note
+    }
+
+    /// テキストの可視性検証の赤が確定したときに、最後の `notRendered` の絵を1回判定して公表する。撮影は足さない。
+    /// poll の途中で呼ばない(遷移の途中の1枚を白紙と呼ばない・1周ごとに失敗文の判定と二重になる)
+    func publishScreenStateAfterNotRendered() {
+        defer { lastNotRenderedFrame = nil }
+        guard screenStatePublisher != nil, let frame = lastNotRenderedFrame else { return }
+        let finding = RenderCollapse.judge(pngData: frame.screenshot, elements: frame.elements, screen: frame.screen,
+                                           keyboard: guardKeyboardFrame, inkThreshold: occlusionInkThreshold,
+                                           minimumTextElements: RenderCollapse.minimumTextElements)
+        reflectScreenState(finding, clearsWhenHealthy: false)
+    }
+
     /// 検証が緑になったら、画素で文字を確かめたかで義務を貯める・下ろす(execute の assert の枝が呼ぶ)
     func noteAssertionForRenderCollapse(_ assert: String, step: FlowStep, status: StepResult.Status) {
-        guard renderCollapseCheckEnabled, Self.isSuccess(status) else { return }
+        guard tracksRenderCollapse, Self.isSuccess(status) else { return }
         if pixelsShowedTextThisStep {
             assertionsWithoutPixelProof.removeAll()
+            // 描けていると分かったので前の公表を消す。義務が無いと区切りの確かめは走らない = ここで消さないと印が鮮度切れまで残る
+            if !screenStateConfirmedDrawn {
+                screenStateConfirmedDrawn = true
+                screenStatePublisher?(nil)
+            }
             return
         }
         assertionsWithoutPixelProof.append(step.locator == nil ? assert : "\(assert) \(step.locatorSummary)")
@@ -31,12 +73,21 @@ extension StepExecutor {
     /// 当たったら `renderCollapseRetakeSeconds` 待って撮り直し、同じときだけ言う(遷移の途中の一瞬を崩壊と呼ばない)。
     /// 撮れない・読めないは nil(判定できないことを崩壊と呼ばない)。呼ぶと義務は下ろす
     public func renderCollapseVerdict() async -> String? {
-        guard renderCollapseCheckEnabled, !assertionsWithoutPixelProof.isEmpty else { return nil }
+        renderCollapseNotes = []
+        guard tracksRenderCollapse, !assertionsWithoutPixelProof.isEmpty else { return nil }
         let pending = assertionsWithoutPixelProof
         assertionsWithoutPixelProof.removeAll()
-        guard await renderCollapseFinding() != nil else { return nil }
+        guard await renderCollapseFinding() != nil else {
+            reflectScreenState(nil, clearsWhenHealthy: true)
+            return nil
+        }
         try? await Task.sleep(nanoseconds: UInt64(Self.renderCollapseRetakeSeconds * 1_000_000_000))
-        guard let finding = await renderCollapseFinding() else { return nil }
+        guard let finding = await renderCollapseFinding() else {
+            reflectScreenState(nil, clearsWhenHealthy: true)
+            return nil
+        }
+        renderCollapseNotes = reflectScreenState(finding, clearsWhenHealthy: true).map { [$0] } ?? []
+        guard renderCollapseCheckEnabled else { return nil }
         return Self.renderCollapseMessage(finding, unverified: pending)
     }
 

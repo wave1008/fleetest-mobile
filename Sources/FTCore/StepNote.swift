@@ -401,6 +401,13 @@ public enum StepNote: String, Sendable, Codable, CaseIterable {
     /// 長さだけ待った(`PresentedOverlayTapWait`。React Native だけ)。判定は変えない。数えて払った回数を見る口
     case waitedForPresentedOverlay = "waited-for-presented-overlay"
 
+    /// アプリの領域が一色なのに木は文字の要素を報告している画面を検出し、デバイスの描画の状態として公表した
+    /// (`DeviceScreenStateStore`・`RenderCollapse.Finding.blankAppArea`)。事実だけ。原因は推測しない
+    case screenBlank = "screen-blank"
+    /// 図形は描かれているが文字の要素が1つも描かれていない画面を検出し、デバイスの描画の状態として公表した
+    /// (`RenderCollapse.Finding.noTextDrawn`)。事実だけ
+    case screenTextless = "screen-textless"
+
     /// 人間向けの文言(FTRuntime がステップ説明へ括弧書きで付ける)
     public var text: String {
         switch self {
@@ -556,6 +563,10 @@ public enum StepNote: String, Sendable, Codable, CaseIterable {
         case .inAppActivationPointOffCentre:
             return "in-app activated the element at its activation point, which is not the centre of its"
                 + " frame that a coordinate tap presses"
+        case .screenBlank:
+            return "the app's area of the screenshot was a single colour although the tree reports text there"
+        case .screenTextless:
+            return "none of the text elements the tree reports was drawn in the screenshot"
         case .waitedForPresentedOverlay:
             return "waited for the just-presented dialog or sheet to finish appearing before tapping"
                 + " (a tap during the transition is dropped)"

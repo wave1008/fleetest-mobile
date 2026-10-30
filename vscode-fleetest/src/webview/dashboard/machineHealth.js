@@ -12,6 +12,7 @@ import { syncChildren } from '../monitor/rowSync.js';
 import { formatLocalDateTime } from './format.js';
 import { machineLabel } from './machineNames.js';
 import { hostMetricsMachines, onHostMetricsCommitted } from '../monitor/hostCharts.js';
+import { renderingCountsOf } from '../monitor/deviceTiles.js';
 import { LOCAL_MACHINE_LABEL, onMachineOrderChanged, paintMachineBadge } from '../monitor/machineColors.js';
 import { compareMachineLabels } from './machineNames.js';
 import { adoptTitleHoverTips, setHoverTip } from '../monitor/hoverTip.js';
@@ -199,6 +200,31 @@ function aveCell(live) {
   return withTip(cell, tips.join('\n'));
 }
 
+/** Rendering: この機械で今凍結(❄️)・白紙(○)・文字消え(🫥)にあるデバイスの数。0 の種類は出さず、全部 0・不明なら空欄。
+ *  数字は注意の色(.mh-rendering-count)。説明は種類ごとにホバー(タイルと run ボードと同じ文言) */
+const RENDERING_KINDS = [
+  ['frozen', 'wvMonitor.tile.frozen', 'wvMonitor.tile.frozenTitle'],
+  ['blank', 'wvMonitor.tile.blank', 'wvMonitor.tile.blankTitle'],
+  ['textless', 'wvMonitor.tile.textless', 'wvMonitor.tile.textlessTitle'],
+];
+
+function renderingCell(live) {
+  const cell = document.createElement('td');
+  cell.className = 'mh-rendering';
+  if (!live || live.stale) return cell;
+  const rendering = renderingCountsOf(live.machine);
+  for (const [kind, markKey, titleKey] of RENDERING_KINDS) {
+    const count = rendering[kind];
+    if (!(count > 0)) continue;
+    const part = document.createElement('span');
+    part.className = 'mh-rendering-part';
+    part.append(document.createTextNode(t(markKey)), chip('mh-rendering-count', String(count)));
+    setHoverTip(part, t(titleKey));
+    cell.appendChild(part);
+  }
+  return cell;
+}
+
 function visionCell(live) {
   const cell = document.createElement('td');
   if (!live || live.stale || live.visionCalls === null) {
@@ -346,11 +372,11 @@ function liveSignature(rows) {
   return JSON.stringify(rows.map((row) => {
     const l = row.live;
     return [row.label, l ? [l.stale, pct(l.cpu), pct(l.memRatio), l.liveness, l.visionCalls, l.visionFailures,
-      l.windowTicks, l.ocrCompiling, l.encoder] : null];
+      l.windowTicks, l.ocrCompiling, l.encoder, renderingCountsOf(l.machine)] : null];
   }));
 }
 
-const LIVE_CELL_BUILDERS = [fmCell, aveCell, visionCell, loadCell];
+const LIVE_CELL_BUILDERS = [fmCell, aveCell, renderingCell, visionCell, loadCell];
 // monitorHtml.ts の「現在の状態」の見出しと同じ順。「今」の列は rowElement の中でマシンの列の直後(rowElement もこの一覧から作る)
 const LIVE_CELL_OFFSET = 1;
 

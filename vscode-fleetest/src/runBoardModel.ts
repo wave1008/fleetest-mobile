@@ -58,6 +58,10 @@ export interface RunBoardRawRun {
   readonly total: number;
   readonly done: number;
   readonly failed: number;
+  /** この run の中で凍結で離脱した・白紙を検出した・文字消えを検出したデバイスの数(MonitorRunEntry と同じ)。 */
+  readonly frozenDevices: number;
+  readonly blankDevices: number;
+  readonly textlessDevices: number;
   readonly etaSeconds?: number;
   readonly lanes: readonly RunBoardLane[];
   /** 全シナリオの後の動画の切り出しの進み(切り出しの間だけ。その間 etaSeconds は省かれる)。 */
@@ -210,6 +214,10 @@ export interface RunBoardGroup {
   readonly total: number;
   readonly done: number;
   readonly failed: number;
+  /** 束ねた run の合計(複数マシンは足す。同じデバイスが別の機械に居ることは無い)。 */
+  readonly frozenDevices: number;
+  readonly blankDevices: number;
+  readonly textlessDevices: number;
   /** 経過は最も長く走っている run(= 束ねた中の最大)。receivedAtMs 時点の値 —— 秒読みは
    * liveElapsedSeconds(elapsedSeconds, receivedAtMs, now) で進める。 */
   readonly elapsedSeconds: number;
@@ -267,6 +275,9 @@ export function buildRunGroups(state: ReadonlyMap<string, MachineRunsEntry>): re
       total: sum(runs.map((r) => r.total)),
       done: sum(runs.map((r) => r.done)),
       failed: sum(runs.map((r) => r.failed)),
+      frozenDevices: sum(runs.map((r) => r.frozenDevices)),
+      blankDevices: sum(runs.map((r) => r.blankDevices)),
+      textlessDevices: sum(runs.map((r) => r.textlessDevices)),
       elapsedSeconds: Math.max(...runs.map((r) => r.elapsedSeconds)),
       etaSeconds: allHaveEta ? Math.max(...(etaValues as number[])) : undefined,
       videoClips: runs.every((r) => r.videoClips !== undefined)

@@ -99,10 +99,18 @@ export const webviewMonitorAStrings = {
     ja: "実機(シミュレータ/エミュレータではありません)。起動・停止は行いません",
     en: "Physical device (not a simulator/emulator). It is never started or stopped.",
   },
-  // **絵文字1文字**(言語に依らないので ja/en 同値)。意味は title(frozenTitle)が担うので、
-  // バッジの文字を増やさない = 狭いタイルのフッターで他のバッジを押し出さない
+  // **絵文字1文字**(言語に依らないので ja/en 同値)。意味はホバーの説明(*Title)が担う
   "wvMonitor.tile.frozen": { ja: "❄️", en: "❄️" },
-  // タイルの ❄️ バッジの説明(hoverTip)。バッジが絵文字1文字なので意味はここが担う
+  "wvMonitor.tile.blank": { ja: "○", en: "○" },
+  "wvMonitor.tile.textless": { ja: "🫥", en: "🫥" },
+  "wvMonitor.tile.blankTitle": {
+    ja: "白紙: アプリの領域に何も描かれていません",
+    en: "Blank: nothing is drawn in the app area",
+  },
+  "wvMonitor.tile.textlessTitle": {
+    ja: "文字消え: 図形はありますが文字が描かれていません",
+    en: "Text missing: shapes are drawn, but no text is",
+  },
   "wvMonitor.tile.frozenTitle": {
     ja: "デバイス凍結中",
     en: "Device frozen",

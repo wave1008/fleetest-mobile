@@ -426,6 +426,15 @@ extension ApiMonitorCommand {
         return own.merged(with: published).merged(with: injected)
     }
 
+    /// run が公表した描画の状態(白紙・文字消え。`DeviceScreenStateStore`)。凍結の判定とは混ぜない。
+    /// 落ちた台の公表は消す(印は描画のプロセスの状態なので、停止・再起動で意味を失う)
+    static func screenState(key: String?, stateDir: URL?, deviceState: String, now: Date = Date()) -> DeviceScreenState? {
+        guard let key, let stateDir else { return nil }
+        if deviceState == "offline" { DeviceScreenStateStore.clear(stateDir: stateDir, key: key) }
+        guard deviceState == "connected" else { return nil }
+        return DeviceScreenStateStore.current(stateDir: stateDir, key: key, now: now)
+    }
+
     /// pause したまま resume が来ない場合に自動的に resume 扱いにするまでの秒数(安全弁)
     static let pauseSafetyValveSeconds: TimeInterval = 120
     /// pause 中、resume(または安全弁)を検知するためのポーリング間隔(秒)

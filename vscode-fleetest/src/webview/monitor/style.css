@@ -963,6 +963,10 @@ body.vscode-dark .tacho-trend-dot { filter: drop-shadow(0 0 2px var(--tacho-line
 .run-board-counts-failed {
   margin-left: 6px;
 }
+/* 色は赤にしない(失敗ではなく、デバイスで起きた事実の数) */
+.run-board-counts-state {
+  margin-left: 6px;
+}
 .run-board-counts-supply {
   margin-left: 8px;
   color: var(--vscode-descriptionForeground);
@@ -1344,8 +1348,7 @@ html.select-all-guard * {
    (line-height 明示で文字種による差も殺す)。表示切替は laneLog.js/deviceTiles.js。 */
 .badge-running,
 .badge-queued,
-.badge-recording,
-.badge-frozen {
+.badge-recording {
   display: none;
   flex: 0 0 auto;
   font-size: 9px;
@@ -1353,16 +1356,26 @@ html.select-all-guard * {
   padding: 1px 6px;
   margin-right: 4px;
 }
-/* 凍結だけは**絵文字を裸で置く**(ピルの背景・角丸・パディングを持たない)。
-   他のバッジは文字なので下地が要るが、❄️ は絵文字自体が図形なので下地を敷くと二重になる。
-   .badge / 上のまとめ指定が付ける装飾をここで打ち消す(font-size は判別できる大きさへ) */
+/* 凍結は絵の真ん中に置く(ユーザー指定)。**絵文字を裸で置く**(.badge の下地を打ち消す = ❄️ は絵文字自体が図形)。
+   凍結中も最後のフレームが残るので、絵だけでは気付けない */
 .badge-frozen {
-  font-size: 13px;
-  line-height: 14px;
+  display: none;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 2;
+  font-size: 30px;
+  line-height: 1;
   padding: 0;
+  margin: 0;
   background: none;
   border-radius: 0;
   color: inherit;
+  filter: drop-shadow(0 0 4px rgba(0, 0, 0, 0.8));
+}
+.lane-preview-frame .badge-frozen {
+  font-size: 64px;
 }
 .badge-running {
   background-color: var(--vscode-charts-blue, #0078d4);
@@ -1733,6 +1746,7 @@ body.vscode-dark .run-lamp {
 /* 枠は外側(.lane-preview)が持つ。ここにも枠を置くと縁で二重線になるので、絵の領域は
    背景色だけで示す。 */
 .lane-preview-frame {
+  position: relative;
   flex: 1 1 auto;
   min-height: 0;
   display: flex;

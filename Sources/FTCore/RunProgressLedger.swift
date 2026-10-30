@@ -98,6 +98,11 @@ public struct RunProgressRecord: Codable, Equatable, Sendable {
     /// 全シナリオの後の動画の切り出しの進み(`VideoRecordingCoordinator.finish`)。切り出しの間だけ非 nil で、
     /// その間 etaSeconds は nil(読み手は残りの代わりにこれを出す)。phase は "running" のまま
     public let videoClips: RunProgressVideoClips?
+    /// **この run の中で**凍結で離脱した・白紙を検出した・文字消えを検出したデバイスの数(同じデバイスで何度起きても1。
+    /// 同じデバイスに複数の状態が起きたらそれぞれ数える)。事実の並置だけで、判定・警告は作らない
+    public let frozenDevices: Int
+    public let blankDevices: Int
+    public let textlessDevices: Int
     /// run を回しているプロセスの環境変数 `FT_STREAM_OWNER` の値**だけ**(`StreamOwner.current` の `FT_PARENT_PID` への
     /// fallback は使わない)。拡張から起こした run を見分ける印で、CLI の run は nil。リモートの run も `RemoteShell` が運ぶので同じ値を持つ
     public let owner: String?
@@ -106,6 +111,7 @@ public struct RunProgressRecord: Codable, Equatable, Sendable {
                profile: String?, startedAt: String, total: Int, done: Int, failed: Int, actions: Int,
                requeued: Int, laneDropouts: Int, etaSeconds: Int?, lanes: [RunProgressLane],
                phase: String, supply: [RunProgressSupply], videoClips: RunProgressVideoClips?,
+               frozenDevices: Int = 0, blankDevices: Int = 0, textlessDevices: Int = 0,
                owner: String?) {
         self.pid = pid
         self.runID = runID
@@ -125,6 +131,9 @@ public struct RunProgressRecord: Codable, Equatable, Sendable {
         self.phase = phase
         self.supply = supply
         self.videoClips = videoClips
+        self.frozenDevices = frozenDevices
+        self.blankDevices = blankDevices
+        self.textlessDevices = textlessDevices
         self.owner = owner
     }
 

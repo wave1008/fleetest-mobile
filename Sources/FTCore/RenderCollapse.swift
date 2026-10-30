@@ -27,6 +27,15 @@ public enum RenderCollapse {
         case noTextDrawn(textElements: Int)
     }
 
+    /// 公表する状態への写し(モニターの ○ / 🫥)。全画面の一色は凍結の担当なので公表しない(nil)
+    public static func screenState(of finding: Finding) -> DeviceScreenState? {
+        switch finding {
+        case .blankAppArea: return .blank
+        case .noTextDrawn: return .textless
+        case .wholeScreenBlank: return nil
+        }
+    }
+
     /// 文字だけを描く型(入力欄・ボタンは枠や背景の構造が残るので数えない)。小文字で比べる
     static let textTypes: Set<String> = ["statictext", "text", "label"]
 

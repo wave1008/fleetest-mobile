@@ -1730,6 +1730,7 @@ public final class RunOrchestrator: Sendable {
             await progressState?.scenarioFinished(laneKey: progressLaneKey, passed: false)
             failed += 1
         }
+        if cause == .frozen { await progressState?.deviceStateObserved(deviceKey: progressLaneKey, state: .frozen) }
         await reportWorkerFailed(worker, "dropped out because of \(reason)", cause: cause)
         // このレーンはもう走らない(復帰できれば superviseWorker が新しい runWorker で laneJoined を呼び直す)
         await progressState?.laneLeft(key: progressLaneKey)
@@ -1854,6 +1855,15 @@ public final class RunOrchestrator: Sendable {
                     }
                     if case .step(_, _, let result) = event, let ms = result.timing?.snapshotMs {
                         slowestStep.note(ms)
+                    }
+                    if case .step(_, _, let result) = event {
+                        let states = Set((result.notes ?? []).compactMap(RunDeviceState.init(note:)))
+                        if !states.isEmpty {
+                            let laneKey = progressLaneKey
+                            Task {
+                                for state in states { await self.progressState?.deviceStateObserved(deviceKey: laneKey, state: state) }
+                            }
+                        }
                     }
                     if case .flowStarted(let worker, let flowURL, _, _) = event {
                         continuation.yield(.flowStartedAt(worker: worker, flowURL: flowURL, at: Date()))
