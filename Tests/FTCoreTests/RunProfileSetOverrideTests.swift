@@ -89,8 +89,9 @@ final class RunProfileSetOverrideParseTests: XCTestCase {
 
     /// string 欄は何を渡しても成功する(パース失敗が起きようがない)
     func testStringKeyNeverFailsToParse() throws {
-        let overrides = try RunProfileSetOverride.parse(["reportDir="])
-        XCTAssertEqual(overrides, ["reportDir": .string("")])
+        // 空の reportDir は値域で断る(ReportDirAndFailedMessageTests)ので、型の解析は空でない値で見る
+        let overrides = try RunProfileSetOverride.parse(["reportDir=out/reports"])
+        XCTAssertEqual(overrides, ["reportDir": .string("out/reports")])
     }
 
     /// **未知キーは即エラーにし、有効なキーの一覧をメッセージに出す**(黙って無視しない)

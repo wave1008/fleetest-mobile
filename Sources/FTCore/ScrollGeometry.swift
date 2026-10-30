@@ -170,6 +170,17 @@ public enum ScrollGeometry {
         return (limit - 1, true)
     }
 
+    /// 座標ドラッグの始点が左右の戻るジェスチャの帯(画面の物理端から `left` / `right` px)の中なら、帯の内側の 1px へ寄せる。
+    /// 帯の幅が 0 なら何もしない。終点は寄せない(`clearingBottomGestureBand` と同じ規約)。DSL の swipePointToPoint と
+    /// MCP の ft_drag が共有する(帯の中から始めた払いは OS の「戻る」に取られる。E2EX-CMP のドロワーを x=3 から引く払いで再現)
+    public static func clearingSideGestureBand(x: Double, viewport: FTRect, left: Double,
+                                               right: Double) -> (x: Double, moved: Bool) {
+        if left > 0, x < viewport.x + left { return (viewport.x + left + 1, true) }
+        let rightLimit = viewport.x + viewport.width - right
+        if right > 0, x >= rightLimit { return (rightLimit - 1, true) }
+        return (x, false)
+    }
+
     /// 要素の枠が、指の向きで中身が**出てくる側の縁**(指が左なら右端)に付いているか(1pt/px 未満の差は付いている)。
     /// 枠を見えている部分へ切り詰めて報告するフレームワーク(Android の Flutter)では、縁から少しだけ出た要素がこの形になり、
     /// 見切れ(`TapTargetGeometry.isClippedByViewport`)と分からない。容器以上の大きさの要素は縁に付くのが当然なので false
@@ -283,6 +294,26 @@ public enum ScrollGeometry {
         let bottom = min(a.y + a.height, b.y + b.height)
         guard right > left, bottom > top else { return nil }
         return FTRect(x: left, y: top, width: right - left, height: bottom - top)
+    }
+
+    /// 送りの前後で**スクロールしている中身が実際にずれたか**(逆走査の門。署名の差だけでは足りない)。
+    /// 署名にはラベル・値が入るので、位置表示の文字や端のバウンスの数 pt でも「動いた」になり、端から動かなかった探索が
+    /// 逆走査(遅いドラッグ最大 8 本)へ入っていた。id を持つ要素があれば: id の集合が変わった(行の出入り)か、
+    /// 共通の id が軸の向きに `SettleMotion.restThresholdPt` を超えて動いたときだけ true。id が1つも無い木は署名の差で言う
+    static func contentShifted(before: [ElementInfo], after: [ElementInfo], vertical: Bool) -> Bool {
+        let old = Dictionary(before.compactMap { e in e.identifier.flatMap { $0.isEmpty ? nil : ($0, e) } },
+                             uniquingKeysWith: { first, _ in first })
+        let new = Dictionary(after.compactMap { e in e.identifier.flatMap { $0.isEmpty ? nil : ($0, e) } },
+                             uniquingKeysWith: { first, _ in first })
+        if old.isEmpty && new.isEmpty {
+            return StepExecutor.contentSignature(before) != StepExecutor.contentSignature(after)
+        }
+        if Set(old.keys) != Set(new.keys) { return true }
+        return new.contains { id, element in
+            guard let previous = old[id] else { return false }
+            let delta = vertical ? element.frame.y - previous.frame.y : element.frame.x - previous.frame.x
+            return abs(delta) > SettleMotion.restThresholdPt
+        }
     }
 
     static func clampMargin(_ ratio: Double) -> Double {

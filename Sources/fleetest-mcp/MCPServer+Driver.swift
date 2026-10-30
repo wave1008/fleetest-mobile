@@ -380,7 +380,9 @@ extension MCPServer {
                 + " your fleetest-mcp binary is stale, so rebuild it"
                 + " (swift build --product fleetest-mcp) or pull"
             : "the bridge is OLDER than this build (v\(skew.running) < v\(skew.expected)) —"
-                + " restart it with `fleetest bridge down --all && fleetest bridge up`"
+                + " restart only this device's bridge (`fleetest bridge down --port <its port>`, then `fleetest bridge up`;"
+                + " `--all` also stops the bridges other sessions and the monitor are using, and a bridge"
+                + " started from another clone is not stopped by this repository's CLI)"
         return "bridge protocol mismatch: \(side)."
             + " Refusing to operate: a stale bridge answers with the behaviour and the notes of"
             + " its own version, and selectors written from those notes are silently wrong."
@@ -1918,6 +1920,11 @@ extension MCPServer {
                 + " way to attach there — but ft_launch \(launched) first if you meant to keep"
                 + " testing the app.\n"
         }
+        if isLockScreenOrAlwaysOnTree(snapshot) {
+            return "⚠️ This tree is the lock screen / always-on display (\(session)), not \(launched):"
+                + " the device screen went dark or is locked, so it is not a dialog to operate. The"
+                + " next tool call wakes the screen — read the screen again before acting.\n"
+        }
         if systemDialogPackages.contains(session) {
             return "⚠️ \(session) is a system dialog drawn over \(launched)"
                 + " (e.g. a permission prompt), not the app itself. Operate the dialog"
@@ -1946,6 +1953,22 @@ extension MCPServer {
             + " Leaving the app (back from its first screen, home, an app switch) hands the"
             + " tools to whatever is in front now — and sibling test apps can look identical."
             + " ft_launch \(launched) before trusting these refs\n"
+    }
+
+    /// 消灯中の常時表示(AOD)・ロック画面の木か。`com.android.systemui` は通知シェードも同じ ID で名乗るので、
+    /// **キーガード/時計の要素 ID が木にあるとき**だけ言う(`keyguard_*` / `animatable_clock_view` /
+    /// `lockscreen*`)。無ければ従来どおり「システムダイアログ」
+    static func isLockScreenOrAlwaysOnTree(_ snapshot: SnapshotResponse) -> Bool {
+        guard snapshot.sessionBundleID == "com.android.systemui" else { return false }
+        let ids = snapshot.elements.map { ($0.identifier ?? "").lowercased() }
+        // 横向きの通知シェード(split shade)は keyguard_message_area_container を持つ。クイック設定のパネルがあれば
+        // 点灯中のシェードで、ロック画面ではない(ロック画面にクイック設定は無い)
+        if ids.contains(where: { $0.contains("expanded_qs") || $0.contains("quick_settings") || $0.contains("qs_panel") }) {
+            return false
+        }
+        return ids.contains { id in
+            id.contains("keyguard") || id.contains("animatable_clock_view") || id.contains("lockscreen")
+        }
     }
 
     /// `switchedAppNote` の `processEvidence` 引数を埋める(Android のみ・adb 2〜3往復)。

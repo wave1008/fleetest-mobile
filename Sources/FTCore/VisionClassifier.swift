@@ -476,6 +476,19 @@ public enum VisionClassifier {
         return crop(image: image, frame: frame, screen: screen)
     }
 
+    /// `crop` が nil のときの理由の文言(呼び手が throw する)。向きの食い違い(横向きの画面に縦のままの絵)は
+    /// 「画面の外か」と誤って帰属しない。向きを推して回さない(左右どちらへ回ったかを絵から言えず、誤った枠を切る)
+    public static func cropFailureReason(png: Data, screen: FTRect) -> String {
+        if let source = CGImageSourceCreateWithData(png as CFData, nil),
+           let image = CGImageSourceCreateImageAtIndex(source, 0, nil),
+           !OcclusionCrop.orientationMatches(imageWidth: image.width, imageHeight: image.height, screen: screen) {
+            return "could not crop: the screenshot is \(image.width)x\(image.height) px but the screen is"
+                + " \(Int(screen.width))x\(Int(screen.height)) (the picture is not in the screen's orientation),"
+                + " so nothing was cut. This is not about the element being outside the screen"
+        }
+        return "could not crop the element from the screenshot (is it inside the screen?)"
+    }
+
     /// 復号済みのスクリーンショットから切る(同じ画面から何枚も切る findImage は復号を1回にする)
     public static func crop(image: CGImage, frame: FTRect, screen: FTRect) -> CGImage? {
         guard screen.width > 0,

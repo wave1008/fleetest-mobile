@@ -137,7 +137,7 @@ struct MCPResultsRequest: Sendable, Equatable {
             // ソース走査だけ(ビルドしない)。走査できなければ空集合 = 供給なし扱い
             let defined = Set(ScenarioFolders.classFileMap(scenariosDir: project.scenariosDir).keys)
             return ResultsRendering.insights(
-                RunResultsQuery.insights(records: records, runs: runs, definedClasses: defined))
+                RunResultsQuery.insights(records: records, runs: runs, definedClasses: defined), runCount: runs.count)
         default:
             throw MCPError("query must be one of: \(Self.queries.joined(separator: ", ")) (got \(query))")
         }

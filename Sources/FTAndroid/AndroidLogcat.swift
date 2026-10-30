@@ -40,12 +40,16 @@ public enum AndroidLogcat {
             throw NotConnected(reason: reason)
         }
 
-        let pid = packageName.flatMap { resolvePID(adbPath: adbPath, serial: serial, packageName: $0) }
+        // **crash バッファは現在の pid で絞らない**: 落ちたアプリを起動し直すと pid が変わり、`--pid` は前のプロセスの
+        // クラッシュ行を全部捨てる(窓の中にあるのに「無い」と読める)。crash バッファは `crashScoped` が
+        // 「パッケージ名を名乗る行のプロセス」の行だけを残す
+        let hasPackage = !(packageName ?? "").isEmpty
+        let scopesCrashBuffer = crashOnly && hasPackage
+        // all: true も crash バッファの前のプロセスの行を落とさない(main は現在の pid・crash は crashScoped で別々に読んで束ねる)
+        let readsCrashSeparately = !crashOnly && hasPackage
+        let pid = scopesCrashBuffer ? nil : packageName.flatMap { resolvePID(adbPath: adbPath, serial: serial, packageName: $0) }
 
-        var args = [adbPath]
-        if let serial { args += ["-s", serial] }
-        args += ["logcat", "-d"]
-        args += crashOnly ? ["-b", "crash"] : ["-b", "main", "-b", "crash"]
+        var timeArgs: [String] = []
         var cutoffNote: String?
         if sinceSeconds > 0 {
             // `-t` は**端末のローカル時刻**で解釈される。ホストの時間帯で組むと、端末と時間帯が
@@ -56,27 +60,63 @@ public enum AndroidLogcat {
                     + " \(sinceSeconds)s window was computed in the host time zone"
                     + " (\(TimeZone.current.identifier)) — it may be off by the zone difference"
             }
-            args += ["-t", logcatTimeArgument(
+            timeArgs = ["-t", logcatTimeArgument(
                 secondsAgo: sinceSeconds, now: Date(),
                 deviceUTCOffsetSeconds: offset ?? TimeZone.current.secondsFromGMT())]
         }
-        if let pid {
-            args += ["--pid", pid]
-        }
 
         // 数秒でも固まると ft_logs の「ブリッジ抜きで診断する」目的そのものが崩れるため timeout を必ず付ける
-        let result = try Shell.run(args, timeout: 10)
-        guard result.status == 0 else {
-            throw DriverError.badResponse(status: Int(result.status),
-                body: "adb logcat failed (is exactly one device connected, or was -s given?): \(result.tail)")
+        func dump(buffers: [String], pid: String?) throws -> String {
+            var args = [adbPath]
+            if let serial { args += ["-s", serial] }
+            args += ["logcat", "-d"]
+            for buffer in buffers { args += ["-b", buffer] }
+            args += timeArgs
+            if let pid { args += ["--pid", pid] }
+            let result = try Shell.run(args, timeout: 10)
+            guard result.status == 0 else {
+                throw DriverError.badResponse(status: Int(result.status),
+                    body: "adb logcat failed (is exactly one device connected, or was -s given?): \(result.tail)")
+            }
+            return result.output
         }
+
         // pid が引けていれば --pid が既に絞っている。引けなかったときのテキスト一致は
         // main バッファでだけ使う(crash バッファでやるとスタックトレースを捨てる。上のコメント参照)
         let textFilterPackage = (pid == nil && !crashOnly) ? packageName : nil
+        if readsCrashSeparately, let packageName {
+            let mainLines = filter(rawOutput: try dump(buffers: ["main"], pid: pid), packageName: textFilterPackage, maxLines: 0)
+            let crashLines = filter(rawOutput: crashScoped(rawOutput: try dump(buffers: ["crash"], pid: nil),
+                                                           packageName: packageName), packageName: nil, maxLines: 0)
+            let merged = mergedByTimestamp(mainLines, crashLines)
+            return Output(lines: maxLines > 0 && merged.count > maxLines ? Array(merged.suffix(maxLines)) : merged,
+                          scopedToPackage: true, cutoffNote: cutoffNote)
+        }
+        var raw = try dump(buffers: crashOnly ? ["crash"] : ["main", "crash"], pid: pid)
+        if scopesCrashBuffer, let packageName { raw = crashScoped(rawOutput: raw, packageName: packageName) }
         return Output(
-            lines: filter(rawOutput: result.output, packageName: textFilterPackage, maxLines: maxLines),
-            scopedToPackage: packageName == nil || pid != nil || textFilterPackage != nil,
+            lines: filter(rawOutput: raw, packageName: textFilterPackage, maxLines: maxLines),
+            scopedToPackage: packageName == nil || pid != nil || textFilterPackage != nil || scopesCrashBuffer,
             cutoffNote: cutoffNote)
+    }
+
+    /// 2本の logcat 行(各々は時刻順)を行頭の時刻(`MM-dd HH:mm:ss.SSS`、threadtime 書式の先頭 18 文字)で束ねる。
+    /// 時刻の読めない行(`--------- beginning of` 等)は前の行の後ろに付く。同時刻は a → b の順(安定)
+    static func mergedByTimestamp(_ a: [String], _ b: [String]) -> [String] {
+        func stamp(_ line: String) -> String? {
+            let head = line.prefix(18)
+            guard head.count == 18, head.dropFirst(2).first == "-", head.dropFirst(5).first == " " else { return nil }
+            return String(head)
+        }
+        var out: [String] = []
+        var i = 0, j = 0
+        while i < a.count || j < b.count {
+            if j >= b.count { out.append(a[i]); i += 1; continue }
+            if i >= a.count { out.append(b[j]); j += 1; continue }
+            let ta = stamp(a[i]), tb = stamp(b[j])
+            if let ta, let tb, tb < ta { out.append(b[j]); j += 1 } else { out.append(a[i]); i += 1 }
+        }
+        return out
     }
 
     public struct NotConnected: LocalizedError, Equatable {
@@ -113,6 +153,33 @@ public enum AndroidLogcat {
               hours <= 23, minutes <= 59 else { return nil }
         let magnitude = hours * 3600 + minutes * 60
         return sign == "-" ? -magnitude : magnitude
+    }
+
+    /// crash バッファの生テキストから、パッケージ名を名乗る行(`Process: <pkg>, PID: n` / `>>> <pkg> <<<`)を出した
+    /// プロセスの行だけを残す。**logcat の行頭(threadtime 書式)の pid 列で照らす** —— スタックトレースの行は
+    /// パッケージ名を含まないので、名前の一致だけで絞ると原因そのものを捨てる。pid 列を読めない行は残さない。
+    /// パッケージ名の一致は前後が識別子文字でないものに限る(`com.x` が `com.x.flutter` を拾わない)
+    static func crashScoped(rawOutput: String, packageName: String) -> String {
+        let lines = rawOutput.split(separator: "\n", omittingEmptySubsequences: true)
+        func pidColumn(_ line: Substring) -> Substring? {
+            let columns = line.split(separator: " ", maxSplits: 3, omittingEmptySubsequences: true)
+            guard columns.count >= 3, columns[2].allSatisfy(\.isNumber) else { return nil }
+            return columns[2]
+        }
+        func names(_ line: Substring) -> Bool {
+            var rest = line[...]
+            while let range = rest.range(of: packageName) {
+                let before = range.lowerBound > line.startIndex ? line[line.index(before: range.lowerBound)] : " "
+                let after = range.upperBound < line.endIndex ? line[range.upperBound] : " "
+                func isIdentifier(_ c: Character) -> Bool { c.isLetter || c.isNumber || c == "_" || c == "." }
+                if !isIdentifier(before) && !isIdentifier(after) { return true }
+                rest = line[range.upperBound...]
+            }
+            return false
+        }
+        let pids = Set(lines.compactMap { names($0) ? pidColumn($0).map(String.init) : nil })
+        return lines.filter { line in pidColumn(line).map { pids.contains(String($0)) } ?? false }
+            .joined(separator: "\n")
     }
 
     /// 生の logcat テキストを行へ分解し、package で絞り(部分一致)、末尾 maxLines へ切り詰める。

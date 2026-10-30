@@ -386,16 +386,6 @@
 - 場所: CLI は呼び出しをまたぐ木の控えを持たない(1回ごとに別プロセス)= 撃つ前に ref が同じ要素かを確かめる材料が無い
 - 手がかり: ブリッジの期待値の照合(`RefExpectation`)を CLI からも渡せるよう、直前の snapshot の要素を控えに残すか
 
-### OI-44 ft_draft_scenario で下書きを作るデバイスを選べない(いつも最後に操作したデバイス)
-- 状態: 経路確定
-- 確認: 7ac53b33(2026-10-29)
-- 経緯: 発見: 10-29 の /code-review(8回目)
-
-- 症状: Simulator A を操作し、続いて Android の B を操作してから `platform: "ios", udid: A` で ft_draft_scenario を呼ぶと、B の手と
-  「A の手は外した」の注記が返る。A の下書きは A をもう一度操作しないと作れない
-- 場所: 下書きの台は `InteractionLog.latestDevice` だけで決め、呼び出しの udid / serial / profile を見ない(MCPServer+Draft.swift)
-- 手がかり: 宛先の引数が渡されたらその台の鍵(`MCPServer.sessionKey`)で `scope(all:device:)` を引く。渡されなければ今どおり最後の台
-
 ### OI-45 Compose の iOS で Return でキーボードを閉じると画面の下端が切れたまま残り、XCUITest のタップが黙って空振りする
 - 状態: 再現済み
 - 確認: コミット未記録(2026-10-29)
@@ -411,6 +401,254 @@
 - 手がかり: 失敗の文面には空振りした tap が出る(操作の対象が解決できない失敗にも「画面を変えなかった前の tap」を添えた =
   `StepExecutor.unresolvedActionTapHint`)。残るのは空振りそのもの —— 切れの高さを XCUITest 側で得る手段(Compose のホストビューの枠)は
   見つかっていない。数字パッドだけを警告する案は前提(数字パッドでだけ起きる)が否定されたので取り消した
+
+## 探索的テスト(2026-10-30)で見つかり、まだ直していないもの
+
+### OI-46 アプリ自身のタップで出たシステムの権限アラートが前面でも、MCP の ft_snapshot が背面の木を注記なしで返す
+- 状態: 再現済み
+- 確認: コミット未記録(2026-10-30)
+- 経緯: 発見: 10-30 の探索的テスト
+
+- 照会(`/systemalert`)は launch 系ツールの直後の1回だけ(`systemAlertProbePending`)
+- 操作のたびに照会する直しは、iOS の MCP の毎手に照会の往復(約 0.6 秒)を足すので取り消した
+- 手がかり: 照会を足さずに、撃った手の後の木が「操作の前とほぼ同じで、前面のアプリの窓が触れない」形のときだけ照会する
+
+### OI-47 容器の端で半分切れた行への MCP の ft_tap(ref)は中心を撃って空振りし、同じ手の DSL は見えている部分へ寄せて当たる
+- 状態: 再現済み
+- 確認: コミット未記録(2026-10-30)
+- 経緯: 発見: 10-30 の探索的テスト
+
+- MCP は ref を撃つだけ(警告は出る)、DSL は `StepExecutor` が寄せる。下書きは空振りした手を tap の行として残し、回すと別の画面へ進む
+- 決めること: MCP の ref タップにも寄せを合成するか(寄せると ref が変わる)
+
+### OI-48 iOS の CMP のボトムシートで、一覧の切り抜きの外に残った行への tap がドラッグハンドルを押してシートを閉じ ok
+- 状態: 再現済み
+- 確認: コミット未記録(2026-10-30)
+- 経緯: 発見: 10-30 の探索的テスト
+
+- XCUITest の木に一覧の容器(`#list_sheet`)が出ないので「容器の外」の判定の材料が無く、ハンドルは木の順で行より前 = 覆いとしても検出されない。OI-41 と同系
+- 手がかり: ラベルの空いた行だけが材料で、誤検知 0 をコーパス(`SweepHarnessTests`)で確かめずには入れない
+
+### OI-49 Android の CMP の固定トップバーに ⚠️scroll-leftover が付く・Flutter の反転チャットの浮きボタンを「行に覆われた」と警告する
+- 状態: 推測
+- 確認: コミット未記録(2026-10-30)
+- 経緯: 発見: 10-30 の探索的テスト
+
+- どちらも警告だけ(押せば効く)。原因の確定に生の木(depth・z・scrollable)が要る
+- 固定バーの型は sut-ec-mobile(CMP)の Android でも広く出る(10-30 の負荷テスト: #btn_back・#btn_add_to_cart・#btn_open_cart 等のほぼ全部のタップに「reported entirely outside scrollView … leftover from scrolling」)。**警告だけでなく、DSL はタップのたびに容器へ送りを1本撃って確かめる**(`1 extra swipe(s)`)= 余分な操作と時間
+- 浮きボタンの仮説: Android ブリッジの `SnapshotBuilder.assignPaintOrder` は zPath の共通部分が等しいとき浅い方を奥にする。Flutter の仮想ノードの描画順が全部同じだと、深いリストの行が浅い浮きボタンより手前に並ぶ(未確認)
+- 手がかり: その画面の `/snapshot` の JSON を `Tests/Fixtures/RealAppSnapshots/` に固定し、`ContainerGeometry.isOutsideContainer` / `PaintOrder` に当てて確定する
+
+### OI-50 CMP で効いた tap の後に tap が続く ft_batch が「画面が変わらなかった = 飲まれたかも」と警告する
+- 状態: 再現済み
+- 確認: コミット未記録(2026-10-30)
+- 経緯: 発見: 10-30 の探索的テスト
+
+- 比較は `executor.lastTapTreeBefore` どうし。次の tap が前の tap の効果の出る前の木で解決している疑い(DSL の `unchangedEarlierTaps` にも同じ型で効きうる。その場合は警告より実害が大きい)
+
+### OI-51 横向きで全画面の IME(抽出ビュー)が出ていると Android の木が空になり「画面遷移の途中」と言う
+- 状態: 再現済み
+- 確認: コミット未記録(2026-10-30)
+- 経緯: 発見: 10-30 の探索的テスト
+
+- 全画面 IME の下ではアプリの窓が窓一覧に出ない = 木は本当に空
+- 手がかり: 木が空でキーボードが画面の大半を覆うときに「全画面のキーボードがアプリを隠している。ft_hide_keyboard で閉じる」と言う(注記は MCPServer+Hints.swift)
+
+### OI-52 待ちの途中で端末が消灯すると(常時表示)、MCP は画面を起こさずに常時表示の木を読み続ける
+- 状態: 再現済み
+- 確認: コミット未記録(2026-10-30)
+- 経緯: 発見: 10-30 の探索的テスト
+
+- 起こすのは呼び出しの開始時だけ(`wakeIfAsleep`)。常時表示・ロック画面の木を「system dialog」と言う誤りは直した(`isLockScreenOrAlwaysOnTree`)
+- 残り: waitFor / snapshotAfter の読み直しの間に消灯した分を起こす
+
+### OI-53 Android で前面に居座ったアプリを止めて起動し直した ft_launch が、止めたことを言わない
+- 状態: 経路確定
+- 確認: コミット未記録(2026-10-30)
+- 経緯: 発見: 10-30 の探索的テスト
+
+- Android ブリッジの `/launch` は v116 から `stoppedForeground` を返す。ホスト(AndroidDriver.launch・ft_launch)はまだ読まない
+- 手がかり: 応答を読み、`Launched: X (force-stopped <pkg> that stayed in front)` と添える
+
+### OI-54 ft_batch で FAILED になった手が、下書きに印なしの普通の行として入る
+- 状態: 再現済み
+- 確認: コミット未記録(2026-10-30)
+- 経緯: 発見: 10-30 の探索的テスト
+
+- `InteractionLog` が成否を持たない(失敗した手も追跡のために記録する設計)
+- 決めること: Entry に失敗の印を足して下書きで TODO にするか、失敗した手を記録しないか
+
+### OI-55 MCP の ft_services は読むだけの status でも `swift run fleetest` = swift build を起こす
+- 状態: 経路確定
+- 確認: コミット未記録(2026-10-30)
+- 経緯: 発見: 10-30 の探索的テスト
+
+- 隣の fleetest が古いことがあるので `swift run` を使う設計(MCPServer+Services.swift)。保守者の「E2E 中にビルドしない」と衝突する
+- 案: status だけ `--skip-build`(古いバイナリを読む副作用)/ ツール説明に書く
+
+### OI-56 `--set reportDir=<相対パス>` の基準が `--profile` の有無で変わる(無し = 作業ディレクトリ・有り = プロジェクトのルート)
+- 状態: 経路確定
+- 確認: コミット未記録(2026-10-30)
+- 経緯: 発見: 10-30 の探索的テスト
+
+- 両方の help に基準の違いを書いた(空の reportDir は断るようにした)。揃えるならどちらの基準にするかを決める
+
+### OI-57 MCP が宛先を検めて断った serial(`NOSUCHSERIAL`・前に空白の付いた serial)にも使用中の印(lease)を書く
+- 状態: 再現済み
+- 確認: コミット未記録(2026-10-30)
+- 経緯: 発見: 10-30 の探索的テスト
+
+- 印を書くのは宛先の検査より前(`markDeviceInUse`)。adb の一覧で確かめる直しは毎回の呼び出しに adb の往復を足し、run の使用中の警告まで消したので取り消した
+
+### OI-58 横向きで低い縦の一覧(Android・高さ 411px)では、全画面のスクロール探索の払いが一覧に当たらず「nothing moved at all」で失敗し、scrollFrame も勧めない
+- 状態: 再現済み
+- 確認: コミット未記録(2026-10-30)
+- 経緯: 発見: 10-30 の探索的テスト(Emulator・4 フレームワークとも 4/4)。失敗文の候補選びを申告の軸で見る直しは入れたが、確認(10-30)で未修正のまま
+
+- `scrollFrame: "#list_chat"` を付ければ動く。全画面の払いの始点・終点が一覧の外に落ちる疑い(払いは画面の高さの固定割合)
+- 手がかり: その画面の木を固定し、全画面の払いの座標と一覧の枠を突き合わせる。候補に上がらない理由(申告・縦横比)も同じ木で確かめる
+
+### OI-59 iOS のアラートの入力欄への ft_type(replace)を「アラートが前面で届かない。ボタンを押せ」と断る
+- 状態: 再現済み
+- 確認: コミット未記録(2026-10-30)
+- 経緯: 発見: 10-30 の探索的テスト(Simulator・E2EX の入力つきアラート)。RefGuard の文言の直し(的がアラートの枠の中なら断らない)は入れたが、確認(10-30)で残った
+
+- replace なしの古い ref は照合し直して打てる。replace の経路(消去の前の ref の検査)で、キーボードで動いた欄の枠がアラートの枠の外と読まれている疑い
+- 手がかり: 断る直前の木で、欄とアラートの枠を突き合わせる
+
+### OI-60 iOS の CMP で replace の消去の後に欄が木から消えると、キーボードを閉じて引き直す手が無い
+- 状態: 経路確定
+- 確認: コミット未記録(2026-10-30)
+- 経緯: 発見: 10-30 午後の探索的テスト(SE3 実機・E2E-CMP のパスワード欄 = se3 F8 の CMP の形)
+
+- 引き直し(StepExecutor の relocateAfterClear / MCP の ftType)は、見つからずキーボードが出ていれば hideKeyboardIfShown で閉じて1回だけ引き直す。XCUITest ブリッジは `/hidekeyboard` を 501 で断るので、iOS では何も送らずに「消した・打っていない」で失敗する
+- 手がかり: DSL の hideKeyboard と同じ「キーボードの上の空きを叩く」を引き直しにも使うか(Enter は送らない = 消した欄で確定させない)
+
+### OI-61 通知センター(カバーシート)がアプリを覆っている間、ft_snapshot / ft_status / snapshotAfter が「アプリが前面」と言う
+- 状態: 経路確定
+- 確認: コミット未記録(2026-10-30)
+- 経緯: 発見: 10-30 午後の探索的テスト(SE3 実機 = se3 F11)
+
+- `systemUICoveringWarning`(MCPServer+Snapshot.swift)は撃った後の警告にしか使われていない。撃つ前の読みでも `/systemui/covering` を引くか、verifiedRef の門で覆いを見る
+- ランナー側で /snapshot ごとに SpringBoard を引くと約 185ms 増える(G1 の見積もり)ので、引くのは MCP の読みだけにする案
+
+### OI-62 横向きの ft_screenshot で maxWidth が高さの上限として効き、fullSize の PNG の画素が縦のまま(向きは eXIf だけ)
+- 状態: 経路確定
+- 確認: コミット未記録(2026-10-30)
+- 経緯: 発見: 10-30 午後の探索的テスト(M1Max の Simulator = mxios F8)
+
+- `ImageDownscale.jpeg` が向きを当てる前の `kCGImagePropertyPixelWidth` で長辺を測る。EXIF の向きが 5〜8 なら幅と高さを入れ替える。fullSize は表示の向きへ回した画素で返す
+- 同じ根の ft_capture_element(mxios F9)は「絵が画面の向きでない」と事実を言うようにした(回転はしない)。`VisionClassifier.crop` を使う DSL の checkIsON / imageIs / findImage も横向きで同じく切れない疑い(推測)
+
+### OI-63 オーバーレイ窓の下にアプリ内アラートが出ると、アラートのボタン一覧にオーバーレイのボタンが混ざる
+- 状態: 経路確定
+- 確認: コミット未記録(2026-10-30)
+- 経緯: 発見: 10-30 午後の探索的テスト(SE3 実機 = se3 F14)
+
+- 原因は `AlertTreeScope`(inOverlayWindow の行をアラートの範囲から外していない)。容器の推定が窓をまたぐのも同根(ContainerGeometry)
+
+### OI-64 iOS の木に z も「固定領域の裏に回った」印も無く、固定のバーの裏に回った要素への tap が手前の要素を押して ok
+- 状態: 再現済み
+- 確認: コミット未記録(2026-10-30)
+- 経緯: 発見: 10-30 午後の探索的テスト(Simulator・E2EY の隠れるバー / RN の折りたたみヘッダ / CMP のカルーセル = sim8 F11・F12・sim9 F6)
+
+- `PaintOrder` は木の並びの代用なので、host の幾何だけでは決められない(G2 の調べ)。ブリッジが固定領域の枠を申告する設計判断が要る
+- 同型: ステータスバーの帯の「◀ 前のアプリ」に当たる(sim9 F12 = OI-1 の実例。SwiftUI ではキーボードの寄せで帯に入る)
+
+### OI-65 別ウィンドウのモーダルを開いた手の直後の木にモーダルの中身が無く「画面が変わらなかった」と言う
+- 状態: 再現済み
+- 確認: コミット未記録(2026-10-30)
+- 経緯: 発見: 10-30 午後の探索的テスト(SE3 実機 = se3 F18)
+
+- `captureSettled` の静止判定は要素の署名だけ。窓の数を署名に足す・整定後にもう1回だけ読む、のどちらかを実機で測ってから
+
+### OI-66 scrollTo に待つ口(waitSeconds)が無く、読み込み中の一覧で 1.8 秒で「端に居る・上を探せ」と失敗する
+- 状態: 据え置き
+- 確認: コミット未記録(2026-10-30)
+- 経緯: 発見: 10-30 午後の探索的テスト(Simulator・E2EY の読み込み中 = sim8 F9)
+
+- 午前に足した「waitSeconds の間は端と確定しない」は `step.timeout` を見るので scrollTo には効かない。待つ口を足すのは DSL の変更(利用者の決定と docs の更新が要る)
+
+### OI-67 CLI の残り: 書けない --report-dir がシナリオの失敗として出る・api run --debug の「解決後に1本」の検査が供給とビルドの後・メモ/値の行でブレークポイントが止まらない
+- 状態: 経路確定
+- 確認: コミット未記録(2026-10-30)
+- 経緯: 発見: 10-30 午後の探索的テスト(CLI = cli F6・F7・F8)
+
+- F6: `--junit` と同じ事前検査を `validateSingleTarget` に置く
+- F7: ApiRunCommand の検査をロック・供給・ビルドより前へ(ソース読みだけ・未再現)
+- F8: checkpoint が `FTDSL/FTRuntime.swift` の perform 系3箇所だけ。メモ・値の行にも置く
+
+### OI-68 同じ udid のブリッジの port が変わっただけで「2台を動かした」と数え、宛先を省いた呼び出しを断り続ける
+- 状態: 再現済み
+- 確認: コミット未記録(2026-10-30)
+- 経緯: 発見: 10-30 午後の探索的テスト(Simulator = sim8 F1)
+
+- `MCPServer+DeviceMemory.swift` の `rememberedDeviceRefusal` / `allSeenLabels` が port 単位で数える。同じ udid は1台として新しい port へ向け直す。版ガードで断られた呼び出しは「駆動した」に数えない
+- 同じく、版ガードで断った MCP が端末の使用中の印を握り `bridge down --port` を止める(mxios F1 の後半)
+
+### OI-69 下書きの残り: 付け替えて撃った手・失敗した ft_scroll_to が画面を動かした事実・アラートの欄のセレクタ
+- 状態: 経路確定
+- 確認: コミット未記録(2026-10-30)
+- 経緯: 発見: 10-30 午後の探索的テスト(Simulator = sim8 F6・F8・sim9 F3)
+
+- 無効な要素を叩いた手は TODO を残すようにした(sim8 F2)。付け替え(RefGuard の movedNote)は構造化された印が無く、下書きへ渡せていない
+- 失敗した ft_scroll_to は記録されない(ScenarioTools 側)
+- アラートの id の無い欄のセレクタが、一意の placeholder ではなくキーボードの部品を錨にする(`SelectorNaming` が `keyboardChromeIdentifiers` を錨にしない・`DraftNotes.selectorDurability` が相対セレクタを「index-based」と呼ぶ)
+
+### OI-70 iOS の WebView の欄でキーボードを出すと hideKeyboard が閉じられず、画面の Done(✓)を試しも案内もしない
+- 状態: 再現済み
+- 確認: コミット未記録(2026-10-30)
+- 経緯: 発見: 10-30 午後の探索的テスト(M1Max の Simulator = mxios F4)
+
+- DSL は Enter まで送ってから失敗する(フォームが送信される)。キーボードの上の入力補助バーはキーボードの枠に含まれず、その下の要素への tap は ok
+- 同じく軽いもの: Flutter で空の replace の後に「Scan Text」の編集メニューが残る(mxios F11)・自分のラベルに中心を覆われていると誤警告(mxios F5 の後半。`OcclusionGeometry.occluder`、SweepHarnessTests の件数に触れうる)
+
+### OI-71 ft_batch の途中の手でアプリが落ちても、続く手を撃ち続ける(前面の別アプリに効く)
+- 状態: 据え置き
+- 確認: コミット未記録(2026-10-30)
+- 経緯: 発見: 10-30 午後の探索的テスト(Emulator = emu F3)
+
+- 結論の文言は「途中の手で離れた可能性」と言うようにした。各手の後に前面を確かめて止めるかは設計判断(権限ダイアログ・意図した home / 別アプリへの遷移で正しい batch を止める危険)
+
+### OI-72 スクロール探索の逆走査の本数(最後に動いた1本の移動量から決める)と、弾切れでも逆走査する挙動の docs との食い違い
+- 状態: 推測
+- 確認: コミット未記録(2026-10-30)
+- 経緯: 発見: 10-30 午後の探索的テスト(Simulator・E2EY = sim8 F4・F7・F10・se3 F13・mxios F6)
+
+- 本数は「移動量 ÷ 容器の半分 + 1(1〜8)」で、デバイスでは未実測。逆走査に入る門は「中身が実際にずれた」(`ScrollGeometry.contentShifted`)にした
+- 弾切れでも1回逆走査する挙動は RN の横カルーセルの対策として残した。docs/commands.md は「端に着いて見つからなかったときだけ」と書くので、docs を直すか挙動を絞るかは判断が要る
+- 反転チャット(SwiftUI・Flutter)で動かないはずの探索が「動いた」と数えられた原因(位置表示の文字か・バウンスか)は未確認
+
+### OI-73 Android の Compose で、焦点を移した後の ref なしの type / clear が前の欄へ入り「#B に入った」と言う
+- 状態: 再現済み
+- 確認: コミット未記録(2026-10-30)
+- 経緯: 発見: 10-30 午後の探索的テスト(Pixel 4a・E2E-CMP / E2EX-CMP = pixel F13・emu F13 の典型形)
+
+- 「`findFocus(FOCUS_INPUT)` が前の欄の古いノードを返す」前提で、取り直して focused でなければ木から探す直しを入れたが、確認で効かなかった(4a で 2/2)ので取り消した。前提は否定も確認もされていない
+- emu F13 は `type "#field_first" "Taro\n"; type "Jiro"` の形は直った(改行入りの type の後に叩いた欄の控えを捨てる)。典型の `tap; type; pressEnter; type` は 2/2 で 1つ目の欄へ入り All passed
+- 手がかり: IME の「次へ」の後に、ブリッジが焦点として掴むノードの id と、画面の焦点(echo の focus=)を並べて記録する
+
+### OI-74 MCP の ft_tap(ref)の後の ft_type が、救済で別の欄へ打つ(Flutter)
+- 状態: 再現済み
+- 確認: コミット未記録(2026-10-30)
+- 経緯: 発見: 10-30 午後の探索的テスト(Emulator・E2EX-Flutter = emu F14 の MCP の形)
+
+- DSL の形は直った(`InputFocusRescue.currentFrame` で、撮り直した木の枠で突き合わせる)。MCP の ft_tap ref → ft_type は 2/2 で「名」へ入る。MCP 側の救済の材料(lastTapTargets は叩く前の木)が古い枠のまま
+
+### OI-75 Android の横向きで、座標の ft_drag / ft_long_press(x,y) と DSL の座標ジェスチャが縦の座標系で撃たれる
+- 状態: 再現済み
+- 確認: コミット未記録(2026-10-30)
+- 経緯: 発見: 10-30 午後の探索的テスト(Emulator・横向き = mxand F1)
+
+- gRPC のタッチ合成(`EmulatorControl.drag` / `longPress`)が表示の回転を反映しない。getScreenshot の `format.rotation` で戻す直しは、端末の中で回した向きがそこに反映されず(PORTRAIT のまま)効かなかったので取り消した(ジェスチャごとに画面取得が1回増えるだけ)
+- 手がかり: 回転は `dumpsys input` / `wm` の向き(ブリッジの申告)から引く。ref 起点の drag も同じく外れる。ブリッジ経由の ref long press・swipe・pinch・double tap は正しい
+
+### OI-76 CMP の横向きで焦点の欄がキーボードに押し出されて木から消えると、ref なしの ft_type / ft_clear_input が no-input-focus と TextInputLayout の帰属で断る
+- 状態: 再現済み
+- 確認: コミット未記録(2026-10-30)
+- 経緯: 発見: 10-30 午後の探索的テスト(Emulator・E2E-CMP 横向き = emu F1 の ref なしの形)
+
+- ref+replace はキーボードを閉じて引き直すようになった。ref なしの経路は従来の断りのまま。帰属の文(`AndroidDriver.typeNoFocusAdvice`)が直前の手を見ずに一律に TextInputLayout と言う(emu F7)
 
 ## 設計判断で据え置いているもの(直さないと決めた。症状が出たら見直す)
 

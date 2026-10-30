@@ -24,12 +24,12 @@ enum CrashLogs {
     /// `simulatorUDID`: 呼び手が udid を名指しした回だけ非 nil = そのシミュレータのレポートに絞る
     static func text(platform: String, bundleID: String?, serial: String?,
                      withinSeconds: Int, maxLines: Int, crashOnly: Bool,
-                     physicalUDID: String?, simulatorUDID: String?) async -> String {
+                     physicalUDID: String?, simulatorUDID: String?, launchedAt: Date? = nil) async -> String {
         switch platform {
         case "ios":
             return await iosTextWaitingForReport(bundleID: bundleID, withinSeconds: withinSeconds,
                                                  physicalUDID: physicalUDID,
-                                                 simulatorUDID: simulatorUDID)
+                                                 simulatorUDID: simulatorUDID, launchedAt: launchedAt)
         case "android":
             return androidText(serial: serial, bundleID: bundleID, withinSeconds: withinSeconds,
                                maxLines: maxLines, crashOnly: crashOnly)
@@ -54,7 +54,8 @@ enum CrashLogs {
         + " to show."
 
     static func iosTextWaitingForReport(bundleID: String?, withinSeconds: Int,
-                                        physicalUDID: String?, simulatorUDID: String?) async -> String {
+                                        physicalUDID: String?, simulatorUDID: String?,
+                                        launchedAt: Date? = nil) async -> String {
         // **実機は待つだけ無駄**(件3): DiagnosticReports には端末のクラッシュが絶対に来ないので、
         // reportPollAttempts × reportPollIntervalNanos ≒ 4.2 秒はシミュレータのときにしか
         // 意味を持たない
@@ -66,13 +67,37 @@ enum CrashLogs {
         }
         var waited = 0.0
         for _ in 0..<reportPollAttempts {
-            if SimulatorCrashReport.findRecent(bundleID: bundleID, udid: simulatorUDID,
-                                               within: TimeInterval(withinSeconds)) != nil { break }
+            if let found = SimulatorCrashReport.findRecent(bundleID: bundleID, udid: simulatorUDID,
+                                                           within: TimeInterval(withinSeconds)),
+               !isFromBeforeLaunch(path: found.path, launchedAt: launchedAt) { break }
             try? await Task.sleep(nanoseconds: reportPollIntervalNanos)
             waited += Double(reportPollIntervalNanos) / 1_000_000_000
         }
+        // **このセッションの起動より前のレポートは、今のプロセスのクラッシュではない**(新しいレポートは書き込みが遅れ、
+        // 待ち切る前に前の回のレポートを今回のものとして返していた)。待っても新しいレポートが出なかった回はそう言う
+        if let found = SimulatorCrashReport.findRecent(bundleID: bundleID, udid: simulatorUDID,
+                                                       within: TimeInterval(withinSeconds)),
+           isFromBeforeLaunch(path: found.path, launchedAt: launchedAt) {
+            return olderThanLaunchText(bundleID: bundleID, launchedAt: launchedAt, waited: waited) + "\n"
+                + iosText(bundleID: bundleID, withinSeconds: withinSeconds, udid: simulatorUDID)
+        }
         return iosText(bundleID: bundleID, withinSeconds: withinSeconds, udid: simulatorUDID,
                        waitedSeconds: waited)
+    }
+
+    /// レポートの更新時刻がこのセッションの起動より前か(読めない・起動時刻が無いは false = 従来どおり返す)
+    static func isFromBeforeLaunch(path: String, launchedAt: Date?) -> Bool {
+        guard let launchedAt, let modified = (try? FileManager.default.attributesOfItem(atPath: path))?[.modificationDate] as? Date
+        else { return false }
+        return modified < launchedAt
+    }
+
+    static func olderThanLaunchText(bundleID: String, launchedAt: Date?, waited: Double, now: Date = Date()) -> String {
+        let launched = launchedAt.map { " (launched \(Int(now.timeIntervalSince($0).rounded()))s ago)" } ?? ""
+        return "note: no crash report from this run of \(bundleID)\(launched) yet — the report below was written before"
+            + " this session launched it, so it is an earlier run's crash, not this one's. Waited"
+            + " \(String(format: "%.1f", waited))s. ReportCrash writes the report after the process dies and can take well"
+            + " over a few seconds on a busy Mac — if the app has just crashed, call ft_logs again."
     }
 
     /// 宛先が実機だと分かっているときの本文。取り出し方まで言う(黙ると「ではどうやって
@@ -82,8 +107,10 @@ enum CrashLogs {
         return "This destination is a physical device (\(udid))\(scope) — crash reports stay on"
             + " the device and never reach the Mac's DiagnosticReports, so this tool cannot read"
             + " them here. Pull them with Xcode's Window > Devices and Simulators (select the"
-            + " device, \"View Device Logs\"), or `xcrun devicectl device copy from --device"
-            + " \(udid) <container path> <destination>`. \(asymmetryNote)"
+            + " device, \"View Device Logs\"), or from the command line: list them with"
+            + " `xcrun devicectl device info files --device \(udid) --domain-type systemCrashLogs`, then copy one with"
+            + " `xcrun devicectl device copy from --device \(udid) --domain-type systemCrashLogs"
+            + " --source <name>.ips --destination <folder>` (they are not in the app's container). \(asymmetryNote)"
     }
 
     /// dir/now を差し替え可能にした internal 版(テストは実ホームディレクトリを汚さず
@@ -103,7 +130,8 @@ enum CrashLogs {
             // **実機のレポートはここには来ない**(端末に残り、Xcode で同期するまで Mac 側の
             // DiagnosticReports に現れない)。黙って「無い」と答えると実機で必ず誤答になる
             let waited = waitedSeconds > 0
-                ? " Waited \(String(format: "%.1f", waitedSeconds))s in case one was still being written."
+                ? " Waited \(String(format: "%.1f", waitedSeconds))s in case one was still being written (on a busy Mac it can take"
+                    + " longer — if the app has just crashed, call ft_logs again)."
                 : ""
             let scope = udid.map { " on \($0)" } ?? ""
             return "No crash report for \(bundleID)\(scope) in the last \(withinSeconds)s.\(waited)"
@@ -166,6 +194,11 @@ enum CrashLogs {
         }
         let shown = Array(all.suffix(cap))
         var header = androidLogHeader(shownCount: shown.count, allCount: all.count, crashOnly: crashOnly)
+        if bundleID == nil {
+            // 何も launch していない台では絞る相手が無い。黙ると他アプリのクラッシュを自分のものと読む
+            header += ". No bundleId was given and this session launched nothing on this device, so these lines are not"
+                + " scoped to any app — other apps' lines may appear below"
+        }
         if let bundleID, !output.scopedToPackage {
             // 絞れなかったことを黙ると、他アプリのクラッシュを対象アプリのものと読む
             header += ". \(bundleID) is not running, so these lines could not be scoped to it"

@@ -579,12 +579,12 @@ final class MCPToolCallTests: XCTestCase {
         XCTAssertEqual(driver.calls, ["type(ref:nil,text:hello)", "snapshot"])
     }
 
-    /// replace: true は type の前に clearInput(ft_clear_input と同じ呼び出し形)を挟み、
-    /// 最後に読み返し用の snapshot を1回だけ払う(clear の嘘 200 を検出するため)
+    /// replace: true は type の前に clearInput(ft_clear_input と同じ呼び出し形)を挟み、消去の後の木で欄を引き直して
+    /// (消去で ref が変わると撃つ前の ref は stale-ref で断られる)、最後に読み返し用の snapshot を1回だけ払う
     func testTypeReplaceClearsBeforeTyping() async throws {
         seedRefsTwoToFour()
         _ = try await server.call(tool: "ft_type", args: ["text": "あいう", "ref": 2, "replace": true])
-        XCTAssertEqual(driver.calls, verified(2) + ["clearInput(ref:2)", "type(ref:2,text:あいう)", "snapshot"])
+        XCTAssertEqual(driver.calls, verified(2) + ["clearInput(ref:2)", "snapshot", "type(ref:2,text:あいう)", "snapshot"])
     }
 
     /// replace: false(既定と同じ)は今までどおり追記のみで、clearInput は呼ばない

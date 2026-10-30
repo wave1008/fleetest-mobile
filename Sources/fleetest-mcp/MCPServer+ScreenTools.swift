@@ -111,9 +111,12 @@ extension MCPServer {
             } else {
                 try await d.tap(ref: nativeRef(target.ref, args: args))
             }
-            recordInteraction(action: "tap", resolvedRef: target.ref, args: args)
             // 次の ref なし ft_type の救済材料(verifiedRef が撮り直した木 = 叩く前の木から引く)
             let treeBeforeTap = lastSnapshots[Self.sessionKey(args)]?.elements
+            // 無効な要素を叩いた手は下書きで印なしの行にしない(シナリオの tap は有効になるまで待って押すので、探索で起きなかった遷移が起きる)
+            recordInteraction(action: "tap", resolvedRef: target.ref, args: args,
+                              noEffectWarning: treeBeforeTap?.first { $0.ref == target.ref }?.enabled == false
+                                  ? "the target was disabled" : nil)
             lastTapTargets[Self.sessionKey(args)] = treeBeforeTap?.first { $0.ref == target.ref }
             focusedBeforeLastTaps[Self.sessionKey(args)] = treeBeforeTap?.first { $0.focused == true }
             return text("tap [\(ref)] done.\(target.note)" + (bandPoint != nil ? Self.bottomBandTouchNote : "")
@@ -208,8 +211,30 @@ extension MCPServer {
         // 書き方で、スキーマも "Clear the field before typing" と約束している。下の入力分岐
         // (文字が非空のときだけ通る)の内側に置くと、空文字はそこへ一度も入らず黙って
         // 何もしない(スキーマの約束を破る)
+        // 消去の後に撮り直した木で引き直した native ref(消去でキーボードが引っ込むと欄が動き、撃つ前の ref は
+        // ブリッジに stale-ref で断られる。DSL の `relocateAfterClear` と同じ規律)
+        var relocatedNativeRef: Int?
         if wantsReplace {
             try await typeDriver.clearInput(ref: targetRef.map { nativeRef($0, args: args) })
+            if let priorElement, let content, !content.isEmpty {
+                // 生読み(adoptSnapshot を通さない = 世代・settle-lite の基準を壊さない)。返る ref は native
+                var afterClear = try? await typeDriver.snapshot(bypassingCache: typeDriver.supportsCacheBypass)
+                var refoundField = afterClear.flatMap { Self.relocateAfterClear(priorElement, in: $0.elements) }
+                if refoundField == nil, let shown = afterClear, KeyboardWait.isShown(shown),
+                   (try? await typeDriver.hideKeyboardIfShown()) == true {
+                    // キーボードが欄を押し下げて木から消す形(横向き・全画面 IME・CMP)。DSL と同じく閉じて一度だけ引き直す
+                    afterClear = try? await typeDriver.snapshot(bypassingCache: typeDriver.supportsCacheBypass)
+                    refoundField = afterClear.flatMap { Self.relocateAfterClear(priorElement, in: $0.elements) }
+                    if refoundField != nil {
+                        note += " (closed the keyboard — the field was not on the screen while it was up)"
+                    }
+                }
+                guard let refound = refoundField else {
+                    throw MCPError("the field was cleared for replace:, but it could not be found on the screen afterwards"
+                        + " (nothing was typed) — ft_snapshot, then ft_type the new text")
+                }
+                relocatedNativeRef = refound.ref
+            }
         }
         // **replace + snapshotAfter(Enter を伴わない形)は同じ木を2回読まない**:
         // この組み合わせでは検証が読みたい瞬間(clear/type 直後)と snapshotAfter が読みたい
@@ -274,10 +299,21 @@ extension MCPServer {
                 }
             }
             // targetRef はセッション ref。ブリッジへ渡す直前にだけ native へ戻す
-            let resolvedTypeRef = rescuedNativeRef ?? nativeTargetRef
+            let resolvedTypeRef = rescuedNativeRef ?? relocatedNativeRef ?? nativeTargetRef
             let keyboardBeforeType = lastSnapshots[Self.sessionKey(args)]
             do {
-                try await typeDriver.type(ref: resolvedTypeRef, text: content)
+                do {
+                    try await typeDriver.type(ref: resolvedTypeRef, text: content)
+                } catch DriverError.staleRef where relocatedNativeRef != nil && resolvedTypeRef == relocatedNativeRef {
+                    // 消去の後に引いた欄が撃つ瞬間にまた動いた(キーボードの出入りで y が往復するアラートの欄)。
+                    // stale-ref は「撃つ前に断った = 届いていない」と確定している断りなので、読み直して一度だけ撃ち直してよい
+                    guard let priorElement,
+                          let reread = try? await typeDriver.snapshot(bypassingCache: typeDriver.supportsCacheBypass),
+                          let again = Self.relocateAfterClear(priorElement, in: reread.elements) else {
+                        throw DriverError.staleRef(detail: "the field moved again after it was cleared")
+                    }
+                    try await typeDriver.type(ref: again.ref, text: content)
+                }
                 // XCUITest ランナーが打ち直した事実(OKResponse.note)を返答に載せる
                 note += Self.driverFallbackNote(typeDriver)
                 // 出現待ちは次の ref 操作の撮り直しで払う(verifiedRef。DSL の pendingTypeKeyboardCheck と同じ = 読みを足さない)
@@ -293,6 +329,11 @@ extension MCPServer {
                         + " app, which likely explains the missing focus. Handle it first with"
                         + " `ft_launch bundleId: com.apple.springboard`, tap its button by ref,"
                         + " then `ft_launch` your app again.")
+                }
+                if wantsReplace {
+                    // 失敗の文言は「何も送っていない」だが、replace の消去は済んでいる(欄は空)
+                    throw MCPError(error.localizedDescription
+                        + " — replace: the field had already been cleared before this failure")
                 }
                 throw error
             }
@@ -370,6 +411,23 @@ extension MCPServer {
         return text((content.map { "Typed: \"\($0)\" and pressed Enter" } ?? "Pressed Enter")
             + note + typedSelector + waitForWithoutSnapshotAfterNote(args)
             + (await snapshotAfterBody(args, outsideTheAppTree: false)))
+    }
+
+    /// 消去の後の木で、消した欄と同じ欄を引き直す(nil = 撃たない)。順は ①空でない identifier と型が同じ要素が1つ
+    /// ②型と枠が同じ要素が1つ ②' 型と空でない placeholder / ラベルが同じ要素が1つ ③焦点のある同じ型の要素が1つ(id の無い欄が消去で動いた形)。DSL は
+    /// `StepExecutor.relocateAfterClear`(ロケータ依存)。MCP は ref 指定なのでロケータを持たない
+    static func relocateAfterClear(_ element: ElementInfo, in elements: [ElementInfo]) -> ElementInfo? {
+        func only(_ matches: [ElementInfo]) -> ElementInfo? { matches.count == 1 ? matches[0] : nil }
+        if let id = element.identifier, !id.isEmpty {
+            return StepExecutor.relocateByIdentifier(element, id: id, in: elements)
+        }
+        if let same = only(elements.filter { $0.type == element.type && $0.frame == element.frame }) { return same }
+        // id が無く枠も動いた欄(キーボードで持ち上がるアラートの入力欄)は、空でない placeholder / ラベルが同じ1つ
+        if let hint = [element.placeholder, element.label].compactMap({ $0 }).first(where: { !$0.isEmpty }),
+           let same = only(elements.filter { $0.type == element.type && ($0.placeholder == hint || $0.label == hint) }) {
+            return same
+        }
+        return only(elements.filter { $0.type == element.type && $0.focused == true })
     }
 
     func ftClearInput(_ args: [String: Any]) async throws -> [[String: Any]] {
@@ -470,6 +528,15 @@ extension MCPServer {
                               "mimeType": "image/jpeg"]]
     }
 
+    /// **手前の部品に中心を覆われた要素は見本にしない**(切り抜きは覆いの絵になる。保存は永続で、分類器が以後ずっと誤る)。
+    /// 判定は DSL・タップの遮蔽と同じ OcclusionGeometry.overlayCovering。nil = 保存してよい
+    static func captureCoverRefusal(_ element: ElementInfo, in elements: [ElementInfo], screen: FTRect) -> String? {
+        guard let cover = OcclusionGeometry.overlayCovering(element, in: elements, screen: screen) else { return nil }
+        return "nothing was saved: \(RefGuard.describe(element)) is covered by \(RefGuard.describe(cover))"
+            + " drawn in front of it, so its crop would be a picture of that instead. Close or move what covers it,"
+            + " then capture again"
+    }
+
     func ftCaptureElement(_ args: [String: Any]) async throws -> [[String: Any]] {
         // 中核(ラベル検査・保存と重複時の巻き戻し・点検)は VisionSample を CLI と共有する
         let classifier = try Self.requiredStringArgument(args, "classifier")
@@ -483,6 +550,7 @@ extension MCPServer {
         let d = try await driver(args)
         let element: ElementInfo
         let screen: FTRect
+        let elements: [ElementInfo]
         var refNote = ""
         if let ref = try Self.intArgument(args, "ref") {
             let target = try await verifiedRef(ref, driver: d, args: args)
@@ -492,6 +560,7 @@ extension MCPServer {
             }
             element = found
             screen = snapshot.screen
+            elements = snapshot.elements
             refNote = target.note
         } else if let selector = args["selector"] as? String {
             let snapshot = try await freshSnapshot(d, args: args)
@@ -503,9 +572,11 @@ extension MCPServer {
             }
             element = found
             screen = snapshot.screen
+            elements = snapshot.elements
         } else {
             throw MCPError("ref or selector is required")
         }
+        if let refusal = Self.captureCoverRefusal(element, in: elements, screen: screen) { throw MCPError(refusal) }
         let png = try await d.screenshot()
         // **一色の絵は見本にしない**(判定は DSL の分類と同じ BlankFrameDetector.isUnjudgeable)。撮れていない・何も
         // 描かれていない絵の切り出しは OFF に似ていて、見本に入ると分類器が以後ずっと誤る(保存は永続)
@@ -514,7 +585,7 @@ extension MCPServer {
                 + " there yet, or the capture failed). Wait for the screen to draw, then capture again")
         }
         guard let image = VisionClassifier.crop(png: png, frame: element.frame, screen: screen) else {
-            throw MCPError("could not crop the element from the screenshot (is it inside the screen?)")
+            throw MCPError(VisionClassifier.cropFailureReason(png: png, screen: screen))
         }
         let captureName = try Self.stringArgument(args, "name")
         let file: URL

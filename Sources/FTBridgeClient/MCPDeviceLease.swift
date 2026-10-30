@@ -119,6 +119,12 @@ public enum MCPDeviceLease {
             .filter { $0.key == key }.map { $0.pid }.min()
     }
 
+    /// MCP の形の印を持つ生きている保持者がいるか(ライブ操作の印は数えない = モニターでデバイスを選ぶだけで立つ)。
+    /// モニターの実行中のランプの入力(ApiMonitorCommand の inMCP)
+    public static func hasMCPHolder(stateDir: URL, key: String, excluding: Set<Int32>) -> Bool {
+        liveEntries(stateDir: stateDir, excluding: excluding).contains { $0.key == key && $0.role == .mcp }
+    }
+
     /// 生きている保持者の一覧(鍵 → pid)。`excluding` の pid が持つ印は数えない(自分・親)。
     /// 同じ鍵に複数の生きた保持者が居ても代表(最小 pid)しか返さない(holderPID と同じ理由)
     public static func liveHolders(stateDir: URL, excluding: Set<Int32>) -> [String: Int32] {

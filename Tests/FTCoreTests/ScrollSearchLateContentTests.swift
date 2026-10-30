@@ -43,7 +43,18 @@ private final class LateAppendingListDriver: AppDriver {
 
     init(appendDelay: TimeInterval?) { self.appendDelay = appendDelay }
 
+    /// アプリは自分の時計で続きを足す(読みとは無関係)。送りの時点でも反映しないと、猶予の後の1本が古い件数で空振りし、
+    /// テストが逆走査(この偽物ではドラッグも前へ進む)の本数で通る形になる
+    private func appendIfDue() {
+        if let appendDelay, let reached = endReachedAt, Date().timeIntervalSince(reached) >= appendDelay,
+           available < 100 {
+            available += 20
+            endReachedAt = nil
+        }
+    }
+
     private func advance() {
+        appendIfDue()
         swipes += 1
         top = min(top + 4, available - window)
         if top == available - window, endReachedAt == nil { endReachedAt = Date() }
@@ -71,11 +82,7 @@ private final class LateAppendingListDriver: AppDriver {
               pressSeconds: Double, durationSeconds: Double) async throws { advance() }
 
     func snapshot() async throws -> SnapshotResponse {
-        if let appendDelay, let reached = endReachedAt, Date().timeIntervalSince(reached) >= appendDelay,
-           available < 100 {
-            available += 20
-            endReachedAt = nil
-        }
+        appendIfDue()
         var elements = [ElementInfo(ref: 1, type: "scrollView", identifier: "list", label: nil, value: nil,
                                     placeholder: nil, enabled: true,
                                     frame: FTRect(x: 0, y: 0, width: 400, height: 800), depth: 0,

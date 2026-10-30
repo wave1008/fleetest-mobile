@@ -171,8 +171,12 @@ public enum ResultsRendering {
         return SimpleTable.render(headers: headers, rows: tableRows)
     }
 
-    public static func insights(_ rows: [RunResultsQuery.InsightRow]) -> String {
-        guard !rows.isEmpty else { return "Nothing needs attention" }
+    /// `runCount` = 検知の入力にした期間内の run 数。0 なら何も見ていないので「注意すべきことは無い」とは言わない
+    /// (nil = 呼び手が数を持たない。呼び手は渡す)
+    public static func insights(_ rows: [RunResultsQuery.InsightRow], runCount: Int? = nil) -> String {
+        guard !rows.isEmpty else {
+            return runCount == 0 ? "No runs in the period — nothing was checked" : "Nothing needs attention"
+        }
         return rows.map { row -> String in
             let icon: String
             switch row.severity {

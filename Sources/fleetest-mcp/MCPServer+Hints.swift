@@ -281,6 +281,12 @@ extension MCPServer {
     /// 「session のアプリが今も前面か」。判定できないドライバでは黙る(嘘を足さない)
     static func foregroundNote(_ sessionBundleID: String?, driver: AppDriver) async -> String {
         guard let bundleID = sessionBundleID else { return "" }
+        // SpringBoard は常に動いているので appstate は「前面」と答える —— アプリを開いた後でも。iOS は別アプリの前面を知る手段が無い
+        // (`BridgeClient.foregroundAppID`)ので yes と断定せず、アプリを開いたなら向け直しが要ると言う
+        if bundleID == "com.apple.springboard" {
+            return " / foreground: unknown (the session is SpringBoard — if you opened an app from the home screen,"
+                + " ft_launch its bundleId with resume: true to drive it)"
+        }
         if let front = (try? await driver.foregroundAppID()) ?? nil {
             return front == bundleID ? " / foreground: yes"
                 : " / foreground: no (\(front) is in front — ft_launch to come back)"
@@ -647,11 +653,17 @@ extension MCPServer {
 
     /// スクロールできる容器の実名の列挙だけ(理由の断定はしない。呼び出し側の文に添える)
     static func scrollAlternativesHint(_ snapshot: SnapshotResponse) -> String {
-        let real = ScrollFrameCandidates.candidates(in: snapshot)
-            .compactMap(\.selector).prefix(4).joined(separator: " ")
-        return real.isEmpty
-            ? " No element on this screen declares itself scrollable."
-            : " Scrollable areas here: \(real)."
+        let candidates = ScrollFrameCandidates.candidates(in: snapshot)
+        let real = candidates.compactMap(\.selector).prefix(4).joined(separator: " ")
+        if !real.isEmpty { return " Scrollable areas here: \(real)." }
+        // 申告はあるが id もラベルも無く名指しできないだけ —— 「申告する要素が無い」と言うと事実と逆になる
+        // (ref は scrollFrame へそのまま渡せる。MCPServer.scrollTo が整数を frame へ解決する)
+        if !candidates.isEmpty {
+            let refs = candidates.prefix(4).map { "[\($0.ref)]" }.joined(separator: " ")
+            return " This screen has scrollable areas but none has an id or label to name it —"
+                + " pass an ft_snapshot ref as scrollFrame instead: \(refs)."
+        }
+        return " No element on this screen declares itself scrollable."
     }
 
     /// `isAndroid`: 「in-app ブリッジだけが Compose/Flutter の申告を見られる」は iOS の話

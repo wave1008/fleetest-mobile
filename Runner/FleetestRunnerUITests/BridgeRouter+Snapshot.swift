@@ -41,6 +41,7 @@ extension BridgeRouter {
                 gathered.append(Gathered(info: makeInfo(node, ref: 0, depth: depth), frame: node.frame))
             }
             var contributing = Set<Int>()
+            var content: [Int: (union: CGRect, hasTextInput: Bool)] = [:]
             for (index, window) in node.children.enumerated() {
                 let start = gathered.count
                 gather(window, depth: depth + 1, screen: screen, insideWebView: insideWebView,
@@ -48,10 +49,16 @@ extension BridgeRouter {
                        keyboardFrame: &keyboardFrame, offscreenHints: &offscreenHints)
                 if overlayWindowIndices.contains(index) {
                     for i in start..<gathered.count { gathered[i].info.inOverlayWindow = true }
-                    if gathered.count > start { contributing.insert(index) }
+                    if gathered.count > start {
+                        contributing.insert(index)
+                        let slice = gathered[start..<gathered.count]
+                        content[index] = (slice.dropFirst().reduce(slice[start].frame) { $0.union($1.frame) },
+                                          slice.contains { Self.textInputTypes.contains(ElementInfo.normalizedType($0.info.type)) })
+                    }
                 }
             }
             lastContributingOverlayWindows = contributing
+            lastOverlayWindowContent = content
         }
         // **画面全体の枠の Toolbar(浮いたバーの入れ物)を出さない**: iOS 26 以降の `_UIFloatingBarContainerView` は型 toolbar・
         // 枠が画面全体(実測 0,0 402x874)で、中のボタンとは別に手前に載る。ホストの覆いの判定が「すべての要素が #Toolbar に
@@ -97,6 +104,9 @@ extension BridgeRouter {
             elements.append(info)
         }
     }
+
+    /// 入力欄の型(正規化後)。手前の窓がキーボードを出さない inputAccessoryView だけの窓かの判定に使う
+    static let textInputTypes: Set<String> = ["textField", "secureTextField", "textView", "searchField"]
 
     /// preorder 走査。不可視ノードはサブツリーごと除外。**上限で打ち切らない**(collect の2パス目が
     /// dedupe・間引きをまとめて行う)

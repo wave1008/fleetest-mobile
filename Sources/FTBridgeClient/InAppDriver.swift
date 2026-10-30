@@ -89,7 +89,11 @@ public final class InAppDriver: AppDriver {
     /// 起動したまま消すとプロセスが持っている状態が書き戻るため、この順序が要る
     public func clearAppData(bundleID: String) async throws {
         let target = try await withCrashContext { try await client.simulatorTarget() }
-        try await terminate()
+        // 終了させるのは消す相手が操作中のアプリのときだけ(別のアプリ B を消すときに撃つと A を巻き添えにする。
+        // 判定は BridgeClient と共有。B の確実な終了は clearAppDataOnSimulator の stopOnSimulator が持つ)
+        if BridgeClient.shouldCloseSessionBeforeClearing(sessionBundleID: lastBundleID, clearing: bundleID) {
+            try await terminate()
+        }
         try client.clearAppDataOnSimulator(bundleID: bundleID, target: target)
     }
     /// URL(ディープリンク)を配送する。**`simctl openurl` は環境変数を渡せない**ため、

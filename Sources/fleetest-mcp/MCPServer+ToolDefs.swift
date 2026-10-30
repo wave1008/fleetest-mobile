@@ -364,7 +364,8 @@ extension MCPServer {
                             "description": "Max wait for waitFor (default \(number(defaultWaitSeconds)))"],
         ], extra: foldingProperties, required: ["steps"]),
         tool("ft_rotate", "Rotate the device and return the settled tree in the new orientation (new "
-            + "coordinates; earlier refs no longer resolve; a note says if settling was not confirmed). "
+            + "coordinates; earlier refs are matched to elements again by identity, not position — use the "
+            + "new refs below; a note says if settling was not confirmed). "
             + "Android: turns auto-rotate off; rotating back to portrait restores it, but only on this "
             + "same connection", [
             "orientation": ["type": "string", "enum": ["portrait", "landscape"]],
@@ -406,6 +407,8 @@ extension MCPServer {
             "all": ["type": "boolean", "description": "Use every recorded interaction, not only "
                 + "those since the last ft_launch"],
             "className": ["type": "string", "description": "Class name (default DraftedScenario)"],
+            "device": ["type": "string", "description": "Draft this device's steps instead of the one you "
+                + "drove last, written as the reply names it: android:<serial> or ios:<udid>"],
             "drop": ["type": "array", "items": ["type": "integer"],
                      "description": "Step numbers to omit (dead ends, retries); applied after lastN"],
             "lastN": ["type": "integer", "description": "Keep only the last N steps (before drop)"],
@@ -621,6 +624,18 @@ extension MCPServer {
         case none
     }
 
+    /// 木に焦点のある要素が無いときの文言。**「どこにも行っていないかも」と言えるのはキーボードも出ていないときだけ**。
+    /// キーボードが出ている(= 入力接続がある)か木が空のとき(横向きの全画面 IME・WebView の中の欄・木に載らない隠れた入力欄)は、
+    /// 入っていても焦点が木に出ない —— 警告すると読み手が打ち直して二重に入力する。確かめられなかった事実だけを言う
+    static func noFocusNote(_ snapshot: SnapshotResponse) -> String {
+        if KeyboardWait.isShown(snapshot) || snapshot.elements.isEmpty || snapshot.elements.contains(where: { $0.type == "webView" }) {
+            return " (no element reports input focus in the tree (keyboard up, tree empty or a WebView on screen), so where the text went could not"
+                + " be confirmed — the field may be hidden from the tree: full-screen keyboard, WebView, hidden input; check the screen)"
+        }
+        return " (warning: nothing has input focus now, so the text may have gone nowhere"
+            + " — tap the field by ref first)"
+    }
+
     /// ref なしで入力したあと、**実際にどの欄へ入ったか**を名指しする。
     /// 焦点が無ければそれ自体が答え(撃った先が無かった = 沈黙した誤り)。
     /// 値が読めるなら期待した文字列が入っているかまで見る
@@ -628,8 +643,7 @@ extension MCPServer {
                               snapshot: SnapshotResponse?) async -> String {
         guard let snapshot else { return " (could not re-read the screen to confirm where it went)" }
         guard let field = snapshot.elements.first(where: { $0.focused == true }) else {
-            return " (warning: nothing has input focus now, so the text may have gone nowhere"
-                + " — tap the field by ref first)"
+            return noFocusNote(snapshot)
         }
         let name = RefGuard.describe(field)
         guard let value = field.value.map(FlowMatchMode.normalizeInvisibleCharacters), !value.isEmpty
@@ -681,8 +695,7 @@ extension MCPServer {
         }
         guard let found else {
             return target == nil
-                ? " (warning: nothing has input focus now, so the text may have gone nowhere"
-                    + " — tap the field by ref first)"
+                ? noFocusNote(fresh)
                 : " (\(requestedAs) requested; the field could not be read back)"
         }
         guard let rawValue = found.value else {
@@ -700,9 +713,13 @@ extension MCPServer {
         // **正規化してから比較する**: typedIntoNote と同じゼロ幅文字の扱いを
         // expected 側にもかける —— これが無いと、両辺が実質同じ文字列でも不一致の警告が出る
         let value = FlowMatchMode.normalizeInvisibleCharacters(rawValue)
-        let normalizedExpected = FlowMatchMode.normalizeInvisibleCharacters(expected)
+        // **末尾の改行は IME アクション(撃たれて欄の値には残らない)**: そのまま比べると、正しく置き換わった欄を
+        // 「does not match what was typed」と警告し、読み手が打ち直して送信・検索を二重に撃つ
+        let verbatimExpected = FlowMatchMode.normalizeInvisibleCharacters(expected)
+        var normalizedExpected = verbatimExpected
+        while normalizedExpected.hasSuffix("\n") { normalizedExpected.removeLast() }
         let clearOnly = normalizedExpected.isEmpty
-        if value == normalizedExpected {
+        if value == normalizedExpected || value == verbatimExpected {
             return clearOnly ? " (cleared the field)" : " (replaced the field's prior content)"
         }
         // **マスク欄は偽警告にしない**: パスワード欄の読み返しは伏せ字(•/●/*…)なので、

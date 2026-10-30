@@ -168,7 +168,8 @@ function refreshSelectAllState() {
 // device id -> { wrapEl, imgEl, canvasEl }
 const deviceMirrors = new Map();
 // シナリオを実行中のデバイス(run ボードのレーンのうち scenario を持つもの。runBoard.js が setRunningDevices で配る)。
-// ラインビューのタイルとグリッドビューの拡大表示の左上の点灯マークが読む(ユーザー決定)
+// ラインビューのタイルとグリッドビューの拡大表示の左上の点灯マークが読む(ユーザー決定)。
+// マークは MCP が掴んでいるデバイス(device.inMCP = MCP の印。ライブ操作の印は含まない)でも点く(ユーザー決定)
 let runningDeviceIds = new Set();
 
 // 画像高さの絶対下限(px)。セパレーターを手で最小まで詰めたときに 0 や負にならないための床。
@@ -630,12 +631,16 @@ function renderLamp(lampEl, entry) {
   // 色は OS で分ける(iOS = タコメーターの青・Android = 緑系。ユーザー決定。CSS の .run-lamp[data-platform])
   const platform = entry.device.platform === 'android' ? 'android' : 'ios';
   if (lampEl.dataset.platform !== platform) { lampEl.dataset.platform = platform; }
-  const on = runningDeviceIds.has(entry.device.id) ? '1' : '0';
-  if (lampEl.dataset.on === on) {
+  const inRun = runningDeviceIds.has(entry.device.id);
+  const on = inRun || entry.device.inMCP === true ? '1' : '0';
+  // 説明はシナリオの実行を優先する(両方なら run が画面を動かしている)
+  const tip = inRun ? t('wvMonitor.tile.running') : on === '1' ? t('wvMonitor.tile.runningMCP') : '';
+  if (lampEl.dataset.on === on && lampEl.dataset.tip === tip) {
     return;
   }
   lampEl.dataset.on = on;
-  setHoverTip(lampEl, on === '1' ? t('wvMonitor.tile.running') : '');
+  lampEl.dataset.tip = tip;
+  setHoverTip(lampEl, tip);
 }
 
 function renderMirrorLamp(entry, mirror) {
@@ -1667,6 +1672,11 @@ function applyVisibleDevices(devices) {
     }
     renderMeta(entry);
     renderFrame(entry);
+    renderLamp(entry.lampEl, entry);
+    const mirror = deviceMirrors.get(device.id);
+    if (mirror) {
+      renderMirrorLamp(entry, mirror);
+    }
   }
   for (const [id, entry] of tiles) {
     if (!seen.has(id)) {

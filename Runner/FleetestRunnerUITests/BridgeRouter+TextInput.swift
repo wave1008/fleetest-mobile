@@ -163,8 +163,12 @@ extension BridgeRouter {
             // 目標は撃つ前の値 + 本文が既定で、ヒントが value に載る欄では本文だけへ採り直す
             // (規則はホストと共有 = TypeReadback.readbackTarget。採り直さないと `.retype` が
             // ヒント文字列ごと打ち込む)
-            let readbackTarget = TypeReadback.readbackTarget(expected: expected, typedOnly: main, actual: actual)
-            switch TypeReadback.plan(expected: readbackTarget, actual: actual) {
+            // 撃つ前から欄にあった値の範囲の欠落は打鍵の落ちではない(選択範囲の置き換え。TypeReadback.plan)
+            let priorCount = expected.count - main.count
+            let readbackTarget = TypeReadback.readbackTarget(expected: expected, typedOnly: main, actual: actual,
+                                                             protectedPrefixCount: priorCount)
+            switch TypeReadback.plan(expected: readbackTarget, actual: actual,
+                                     protectedPrefixCount: readbackTarget == expected ? priorCount : 0) {
             case .done, .unverifiable:
                 break loop
             case .resend where valueAtLastResend == actual:
@@ -408,7 +412,9 @@ extension BridgeRouter {
                 Self.tapBeforeTyping(coordinate(app, point))
                 fieldTappedAt = Date()
                 let refIsTextInput = refElements[ref].map(TypeReadback.isTextInput) ?? false
+                let focusWasOnRefField = focusIsRefField(focusBefore, ref: ref)
                 focused = try Self.awaitClearFocusTarget(app, tapped: point, focusBefore: focusBefore,
+                                                         focusWasOnRefField: focusWasOnRefField,
                                                          refIsTextInput: refIsTextInput)
             }
         } else {
@@ -520,6 +526,29 @@ extension BridgeRouter {
         return live
     }
 
+    /// タップ前の焦点がすでに ref の欄だったか。**そうなら焦点が「変わらない」のが正しい** —— 焦点の枠がタップ点
+    /// (解決した瞬間の中心)を含まなくても「別の欄」ではない(id の無いアラートの欄はキーボードの出入りで枠が動く)。
+    /// 判定: 型が入力欄で、identifier が一致する。ref に identifier が無いときは、直近の木で identifier の無い
+    /// 同型の入力欄がその1つだけのときに限る(複数あれば取り違えるので false = 従来どおり別の欄と断る)
+    private func focusIsRefField(_ mark: FocusMark?, ref: Int) -> Bool {
+        guard let mark, let target = refElements[ref], TypeReadback.isTextInput(target) else { return false }
+        let markType: String
+        switch mark.type {
+        case .textField: markType = "textField"
+        case .secureTextField: markType = "secureTextField"
+        case .textView: markType = "textView"
+        case .searchField: markType = "searchField"
+        default: return false
+        }
+        guard markType == target.type else { return false }
+        if let identifier = target.identifier, !identifier.isEmpty { return mark.identifier == identifier }
+        guard mark.identifier.isEmpty else { return false }
+        let unnamedSameType = refElements.values.filter {
+            $0.type == markType && ($0.identifier ?? "").isEmpty
+        }
+        return unnamedSameType.count == 1
+    }
+
     /// 焦点の欄の右端を叩いてカーソルを末尾へ寄せる。**欄がそこで叩けない(他の部品の裏・画面の外)なら叩かない** ——
     /// 叩くと手前の部品を押す(実機 iPhone SE3 の CMP: キーボード表示中にパスワード欄が下のタブバーの裏へ回り、
     /// 枠の右端は「情報」タブの上だった)。叩かなくても削除キーは焦点の欄(最前のレスポンダ)へ届き、
@@ -540,12 +569,13 @@ extension BridgeRouter {
     /// 点を含まないので断ってしまう。待つのは「無焦点」か「タップ前と同じ欄のまま」の間だけ
     private static func awaitClearFocusTarget(_ app: XCUIApplication, tapped: CGPoint,
                                               focusBefore: FocusMark?,
+                                              focusWasOnRefField: Bool,
                                               refIsTextInput: Bool) throws -> XCUIElement {
         let deadline = Date().addingTimeInterval(FocusWait.waitSeconds)
         var lastElsewhere: FocusMark?
         while true {
             if let mark = focusMark(app) {
-                if mark.frame.contains(tapped) || mark != focusBefore {
+                if mark.frame.contains(tapped) || mark != focusBefore || focusWasOnRefField {
                     let element = focusedInput(app)
                     if element.exists { return element }
                 } else {

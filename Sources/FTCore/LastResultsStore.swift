@@ -61,9 +61,17 @@ public enum LastResultsStore {
     /// `--failed` の対象が空だったときの発話(`run` の単機経路・フリート経路で共有)。
     /// **空は「直近失敗 ∩ 選んだ範囲(--scenario / --folder)」** —— 直近失敗が範囲の外にだけあるときに
     /// 「全部緑」と言うと誤る(failedCount = 範囲で絞る前の直近失敗の数)
-    public static func nothingFailedMessage(recordedCount: Int, failedCount: Int) -> String {
+    /// - hasSelection: `--scenario` / `--folder` で範囲を絞ったか。絞っていないのに「範囲の外」とは言わない
+    /// - staleCount: 失敗の記録のうち今のプロジェクトに無いシナリオの数(`failedCount` には含めない)
+    public static func nothingFailedMessage(recordedCount: Int, failedCount: Int,
+                                            hasSelection: Bool = true, staleCount: Int = 0) -> String {
         if failedCount > 0 {
-            return "None of the selected scenarios failed last time (\(failedCount) scenario(s) outside this selection did)"
+            return hasSelection
+                ? "None of the selected scenarios failed last time (\(failedCount) scenario(s) outside this selection did)"
+                : "None of the scenarios that failed last time can run now (\(failedCount) are marked @Deleted or @Draft)"
+        }
+        if staleCount > 0 {
+            return "No scenarios in this project failed last time (\(staleCount) recorded failure(s) belong to scenarios that no longer exist here)"
         }
         return recordedCount == 0
             ? "No results recorded yet for this project/profile (nothing has run), so there is nothing to re-run"

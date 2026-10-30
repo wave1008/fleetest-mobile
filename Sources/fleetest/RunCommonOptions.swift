@@ -125,6 +125,31 @@ extension RunCommonOptions {
         try ports.forEach { try DriverOptions.rejectZeroPort($0) }
     }
 
+    /// 空(空白のみ含む)の `--report-dir` を断る。空文字は基準ディレクトリそのものに解かれ、レポートが
+    /// カレントディレクトリ(リポジトリ直下)へ散らばる。判定は `RunProfileDocument.isBlankReportDir` の1箇所
+    /// (`--set reportDir=`・プロファイルの reportDir も同じ判定)。両 validate() が呼ぶ
+    static func rejectBlankReportDir(_ reportDir: String?) throws {
+        if let reportDir, RunProfileDocument.isBlankReportDir(reportDir) {
+            throw ValidationError("--report-dir must not be empty (omit it to use reports/)")
+        }
+    }
+
+    /// 負の `--wait-lock`(0 = 待たない)を断る。両 validate() が呼ぶ
+    static func rejectNegativeWaitLock(_ waitLock: Int?) throws {
+        if let waitLock, waitLock < 0 {
+            throw ValidationError("--wait-lock must be zero or a positive number of seconds (got \(waitLock))")
+        }
+    }
+
+    /// 同じ `--port` の重複を断る(同じブリッジ = 同じ Simulator に iOS ワーカーが2つ並び、同じデバイスで
+    /// 2本のシナリオが同時に走る)。`fleetest run` の validate() が呼ぶ(`api run` は --port 2つ以上を別の文言で断る)
+    static func rejectDuplicatePorts(_ ports: [UInt16]) throws {
+        var seen: Set<UInt16> = []
+        for port in ports where !seen.insert(port).inserted {
+            throw ValidationError("--port \(port) was given more than once (each port is one device; pass distinct ports)")
+        }
+    }
+
     /// `--platform` の値の検査と、`--profile` との併用禁止(platform/port/serial/app-id)。
     /// `--platform` は dry-run でも検証する(`ios{}`/`android{}` の選択に直結するので、
     /// 大文字違い等が黙って両方を実行してしまう)。ports はコマンド固有の宣言なので引数で受ける
@@ -135,6 +160,14 @@ extension RunCommonOptions {
         }
         if profile != nil && (platform != nil || !ports.isEmpty || serial != nil) {
             throw ValidationError("--profile cannot be combined with --platform/--port/--serial")
+        }
+        // 明示した --platform と反対の OS の宛先(android に --port・ios に --serial)は、その OS では使われず黙って無視される。
+        // platform 省略で両方の宛先を渡す形は断らない(シナリオごとの platform で両 OS を回す経路がある)。
+        // 判定は MCP と共有の DeviceTargetConsistency・文言は DriverOptions
+        if platform != nil,
+           let mismatch = DeviceTargetConsistency.mismatch(
+               platform: platform, gaveIOSTarget: !ports.isEmpty, gaveAndroidTarget: serial != nil) {
+            throw ValidationError(DriverOptions.deviceTargetMismatchMessage(mismatch))
         }
         if profile != nil && appID != nil {
             throw ValidationError("--app-id cannot be combined with --profile (the app profile supplies the bundle ID)")
@@ -164,6 +197,16 @@ extension RunCommonOptions {
         // 黙って無視するとユーザーの指したデバイスと別のデバイスで回る(`--fleet` の各エントリは自分の --profile を持つ)
         if profile == nil, !hasFleet, !devices.isEmpty || deviceMachine != nil {
             throw ValidationError("\(deviceScopeDescription()) requires --profile")
+        }
+        // `--remote-dir` は遠隔ディスパッチ先の置き場。--profile(デバイスの machine による自動ディスパッチ)も
+        // --runner も無い run は遠隔へ行かないので、黙って無視せず断る(--runner 単独は上で --profile を要求済み。
+        // `--fleet` の各エントリは自分の --profile を持つ)
+        if profile == nil, !hasFleet, remoteDir != nil {
+            throw ValidationError("--remote-dir requires --profile (it names the runner-side directory of a remote dispatch)")
+        }
+        // `--all-machines` は「--device の名前が2つ以上の機械に当たる」ときの解決口。--device が無ければ効く相手が無い
+        if !hasFleet, allMachines, devices.isEmpty {
+            throw ValidationError("--all-machines requires --device (it only applies when a --device name matches devices on more than one machine)")
         }
         if let message = RunDeviceMachineAmbiguity.allMachinesConflictMessage(
             allMachines: allMachines, runner: runner, deviceMachine: deviceMachine) {

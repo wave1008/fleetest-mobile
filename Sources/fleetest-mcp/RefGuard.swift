@@ -175,6 +175,13 @@ enum RefGuard {
                 + " by the snapshot limit)"
             : ""
         if let (alert, buttons) = inAppAlert {
+            // 的がそのアラートの中身(入力欄など)なら「アラートのボタンを押せ」は誤誘導 —— 従うと的ごと閉じる。
+            // 古い ref が再照合できなかっただけなので、撮り直して新しい ref を使わせる
+            if TapTargetGeometry.contains(alert.frame, target.frame) {
+                return "[\(ref)] \(describe(target)) is inside \(describe(alert)) but this ref no longer matches it"
+                    + " (the alert is still open) — take a fresh ft_snapshot and use the new ref."
+                    + " Do not tap the alert's buttons unless you mean to close it."
+            }
             let named = buttons.isEmpty ? "" : " (buttons: " + buttons.map { "\"\($0)\"" }.joined(separator: " / ") + ")"
             return "[\(ref)] \(describe(target)) is not reachable right now — \(describe(alert))\(named) is in front"
                 + " of the app. Handle it first (ft_tap one of its buttons), then take a fresh ft_snapshot."
@@ -250,7 +257,7 @@ enum RefGuard {
                                      overlayWindows: OverlayWindowOcclusion) -> String? {
         guard let advisory = overlayWindows.advisory(for: element) else { return nil }
         return " (warning: \(describe(element)) — \(advisory);"
-            + " ft_screenshot shows the overlay, which is why it is not in the element list)"
+            + " ft_screenshot shows the overlay)"
     }
 
     /// keyboard + overlay window + disabled の組。**この順序で4箇所から呼ばれる** ——
@@ -347,8 +354,9 @@ enum RefGuard {
         }
     }
 
-    static func movedNote(found: ElementInfo, moved: Double, cause: String) -> String {
-        " (\(describe(found)) had moved \(Int(moved.rounded()))px since the snapshot;"
+    /// `unit` は木の座標の単位(iOS=pt / Android=px)。呼び手が `isAndroid` から渡す(既定は Android の px)
+    static func movedNote(found: ElementInfo, moved: Double, cause: String, unit: String = "px") -> String {
+        " (\(describe(found)) had moved \(Int(moved.rounded()))\(unit) since the snapshot;"
             + " retargeted to where it is now\(cause))"
     }
 
@@ -380,8 +388,11 @@ enum RefGuard {
     /// **原因は断定できないが、範囲は言える**: 同じ分だけ動いた要素が他にもあるなら
     /// スクロール等の画面全体の移動、その要素だけならレイアウト変化。
     /// 「なぜ動いたか」の手掛かりが欲しいという要望への、嘘をつかない答え
+    /// `ownActionSince`: このセッションの操作が snapshot の後にあった。画面遷移の最中も兄弟がそろって動くので、
+    /// スクロールと断定しない(遷移中の古い木で別の画面の行を押した実例)
     static func movedTogether(_ target: ElementInfo, _ found: ElementInfo,
-                              before: [ElementInfo], after: [ElementInfo]) -> String {
+                              before: [ElementInfo], after: [ElementInfo],
+                              ownActionSince: Bool = false) -> String {
         let dy = found.frame.y - target.frame.y
         let dx = found.frame.x - target.frame.x
         // **比べる相手は同じ深さの兄弟だけ**。画面全体で数えると、固定ヘッダやタブバーのような
@@ -399,6 +410,11 @@ enum RefGuard {
         }
         guard otherPairs >= 2 else { return "" }
         // 兄弟の過半が同じ分だけ動いた = 面ごと動いた(スクロール等)
+        if samePairs * 2 >= otherPairs, ownActionSince {
+            return "; \(samePairs) of \(otherPairs) siblings shifted by the same amount after your own action —"
+                + " that can be a screen transition still animating (this ref may now be a different screen's element),"
+                + " not only a scroll; take a fresh ft_snapshot and verify the outcome"
+        }
         return samePairs * 2 >= otherPairs
             ? "; \(samePairs) of \(otherPairs) siblings shifted by the same amount,"
                 + " so the container scrolled rather than this element alone"

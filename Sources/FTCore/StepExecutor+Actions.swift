@@ -926,11 +926,25 @@ extension StepExecutor {
                         current = try await actingDriver.snapshot()
                         phase.snapshotMs += Self.ms(clock.now - snapStart)
                     }
-                    guard let refound = Self.relocateAfterClear(element, step: step, in: current) else {
+                    var relocated = Self.relocateAfterClear(element, step: step, in: current)
+                    var relocatedSnapshot = current
+                    if relocated == nil, KeyboardWait.isShown(current),
+                       (try? await actingDriver.hideKeyboardIfShown()) == true,
+                       let reread = try? await actingDriver.snapshot() {
+                        // キーボードが欄を押し下げて木から消す形(横向き・全画面 IME・CMP)。人は閉じてから打てる
+                        // ので、撃つ前の規則(reachPastKeyboard)と同じく閉じて一度だけ引き直す
+                        relocated = Self.relocateAfterClear(element, step: step, in: reread)
+                        relocatedSnapshot = reread
+                        if relocated != nil {
+                            replaceFallbackNote = Self.joinNotes(replaceFallbackNote,
+                                "closed the keyboard — the field was not on the screen while it was up")
+                        }
+                    }
+                    guard let refound = relocated else {
                         return StepOutcome(status: failed(.notFound, Self.clearLostTargetMessage(step)))
                     }
                     element = refound
-                    snapshot = current
+                    snapshot = relocatedSnapshot
                 case .failed(let message):
                     return StepOutcome(status: .failed(message))
                 }
@@ -1538,10 +1552,20 @@ extension StepExecutor {
     static func relocateAfterClear(_ element: ElementInfo, step: FlowStep, in snapshot: SnapshotResponse) -> ElementInfo? {
         func only(_ matches: [ElementInfo]) -> ElementInfo? { matches.count == 1 ? matches[0] : nil }
         if let id = element.identifier, !id.isEmpty {
-            return only(snapshot.elements.filter { $0.identifier == id && $0.type == element.type })
+            return relocateByIdentifier(element, id: id, in: snapshot.elements)
         }
         if let (found, _) = LocatorResolver.resolve(step: step, in: snapshot), found.type == element.type { return found }
         return only(snapshot.elements.filter { $0.type == element.type && $0.frame == element.frame })
+    }
+
+    /// 同じ identifier の入力欄を引き直す。型が同じものを先に、無ければ入力欄どうし(Flutter の textField ⇄ secureTextField は
+    /// 焦点で型が変わる)。MCP の `relocateAfterClear` も共有する
+    public static func relocateByIdentifier(_ element: ElementInfo, id: String, in elements: [ElementInfo]) -> ElementInfo? {
+        func only(_ matches: [ElementInfo]) -> ElementInfo? { matches.count == 1 ? matches[0] : nil }
+        let sameId = elements.filter { $0.identifier == id }
+        if let same = only(sameId.filter { $0.type == element.type }) { return same }
+        guard TypeReadback.isTextInput(element) else { return nil }
+        return only(sameId.filter { TypeReadback.isTextInput($0) })
     }
 
     static func clearLostTargetMessage(_ step: FlowStep) -> String {

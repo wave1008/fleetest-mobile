@@ -62,7 +62,7 @@ public enum ResultsLogReport {
             let anyStarted = RunResultsStore.records(runDir: runDir).contains { $0.skipKind == nil }
             throw ResultsLogError(message: ResultsLogEntries.missingEventsMessage(
                 runID: resolvedRunID, interrupted: meta.interrupted == true,
-                abortReason: meta.abortReason, anyScenarioStarted: anyStarted))
+                abortReason: meta.abortReason, anyScenarioStarted: anyStarted, recordedTotal: meta.total))
         }
 
         let entries = ResultsLogEntries.collect(runDir: runDir, eventsDir: eventsDir, scenarioFilter: scenario)
@@ -111,13 +111,16 @@ public enum ResultsLogEntries {
     /// (中断・供給段の中止)は events/ を作らない。それ以外(この機能より前の run / 保持容量の掃除で
     /// 消えた)は記録から区別できないので両方を挙げる
     public static func missingEventsMessage(runID: String, interrupted: Bool, abortReason: String?,
-                                     anyScenarioStarted: Bool) -> String {
+                                     anyScenarioStarted: Bool, recordedTotal: Int? = nil) -> String {
         if anyScenarioStarted {
             // 始まったシナリオがあるのに無い = 中断・中止では説明が付かない
         } else if let abortReason {
             return "this run has no execution log (it ended before any scenario started: \(abortReason)): \(runID)"
         } else if interrupted {
             return "this run has no execution log (it was interrupted before any scenario started): \(runID)"
+        } else if recordedTotal == 0 {
+            // run.json が total 0 と言う = 1本も回していない(同じ runGroup の他の機械が全部受け取った等)。掃除や旧版ではない
+            return "this run has no execution log (it ran no scenarios: its record says total 0): \(runID)"
         }
         return "this run has no execution log (events/ is missing — either the run predates"
             + " this feature, or it was cleaned up by retention): \(runID)"
@@ -144,7 +147,7 @@ public enum ResultsLogEntries {
             let fileBase = String(name.dropLast(".json".count))
             guard let data = try? Data(contentsOf: scenariosDir.appendingPathComponent(name)),
                   let record = try? decoder.decode(ScenarioRunRecord.self, from: data) else { continue }
-            if let scenarioFilter, record.scenarioID != scenarioFilter { continue }
+            if let scenarioFilter, !ScenarioSelection.selects(scenarioFilter, scenarioID: record.scenarioID) { continue }
             let eventsURL = eventsDir.appendingPathComponent("\(fileBase).ndjson")
             guard FileManager.default.fileExists(atPath: eventsURL.path) else { continue }
             result.append(Entry(heading: completedHeading(record), fileURL: eventsURL))
@@ -170,8 +173,10 @@ public enum ResultsLogEntries {
         var result: [Entry] = []
         for name in names.filter({ $0.hasSuffix(".ndjson") }).sorted() {
             let withoutExt = String(name.dropLast(".ndjson".count))
-            if let sanitizedFilter, sanitizedScenarioID(fromSupersededBase: withoutExt) != sanitizedFilter {
-                continue
+            if let sanitizedFilter {
+                // クラス名の指定は ID の前置き(`Class.`)で選ぶ(`ScenarioSelection.isMember` と同じ規則を sanitize 後の名前に当てる)
+                guard let base = sanitizedScenarioID(fromSupersededBase: withoutExt),
+                      base == sanitizedFilter || base.hasPrefix(sanitizedFilter + ".") else { continue }
             }
             result.append(Entry(heading: "\(withoutExt) (superseded)", fileURL: dir.appendingPathComponent(name)))
         }
@@ -203,7 +208,8 @@ public enum ResultsLogEntries {
             let fileURL = eventsDir.appendingPathComponent(name)
             let discoveredScenario = firstScenarioID(in: fileURL)
             if let scenarioFilter {
-                guard discoveredScenario == scenarioFilter else { continue }
+                guard let discoveredScenario,
+                      ScenarioSelection.selects(scenarioFilter, scenarioID: discoveredScenario) else { continue }
             }
             let label = discoveredScenario ?? name
             result.append(Entry(heading: "\(label) (incomplete)", fileURL: fileURL))

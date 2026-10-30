@@ -278,7 +278,7 @@ struct RunScenarios: AsyncParsableCommand {
     var failed = false
 
     @Option(name: .customLong("report-dir"),
-            help: "Directory to write reports to (defaults to TestProjects/<name>/reports). Cannot combine with --set reportDir=...")
+            help: "Directory to write reports to (defaults to TestProjects/<name>/reports; a relative path is relative to the current directory, and so is a relative --set reportDir= without --profile, while a profile's reportDir is relative to the project root). Must not be empty. Cannot combine with --set reportDir=...")
     var reportDir: String?
 
     @Option(name: .customLong("port"),
@@ -387,6 +387,9 @@ struct RunScenarios: AsyncParsableCommand {
 
     private func validateSingleTarget() throws {
         try RunCommonOptions.rejectZeroPorts(ports)
+        try RunCommonOptions.rejectDuplicatePorts(ports)
+        try RunCommonOptions.rejectBlankReportDir(reportDir)
+        try RunCommonOptions.rejectNegativeWaitLock(waitLock)
         // レポートは run 後に書くので、書けない先は**始める前に**言う(フリート run では
         // 20 分走ってから分かっていた)。末尾の書き込み失敗が警告のみの規律は変えない
         // (判定は FTCore.JUnitOutputPath の doc)
@@ -764,12 +767,23 @@ struct RunScenarios: AsyncParsableCommand {
             // 手元でこの分岐へ来る時点でリモート/フリートへの分岐(dispatchToRemoteHost/
             // dispatchToFleet)は既に return 済みなので、`--failed` は常にこの機械での直近実行を見る。
             // リモートで落ちた分は RemoteRunDispatcher が回収した scenario JSON から書く
+            // 存在しないプロファイル名は「記録なし」で exit 0 にせず、`--failed` 無しと同じ断りにする
+            if let profile = common.profile {
+                let names = ProfileResolver.runProfileNames(project: testProject)
+                guard names.contains(profile) else {
+                    throw ProfileError.runProfileNotFound(name: profile, available: names)
+                }
+            }
             let failedSet = LastResultsStore.failedIDs(project: testProject, profile: common.profile)
             selected = selected.filter { failedSet.contains($0.id) }
             guard !selected.isEmpty else {
+                // 記録は消えたシナリオのファイルを消さない。今のプロジェクトに無い ID は「範囲の外の失敗」に数えない
+                let projectIDs = Set(all.map(\.id))
                 ConsoleOut.out(LastResultsStore.nothingFailedMessage(
                     recordedCount: LastResultsStore.recordedCount(project: testProject, profile: common.profile),
-                    failedCount: failedSet.count))
+                    failedCount: failedSet.filter { projectIDs.contains($0) }.count,
+                    hasSelection: !scenarios.isEmpty || !folders.isEmpty,
+                    staleCount: failedSet.filter { !projectIDs.contains($0) }.count))
                 return
             }
             ConsoleOut.out("→ Re-running the \(selected.count) scenario(s) that failed last time")

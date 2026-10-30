@@ -196,7 +196,7 @@ final class InputInjector {
                             masked = target.isPassword();
                             rejectMaskedAppend(masked, current);
                             before = current;
-                            combined = current + text;
+                            combined = appendOrReplaceSelection(target, current, text);
                         }
                         Bundle args = new Bundle();
                         args.putCharSequence(
@@ -204,7 +204,7 @@ final class InputInjector {
                         if (target.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)) {
                             accepted++;
                             if (firstFireAt == 0) firstFireAt = SystemClock.uptimeMillis();
-                            lastState = focused ? "ACTION_SET_TEXT was accepted but the value did not change"
+                            lastState = focused ? "ACTION_SET_TEXT was accepted but the read-back never showed the new value"
                                                 : "ACTION_SET_TEXT on an unfocused field did not take effect";
                             if (!focused) blindFired = true;
                         } else {
@@ -234,7 +234,8 @@ final class InputInjector {
                         "cannot type into the field that was tapped (" + lastState + ", "
                         + timeoutMs + "ms waited; "
                         + failureFacts(ua, lastRead, masked, lastRefreshOK, accepted)
-                        + "; giving up rather than typing into the wrong field)");
+                        + "; giving up rather than typing into the wrong field)"
+                        + deliveryUnknownNote(accepted));
             }
             SystemClock.sleep(RETRY_POLL_MS);
         }
@@ -316,6 +317,27 @@ final class InputInjector {
                 + " (wrote \"" + combined + "\")");
     }
 
+    /** 欄に**範囲選択**(start < end)があれば、その範囲を text で置き換える(人が打った結果・iOS と同じ)。
+     *  カーソルだけ(start == end)・選択が読めない(-1)・ヒント表示中・欄の長さと食い違う読みは従来どおり末尾へ足す
+     *  (カーソルの位置は SET_TEXT 後の Compose / Flutter で信用できない)。パスワード欄は呼び手が先に断る */
+    private static String appendOrReplaceSelection(AccessibilityNodeInfo node, String current, String text) {
+        int start = node.getTextSelectionStart();
+        int end = node.getTextSelectionEnd();
+        if (node.isShowingHintText() || start < 0 || end <= start || end > current.length()) {
+            return current + text;
+        }
+        return current.substring(0, start) + text + current.substring(end);
+    }
+
+    /** SET_TEXT が1回でも受理された後の期限切れは「入らなかった」と確定できない(欄が木から消える・読みが古い等で
+     *  読み返せないだけのことがある)。届いたか分からない操作は撃ち直させない(CLAUDE.md) */
+    private static String deliveryUnknownNote(int accepted) {
+        return accepted > 0
+                ? "; whether the text reached the field is unknown (ACTION_SET_TEXT was accepted, so it may already be in"
+                  + " the field): check the screen with ft_snapshot before typing again, a retry can enter it twice"
+                : "";
+    }
+
     /** `refresh()` の false は「取り直せなかった」で、**ノードの中身は古いまま残る**。
      *  その読みを「値がまだ入っている」の根拠にすると、反映済みの欄を期限切れで失敗にする
      *  (読む経路は4つとも、false の周回では読まず・撃たず、次の周回で木から引き直す)。 */
@@ -341,7 +363,24 @@ final class InputInjector {
                 + (imeWindowVisible(ua) ? ", the IME window is in front" : "");
     }
 
-    /** id で引いた欄が今フォーカスを持っているか(読めない・取り直せないときは false = 今までどおり撃つ) */
+    /** ref なしの入力・消去の前: 焦点のある欄があるのに IME の窓が前に無ければ、その欄の中心を1回タップして入力接続を
+     *  張り直させる(`isFocusedEditable` と同じ理由: IME アクションの後の Flutter は焦点を残したままキーボードを閉じ、
+     *  SET_TEXT がセマンティクスの値だけを書き換えて画面の欄に届かない)。焦点の欄が無い・読めないときは何もしない */
+    static void tapFocusedEditableIfImeHidden(UiAutomation ua) {
+        try {
+            AccessibilityNodeInfo root = SnapshotBuilder.waitForRoot(ua, FOCUS_ROOT_WAIT_MS);
+            AccessibilityNodeInfo focus = root == null ? null : focusedEditable(root);
+            if (focus == null || !focus.refresh() || imeWindowVisible(ua)) return;
+            Rect bounds = new Rect();
+            focus.getBoundsInScreen(bounds);
+            if (bounds.isEmpty()) return;
+            tap(ua, bounds.exactCenterX(), bounds.exactCenterY());
+        } catch (RuntimeException e) {
+            // 読めない = 今までどおりそのまま撃つ
+        }
+    }
+
+    /** id で引いた欄が今フォーカスを持ち、かつ IME が前面か(読めない・取り直せないときは false = 今までどおり撃つ) */
     static boolean isFocusedEditable(UiAutomation ua, double x, double y, String shortId) {
         try {
             AccessibilityNodeInfo root = ua.getRootInActiveWindow();
@@ -353,7 +392,10 @@ final class InputInjector {
             if (target == null && matches.isEmpty()) {
                 target = editableInsideTagged(root, shortId, (int) x, (int) y, tmp);
             }
-            return target != null && target.refresh() && target.isFocused();
+            // IME の窓が前に無い「焦点だけ残った欄」は欄が入力を受けていない: IME アクション(Enter)の後の Flutter は
+            // a11y の焦点を残したままキーボードを閉じ、SET_TEXT がセマンティクスの値だけを書き換えて画面の欄に届かない。
+            // その欄は撃たずに実タップして入力接続を張り直させる(false = 呼び手がタップする)
+            return target != null && target.refresh() && target.isFocused() && imeWindowVisible(ua);
         } catch (RuntimeException e) {
             return false;
         }
@@ -617,14 +659,14 @@ final class InputInjector {
                         masked = focus.isPassword();
                         rejectMaskedAppend(masked, current);
                         before = current;
-                        combined = current + text;
+                        combined = appendOrReplaceSelection(focus, current, text);
                     }
                     Bundle args = new Bundle();
                     args.putCharSequence(
                             AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, combined);
                     if (focus.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)) {
                         accepted++;
-                        lastState = "ACTION_SET_TEXT was accepted but the value did not change";
+                        lastState = "ACTION_SET_TEXT was accepted but the read-back never showed the new value";
                     } else {
                         lastState = "this field does not accept ACTION_SET_TEXT (a WebView, for example)";
                     }
@@ -637,7 +679,8 @@ final class InputInjector {
             }
             if (SystemClock.uptimeMillis() >= deadline) {
                 throw new BridgeRouter.BridgeException(500, lastState + " (2000ms waited; "
-                        + failureFacts(ua, lastRead, masked, lastRefreshOK, accepted) + ")");
+                        + failureFacts(ua, lastRead, masked, lastRefreshOK, accepted) + ")"
+                        + deliveryUnknownNote(accepted));
             }
             SystemClock.sleep(RETRY_POLL_MS);
         }

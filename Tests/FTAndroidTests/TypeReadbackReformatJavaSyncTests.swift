@@ -56,7 +56,8 @@ final class TypeReadbackReformatJavaSyncTests: XCTestCase {
                        "before 無しの旧形が残っている")
         XCTAssertEqual(code.components(separatedBy: "before = current;").count - 1, 2,
                        "before は combined を作る読み(1回だけ)から控える —— 追加の読みを足さない")
-        XCTAssertEqual(code.components(separatedBy: "combined = current + text;").count - 1, 2)
+        // 範囲選択があれば選択範囲を置き換え、無ければ末尾へ足す(appendOrReplaceSelection)。2経路とも同じ組み立てを通る
+        XCTAssertEqual(code.components(separatedBy: "combined = appendOrReplaceSelection(").count - 1, 2)
     }
 
     /// 「変わったが完全一致ではない」で通した回は logcat に残す(/type の応答 JSON は増やさない)

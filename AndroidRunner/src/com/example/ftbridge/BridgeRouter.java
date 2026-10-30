@@ -383,6 +383,7 @@ final class BridgeRouter implements BridgeHttpServer.Handler {
             // resource-id を渡す: キーボードの開閉で座標がズレても同じ要素を追跡し直すため
             InputInjector.setTextAppendingAt(ua(), center[0], center[1], refIds.get(ref), text, TEXT_INPUT_CONFIRM_BUDGET_MS);
         } else {
+            InputInjector.tapFocusedEditableIfImeHidden(ua());
             InputInjector.setTextAppending(ua(), text);
         }
         settle();
@@ -409,6 +410,7 @@ final class BridgeRouter implements BridgeHttpServer.Handler {
             tapUnlessAlreadyFocused(center, refIds.get(ref));
             InputInjector.clearTextAt(ua(), center[0], center[1], refIds.get(ref), TEXT_INPUT_CONFIRM_BUDGET_MS);
         } else {
+            InputInjector.tapFocusedEditableIfImeHidden(ua());
             InputInjector.clearFocused(ua(), TEXT_INPUT_CONFIRM_BUDGET_MS);
         }
         settle();
@@ -1091,6 +1093,22 @@ final class BridgeRouter implements BridgeHttpServer.Handler {
         }
     }
 
+    /** 起動できなかったパッケージの事実(無効化・未インストール・起動画面なし)。確かめられないときだけ従来の案内 */
+    private String launchFailureReason(String bundleID) {
+        String exact = "package:" + bundleID;
+        for (String line : shell("pm list packages -d " + bundleID).split("\n")) {
+            if (line.trim().equals(exact)) {
+                return "the package is installed but disabled; enable it with `adb shell pm enable " + bundleID + "`";
+            }
+        }
+        String path = shell("pm path " + bundleID);
+        if (path != null && path.contains("package:")) {
+            return "the package is installed but has no launchable activity";
+        }
+        if (path != null && path.trim().isEmpty()) return "the package is not installed";
+        return "check that it is installed";
+    }
+
     /** 1回分の起動試行。前面判定タイムアウトは例外ではなく false */
     private boolean attemptLaunch(String bundleID) {
         shell("am force-stop " + bundleID);
@@ -1108,7 +1126,7 @@ final class BridgeRouter implements BridgeHttpServer.Handler {
             String start = component == null ? null : shell("am start -n " + component);
             if (component == null || start == null || start.contains("Error")) {
                 throw new BridgeException(500,
-                        "cannot launch the app: " + bundleID + " (check that it is installed)");
+                        "cannot launch the app: " + bundleID + " (" + launchFailureReason(bundleID) + ")");
             }
         }
         sessionBundleID = bundleID;
@@ -1171,11 +1189,25 @@ final class BridgeRouter implements BridgeHttpServer.Handler {
         }
         String self = instrumentation.getContext().getPackageName();
         String home = resolveHomePackage();
+        String stoppedForeground = null;   // 応答に載せる事実(前面に居座ったアプリを止めたとき)
+        if ("com.android.systemui".equals(stuck)) {
+            // 起動の途中で画面が消えた/キーガードが出た形。systemui は殺さない(通知・アラーム・ジョブを落とす)。
+            // 起こしてキーガードを外し、再試行で前面に出す。それでも出なければ原因を言って失敗
+            shell("input keyevent KEYCODE_WAKEUP");
+            shell("wm dismiss-keyguard");
+            if (attemptLaunch(bundleID)) return ok();
+            throw new BridgeException(500, "the app never came to the foreground: " + bundleID
+                    + " (the screen is showing com.android.systemui — the screen went off or the device is locked during the launch)");
+        }
         if (stuck != null && !stuck.equals(bundleID) && !stuck.equals(self) && !stuck.equals(home)) {
             shell("am force-stop " + stuck);
             shell("input keyevent KEYCODE_HOME");
+            stoppedForeground = stuck;
         }
-        if (attemptLaunch(bundleID)) return ok();
+        if (attemptLaunch(bundleID)) {
+            return stoppedForeground == null ? ok() : BridgeHttpServer.Response.json(200,
+                    "{\"ok\":true,\"stoppedForeground\":" + JSONObject.quote(stoppedForeground) + "}");
+        }
         throw new BridgeException(500, "the app never came to the foreground: " + bundleID);
     }
 
@@ -1426,8 +1458,10 @@ final class BridgeRouter implements BridgeHttpServer.Handler {
     private double[] centerOf(int ref) {
         double[] center = refCenters.get(ref);
         if (center == null) {
-            throw new BridgeException(404,
-                    "reference number [" + ref + "] is unknown. Run GET /snapshot first");
+            // 撃つ前の断り(何も送っていない)= 届いていないと確定。stale-ref でホストの引き直し(waitSeconds 内)に乗せる
+            throw new BridgeException(422,
+                    "reference number [" + ref + "] is unknown (nothing was sent). Run GET /snapshot first",
+                    STALE_REF_REASON);
         }
         return center;
     }

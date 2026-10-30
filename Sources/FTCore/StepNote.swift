@@ -502,8 +502,8 @@ public enum StepNote: String, Sendable, Codable, CaseIterable {
             return "a system alert was in front of the app with no iosAlertHandler registered for it,"
                 + " so the app behind it was operated anyway"
         case .landscapeWithoutRotate:
-            return "the screen was in landscape and this scenario never rotated it — an earlier session"
-                + " (ft_rotate, live control) may have left the device rotated"
+            return "the screen was in landscape and this scenario never rotated it — the rotation"
+                + " came from outside this scenario (an ft_rotate or live-control rotation, or an earlier scenario)"
         case .systemAlertProbeFailed:
             return "the check for a system alert in front of the app failed, so the step went ahead"
                 + " without knowing whether one was there"

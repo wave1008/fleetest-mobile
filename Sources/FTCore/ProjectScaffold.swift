@@ -170,7 +170,10 @@ public enum ProjectScaffold {
         }
         var permissions = (settings["permissions"] as? [String: Any]) ?? [:]
         var allow = (permissions["allow"] as? [String]) ?? []
-        var added = (entries + [mcpToolsPermission]).filter { !allow.contains($0) }
+        // allow へ足す候補(deny にあるものは下で除く)。ask・deny の追加は別に数える
+        var allowCandidates = (entries + [mcpToolsPermission]).filter { !allow.contains($0) }
+        var askAdded: [String] = []
+        var denyAdded: [String] = []
         // ask は台帳に無いものだけ一度提示する(利用者が外したものは台帳にあるので戻らない)。台帳が無ければ全部を一度提示する
         // (台帳より前の受け手では、外していた ask も 1 度だけ戻る。設定の形からは「外した」と「提示前」を区別できない)。
         // 台帳はシナリオから書けない(`ScenarioSandbox.writeDeniedPaths`。書けると「提示済み」にして ask を足させない)
@@ -180,10 +183,15 @@ public enum ProjectScaffold {
            let list = (try? JSONSerialization.jsonObject(with: data)) as? [String] {
             offered = Set(list)
         }
+        // allow の `mcp__fleetest` を足し直すなら、台帳は「外した」証拠にならない(allow ごと消えている)。
+        // ask が無いと allow が ft_start_run / ft_services にそのまま効くので、同じ呼び出しで ask も置く
+        if !allow.contains(mcpToolsPermission) { offered = [] }
         var ask = (permissions["ask"] as? [String]) ?? []
-        for permission in mcpAskPermissions where !offered.contains(permission) && !ask.contains(permission) {
+        // **利用者が allow に明示したツールへ ask を足さない**(ask が allow に勝つので、明示の許可を打ち消してしまう)
+        for permission in mcpAskPermissions
+        where !offered.contains(permission) && !ask.contains(permission) && !allow.contains(permission) {
             ask.append(permission)
-            added.append(permission)
+            askAdded.append(permission)
         }
         permissions["ask"] = ask
         offered.formUnion(mcpAskPermissions)
@@ -195,20 +203,23 @@ public enum ProjectScaffold {
         // (`sandbox.disabled`)がそこにある(`ScenarioSandbox.MachineSettings`)
         if let rules = cloneReadOnlyRules(packageRoot: packageRoot, toolRoot: toolRoot),
            !allow.contains(rules.read) {
-            added.append(rules.read)
+            allowCandidates.append(rules.read)
             var deny = (permissions["deny"] as? [String]) ?? []
             for rule in [rules.edit, machineConfigEditDeny] where !deny.contains(rule) {
                 deny.append(rule)
-                added.append(rule)
+                denyAdded.append(rule)
             }
             permissions["deny"] = deny
         }
+        // deny にある許可は allow へ書かない = 書かないものを「Added」に数えない
+        let denied = Set((permissions["deny"] as? [String]) ?? [])
+        let allowAdded = allowCandidates.filter { !denied.contains($0) }
+        let added = allowAdded + askAdded + denyAdded
         guard !added.isEmpty else {
             try recordOfferedAsks(offered, at: ledgerURL)
             return []
         }
-        let denied = Set((permissions["deny"] as? [String]) ?? [])
-        allow.append(contentsOf: added.filter { !mcpAskPermissions.contains($0) && !denied.contains($0) })
+        allow.append(contentsOf: allowAdded)
         permissions["allow"] = allow
         settings["permissions"] = permissions
 

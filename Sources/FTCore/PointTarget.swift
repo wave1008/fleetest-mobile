@@ -33,15 +33,19 @@ public enum PointTarget {
     }
 
     /// 点に写る要素の書けるセレクタ(`SelectorNaming` の格付けつき)。写る要素が無い・書けるセレクタが無ければ nil
-    public static func writableSelector(atX x: Double, y: Double, in snapshot: SnapshotResponse) -> Target? {
+    /// `notDrawn` = 木に枠だけ残っていて、そこには描かれていない要素の ref(スクロール容器の外の残像。判定は呼び手 = MCP の `ghostRefs`)。
+    /// 点に写る要素がそれなら**書かない**(nil = 座標の行): セレクタの行は送り戻して別の物を押す
+    public static func writableSelector(atX x: Double, y: Double, in snapshot: SnapshotResponse,
+                                        notDrawn: Set<Int> = []) -> Target? {
         let naming = SelectorNaming(snapshot)
         if let operable = element(atX: x, y: y, in: snapshot.elements) {
+            if notDrawn.contains(operable.ref) { return nil }
             return naming.graded(for: operable, in: snapshot)
                 .map { Target(selector: $0.selector, durability: $0.durability, pressesThePoint: true) }
         }
         guard let area = smallest(atX: x, y: y, in: snapshot.elements.filter {
             !TapTargetGeometry.contains($0.frame, snapshot.screen) && !positionSensitiveTypes.contains($0.type)
-        }) else { return nil }
+        }), !notDrawn.contains(area.ref) else { return nil }
         // 中心に別の(より小さい)要素が在れば、セレクタの行はそちらを押す(Android の `#nav_host_fragment` の余白 等)
         let centre = (x: area.frame.x + area.frame.width / 2, y: area.frame.y + area.frame.height / 2)
         guard smallest(atX: centre.x, y: centre.y, in: snapshot.elements)?.ref == area.ref else { return nil }

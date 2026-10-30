@@ -139,7 +139,13 @@ struct ApiResultsCommand: AsyncParsableCommand {
         let bodyJSON = String(decoding: try encoder.encode(body), as: UTF8.self)
         let trendJSON = try scenario.map { id in
             let fullRecords = RunResultsStore.fullRecords(entries: entries, scenarioID: id)
-            return String(decoding: try encoder.encode(RunResultsQuery.trend(fullRecords, scenarioID: id)), as: UTF8.self)
+            let rows = RunResultsQuery.trend(fullRecords, scenarioID: id)
+            // クラス名は「履歴なし」(空配列)と見分けが付かないので断る。CLI の `results trend` / MCP の ft_results と同じ判定
+            if rows.isEmpty, let listing = RunResultsQuery.trendClassMemberListing(
+                selector: id, scenarioIDs: entries.map(\.record.scenarioID)) {
+                throw ValidationError("--scenario \(id) is a class name; trend takes one scenario ID (Class.method): " + listing)
+            }
+            return String(decoding: try encoder.encode(rows), as: UTF8.self)
         }
 
         // 窓に含めた最古の startedAt(run.json と記録の両方・machineHealth が読む他プロジェクトの分も。どれかが落ちれば出力が変わる)
@@ -195,6 +201,11 @@ struct ApiResultsCommand: AsyncParsableCommand {
                 return nil
             }
             let records = Self.records(index: index, scenarioID: scenario, resultsDir: resultsDir, sinceKey: sinceKey)
+            // クラス名は全計算の経路で断る(nil = 計算し直し。断る文面は1箇所に置く)
+            if records.isEmpty, RunResultsQuery.trendClassMemberListing(
+                selector: scenario, scenarioIDs: Array(index.files.keys)) != nil {
+                return nil
+            }
             guard let data = try? Self.makeEncoder().encode(RunResultsQuery.trend(records, scenarioID: scenario)) else {
                 return nil
             }

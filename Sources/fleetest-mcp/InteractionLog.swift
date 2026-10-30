@@ -35,6 +35,10 @@ struct InteractionLog {
         /// **sessionKey と比べない**)。**下書きは1台分だけ** —— 1つのプロセスで
         /// 2台を操作すると、別デバイスの手が1本のシナリオへ混ざる。nil は宛先を持たない記録(宣言など)で、どの台の下書きにも入る
         var deviceKey: String?
+        /// ツール自身が「効かなかったはず」と警告した手の警告文(下書きが印なしの行にしない。記録する側が渡す)
+        var noEffectWarning: String?
+        /// step なしの手を、この文のまま TODO として行の位置に残す(下書きの生成時に作る)
+        var todoNote: String?
     }
 
     private(set) var entries: [Entry] = []
@@ -66,6 +70,9 @@ struct InteractionLog {
         guard !all, let index = ofDevice.lastIndex(where: \.isLaunch) else { return ofDevice }
         return Array(ofDevice[index...])
     }
+
+    /// 記録に現れる台の鍵(`ft_draft_scenario` の `device:` で選べるもの)
+    var deviceKeys: Set<String> { Set(entries.compactMap(\.deviceKey)) }
 
     /// 最後に宛先付きで記録した手の台
     var latestDevice: String? { entries.last { $0.deviceKey != nil }?.deviceKey }

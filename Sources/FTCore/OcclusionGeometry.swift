@@ -76,6 +76,15 @@ public enum OcclusionGeometry {
             // **視覚的には親だが木では兄弟**のラッパーが遮蔽物になる(実測・Apple マップの1画面目:
             // 検索バーが中のボタンを覆っていると誤報し、タップは正常だった)
             if !PaintOrder.drawnAbove(other, element) { return false }
+            // **全画面の操作可能な要素が手前にあれば容器でなく幕**(RN の `Modal` の「Close modal」ボタン等。
+            // 背面のボタンを撃つと幕に当たってモーダルが閉じる)。祖先は lineage で除外済みで、
+            // 下の「画面規模の相手は容器」へ落とすと幕を素通しする。押せる型に限るのが要点 —— 非対話の全画面は普通の容器
+            if TapTargetGeometry.interactiveTypes.contains(other.type),
+               screen.width * screen.height > 0,
+               other.frame.width * other.frame.height
+                   >= screen.width * screen.height * TapTargetGeometry.fullScreenContainerAreaRatio {
+                return true
+            }
             // **塗り順が実測で採れているなら、ここから下の幾何ヒューリスティクスは使わない**。下の2つは
             // 「木の順序では手前/奥が分からない」ことへの当て推量で、真値がある場に混ぜると打ち消す
             // (実測・Google マップ: z のあるシートが地図側の容器を「内側の入れ物」と誤判定し警告が消えた)。

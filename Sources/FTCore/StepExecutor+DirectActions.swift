@@ -481,21 +481,27 @@ extension StepExecutor {
         let clock = ContinuousClock()
         let start = clock.now
         let latchedBefore = dragFallbackLatched
+        var startX = x
         var startY = y
         var bandNote: String?
-        if let band = await driver.backGestureEdgeWidths(), band.bottom > 0 {
+        if let band = await driver.backGestureEdgeWidths(), band.bottom > 0 || band.left > 0 || band.right > 0 {
             let screen = try await snapshotForScrollFrame(phase: &phase).screen
             let cleared = ScrollGeometry.clearingBottomGestureBand(y: y, viewport: screen, bottom: band.bottom)
             startY = cleared.y
             if cleared.moved { bandNote = Self.bottomBandNote }
+            let side = ScrollGeometry.clearingSideGestureBand(x: x, viewport: screen, left: band.left, right: band.right)
+            startX = side.x
+            if side.moved { bandNote = Self.joinNotes(bandNote, Self.sideBandNote) }
         }
-        try await dragWithFallback(fromX: x, fromY: startY, toX: toX, toY: toY, pressSeconds: FlowStep.defaultDragPressSeconds,
+        try await dragWithFallback(fromX: startX, fromY: startY, toX: toX, toY: toY, pressSeconds: FlowStep.defaultDragPressSeconds,
                                    durationSeconds: step.duration ?? tunables.defaultSwipeDuration)
         phase.actionMs += Self.ms(clock.now - start)
         return StepOutcome(status: .passed,
                            driverFallback: Self.joinNotes(
                                dragFallbackLatched && !latchedBefore ? "fell back to XCUITest" : nil, bandNote))
     }
+
+    static let sideBandNote = "start point moved clear of the Android back-gesture band at the screen edge (a touch there is taken as back)"
 
     /// 始点を下端のジェスチャ帯の外へ寄せたときの注記(Android のジェスチャナビ。
     /// 帯の中から始めると OS のホーム・アプリ切替に取られてアプリが離脱する)
@@ -626,6 +632,9 @@ extension StepExecutor {
             try await driver.type(ref: nil, text: text)
         }
         phase.actionMs += Self.ms(clock.now - start)
+        // **改行(IME アクション)で焦点は次の欄へ移りうる** —— 叩いた欄を覚えたままだと、続くロケータなしの type が
+        // 「焦点が木に無い」(次の欄がキーボードの下)を救済の対象と読んで、叩いた欄(移る前の欄)へ打つ
+        if text.contains("\n") { lastTapTarget = nil }
         return StepOutcome(status: .passed, driverFallback: Self.joinNotes(replaceFallbackNote, focusNote))
     }
 

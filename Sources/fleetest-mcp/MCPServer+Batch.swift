@@ -727,6 +727,7 @@ extension MCPServer {
                 continue
             }
             let start = clock.now
+            let treeBeforeStep = lastSnapshots[Self.sessionKey(args)]
             let outcome = await executor.execute(plan.step)
             let ms = Int((clock.now - start) / .milliseconds(1))
             // **実行した手はそのまま記録する**(利用者が書いた式のまま — 解決後の要素ではない。
@@ -749,7 +750,7 @@ extension MCPServer {
                 case .passed, .passedViaFallback, .healed:
                     reason = "could not confirm the result"
                 }
-                lines.append("\(index + 1). \(plan.summary) — FAILED (\(ms)ms): \(reason)" + refNote)
+                lines.append("\(index + 1). \(plan.summary) — FAILED (\(ms)ms): \(Self.batchWritableAdvice(reason))" + refNote)
                 // **止まった位置と、そこで見えている画面を一緒に返す**(scrollTo の failure と
                 // 同じ形: throw で isError にする — 呼び手が要求した手が最後まで実行されなかった
                 // という点で、要素へ届かなかった scrollTo と同種の失敗)
@@ -768,6 +769,14 @@ extension MCPServer {
                 throw MCPError(lines.joined(separator: "\n") + stoppedNote
                     + inheritedNote + (await snapshotBody(stopped, driver: batchDriver, args: treeArgs, foldsSelectorTables: true)))
             }
+            // type の後のキーボードの出現待ちは次の ref 操作の撮り直しで払う(ft_type と同じ印。
+            // 立てないと、バッチ直後の ft_hide_keyboard が出現前の木を読んで「出ていない」と答える)。type 以外の手は印を捨てる
+            if plan.step.action == "type" {
+                pendingTypeKeyboardChecks[Self.sessionKey(args)] = PendingTypeKeyboardCheck(
+                    before: treeBeforeStep, typedNewline: plan.step.text?.hasSuffix("\n") == true)
+            } else {
+                pendingTypeKeyboardChecks[Self.sessionKey(args)] = nil
+            }
             var okLine = "\(index + 1). \(plan.summary) — ok (\(ms)ms)"
             if case .passedViaFallback(let locator) = outcome.status {
                 okLine += " (matched via the fallback \(locator.summary))"
@@ -784,6 +793,14 @@ extension MCPServer {
                     + " narrow it with #id, a type, or [n])"
             }
             if sentNothing { okLine += " (the keyboard was not shown; nothing was sent)" }
+            // ft_double_tap と同じ但し書き(Compose は XCUITest ブリッジでダブルタップを受けない)。届かない確定した形は結論も passed にしない
+            if plan.step.action == "doubleTap" {
+                let hint = iosModeHint("Compose Multiplatform", frameworkKey: .compose, "double tap", args: args)
+                if !hint.isEmpty {
+                    okLine += " (warning:" + hint.replacingOccurrences(of: "\n", with: " ") + ")"
+                    if hint.contains("apps do not receive"), !suspectSteps.contains(index + 1) { suspectSteps.append(index + 1) }
+                }
+            }
             okLine += refNote
             lines.append(okLine)
             // 無効な要素への touch は撃った上で ok(DSL と同じ = 失敗にはしない)。結論で名指す
@@ -800,12 +817,38 @@ extension MCPServer {
                 pendingTap = nil
             }
         }
+        // 最後の手が tap なら、その撃つ前の木。最後の手の後に出たアラートはその手の結果でありうる(吸われたとは言えない)
+        let treeBeforeLastTap = pendingTap.flatMap { $0.step == plans.count ? $0.before : nil }
+        // 最後の木が起動したアプリのものでなければ(落ちて下のアプリが出た・別アプリへ移った)、「通った」「変化なし」とは言わない。
+        // 「前と同じ木」は落ちた後に現れた別アプリを起動前の木と比べた結果にすぎない(snapshotBody が同じ注記で名指す)
+        // iOS の XCUITest はセッションのアプリの木(落ちた後は空・別アプリへ移った後は古い木)を返し続けるので sessionBundleID は
+        // 食い違わない —— 前面かどうかは /appstate(backgroundedSessionNote)で聞く
+        func appLeftFront(_ tree: SnapshotResponse) async -> Bool {
+            let launched = launchedBundleIDs[Self.sessionKey(args)]
+            if !Self.switchedAppNote(
+                launched: launched, snapshot: tree,
+                processEvidence: androidProcessEvidenceForSwitch(
+                    launched: launched, snapshot: tree, driver: batchDriver, args: args),
+                stoppedByTool: toolStoppedBundleIDs[Self.sessionKey(args)]).isEmpty { return true }
+            return !(await Self.backgroundedSessionNote(tree, driver: batchDriver)).isEmpty
+        }
+        // 全手を撃った後の読みが失敗した(落ちた・前面を離れた)。手の一覧は捨てない —— 捨てると撃ち直しを誘う(届いた手の二重実行)
+        func unreadableAfterBatch(_ error: Error) -> [[String: Any]] {
+            text(lines.joined(separator: "\n") + "\n\nAll \(plans.count) step(s) were sent, but reading the screen afterwards failed: "
+                + ((error as? LocalizedError)?.errorDescription ?? "\(error)")
+                + " — the app may have crashed or left the front. Do not re-send the steps; check ft_status / ft_logs.\n")
+        }
         // **waitFor は「変化なし」の撮り直しの代わり**(snapshotAfter と同じ = 待つ理由が同じなので両方は二重に待つだけ)
         if let waitFor = args["waitFor"] as? String {
             let seconds = try Self.doubleArgument(args, "waitSeconds") ?? Self.defaultWaitSeconds
-            let first = try await freshSnapshot(batchDriver, args: args)
-            let waited = try await Self.waitFor(waitFor, driver: batchDriver, first: first, seconds: seconds,
+            let first: SnapshotResponse
+            let waited: (found: Bool, snapshot: SnapshotResponse, partialSeenAfter: Double?, partialHint: String,
+                         refetched: Bool, quietStopAfter: Double?)
+            do {
+                first = try await freshSnapshot(batchDriver, args: args)
+                waited = try await Self.waitFor(waitFor, driver: batchDriver, first: first, seconds: seconds,
                                                 elementLimit: try pollElementLimit(args))
+            } catch { return unreadableAfterBatch(error) }
             let final = waited.refetched ? adoptSnapshot(waited.snapshot, args: args) : waited.snapshot
             recordSnapshot(final, batchDriver is AndroidDriver ? "android" : "ios", args)
             flagUnchangedTap(now: final.elements)
@@ -817,29 +860,42 @@ extension MCPServer {
                 : Self.waitMissHeadline(waitFor, seconds: seconds, quietStopAfter: waited.quietStopAfter,
                                         explain: explainMiss, canWaitForChange: false)
                     // alert は batchAlertAppearedNote が先に言う(重ねない)
-                    + (Self.batchAlertAppearedNote(beforeBatch: beforeBatch, final: final).isEmpty
+                    + (Self.batchAlertAppearedNote(beforeBatch: beforeBatch, final: final, beforeLastStep: treeBeforeLastTap).isEmpty
                        ? Self.appearedPromptNote(before: beforeBatch, now: final) : "")
                     + " — this is the screen as it is now"
                     + Self.truncationHint(final) + Self.notationHint(waitFor, in: final)
                     + Self.similarLabelsHint(waitFor, in: final) + "\n"
-            return text(lines.joined(separator: "\n") + Self.batchVerdict(stepCount: plans.count, suspects: suspectSteps)
-                + Self.batchAlertAppearedNote(beforeBatch: beforeBatch, final: final)
+            return text(lines.joined(separator: "\n") + Self.batchVerdict(stepCount: plans.count, suspects: suspectSteps,
+                                                                       appLeftFront: await appLeftFront(final))
+                + Self.batchAlertAppearedNote(beforeBatch: beforeBatch, final: final, beforeLastStep: treeBeforeLastTap)
                 + waitNote + inheritedNote + (await snapshotBody(final, driver: batchDriver, args: treeArgs, foldsSelectorTables: true)))
         }
-        let (unchangedNote, final) = try await Self.batchUnchangedNote(
-            beforeBatch: beforeBatch, final: try await freshSnapshot(batchDriver, args: args),
-            stepCount: plans.count, bridge: bridges[Self.sessionKey(args)],
-            probeSystemAlert: { try? await batchDriver.systemAlert() }) {
-            // settle-lite と同じ待ち(snapshotAfterBodyWithStatus 参照。新しい定数は置かない)
-            try await Task.sleep(nanoseconds: UInt64(max(0, self.settleWaitSeconds) * 1_000_000_000))
-            return try await self.freshSnapshot(batchDriver, args: args)
-        }
+        let unchangedNote: String
+        let final: SnapshotResponse
+        do {
+            (unchangedNote, final) = try await Self.batchUnchangedNote(
+                beforeBatch: beforeBatch, final: try await freshSnapshot(batchDriver, args: args),
+                stepCount: plans.count, bridge: bridges[Self.sessionKey(args)],
+                probeSystemAlert: {
+                    // 「居ない」と言い切る前に、遅れて出るアラート(tap が権限を求める典型)を settle-lite と同じ間隔で1回だけ読み直す
+                    let first = try? await batchDriver.systemAlert()
+                    guard first?.present == false else { return first }
+                    try? await Task.sleep(nanoseconds: UInt64(max(0, self.settleWaitSeconds) * 1_000_000_000))
+                    return (try? await batchDriver.systemAlert()) ?? first
+                }) {
+                // settle-lite と同じ待ち(snapshotAfterBodyWithStatus 参照。新しい定数は置かない)
+                try await Task.sleep(nanoseconds: UInt64(max(0, self.settleWaitSeconds) * 1_000_000_000))
+                return try await self.freshSnapshot(batchDriver, args: args)
+            }
+        } catch { return unreadableAfterBatch(error) }
         recordSnapshot(final, batchDriver is AndroidDriver ? "android" : "ios", args)
         flagUnchangedTap(now: final.elements)
         applyUnchangedTaps(final: final)
-        return text(lines.joined(separator: "\n") + Self.batchVerdict(stepCount: plans.count, suspects: suspectSteps)
-            + Self.batchAlertAppearedNote(beforeBatch: beforeBatch, final: final)
-            + unchangedNote + inheritedNote + (await snapshotBody(final, driver: batchDriver, args: treeArgs, foldsSelectorTables: true)))
+        let leftFront = await appLeftFront(final)
+        return text(lines.joined(separator: "\n") + Self.batchVerdict(stepCount: plans.count, suspects: suspectSteps,
+                                                                   appLeftFront: leftFront)
+            + Self.batchAlertAppearedNote(beforeBatch: beforeBatch, final: final, beforeLastStep: treeBeforeLastTap)
+            + (leftFront ? "" : unchangedNote) + inheritedNote + (await snapshotBody(final, driver: batchDriver, args: treeArgs, foldsSelectorTables: true)))
     }
 
     /// ok の手の後で画面(木の内容)が1つも変わっていなかった tap の行に添える。iOS の木はアプリの外(システムのアラート)を
@@ -850,8 +906,26 @@ extension MCPServer {
             + (isAndroid ? "" : ", or it raised a system alert, which is drawn outside the app's tree") + ")"
     }
 
+    /// ft_batch はブロック(`withScroll*(scrollFrame:) { }`)を書けない。DSL の探索失敗の「withScroll* で包め」は、
+    /// バッチで書ける `scrollTo … scrollFrame: … direction:`(その後に tap)へ言い換える
+    static func batchWritableAdvice(_ reason: String) -> String {
+        guard let regex = try? NSRegularExpression(
+            pattern: #"consider wrapping the step in withScroll(\w+)\(scrollFrame: ("[^"]*")\) \{ \}"#) else { return reason }
+        let range = NSRange(reason.startIndex..., in: reason)
+        guard let match = regex.firstMatch(in: reason, range: range),
+              let full = Range(match.range, in: reason),
+              let frame = Range(match.range(at: 2), in: reason) else { return reason }
+        return reason.replacingCharacters(in: full, with: "putting a scrollTo '<target>' scrollFrame: \(reason[frame])"
+            + " direction: <the direction you gave scroll:> step before it (ft_batch cannot write withScroll* blocks)")
+    }
+
     /// 結論の行。ok でも何も起きていないかもしれない手(`suspects` = 手の番号)があれば「passed」と言わない
-    static func batchVerdict(stepCount: Int, suspects: [Int]) -> String {
+    static func batchVerdict(stepCount: Int, suspects: [Int], appLeftFront: Bool = false) -> String {
+        if appLeftFront {
+            return "\n\nAll \(stepCount) step(s) ran, but the app is no longer in front after the last step — it may have"
+                + " crashed or moved to another app, possibly during an EARLIER step (then the steps after it acted on"
+                + " whatever was in front instead; see the note on the screen below).\n\n"
+        }
         guard !suspects.isEmpty else { return "\n\nAll \(stepCount) step(s) passed.\n\n" }
         let numbers = suspects.sorted().map(String.init).joined(separator: ", ")
         return "\n\nAll \(stepCount) step(s) ran, but step(s) \(numbers) may have done nothing (see the warning on"
@@ -877,13 +951,21 @@ extension MCPServer {
     /// 後続の waitFor が上限まで空振りした。各手が ok でも alert が手を吸ったかは木から言えないので
     /// 「吸われたかもしれない」に留める。**開始前の木に同じ alert が居たら言わない**(元からあった)・
     /// 開始前の木が無ければ比べられないので言わない
+    /// `beforeLastStep` = 最後の手(tap)を撃つ前の木。**そこに居なかったアラートは最後の手の結果**でありうる
+    /// (それが先の手を吸うことは無い)ので言わない。最後の手が tap でなければ nil(比べられない = 従来どおり言う)
     static func batchAlertAppearedNote(beforeBatch: SnapshotResponse?,
-                                       final: SnapshotResponse) -> String {
+                                       final: SnapshotResponse,
+                                       beforeLastStep: [ElementInfo]? = nil) -> String {
         guard let before = beforeBatch else { return "" }
         func alerts(_ snapshot: SnapshotResponse) -> [ElementInfo] {
             snapshot.elements.filter { ElementInfo.normalizedType($0.type) == "alert" }
         }
-        let earlier = Set(alerts(before).map { $0.label ?? "" })
+        var earlier = Set(alerts(before).map { $0.label ?? "" })
+        if let beforeLastStep {
+            // 最後の手の前に居なかったアラートは「元からあった」と同じ扱いで外す
+            let upBeforeLast = Set(beforeLastStep.filter { ElementInfo.normalizedType($0.type) == "alert" }.map { $0.label ?? "" })
+            earlier.formUnion(alerts(final).map { $0.label ?? "" }.filter { !upBeforeLast.contains($0) })
+        }
         guard let appeared = alerts(final).first(where: { !earlier.contains($0.label ?? "") })
         else { return "" }
         return "note: an alert (\(RefGuard.describe(appeared))) appeared during this batch — a step sent"

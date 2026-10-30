@@ -944,9 +944,31 @@ public enum TapTargetGeometry {
     /// 見えている部分を撃っても、Compose は focus 時に内容を動かして隣の行が指の下へ来ることがある
     public static func straddleAdvisory(for element: ElementInfo, in elements: [ElementInfo],
                                         inferring: Bool = true) -> String? {
-        guard straddlingContainerEdge(element, in: elements, inferring: inferring) != nil else { return nil }
+        guard straddlingContainerEdge(element, in: elements, inferring: inferring) != nil else {
+            return sideEdgeCentreAdvisory(for: element, in: elements, inferring: inferring)
+        }
         return "the target straddles the edge of its scroll container (partly clipped), so the"
             + " tap may land on a neighbouring row — scroll it fully inside the container first"
+    }
+
+    /// **横の容器の左右の縁で切れ、frame の中心が容器の外に落ちる**要素の警告(`straddleAdvisory` の横版)。
+    /// `straddleJump` は縦の寄せ量しか持たないので `straddlingContainerEdge` には載らず、ref(= frame の中心)を撃つ MCP は
+    /// 容器の外の余白を無警告で撃っていた(実機 SE3 の横カルーセル: 中心 x=12・容器の左端 16)。DSL は
+    /// `StepExecutor.visibleTapRect` が見えている部分へ寄せるので当たる。**中心が容器の中なら言わない**
+    /// (縁で切れていても中心は描かれていて当たる = 横カルーセルの端の項目ごとに警告すると毎回のノイズ)。
+    /// 縦に切れた要素は `straddlingContainerEdge` の側が先に拾うので、ここは横の外側だけを見る
+    static func sideEdgeCentreAdvisory(for element: ElementInfo, in elements: [ElementInfo],
+                                       inferring: Bool) -> String? {
+        guard let container = ContainerGeometry.clippingContainer(of: element, in: elements,
+                                                                  inferring: inferring),
+              container.width > 0, element.frame.width > 0,
+              element.frame.width <= container.width,
+              ScrollGeometry.intersection(element.frame, container) != nil else { return nil }
+        let centreX = element.frame.centerX
+        guard centreX < container.x || centreX > container.x + container.width else { return nil }
+        return "its centre (\(Int(centreX)), \(Int(element.frame.centerY))) falls outside the side edge of its scroll"
+            + " container (partly clipped), so the tap lands on the empty margin beside it, not on the visible part —"
+            + " scroll it fully inside the container first"
     }
 
     /// 「そもそも無効」。**撃つ座標に依らない**ので、どの経路でも同じことが言える

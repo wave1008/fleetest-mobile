@@ -36,7 +36,16 @@ public enum InputFocusRescue {
         if let id = tapped.identifier, !id.isEmpty, focused.identifier == id, focused.type == tapped.type {
             return false
         }
-        return !contains(tapped.frame, centreOf: focused.frame)
+        return !contains(currentFrame(of: tapped, in: elements), centreOf: focused.frame)
+    }
+
+    /// 叩いた要素の**撮り直した木での枠**。キーボードが出ると一覧が押し上げられ(Flutter・View)、叩いた時点の枠のままでは
+    /// 焦点のある欄の中心が枠の外に出て「焦点はよそ」と読み、**古い枠の中に来た隣の欄**を選んで打つ。
+    /// id + 型がちょうど1個に決まるときだけ撮り直した木の枠を使い、決まらなければ叩いた時点の枠のまま
+    static func currentFrame(of tapped: ElementInfo, in elements: [ElementInfo]) -> FTRect {
+        guard let id = tapped.identifier, !id.isEmpty else { return tapped.frame }
+        let same = elements.filter { $0.identifier == id && $0.type == tapped.type }
+        return same.count == 1 ? same[0].frame : tapped.frame
     }
 
     /// 直前に叩いた要素から「入れるべき欄」を決める。**一意に決まらなければ nil**。
@@ -50,9 +59,10 @@ public enum InputFocusRescue {
     /// 容器と中身は数 px ずれることがあり、厳密な包含だと落ちる
     public static func fieldToType(after tapped: ElementInfo,
                                    in elements: [ElementInfo]) -> ElementInfo? {
+        let frame = currentFrame(of: tapped, in: elements)
         let candidates = elements.filter {
             SnapshotRenderer.textInputTypes.contains($0.type) && $0.enabled
-                && contains(tapped.frame, centreOf: $0.frame)
+                && contains(frame, centreOf: $0.frame)
         }
         guard candidates.count == 1 else { return nil }
         return candidates.first

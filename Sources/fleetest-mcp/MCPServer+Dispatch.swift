@@ -159,10 +159,32 @@ extension MCPServer {
     }
 
     /// ft_logs の bundleId 既定。ログはブリッジを通らないので sessionKey が launch 時と
-    /// 揃わない(profile で起動し serial 直指定で読む等)。覚えている起動が1つだけならそれを使う
+    /// 揃わない(profile で起動し serial 直指定で読む等)。覚えている起動が1つだけならそれを使う。
+    /// **別の台を名指しして起動した記録は借りない**(`borrowableLaunchedBundleID`)
     func lastLaunchedBundleID(_ args: [String: Any]) -> String? {
         if let exact = launchedBundleIDs[Self.sessionKey(args)] { return exact }
-        let known = Set(launchedBundleIDs.values)
+        var launched: [String: String] = [:]
+        for (key, session) in sessions { if let bundleID = session.launchedBundleID { launched[key] = bundleID } }
+        return Self.borrowableLaunchedBundleID(launched: launched, platform: Self.platformName(args))
+    }
+
+    /// 呼び手の宛先に一致するセッションが無いときに借りてよい起動先。**借りてよいのは、同じ OS で、台を名指ししていない
+    /// セッション(profile 鍵・port も serial も無い direct 鍵)の記録が1種類だけのとき**。
+    /// serial / port を名指しして起動した記録は別の台のものかもしれず、借りると別の台のログを「そのアプリのもの」として読む
+    /// (direct 鍵の形は `driverCacheKey(platform:port:serial:)` = `direct:<platform>:<port or 0>:<serial>`。変えたらここも直す)
+    static func borrowableLaunchedBundleID(launched: [String: String], platform: String) -> String? {
+        let candidates = launched.filter { key, _ in
+            if key.hasPrefix("direct:") {
+                let parts = key.split(separator: ":", maxSplits: 3, omittingEmptySubsequences: false)
+                return parts.count == 4 && parts[1] == platform && parts[2] == "0" && parts[3].isEmpty
+            }
+            if key.hasPrefix("profile:") {
+                let keyPlatform = key.split(separator: ":", omittingEmptySubsequences: false).last.map(String.init) ?? ""
+                return keyPlatform.isEmpty || keyPlatform == platform
+            }
+            return false
+        }
+        let known = Set(candidates.values)
         return known.count == 1 ? known.first : nil
     }
 
@@ -217,6 +239,14 @@ extension MCPServer {
         let platform = platformArg ?? Self.fallbackPlatform(fallback, resolved: resolved)
         guard let device = resolved.devices.first(where: { $0.platform == platform }) else {
             throw MCPError("profile \(profileName) has no \(platform) device")
+        }
+        // 2台以上あるのに先頭を使うことを黙らない(回帰の使っている1台目へ黙って向く)。他の台は serial / udid で指せる
+        let sameOS = resolved.devices.filter { $0.platform == platform }
+        if sameOS.count > 1 {
+            prologue.append("⚠️ profile \(profileName) has \(sameOS.count) \(platform) devices; using the first (\(device.name))."
+                + " To drive another one, drop profile and pass \(platform == "ios" ? "udid" : "serial")"
+                + " (ft_list_devices lists them; profile cannot be combined with it): "
+                + sameOS.dropFirst().map(\.name).joined(separator: ", "))
         }
         if platform == "ios" {
             // ブリッジ資産(InAppBridge/・Runner/)を持つ**ツール本体**のルート。受け手パッケージの
@@ -415,6 +445,32 @@ extension MCPServer {
             + " retry for finding its target, about 0.7 s by default)"
     }
 
+    /// 未知の引数があれば**撃たずに断る**ツール = 端末を動かす・消すツール全部(`toolEffects` が drivesDevice / destructive)。
+    /// 他のツールは注記して撃つ(断ると二度撃ちを誘う)が、動かすツールは宛先のつもりの欄(`selector` / `scrollframe` 等)を
+    /// 落とすと焦点のある別の欄へ打つ・画面全体を払う・別の要素を押す —— 取り返せない。
+    /// 断る前に撃っていない(= 何も送っていない)ので、綴りを直した撃ち直しは二重実行にならない
+    static func refusesUnknownArguments(_ tool: String) -> Bool {
+        switch toolEffects[tool] {
+        case .drivesDevice?, .destructive?: return true
+        default: return false
+        }
+    }
+
+    /// 宛先・撃ち方を選ばない「木の読み方」の欄。宣言していないツールへ渡しても落ちて困るのは読み方だけ
+    /// (ft_tap に `maxElements` を渡す形は従来どおり注記で通す = `DeclaredArgumentTypeCheckTests`)
+    static let viewOnlyArgumentNames: Set<String> = Set(foldingProperties.keys)
+        .union(["maxElements", "waitFor", "waitSeconds", "waitForChange", "snapshotAfter"])
+
+    static func unknownArgumentRefusal(tool: String, args: [String: Any]) -> String? {
+        guard refusesUnknownArguments(tool) else { return nil }
+        let shaping = args.filter { !viewOnlyArgumentNames.contains($0.key) }
+        let note = unknownArgumentNote(tool: tool, args: shaping)
+        guard !note.isEmpty else { return nil }
+        return note.replacingOccurrences(of: "⚠️ ignored unknown argument(s): ", with: "unknown argument(s): ")
+            + " — nothing was sent (an argument meant to pick the target or shape the action would be dropped and"
+            + " \(tool) would act on whatever it falls back to)"
+    }
+
     static func unknownArgumentNote(tool: String, args: [String: Any]) -> String {
         guard let definition = toolDefinitions.first(where: { $0["name"] as? String == tool }),
               let schema = definition["inputSchema"] as? [String: Any],
@@ -514,6 +570,7 @@ extension MCPServer {
         // 投げるより前に確定させ、成功(decorated)・失敗(下の catch)の両方へ同じ注記を乗せる
         // **改名した引数は、宣言していない欄を落とす前に断る**(落とした後では本体に届かない)
         if let refusal = Self.renamedArgumentRefusal(tool: tool, args: cleaned) { throw MCPError(refusal) }
+        if let refusal = Self.unknownArgumentRefusal(tool: tool, args: cleaned) { throw MCPError(refusal) }
         let unknownArgumentNote = [Self.unknownArgumentNote(tool: tool, args: cleaned),
                                    Self.ignoredWaitSecondsNote(tool: tool, args: cleaned)]
             .filter { !$0.isEmpty }.joined(separator: " ")
@@ -618,6 +675,12 @@ extension MCPServer {
             }
             if let note = takeUIFrameworkUnknownNote(args: resolved) {
                 content = [["type": "text", "text": note]] + content
+            }
+            // ドライバの供給で溜まったプロファイル警告(複数台の「先頭を使う」等)を、それを生んだ呼び出し自身の応答で吐く。
+            // ft_status / ft_snapshot は本文の組み立てで先に取り出すので二重にはならず、他の道具では次の ft_snapshot まで遅れていた
+            if Self.toolAcceptsDeviceTarget(tool) {
+                let pending = withPendingWarnings("", args: resolved)
+                if !pending.isEmpty { content = [["type": "text", "text": pending.trimmingCharacters(in: .newlines)]] + content }
             }
             return Self.withElapsed(content, since: start, clock: clock,
                                     breakdown: SlowCallWatchdog.breakdown())

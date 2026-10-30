@@ -45,6 +45,46 @@ public enum ReinstallPackageCheck: Equatable, Sendable {
         }
     }
 
+    /// パスが「パッケージの形」か(.ipa のファイル / Info.plist を持つ .app のフォルダ)。**呼び手が名指ししたパスでも、
+    /// この形でなければ消す前に断る** —— フォルダや Info.plist を渡すと devicectl が後から断り、uninstall 済みの
+    /// アプリが端末から消えたまま終わる。`unreadable` の「申告を信じる」は、形が正しいのに読めない場合だけ
+    public static func looksLikePackage(path: String, fileManager: FileManager = .default) -> Bool {
+        var isDirectory: ObjCBool = false
+        guard fileManager.fileExists(atPath: path, isDirectory: &isDirectory) else { return false }
+        switch (path as NSString).pathExtension.lowercased() {
+        case "ipa": return !isDirectory.boolValue
+        case "app":
+            return isDirectory.boolValue
+                && fileManager.fileExists(atPath: (path as NSString).appendingPathComponent("Info.plist"))
+        default: return false
+        }
+    }
+
+    /// `looksLikePackage` を通った名指しのパスに、**入れられる中身が無い**ときの理由(あれば nil でない)。
+    /// .ipa は zip の署名(`PK\u{3}\u{4}`)・.app は Info.plist の `CFBundleExecutable` が指す実行ファイルを見る。
+    /// 形だけ整った偽物は devicectl が uninstall の後で断り、アプリが端末から消えたまま終わる。
+    /// **読めた中身の正しさ(署名・bundle ID)は見ない** —— 見るのは「パッケージとして空か」だけ
+    public static func emptyPackageReason(path: String, fileManager: FileManager = .default) -> String? {
+        switch (path as NSString).pathExtension.lowercased() {
+        case "ipa":
+            guard let handle = FileHandle(forReadingAtPath: path) else { return "the .ipa cannot be opened" }
+            defer { try? handle.close() }
+            let head = (try? handle.read(upToCount: 4)) ?? Data()
+            return head == Data([0x50, 0x4B, 0x03, 0x04]) ? nil : "the .ipa is not a zip archive"
+        case "app":
+            let plistPath = (path as NSString).appendingPathComponent("Info.plist")
+            guard let data = fileManager.contents(atPath: plistPath),
+                  let plist = (try? PropertyListSerialization.propertyList(from: data, format: nil)) as? [String: Any]
+            else { return "its Info.plist cannot be read" }
+            guard let executable = plist["CFBundleExecutable"] as? String, !executable.isEmpty
+            else { return "its Info.plist has no CFBundleExecutable" }
+            return fileManager.fileExists(atPath: (path as NSString).appendingPathComponent(executable))
+                ? nil : "the executable \(executable) is missing from the .app"
+        default:
+            return nil
+        }
+    }
+
     /// パスのパッケージを読んで判定する(.app / .ipa)。**.ipa は unzip を同期で撃つ**(大きいと数秒) =
     /// async の呼び手は `inspectOffPool` を使う
     public static func inspect(path: String, expectedBundleID: String) -> ReinstallPackageCheck {
@@ -54,6 +94,13 @@ public enum ReinstallPackageCheck: Equatable, Sendable {
     /// `inspect` を協調スレッドプールの外で撃つ(同期の外部コマンドでプールを塞がない。MCP の規律と同じ)
     public static func inspectOffPool(path: String, expectedBundleID: String) async -> ReinstallPackageCheck {
         await BlockingWork.offPool(name: "fleetest-package-inspect") { inspect(path: path, expectedBundleID: expectedBundleID) }
+    }
+
+    /// パッケージ(.app / .ipa)の bundle ID。読めなければ nil。協調スレッドプールの外で読む
+    public static func bundleIDOffPool(path: String) async -> String? {
+        await BlockingWork.offPool(name: "fleetest-package-inspect") {
+            AppPackageReader.open(path: path)?.infoPlist?["CFBundleIdentifier"] as? String
+        }
     }
 
     /// パスのパッケージが Simulator 用ビルドか(読めなければ false)。協調スレッドプールの外で読む

@@ -12,11 +12,14 @@ final class AlertTreeScopeTests: XCTestCase {
 
     /// いちばん手前(木の順で最後)の alert を採り、その部分木だけを残す。背面の行も、alert の後ろの兄弟も残さない
     func testOnlyTheFrontAlertSubtreeIsKept() throws {
+        // ボタン(y=250・300)を枠の中に持つ手前のアラート
+        var frontAlert = el(4, "alert", "手前のアラート", depth: 1)
+        frontAlert.frame = FTRect(x: 20, y: 200, width: 340, height: 160)
         let snapshot = SnapshotResponse(
             sessionBundleID: "com.example.app", screen: FTRect(x: 0, y: 0, width: 402, height: 874),
             elements: [el(1, "button", "背面", depth: 1),
                        el(2, "alert", "奥のアラート", depth: 1), el(3, "button", "奥のOK", depth: 2),
-                       el(4, "alert", "手前のアラート", depth: 1), el(5, "button", "OK", depth: 2),
+                       frontAlert, el(5, "button", "OK", depth: 2),
                        el(6, "button", "キャンセル", depth: 2), el(7, "button", "後ろの兄弟", depth: 1)],
             truncatedCount: 0)
         let alert = try XCTUnwrap(AlertTreeScope.frontInAppAlert(in: snapshot))
@@ -40,5 +43,18 @@ final class AlertTreeScopeTests: XCTestCase {
                                         elements: [el(1, "button", "背面", depth: 1), offscreen, zero],
                                         truncatedCount: 0)
         XCTAssertNil(AlertTreeScope.frontInAppAlert(in: snapshot))
+    }
+
+    /// 入力欄つきのアラートではキーボード(予測変換の候補)が部分木に入る。ボタン一覧に並べるのはアラートの枠の中だけ
+    func testKeyboardCandidatesInsideTheAlertSubtreeAreNotListedAsButtons() throws {
+        var alert = el(1, "alert", "名前", depth: 1)
+        alert.frame = FTRect(x: 20, y: 200, width: 340, height: 160)
+        var ok = el(2, "button", "OK", depth: 2)
+        ok.frame = FTRect(x: 40, y: 300, width: 300, height: 44)
+        var candidate = el(3, "button", "こんにちは", depth: 3)
+        candidate.frame = FTRect(x: 0, y: 560, width: 130, height: 44)
+        let snapshot = SnapshotResponse(sessionBundleID: "com.example.app", screen: FTRect(x: 0, y: 0, width: 402, height: 874),
+                                        elements: [alert, ok, candidate], truncatedCount: 0)
+        XCTAssertEqual(AlertTreeScope.buttonLabels(of: alert, in: snapshot), ["OK"])
     }
 }

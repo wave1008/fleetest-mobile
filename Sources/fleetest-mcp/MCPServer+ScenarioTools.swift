@@ -113,6 +113,12 @@ extension MCPServer {
         // `#id` 台帳の照合は platform 別なので、宣言の無いシナリオは呼び出し側の platform 引数で
         // 決める(既定 ios)。宣言があるシナリオは常にそちらを使う(クラス展開で platform の
         // 混在する束を渡された場合でも、個々の宣言を尊重する)
+        // enum 外の値("Android" 等)は ios { } / android { } のどちらにも当たらず、分岐を1つも検証せずに緑になる
+        // (CLI の `--platform` は `RunCommonOptions.validateTargeting` で同じ値を断る)
+        if let given = args["platform"] as? String, !RunWorker.knownPlatforms.contains(given) {
+            throw MCPError("platform must be one of "
+                + "\(RunWorker.knownPlatforms.sorted().joined(separator: "/")): \(given)")
+        }
         let fallbackPlatform = args["platform"] as? String ?? "ios"
         var lines: [String] = []
         var passedCount = 0

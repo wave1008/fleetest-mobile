@@ -53,9 +53,12 @@ final class RunRejectionParityTests: XCTestCase {
               arguments: ["--profile", "p", "--all-machines", "--runner", "m1"], rejected: true),
         .init(label: "all-machines with device-machine",
               arguments: ["--all-machines", "--device-machine", "m1"], rejected: true),
-        .init(label: "all-machines alone", arguments: ["--all-machines"], rejected: false),
+        // --device 無しの --all-machines は何もしない(名前が跨るときの曖昧さを解く指定)ので断る
+        .init(label: "all-machines alone", arguments: ["--all-machines"], rejected: true),
         .init(label: "all-machines with profile",
-              arguments: ["--profile", "p", "--all-machines"], rejected: false),
+              arguments: ["--profile", "p", "--all-machines"], rejected: true),
+        .init(label: "all-machines with device",
+              arguments: ["--profile", "p", "--all-machines", "--device", "d"], rejected: false),
 
         // --set(実行プロファイルの上書き)
         .init(label: "set profile-only key without profile",

@@ -153,7 +153,10 @@ extension MCPServer {
             maxLines: try Self.intArgument(args, "lines") ?? Self.logsDefaultLines,
             crashOnly: (args["all"] as? Bool) != true,
             physicalUDID: logsPhysicalUDID,
-            simulatorUDID: logsPhysicalUDID == nil ? logsUDID : nil))
+            simulatorUDID: logsPhysicalUDID == nil ? logsUDID : nil,
+            // このセッションが起動したアプリのレポートなら、起動より前のものは今のプロセスのクラッシュではない
+            launchedAt: logBundleID != nil && launchedBundleIDs[Self.sessionKey(args)] == logBundleID
+                ? launchTimestamps[Self.sessionKey(args)] : nil))
     }
 
     func ftInstall(_ args: [String: Any]) async throws -> [[String: Any]] {
@@ -181,10 +184,18 @@ extension MCPServer {
         // **既に起動していたアプリの上書きインストールは、たいてい実行中のプロセスを止める**
         //。次の snapshot が switchedAppNote 経由で「クラッシュしたかも」と
         // 誤診しないよう、原因をこの操作へ帰属させておく(ft_launch で消える)
-        if launchedBundleIDs[installKey] != nil {
+        var stoppedNote = ""
+        if let launched = launchedBundleIDs[installKey] {
             toolStoppedBundleIDs[installKey] = "ft_install"
+            // 入れ直したのがセッションのアプリなら、ランナーのセッションも畳む(残ると次の木が「落ちたかも(503)」と言う)。
+            // パッケージの bundle ID が読めた iOS だけ(別アプリの install は走っているアプリを止めない)
+            if !(installDriver is AndroidDriver),
+               let installed = await ReinstallPackageCheck.bundleIDOffPool(path: packagePath), installed == launched {
+                if (try? await installDriver.status())?.sessionBundleID == launched { try? await installDriver.terminate() }
+                stoppedNote = "\nnote: \(launched) was running and the install replaced it — the app is stopped; ft_launch to continue"
+            }
         }
-        return text("Installed: \(packagePath)" + (installNote.map { "\n\($0)" } ?? ""))
+        return text("Installed: \(packagePath)" + (installNote.map { "\n\($0)" } ?? "") + stoppedNote)
     }
 
     /// 相対パスの拒否(どの OS の ft_install も撃つ前に通す)。**スキーマ(packagePath: 絶対パス)に反する** ——
@@ -394,7 +405,16 @@ extension MCPServer {
             openURLArgs["waitForChange"] = true
         }
         let treeBeforeDelivery = lastSnapshots[Self.sessionKey(args)]
-        try await openURLDriver.openURL(url, bundleID: openURLBundleID)
+        do {
+            try await openURLDriver.openURL(url, bundleID: openURLBundleID)
+        } catch where explicitBundleID == nil && openURLBundleID != nil && openURLDriver is AndroidDriver {
+            // Android は bundleId を省くと最後に起動したアプリへ宛先を固定する(am start -p)。そのアプリが URL を扱わないと
+            // am の生の出力だけが返り、宛先の固定が原因だと読めない
+            throw MCPError(error.localizedDescription
+                + "\nnote: bundleId was not given, so the URL was addressed to this session's last ft_launch on this device"
+                + " (\(openURLBundleID ?? "")). If that app does not handle this URL, pass bundleId: <the app that handles it>"
+                + " (e.g. a browser package for a web URL).")
+        }
         // ディープリンクが未起動のアプリを新規に立ち上げることがある(systemAlertProbePending 参照)
         systemAlertProbePending.insert(Self.sessionKey(args))
         var openStep = FlowStep(action: "openURL")
@@ -445,7 +465,24 @@ extension MCPServer {
         resetOnceNotes(forScope: noteScope)
         let bundleID = try Self.requiredStringArgument(args, "bundleId")
         if let refusal = Self.bridgeSelfRefusal(tool: "ft_clear_app_data", bundleID: bundleID) { throw MCPError(refusal) }
+        if bundleID == MCPServer.springboardBundleID || bundleID.hasPrefix("com.apple.") {
+            throw MCPError("\(bundleID) is an Apple system app (the home screen, Safari, Settings …), not an app under test —"
+                + " its data cannot be wiped by this tool and it cannot be reinstalled. Nothing was sent.")
+        }
         let clearAppDataDriver = try await driver(args)
+        // **Android のシステムのパッケージは撃つ前に断る**(連絡先・メッセージ等の利用者データを1回の承認で消せる)。
+        // このセッションが起動したものはテスト対象として扱う。入っていないものは `pm clear` が自分で断る
+        if let android = clearAppDataDriver as? AndroidDriver,
+           launchedBundleIDs[Self.sessionKey(args)] != bundleID {
+            let box = UncheckedTransfer(android)
+            let probe = await Self.runOffCooperativePool(name: "fleetest-mcp-clear-app-data") {
+                (box.value.isPersistentPackage(bundleID: bundleID), box.value.isSystemPackage(bundleID: bundleID))
+            }
+            if probe.0 == true || probe.1 == true {
+                throw MCPError("\(bundleID) is a system package, not an app under test — its data was NOT cleared (wiping system"
+                    + " apps can delete user data or break the device). If it really is the app under test, ft_launch it first.")
+            }
+        }
         let springBoardNote = await recheckXCUITestRunnerBeforeLaunch(args: args)
         let clearAppDataKey = Self.sessionKey(args)
         SlowCallWatchdog.mark("clearing the app's data")
@@ -458,6 +495,13 @@ extension MCPServer {
             // 再ビルドや DerivedData の掃除で消えており、確かめずに uninstall すると
             // 端末からアプリだけ消えて戻せなくなる
             // packagePath は ft_install と同じく `~` を展開し、相対パスは断る(撃つ前・消す前)
+            // 端末に入っていないアプリは、別アプリの控えを入れ直し元に名指しした断りに化けない(入っていないと言う)
+            if let udid = iosTargetUDID(key: clearAppDataKey, args: args),
+               let installed = await BlockingWork.offPool(name: "fleetest-mcp-clear-app-data", {
+                   (try? IOSPhysicalAppCatalog.apps(udid: udid))?.map(\.id)
+               }), !installed.contains(bundleID) {
+                throw MCPError("\(bundleID) is not installed on this device — nothing was uninstalled (ft_list_apps shows what is installed).")
+            }
             let rawExplicit = args["packagePath"] as? String
             if let rawExplicit, let refusal = Self.relativePackagePathRefusal(rawExplicit) { throw MCPError(refusal) }
             let path: String
@@ -473,8 +517,34 @@ extension MCPServer {
                 verdict: await ReinstallPackageCheck.inspectOffPool(path: path, expectedBundleID: bundleID)) {
                 throw MCPError(refusal)
             }
+            // **名指しされたパスもパッケージの形でなければ消す前に断る**(フォルダ・Info.plist を devicectl は後から断り、
+            // uninstall 済みのアプリが端末から消えたまま終わっていた)
+            if rawExplicit != nil, !ReinstallPackageCheck.looksLikePackage(path: path) {
+                throw MCPError("The app was NOT uninstalled. packagePath \(path) is not an app package (an .ipa file, or an"
+                    + " .app folder that contains Info.plist) — a device cannot install it, so wiping \(bundleID) by"
+                    + " reinstalling it would leave the app removed from the device. Pass packagePath: <the .app/.ipa of \(bundleID)>.")
+            }
+            // 形だけ整った空のパッケージ(zip でない .ipa・実行ファイルの無い .app)は devicectl が uninstall の後で断る
+            if rawExplicit != nil, let empty = ReinstallPackageCheck.emptyPackageReason(path: path) {
+                throw MCPError("The app was NOT uninstalled. packagePath \(path) is not an installable app: \(empty) — wiping"
+                    + " \(bundleID) by reinstalling it would leave the app removed from the device."
+                    + " Pass packagePath: <the .app/.ipa of \(bundleID)>.")
+            }
             try await clearAppDataDriver.uninstall(bundleID: bundleID)
-            let reinstallNote = try await clearAppDataDriver.install(packagePath: path)
+            let reinstallNote: String?
+            do {
+                reinstallNote = try await clearAppDataDriver.install(packagePath: path)
+            } catch {
+                // uninstall は済んでいる: 失敗の文だけだと消したことが読めない
+                throw MCPError(error.localizedDescription + "\nnote: \(bundleID) was already uninstalled from the device"
+                    + " before this install failed — it is NOT installed now. ft_install a device build to restore it.")
+            }
+            // 入れ直しでアプリのプロセスは消えた。ランナーのセッションが残っていると次の木・タップが
+            // 「落ちたかも(503)」と言う —— 止めたのはこの操作なので、セッションのアプリならセッションも閉じる(ft_terminate と同じ文面になる)
+            if (try? await clearAppDataDriver.status())?.sessionBundleID == bundleID {
+                try? await clearAppDataDriver.terminate()
+            }
+            toolStoppedBundleIDs[clearAppDataKey] = "ft_clear_app_data"
             // 意図した再インストールなので、以後の別アプリの木は「すり替わり」ではない
             // (ft_terminate と同じ扱い)
             launchedBundleIDs[clearAppDataKey] = nil
@@ -491,9 +561,13 @@ extension MCPServer {
         // ここでは消さない(再インストール分岐と違い bundleID はまだ同じアプリのまま —
         // 次の ft_launch は「初回起動」ではなく「再起動」)。switchedAppNote がこれを見て
         // 「クラッシュしたかも」ではなく「この操作で止めた」と言う
-        toolStoppedBundleIDs[clearAppDataKey] = "ft_clear_app_data"
+        // 消したのがセッションのアプリと別のアプリなら、セッションのアプリは止まっていない(帰属も案内も別のアプリに向けない)
+        let clearedSessionApp = launchedBundleIDs[clearAppDataKey].map { $0 == bundleID } ?? true
+        if clearedSessionApp { toolStoppedBundleIDs[clearAppDataKey] = "ft_clear_app_data" }
         recordClearAppData(bundleID: bundleID, args: args)
-        return text(springBoardNote + "Cleared the data of \(bundleID). The app is stopped — ft_launch to continue")
+        return text(springBoardNote + (clearedSessionApp
+            ? "Cleared the data of \(bundleID). The app is stopped — ft_launch to continue"
+            : "Cleared the data of \(bundleID). It is stopped; this session's app (\(launchedBundleIDs[clearAppDataKey] ?? "")) was not touched"))
     }
 
     /// 下書きへ `clearAppData("<bundle ID>")` を残す(DSL に同じコマンドがある。実機の再インストールでも
@@ -518,16 +592,53 @@ extension MCPServer {
         }
         guard let terminateBundleID = explicitBundleID ?? launchedBundleIDs[terminateKey]
         else {
-            throw MCPError("no known target to terminate — nothing was launched in this"
-                + " session and no bundleId was given. Pass bundleId, or ft_launch first.")
+            throw MCPError("no known target to terminate — this session has no running app on record (nothing was launched"
+                + " here, or the last one was already stopped by ft_terminate / ft_clear_app_data). Pass bundleId, or"
+                + " ft_launch first.")
         }
-        if let explicitBundleID, let launched = launchedBundleIDs[terminateKey],
-           explicitBundleID != launched {
+        // **SpringBoard はアプリではない**: 止めるとホーム画面が再起動し、端末がロック画面に落ちる(パスコード付きの実機では
+        // 解除できず以後の run が全滅しうる)。ft_launch com.apple.springboard は「向け直すだけ」で何も起動しないので、
+        // 外すのも ft_launch でアプリへ向け直すこと
+        if terminateBundleID == MCPServer.springboardBundleID {
+            throw MCPError("\(terminateBundleID) is the home screen, not an app — terminating it restarts SpringBoard and drops"
+                + " the device to the lock screen. Nothing was sent. ft_launch <your app's bundleId> to leave it.")
+        }
+        let terminateDriver = try await driver(args)
+        // Android は名指しの package を force-stop できる(am force-stop <pkg>)ので、起動の有無に関わらず**名乗った相手を**止める
+        // (ドライバの `terminate()` は控え `currentPackage` を止める。ft_open_url / ft_clear_app_data が控えを別アプリへ動かすと
+        // 「Terminated A」と言いながら別のアプリを止めていた)。iOS は launch したアプリしか止められない
+        let stopsByName = terminateDriver is AndroidDriver
+        if !stopsByName, let explicitBundleID, let launched = launchedBundleIDs[terminateKey], explicitBundleID != launched {
             throw MCPError("this session launched \(launched), and ft_terminate can only stop the"
                 + " app it is attached to — omit bundleId (or pass \(launched)) to stop that app")
         }
-        let terminateUnverified = explicitBundleID != nil && launchedBundleIDs[terminateKey] == nil
-        let terminateDriver = try await driver(args)
+        // 止めたのがセッションのアプリ(または記録が無い)ときだけ、起動の記録を外す。別のアプリの名指しでは外さない
+        let stopsSessionApp = launchedBundleIDs[terminateKey].map { $0 == terminateBundleID } ?? true
+        var androidWasRunning: Bool?
+        if stopsByName, let android = terminateDriver as? AndroidDriver {
+            // **撃つ前に**: 入っていない package は `am force-stop` が 0 で黙るので「Terminated」と言ってしまう。
+            // OS が常駐させるもの(systemui 等)は force-stop が画面を崩す。このセッションが起動したものは対象にする
+            if !(launchedBundleIDs[terminateKey] == terminateBundleID) {
+                let box = UncheckedTransfer(android)
+                let probe = await Self.runOffCooperativePool(name: "fleetest-mcp-terminate") {
+                    (box.value.isInstalled(bundleID: terminateBundleID),
+                     box.value.isPersistentPackage(bundleID: terminateBundleID))
+                }
+                if probe.0 == false {
+                    throw MCPError("\(terminateBundleID) is not installed on this device — nothing was stopped"
+                        + " (ft_list_apps shows what is installed).")
+                }
+                if probe.1 == true {
+                    throw MCPError("\(terminateBundleID) is a persistent system package (the OS keeps it running and restarts it;"
+                        + " stopping it breaks the status bar and notifications), not an app under test — nothing was stopped.")
+                }
+            }
+            let box = UncheckedTransfer(android)
+            androidWasRunning = await Self.runOffCooperativePool(name: "fleetest-mcp-terminate") {
+                box.value.isRunning(bundleID: terminateBundleID)
+            }
+        }
+        let terminateUnverified = explicitBundleID != nil && launchedBundleIDs[terminateKey] == nil && !stopsByName
         // **シミュレータでは止まったことを simctl で確かめる**(ランナーの terminate はランナーのセッションが起動したアプリに
         // しか効かない = 止まっていないのに「Terminated」と言いうる。clearAppDataOnSimulator と同じ理由・同じ判定)
         // 宛先はセッションが特定した udid がシミュレータのときだけ(ドライバは包まれうるので型で見ない。実機は対象外)
@@ -538,7 +649,11 @@ extension MCPServer {
         }
         var runnerHadNoSession = false
         do {
-            try await terminateDriver.terminate()
+            if stopsByName, let android = terminateDriver as? AndroidDriver {
+                try await android.terminate(bundleID: terminateBundleID)
+            } else {
+                try await terminateDriver.terminate()
+            }
         } catch DriverError.badResponse(409, _) where !(terminateDriver is AndroidDriver) {
             // XCUITest ランナーの 409 は「セッションが無い」(SessionRecoveryDriver の不変条件)。**アプリは生きていうる**
             // (ランナーだけ起動し直した等)ので、シミュレータは下の simctl で止めて確かめる。確かめられない実機は断る。
@@ -557,10 +672,12 @@ extension MCPServer {
             try await BlockingWork.offPool(name: "fleetest-mcp-terminate") { try stop(terminateBundleID, simulatorUDID) }
         }
         // 意図して落としたので、以後の別アプリの木は「すり替わり」ではない
-        launchedBundleIDs[terminateKey] = nil
-        launchTimestamps[terminateKey] = nil
-        toolStoppedBundleIDs[terminateKey] = nil
-        systemAlertProbePending.remove(terminateKey)
+        if stopsSessionApp {
+            launchedBundleIDs[terminateKey] = nil
+            launchTimestamps[terminateKey] = nil
+            toolStoppedBundleIDs[terminateKey] = nil
+            systemAlertProbePending.remove(terminateKey)
+        }
         // 前面が消えたので、覆い探針の記憶(F 節)は使い回さない
         lastScreenProbe[terminateKey] = nil
         // 下書きへ `terminateApp()` を残す(DSL の terminateApp は対象を取らない = セッションのアプリ)
@@ -577,11 +694,14 @@ extension MCPServer {
                 + " \(front)'s tree, not \(terminateBundleID)'s (ft_launch your app to go back)."
         }
         // 409 を simctl で止めた回は、セッションで起動していなくても止まったことを確かめている = 未確認の文面にしない
+        if androidWasRunning == false {
+            return text("\(terminateBundleID) was not running — nothing was stopped" + terminateFrontNote)
+        }
         return text(terminateUnverified && !runnerHadNoSession
             ? "Terminate sent for \(terminateBundleID) (nothing was launched in this session, so the"
-                + " driver stopped whichever app it is attached to — on Android nothing is stopped"
-                + " without a prior ft_launch; nothing about the result is checked)"
+                + " driver stopped whichever app it is attached to; nothing about the result is checked)"
             : "Terminated \(terminateBundleID)"
+                + (stopsByName && !stopsSessionApp ? " (force-stopped by package name; it is not this session's app)" : "")
                 + (runnerHadNoSession ? " (the XCUITest runner had no session for it, so it was stopped on the simulator directly)" : "")
                 + terminateFrontNote)
     }

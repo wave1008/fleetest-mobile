@@ -37,7 +37,11 @@ public enum TypeReadback {
         }
     }
 
-    public static func plan(expected: String, actual: String) -> Plan {
+    /// `protectedPrefixCount`: expected の先頭のうち**撃つ前から欄にあった値**の文字数(0 = 無い/不明)。
+    /// 打鍵が落ちるのは撃った文字だけなので、その範囲の欠落は打鍵の落ちではない —— 欄の選択範囲を置き換えた
+    /// 途中の読み(`hello world` の "hello" を選んで `X` → 一瞬 ` world`)を `.retype` にすると、欄を「hello  world」に壊す。
+    /// 呼び手(ランナーの `performTypeReadback`・ホストの `StepExecutor+TypeClear`)が撃つ前の値の文字数を渡す
+    public static func plan(expected: String, actual: String, protectedPrefixCount: Int = 0) -> Plan {
         if actual == expected { return .done }
         // **空白は a11y から読み返せない**(実測: 空白のみの値は「値なし」で返る/
         // 可視文字と混在していても空白の有無自体は読み返しに現れない)。
@@ -53,7 +57,9 @@ public enum TypeReadback {
         // **前方一致の後にしか置けない**: `hel` は `hello123` の部分列でもあり、先に見ると
         // 今自己修復できている「末尾の欠落 → 追送」を全文打ち直しに変えてしまう。
         // 落ちた文字が空白だけなら読めない空白(上の規則)と区別できないので諦める
-        if isSubsequenceDroppingVisibleCharacters(actual, of: expected) { return .retype }
+        if isSubsequenceDroppingVisibleCharacters(actual, of: expected, protectedPrefixCount: protectedPrefixCount) {
+            return .retype
+        }
         return .unverifiable
     }
 
@@ -78,28 +84,50 @@ public enum TypeReadback {
     /// (撃つ前の値が実在で追記の途中が落ちた形 = `old`+`new` が `onew`)④`typedOnly` が `.retype` →
     /// `typedOnly` ⑤どちらでもない → `expected`(今までどおり諦める)。
     /// 呼び手が不可視文字を正規化してから渡す(このファイルは正規化を持たない)
-    public static func readbackTarget(expected: String, typedOnly: String, actual: String) -> String {
+    public static func readbackTarget(expected: String, typedOnly: String, actual: String,
+                                      protectedPrefixCount: Int = 0) -> String {
         guard expected != typedOnly else { return expected }
-        let byExpected = plan(expected: expected, actual: actual)
+        let byExpected = plan(expected: expected, actual: actual, protectedPrefixCount: protectedPrefixCount)
         if byExpected.explainsByPrefix { return expected }
         let byTypedOnly = plan(expected: typedOnly, actual: actual)
-        if byTypedOnly.explainsByPrefix { return typedOnly }
+        if byTypedOnly.explainsByPrefix,
+           !typedOnlyExcessIsPriorValue(expected: expected, typedOnly: typedOnly, actual: actual) {
+            return typedOnly
+        }
         if case .retype = byExpected { return expected }
         if case .retype = byTypedOnly { return typedOnly }
         return expected
     }
 
+    /// `actual` = 撃った文字 + 余り で、余りが撃つ前の値の後ろ側そのもの(`hello world` の先頭の語を選択して
+    /// `ABCD` → `ABCD world`・カーソルが先頭で `Q` → `Qhello world`)のとき true。これを typedOnly の
+    /// `.deleteExcess` で読むと、削除がカーソルから後ろ向きに撃った文字を消して欄を元に戻す(撃った文字を自分で消す)。
+    /// 余りが撃った文字と同じなら二重入力と区別できないので false(従来どおり削除)。
+    /// ヒント付きの空欄(撃つ前の値がヒント文字列)の二重入力は余りが撃った文字の繰り返しなので、ここに当たらない
+    static func typedOnlyExcessIsPriorValue(expected: String, typedOnly: String, actual: String) -> Bool {
+        guard !typedOnly.isEmpty, expected.hasSuffix(typedOnly), actual.hasPrefix(typedOnly) else { return false }
+        let prior = String(expected.dropLast(typedOnly.count))
+        let excess = String(actual.dropFirst(typedOnly.count))
+        guard !prior.isEmpty, !excess.isEmpty, excess != typedOnly else { return false }
+        return prior.hasSuffix(excess)
+    }
+
     /// `actual` が `expected` の順序を保った真部分列で、落ちた文字に空白でないものが含まれるか
-    public static func isSubsequenceDroppingVisibleCharacters(_ actual: String, of expected: String) -> Bool {
+    /// `protectedPrefixCount` 以内(expected の先頭 = 撃つ前から欄にあった値)の欠落があれば false
+    public static func isSubsequenceDroppingVisibleCharacters(_ actual: String, of expected: String,
+                                                              protectedPrefixCount: Int = 0) -> Bool {
         guard actual.count < expected.count else { return false }
         var dropped: [Character] = []
         var index = actual.startIndex
+        var position = 0
         for ch in expected {
             if index < actual.endIndex, actual[index] == ch {
                 index = actual.index(after: index)
             } else {
+                if position < protectedPrefixCount { return false }
                 dropped.append(ch)
             }
+            position += 1
         }
         guard index == actual.endIndex else { return false }
         return dropped.contains { !$0.isWhitespace && !$0.isNewline }

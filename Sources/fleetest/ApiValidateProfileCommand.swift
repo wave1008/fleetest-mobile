@@ -76,13 +76,26 @@ struct ApiValidateProfile: AsyncParsableCommand {
         var (errors, warnings) = ProfileResolver.validate(
             kind: kind, data: data, context: "\(kind.directoryName)/\(fileName).json")
 
-        // 実行プロファイルは参照(app)も解決チェックする(他の検証エラーがある場合は解決を試みない)
-        if kind == .run, errors.isEmpty {
+        // 実行プロファイルは参照(app)も解決チェックする。**他の検証エラーがあっても解決まで通す** —— 段ごとにしか出ない誤り
+        // (iosMode 等)が前の段のエラーに隠れ、保存時の検証が緑でも run で断られる。同じ文言は重ねない
+        if kind == .run {
             do {
                 let resolved = try ProfileResolver.resolve(project: project, runName: fileName)
                 warnings += resolved.warnings
             } catch {
-                errors.append(error.localizedDescription)
+                // 静的検査が同じ原因を別の文言で出している解決エラーは重ねない(文言の一致では判定しない)
+                let covered = (error as? ProfileError)?.isCoveredByStaticRunValidation(runFileName: fileName) ?? false
+                let message = error.localizedDescription
+                if !covered, !errors.contains(message) { errors.append(message) }
+            }
+            // 未登録の machine は本実行(resolveRemoteTarget)でだけ断られる。登録簿は機械ごとなので、検証では警告に留める
+            let registered = Set((LocalConfig.load().remoteHosts ?? []).map(\.machine))
+            let unregistered = Set(ProfileResolver.runDeviceMachines(project: project, runProfileName: fileName)
+                .compactMap(\.machine)).subtracting(registered).sorted()
+            for machine in unregistered {
+                warnings.append("devices[].machine \"\(machine)\" is not a registered machine on this Mac"
+                    + (registered.isEmpty ? " (none registered — fleetest remote machines add <name> --host <user@host>)"
+                       : " (available: \(registered.sorted().joined(separator: ", ")))"))
             }
         }
 

@@ -52,8 +52,8 @@ public struct OverlayWindowOcclusion: Sendable {
         guard covering(element) != nil else { return nil }
         let cx = Int(element.frame.centerX)
         let cy = Int(element.frame.centerY)
-        return "its centre (\(cx), \(cy)) is under an overlay window that is not in the tree"
-            + " (a popup, tooltip, floating toolbar or sheet drawn above the app) — the tap will"
+        return "its centre (\(cx), \(cy)) is under an overlay window drawn above the app"
+            + " (a popup, tooltip, floating toolbar, sheet or modal; its contents may or may not be in the element list) — the tap will"
             + " land on that overlay, not this element. Dismiss it first (go back, or tap a"
             + " neutral spot), then read the screen again"
     }

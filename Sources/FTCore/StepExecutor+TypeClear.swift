@@ -81,8 +81,12 @@ extension StepExecutor {
                                                                      deadline: deadline, phase: &phase) else {
                 return nil   // 読めない/曖昧 = 検証不能なので受理する(TypeReadback.value 参照)
             }
-            let target = Self.readbackTarget(expected: expected, typedOnly: typedOnly, actual: actual)
-            let plan = TypeReadback.plan(expected: target, actual: actual)
+            // 撃つ前から欄にあった値の範囲の欠落は打鍵の落ちではない(選択範囲の置き換え。TypeReadback.plan)
+            let priorCount = expected.hasSuffix(typedOnly) ? expected.count - typedOnly.count : 0
+            let target = Self.readbackTarget(expected: expected, typedOnly: typedOnly, actual: actual,
+                                             protectedPrefixCount: priorCount)
+            let plan = TypeReadback.plan(expected: target, actual: actual,
+                                         protectedPrefixCount: target == expected ? priorCount : 0)
             switch plan {
             case .done, .unverifiable:
                 return nil
@@ -269,7 +273,8 @@ extension StepExecutor {
     /// `false`)で当たる盤面はまだ無い —— `#field_single` は iOS では placeholder を**ラベル**として
     /// 出すので `priorValue` が空になる。**失敗モードが沈黙(検証を諦めたことを誰にも言わない)なので、
     /// witness が無くても塞ぐ**
-    static func readbackTarget(expected: String, typedOnly: String, actual: String) -> String {
+    static func readbackTarget(expected: String, typedOnly: String, actual: String,
+                               protectedPrefixCount: Int = 0) -> String {
         // 不可視文字を正規化してから比較する(MCP の
         // replaceVerificationNote/appendVerificationNote と同じ規律)。self-contained にする
         // (呼び出し側での正規化に依存しない) —— これが無いと、ゼロ幅文字が expected/typedOnly/actual
@@ -277,7 +282,8 @@ extension StepExecutor {
         // 順序の規則は TypeReadback.readbackTarget(ランナーと共有)
         TypeReadback.readbackTarget(expected: FlowMatchMode.normalizeInvisibleCharacters(expected),
                                     typedOnly: FlowMatchMode.normalizeInvisibleCharacters(typedOnly),
-                                    actual: FlowMatchMode.normalizeInvisibleCharacters(actual))
+                                    actual: FlowMatchMode.normalizeInvisibleCharacters(actual),
+                                    protectedPrefixCount: protectedPrefixCount)
     }
 
     /// 読み返しの打ち切り時間・停滞許容周回数・安定待ち。BridgeRouter.handleType の

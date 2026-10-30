@@ -206,12 +206,11 @@ public final class WebViewDelegatingDriver: AppDriver {
 
     /// domInterop の ref を画面座標(矩形中心)へ解決する。**delegated には x/y だけを渡す**
     /// (ref の名前空間が違う — このクラス冒頭の不変条件参照)。直近 snapshot に無い ref は
-    /// 座標に解決できない = 黙って別経路へ流さずここで落とす(Android の未知 ref と同じ規約:
-    /// Sources/FTAndroid/AndroidDriver.swift の badResponse(status: 404, ...) と同じ文言規約)
+    /// 座標に解決できない = 黙って別経路へ流さずここで落とす。**撃つ前に断ったので staleRef**(届いていないと確定 =
+    /// executeActionRetryingUndelivered が引き直して撃ち直せる。Android の未知 ref・ブリッジの centerOf と同じ規約)
     private func domInteropPoint(ref: Int) throws -> (x: Double, y: Double) {
         guard let frame = domFrames[ref] else {
-            throw DriverError.badResponse(status: 404,
-                                          body: "unknown reference number [\(ref)]. Take a snapshot first")
+            throw DriverError.staleRef(detail: "unknown reference number [\(ref)]; nothing was sent — take a snapshot first")
         }
         return (frame.centerX, frame.centerY)
     }

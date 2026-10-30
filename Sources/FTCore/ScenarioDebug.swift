@@ -8,6 +8,8 @@
 //   {"cmd":"step"}                                    … 次のステップの手前まで実行して一時停止
 //   {"cmd":"pause"}                                   … 次のステップの手前で一時停止
 //   {"cmd":"stop"}                                    … シナリオを中断(残りは skipped)
+//   {"cmd":"detach"}                                  … 制御の口が閉じた(ホストの stdin が EOF)。ブレークポイントを全部外し、
+//                                                       停止中なら再開して最後まで走らせる(誰も再開できないまま止まり続けない)
 //   {"cmd":"breakpoints","locations":["<file>:<line>", …]} … ブレークポイントを全置換
 // ランナー → ホストは既存の NDJSON イベントに kind: "paused" を追加
 // (index = 次に実行するステップ番号、file/line = そのステップのソース位置)。
@@ -99,6 +101,10 @@ public final class ScenarioDebugControl: @unchecked Sendable {
             pauseAtNextStep = true
         case "stop":
             if paused { resumeLocked(.stop) } else { stopRequested = true }
+        case "detach":
+            breakpoints = []
+            pauseAtNextStep = false
+            resumeLocked(.continueRun)
         case "breakpoints":
             let locations = object["locations"] as? [String] ?? []
             breakpoints = locations.compactMap(Self.parseLocation)
@@ -139,6 +145,8 @@ public final class ScenarioRunControl: @unchecked Sendable {
     public func stepOver() { send(["cmd": "step"]) }
     public func pause() { send(["cmd": "pause"]) }
     public func stop() { send(["cmd": "stop"]) }
+    /// 制御の口が閉じた(以後の再開を送れない)ことを伝える。ランナーは止まらずに最後まで走る
+    public func detach() { send(["cmd": "detach"]) }
     public func setBreakpoints(_ locations: [String]) {
         send(["cmd": "breakpoints", "locations": locations])
     }

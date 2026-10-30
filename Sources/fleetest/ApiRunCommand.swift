@@ -56,7 +56,7 @@ struct ApiRunCommand: AsyncParsableCommand {
     var setOverrides: [String] = []
 
     @Option(name: .customLong("report-dir"),
-            help: "Directory to write reports to (defaults to TestProjects/<name>/reports; with --profile it overrides the profile reportDir). Cannot combine with --set reportDir=...")
+            help: "Directory to write reports to (defaults to TestProjects/<name>/reports; with --profile it overrides the profile reportDir; a relative path is relative to the current directory, and so is a relative --set reportDir= without --profile, while a profile's reportDir is relative to the project root). Must not be empty. Cannot combine with --set reportDir=...")
     var reportDir: String?
 
     @Option(name: .customLong("default-timeout"),
@@ -119,11 +119,21 @@ struct ApiRunCommand: AsyncParsableCommand {
     /// ArgumentParser は parse 時にこれを呼ぶので、swift build の前・NDJSON を1行も出す前に落ちる
     func validate() throws {
         try RunCommonOptions.rejectZeroPorts(ports)
+        try RunCommonOptions.rejectBlankReportDir(reportDir)
+        try RunCommonOptions.rejectNegativeWaitLock(waitLock)
         guard !scenarios.isEmpty else {
             throw ValidationError("specify at least one --scenario")
         }
         if debug && scenarios.count != 1 {
             throw ValidationError("--debug can only be used with exactly one --scenario")
+        }
+        // help は "Only effective with --debug"。黙って流すと指定したブレークポイントが効かない run になる
+        if !debug {
+            if !breakpoints.isEmpty { throw ValidationError("--breakpoint requires --debug") }
+            if pauseOnStart { throw ValidationError("--pause-on-start requires --debug") }
+        }
+        for location in breakpoints where ScenarioDebugControl.parseLocation(location) == nil {
+            throw ValidationError("--breakpoint \(location) is not <file>:<line> (line is a positive integer)")
         }
         try common.validateTargeting(ports: ports)
         // 複数対象の1回実行(RR-8.2)は fleetest run だけ。拡張は1プロファイルずつ起こす
@@ -326,20 +336,22 @@ struct ApiRunCommand: AsyncParsableCommand {
         defer { dispatchLock?.release() }
 
         // --debug: stdin を専用スレッドで読み行をそのままランナーへ渡す。ScenarioHost.run が
-        // 起動直後に onControl で渡す ScenarioRunControl を待つ必要があるため小箱経由で受け渡す
+        // 起動直後に onControl で渡す ScenarioRunControl を待つ必要があるため、繋がるまでの行は DebugStdinRelay が貯める
         var debugOptions: ScenarioDebugOptions?
         if debug {
-            let controlBox = DebugControlBox()
+            let relay = DebugStdinRelay()
             let reader = Thread {
                 while let line = readLine(strippingNewline: true) {
-                    controlBox.control?.sendLine(line)
+                    relay.receive(line)
                 }
+                // EOF = もう再開を送れる相手がいない。停止中のまま永久に待たせない
+                relay.inputClosed()
             }
             reader.name = "fleetest-api-run-control"
             reader.start()
             debugOptions = ScenarioDebugOptions(
                 breakpoints: breakpoints, pauseOnStart: pauseOnStart) { control in
-                controlBox.control = control
+                relay.attach(control)
             }
         }
 
@@ -593,6 +605,10 @@ struct ApiRunCommand: AsyncParsableCommand {
         if let notice = ScenarioSelection.collapsedNotice(resolution.collapsed) { logStderr(notice) }
         guard !selected.isEmpty else {
             throw ValidationError("nothing to run (every scenario is marked @Deleted or @Draft)")
+        }
+        // validate() の「ちょうど1本」は引数の個数だけ見る。クラス名・フォルダは解決後に複数本へ展開されるので、ここで本数を見る
+        if debug, selected.count != 1 {
+            throw ValidationError("--debug can only be used with exactly one scenario (the --scenario selection resolves to \(selected.count))")
         }
 
         // dry-run/debug は実測にならない(dry-run はデバイス未接続、debug は人間介入前提)ため記録しない。

@@ -73,6 +73,19 @@ final class BridgeRouter {
     var snapshotElementLimit = BridgeAPI.maxSnapshotElements
     /// 直近の collect で、木に中身を出した手前の窓(root.children の添字)。captureOnce が申告を絞るのに使う
     var lastContributingOverlayWindows = Set<Int>()
+    /// 直近に読んだ SpringBoard / アプリの木の画面(`springBoardTapWouldMiss` の門が「縦で描かれたホーム画面」を見分けるのに使う)
+    var lastTreeScreen: CGRect = .zero
+
+    /// 横向きの SpringBoard の ref タップを断るか。向きだけで決めない: ホームボタン機のホーム画面は端末が横向きでも縦で描かれ、
+    /// 木の画面も縦長(高さ > 幅)で枠と座標が揃うので撃てる(実測 se3)。断るのは木の画面が縦長でない形
+    /// (横向きのアプリの上のアラート = 縦と横の窓の和)だけ
+    func springBoardTapWouldMissNow(bundleID: String?) -> Bool {
+        guard BridgeAPI.springBoardTapWouldMiss(bundleID: bundleID,
+                                                isLandscape: XCUIDevice.shared.orientation.isLandscape) else { return false }
+        return !(lastTreeScreen.height > lastTreeScreen.width)
+    }
+    /// 同じ窓ごとの、木に出した中身の外接矩形と入力欄の有無(`overlayFrame(for:)` が使う)
+    var lastOverlayWindowContent: [Int: (union: CGRect, hasTextInput: Bool)] = [:]
 
     /// /status の idleSeconds 申告用(FleetestBridgeTests がサーバ生成後に配線する。
     /// サーバ⇔ルーターの生成順の都合でコンストラクタ注入にしない)
@@ -291,6 +304,7 @@ final class BridgeRouter {
         let readStarted = ResponseMeasurement.nowMs()
         let cap = try settlePending ? captureSettled(app) : captureOnce(app)
         settlePending = false
+        lastTreeScreen = cap.screen
 
         refFrames = cap.frames
         refIdentity = cap.identities
@@ -531,6 +545,7 @@ final class BridgeRouter {
         // **どちらの口が先に来ても1回だけ**待つ(消費するのは最初に撮った方)
         let cap = try settlePending ? captureSettled(springboard) : captureOnce(springboard)
         settlePending = false
+        lastTreeScreen = cap.screen
         systemRefFrames = cap.frames
         return .json(SnapshotResponse(
             sessionBundleID: "com.apple.springboard",
@@ -552,8 +567,7 @@ final class BridgeRouter {
             throw BridgeError(404,
                 "unknown system-UI reference number [\(ref)] — run GET /systemui/snapshot first")
         }
-        if BridgeAPI.springBoardTapWouldMiss(bundleID: "com.apple.springboard",
-                                             isLandscape: XCUIDevice.shared.orientation.isLandscape) {
+        if springBoardTapWouldMissNow(bundleID: "com.apple.springboard") {
             throw refuseLandscapeSpringBoardTap()
         }
         gestureQuiescence {
@@ -678,8 +692,11 @@ final class BridgeRouter {
         var bulkExempt = 0
         var keyboardFrame: CGRect?
         var offscreenHints: [ElementInfo] = []
-        let overlays = Self.overlayWindows(root: root)
+        // **SpringBoard のセッションでは手前の窓を申告しない**: 窓はすべてシステムの窓(ステータスバー等が全画面の枠で
+        // 中身を出す)で、アプリの手前に浮く UIWindow と区別できず、ホーム画面の全アイコンが「窓の下」と警告された(実機 3/3)。見逃す側に倒す
+        let overlays = sessionBundleID == "com.apple.springboard" ? [] : Self.overlayWindows(root: root)
         lastContributingOverlayWindows = []
+        lastOverlayWindowContent = [:]
         collect(root, depth: 0, screen: screen,
                 elements: &elements, frames: &frames, identities: &identities,
                 truncated: &truncated,
@@ -688,7 +705,17 @@ final class BridgeRouter {
                 overlayWindowIndices: Set(overlays.map(\.index)))
         // **木に中身を1つも出さなかった窓は申告しない**: キーボードを閉じた後に残る窓は名前の無い入れ物だけで(実測 3 段・
         // 要素 0)、数えると以後の全要素が「手前の窓に覆われている」と警告された。アプリのバナー・モーダルは中身を出す
-        let overlayFrames = overlays.filter { lastContributingOverlayWindows.contains($0.index) }.map(\.frame)
+        // **キーボードを出さない inputAccessoryView だけの窓**(画面いっぱいの窓に入力バーだけが載る)は、窓の枠でなく
+        // 中身の外接矩形を申告する。窓の枠のままだと画面のどの要素への tap も「手前の窓の下」と誤って警告された(実測 sim8)。
+        // 画面いっぱいの窓でも入力欄を持たない窓(全面モーダル・暗幕)は窓の枠のまま
+        let overlayFrames = overlays.filter { lastContributingOverlayWindows.contains($0.index) }.map { overlay -> FTRect in
+            guard let content = lastOverlayWindowContent[overlay.index], content.hasTextInput,
+                  abs(overlay.frame.width - screen.width) <= 1, abs(overlay.frame.height - screen.height) <= 1
+            else { return overlay.frame }
+            let r = content.union.intersection(screen)
+            return r.isNull ? overlay.frame : FTRect(x: r.minX, y: r.minY, width: r.width, height: r.height)
+        }
+        keyboardFrame = Self.plausibleKeyboardFrame(keyboardFrame, screen: screen, root: root)
         return Captured(elements: elements, frames: frames, identities: identities,
                         truncated: truncated,
                         truncatedTiers: truncatedTiers, bulkExempt: bulkExempt, screen: screen,
@@ -752,6 +779,29 @@ final class BridgeRouter {
         return out
     }
 
+    /// `.keyboard` 要素の枠が画面に収まらないとき(横向きで XCUITest が 667x667 や縦の座標系のままの枠を返す。実機 SE3 / iOS 26 で
+    /// 再現)は、同じ窓の `inputView` の枠に置き換える。収まる枠・隠れたキーボード(画面の下の外)はそのまま。
+    /// 置き換え先も無ければ元の枠を返す(nil にすると「キーボードが出ていない」と読まれる)
+    static func plausibleKeyboardFrame(_ frame: CGRect?, screen: CGRect, root: XCUIElementSnapshot) -> CGRect? {
+        guard let frame, !screen.isEmpty, !isPlausibleKeyboard(frame, screen: screen) else { return frame }
+        func findInputView(_ node: XCUIElementSnapshot, depth: Int) -> CGRect? {
+            if node.identifier == "inputView", isPlausibleKeyboard(node.frame, screen: screen) { return node.frame }
+            guard depth < 12 else { return nil }
+            for child in node.children { if let hit = findInputView(child, depth: depth + 1) { return hit } }
+            return nil
+        }
+        for window in root.children.dropFirst() {
+            if let hit = findInputView(window, depth: 0) { return hit }
+        }
+        return frame
+    }
+
+    /// 幅が画面を超えず・左右が画面の外へはみ出さず・高さが画面より低い。縦の位置は見ない(隠れたキーボードは画面の下の外)
+    private static func isPlausibleKeyboard(_ f: CGRect, screen: CGRect) -> Bool {
+        f.width > 0 && f.height > 0 && f.width <= screen.width + 1 && f.minX >= screen.minX - 1
+            && f.maxX <= screen.maxX + 1 && f.height < screen.height
+    }
+
     /// 窓がキーボード(とその付属)を載せているか。深さの上限は木の暴走よけ(キーボードの窓は浅い = 実測で 6 段以内)
     private static func containsKeyboard(_ node: XCUIElementSnapshot, depth: Int) -> Bool {
         if node.elementType == .keyboard || BridgeAPI.keyboardWindowMarkers.contains(node.identifier) { return true }
@@ -786,8 +836,7 @@ final class BridgeRouter {
     private func handleTap(_ body: Data) throws -> BridgeHTTPServer.Response {
         let req = try decode(TapRequest.self, body)
         let app = try requireForegroundAppForGesture()
-        if req.ref != nil, BridgeAPI.springBoardTapWouldMiss(bundleID: sessionBundleID,
-                                                             isLandscape: XCUIDevice.shared.orientation.isLandscape) {
+        if req.ref != nil, springBoardTapWouldMissNow(bundleID: sessionBundleID) {
             throw refuseLandscapeSpringBoardTap()
         }
         let point = try resolvePoint(ref: req.ref, x: req.x, y: req.y, expect: req.expect)
@@ -1618,6 +1667,13 @@ final class BridgeRouter {
                 RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.1))
             }
             if left { break }
+            // アラートが前面のままだと押し直しても外れない(ホームボタン機で連打するのも避ける)。原因を言って打ち切る
+            if let blocked = SystemAlertProbe.front() {
+                let buttons = blocked.buttons.isEmpty ? "" : ", buttons: " + blocked.buttons.joined(separator: " / ")
+                throw BridgeError(422, "a system alert is in front of the app (title: \(blocked.title)\(buttons)), so the home"
+                    + " gesture did not take the app out of the foreground — the alert was left as it is. Close it first"
+                    + " by tapping one of its buttons")
+            }
             if attempt == Self.homeAttempts {
                 throw BridgeError(422, "the home gesture was sent \(attempt) times but \(sessionBundleID ?? "the app")"
                     + " is still in the foreground (XCUIDevice.press(.home) can be swallowed on physical devices)."

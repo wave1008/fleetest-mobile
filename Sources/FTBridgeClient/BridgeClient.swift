@@ -214,9 +214,20 @@ public final class BridgeClient: AppDriver, Sendable {
         // (in-app ブリッジは対象アプリのプロセス内に住む)
         let device = try await simulatorTarget()
         // 起動中に消すとプロセスが保持している状態が書き戻る。ランナーのセッションを閉じる(セッションの外で
-        // 起動したアプリには効かないので、確実な終了は clearAppDataOnSimulator が持つ)
-        try? await terminate()
+        // 起動したアプリには効かないので、確実な終了は clearAppDataOnSimulator が持つ)。
+        // **閉じるのは消す相手がセッションのアプリのときだけ**: ランナーの terminate は名指しできず、別のアプリ B を
+        // 消すときに撃つと前面で操作中の A を黙って終了させる(次の ft_snapshot が A を冷起動した木を返す)
+        let sessionBundleID = (try? await status(timeout: 3))?.sessionBundleID
+        if Self.shouldCloseSessionBeforeClearing(sessionBundleID: sessionBundleID, clearing: bundleID) {
+            try? await terminate()
+        }
         try clearAppDataOnSimulator(bundleID: bundleID, target: device)
+    }
+
+    /// clearAppData の前にランナーのセッションを閉じてよいか。セッションのアプリを消すときだけ(nil = セッション無し・
+    /// 状態が採れない = 閉じる相手が分からないので閉じない。確実な終了は `stopOnSimulator` が持つ)
+    static func shouldCloseSessionBeforeClearing(sessionBundleID: String?, clearing bundleID: String) -> Bool {
+        sessionBundleID == bundleID
     }
 
     /// 権限(TCC)を未許可へ戻す。**データコンテナの外(デバイスの TCC.db)にあるので
@@ -531,7 +542,7 @@ public final class BridgeClient: AppDriver, Sendable {
         lastActionNote = nil   // 下の同意ステップが戻せなかったときだけ立てる(前の操作の note を残さない)
         if case .physical(let udid) = try await installTarget() {
             let result = try Shell.run(
-                ["xcrun", "devicectl", "device", "process", "openURL", "--device", udid, url])
+                ["xcrun", "devicectl", "device", "process", "openURL", "--device", udid, Self.encodingNonASCII(url)])
             guard result.status == 0 else {
                 throw DriverError.badResponse(status: Int(result.status),
                     body: "devicectl device process openURL failed: \(result.tail)")
@@ -547,6 +558,15 @@ public final class BridgeClient: AppDriver, Sendable {
         if let bundleID {
             await acknowledgeOpenURLConsent(bundleID: bundleID, target: target)
         }
+    }
+
+    /// 非 ASCII の文字だけをパーセントエンコードする。devicectl は非 ASCII を含む文字列を丸ごとエンコードし直し、
+    /// 既にある `%20` が `%2520` になってアプリに届く(ASCII だけの URL はそのまま届く)
+    static func encodingNonASCII(_ url: String) -> String {
+        url.unicodeScalars.map { scalar -> String in
+            scalar.isASCII ? String(scalar)
+                : String(scalar).utf8.map { String(format: "%%%02X", $0) }.joined()
+        }.joined()
     }
 
     /// 写真ライブラリへ入れる(Simulator は `simctl addmedia`)。**実機は失敗にする** —— devicectl でファイルを送れる先は

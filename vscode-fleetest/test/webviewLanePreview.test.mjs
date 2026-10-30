@@ -66,6 +66,7 @@ function sendDevices(window, specs) {
   const devices = specs.map((spec, i) => ({
     id: `d${i}`, name: `Dev ${i}`, platform: "ios", state: spec.state ?? "connected",
     detail: "", kind: "virtual", udid: `UDID-${i}`, recording: false, registered: true,
+    ...(spec.inMCP === undefined ? {} : { inMCP: spec.inMCP }),
   }));
   window.dispatchEvent(new window.MessageEvent("message", { data: { type: "devices", devices } }));
 }
@@ -587,6 +588,32 @@ test("左上の点灯マークは、シナリオを実行中のデバイスだ�
   window.dispatchEvent(new window.MessageEvent("message", { data: { type: "monitorRuns", observed: true, services: [], runs: [] } }));
   assert.equal(lamp().dataset.on, "0", "run が終われば消える");
   assert.equal(tileLamp().dataset.on, "0", "ラインビューのタイルも消える");
+});
+
+test("点灯マークは MCP が掴んでいるデバイスでも点き、説明で run と区別する(タイルとグリッドビューの両方)", (t) => {
+  const { window, document } = createWebview();
+  t.after(() => window.close());
+  sendDevices(window, [{ inMCP: false }, { inMCP: false }]);
+  clickTile(document, 0);
+  const lamp = () => visiblePreviews(document)[0].querySelector(".run-lamp");
+  const tileLamp = () => document.querySelector("#grid .tile .run-lamp");
+  assert.equal(tileLamp().dataset.on, "0", "MCP の印が無ければ消えている");
+  sendDevices(window, [{ inMCP: true }, { inMCP: false }]);
+  assert.equal(tileLamp().dataset.on, "1", "MCP の印が立てばタイルが点く");
+  assert.equal(lamp().dataset.on, "1", "グリッドビューも点く");
+  assert.equal(tileLamp().dataset.hoverTip, "実行中(MCP)");
+  assert.equal(document.querySelectorAll("#grid .tile .run-lamp")[1].dataset.on, "0", "印の無い隣のデバイスは点かない");
+  window.dispatchEvent(new window.MessageEvent("message", { data: {
+    type: "monitorRuns", observed: true, services: [],
+    runs: [{ pid: 1, runID: "r", mine: true, phase: "running", requeued: 0, laneDropouts: 0, actions: 0, supply: [],
+      project: "p", elapsedSeconds: 1, total: 1, done: 0, failed: 0,
+      lanes: [{ key: "UDID-0", name: "Dev 0", platform: "ios", scenario: "S1", scenarioElapsedSeconds: 1 }] }],
+  } }));
+  assert.equal(tileLamp().dataset.hoverTip, "実行中", "run も走っていれば run の説明を出す");
+  window.dispatchEvent(new window.MessageEvent("message", { data: { type: "monitorRuns", observed: true, services: [], runs: [] } }));
+  sendDevices(window, [{ inMCP: false }, { inMCP: false }]);
+  assert.equal(tileLamp().dataset.on, "0", "MCP の印が消えれば消える");
+  assert.equal(lamp().dataset.on, "0");
 });
 
 test("点灯マークの色は OS で分ける(Android は緑系 = data-platform)", (t) => {

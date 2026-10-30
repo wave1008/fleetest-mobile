@@ -41,6 +41,7 @@ export const webviewMonitorAStrings = {
     en: "Click the screen to select / right-click to Start or Stop",
   },
   "wvMonitor.tile.running": { ja: "実行中", en: "Running" },
+  "wvMonitor.tile.runningMCP": { ja: "実行中(MCP)", en: "Running (MCP)" },
   "wvMonitor.tile.shuttingDown": { ja: "シャットダウン中", en: "Shutting down" },
   "wvMonitor.tile.waiting": { ja: "待機中", en: "Waiting" },
   "wvMonitor.tile.connecting": { ja: "接続中", en: "Connecting" },

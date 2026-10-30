@@ -194,7 +194,8 @@ extension MCPServer {
             : " note: the tree did not settle within the check budget — it may still be"
                 + " mid-relayout; take another ft_snapshot before relying on these frames."
         return text("Rotated to \(settled.rawValue). The frames below are in the new"
-            + " coordinate system — refs taken before the rotation are gone."
+            + " coordinate system — prefer the refs below; a ref taken before the rotation is"
+            + " re-matched to its element by fingerprint, not by its old position."
             + relayoutCaveat + autoRotateCaveat + "\n\n"
             + (await snapshotBody(rotated, driver: rotateDriver, args: args, foldsSelectorTables: true)))
     }
@@ -205,6 +206,18 @@ extension MCPServer {
     func ftHideKeyboard(_ args: [String: Any]) async throws -> [[String: Any]] {
         let hideDriver = try await driver(args)
         let (isAndroid, uiFramework) = await resolveExecutorHints(hideDriver, args: args)
+        // **直前の手が type なら、キーボードが上がるのを待ってから判定する**: type はキーボードの表示を待たずに返り、
+        // ft_batch の type は次の呼び出しへ出現待ちの印を渡さない。この executor は新しいので type の印も持たず、
+        // 上がる前の木を読むと「出ていない」と答えて実際は出たまま(実機 3/3)。出ていれば1枚読むだけ
+        if interactions.entries.last?.step?.action == "type" {
+            pendingTypeKeyboardChecks[Self.sessionKey(args)] = nil
+            let deadline = Date().addingTimeInterval(KeyboardWait.appearSeconds)
+            while let snapshot = try? await hideDriver.snapshot(bypassingCache: hideDriver.supportsCacheBypass),
+                  !StepExecutor.keyboardOnScreen(snapshot.keyboardFrame, screen: snapshot.screen),
+                  Date() < deadline {
+                try? await Task.sleep(for: .seconds(KeyboardWait.pollSeconds))
+            }
+        }
         // **何も送らなかったときは OS に依らず同じ答えにし、下書きにも残さない**
         // 何も送っていないので操作前の木と比べない(比べると「操作が効かなかったかも」と矛盾する注記を出し、待ちも払う)
         // Android は送らなかった回も木からキーボードが消えるのを待つ(dumpsys は閉じても木は数秒残す = 次の ft_tap が下端を見失う)
@@ -421,7 +434,25 @@ extension MCPServer {
         let fromX = from.x
         let fromY = from.y
         let durationSeconds = try Self.doubleArgument(args, "durationSeconds") ?? FlowStep.defaultSwipeDurationSeconds
-        try await dragDriver.drag(fromX: fromX, fromY: fromY, toX: toX, toY: toY,
+        // Android のジェスチャナビ: 始点が戻る(左右)・ホーム/アプリ切替(下端)の帯の中だと OS に取られて前の画面へ戻る/
+        // アプリが離脱する。DSL の swipePointToPoint(executeDirectPointToPoint)と同じく始点を帯の外へ寄せて言う
+        // (終点は寄せない = 認識は押下位置で決まる)。下書きの行は元の座標のまま残す(再生側が同じ寄せをする)
+        var sendFromX = fromX
+        var sendFromY = fromY
+        var bandNote = ""
+        if dragDriver is AndroidDriver, let band = await dragDriver.backGestureEdgeWidths(),
+           band.bottom > 0 || band.left > 0 || band.right > 0,
+           let screen = await coordinateScreen(dragDriver, args: args) {
+            let bottom = ScrollGeometry.clearingBottomGestureBand(y: fromY, viewport: screen, bottom: band.bottom)
+            let side = ScrollGeometry.clearingSideGestureBand(x: fromX, viewport: screen, left: band.left, right: band.right)
+            sendFromY = bottom.y
+            sendFromX = side.x
+            if bottom.moved || side.moved {
+                bandNote = " The start point was moved clear of the Android gesture band at the screen edge"
+                    + " (a touch there is taken as back / home / app switch): sent from (\(sendFromX), \(sendFromY))."
+            }
+        }
+        try await dragDriver.drag(fromX: sendFromX, fromY: sendFromY, toX: toX, toY: toY,
                                   pressSeconds: FlowStep.defaultDragPressSeconds, durationSeconds: durationSeconds)
         // 下書きには DSL の `swipePointToPoint` として残す(座標タップと同じ扱い = 実行できる行 +
         // セレクタへ置き換えるべきことを行末コメントに)。fromRef で始めても終点は座標なので同じ形
@@ -437,7 +468,7 @@ extension MCPServer {
                      args: args)
         // **無検証であることを言う**(swipe / pinch は言っているのに drag / press だけ
         // 「done」で言い切っていた。同じ無検証なのに信頼度が違って見える)
-        return text("drag (\(fromX), \(fromY)) → (\(toX), \(toY)) sent.\(dragSelector)"
+        return text("drag (\(fromX), \(fromY)) → (\(toX), \(toY)) sent.\(bandNote)\(dragSelector)"
             + (args["snapshotAfter"] as? Bool == true
                ? " Nothing about the result is checked — read the tree below to confirm"
                  + " it moved what you meant."

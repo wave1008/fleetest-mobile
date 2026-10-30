@@ -267,6 +267,6 @@ struct ResultsInsightsCommand: AsyncParsableCommand {
             try printResultsJSON(rows)
             return
         }
-        ConsoleOut.out(ResultsRendering.insights(rows))
+        ConsoleOut.out(ResultsRendering.insights(rows, runCount: runs.count))
     }
 }

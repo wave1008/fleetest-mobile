@@ -439,6 +439,10 @@ struct ApiMonitorCommand: AsyncParsableCommand {
                     leaseKey.map { MCPDeviceLease.holderPID(stateDir: dir, key: $0,
                                                            excluding: [getpid(), getppid()]) != nil }
                 } ?? false
+                let inMCP = leaseStateDir.flatMap { dir in
+                    leaseKey.map { MCPDeviceLease.hasMCPHolder(stateDir: dir, key: $0,
+                                                              excluding: [getpid(), getppid()]) }
+                } ?? false
                 // 実機の宛先(LAN IP or ループバック)。拡張が画面配信ヘルパーに渡す
                 let bridgeHost: String? = state.target.spec.isPhysical
                     ? state.iosPort.flatMap { port in
@@ -466,7 +470,7 @@ struct ApiMonitorCommand: AsyncParsableCommand {
                 }
                 return state.info(health: confirmedIssues.isEmpty ? nil : confirmedIssues,
                                    renderMode: state.androidSerial.flatMap { renderModeCache[$0] },
-                                   inRun: inRun, inSession: inSession, recording: recording, host: bridgeHost,
+                                   inRun: inRun, inSession: inSession, inMCP: inMCP, recording: recording, host: bridgeHost,
                                    frozen: frozenVerdict.isFrozen, streamedByOther: streamedByOther,
                                    bridgeRunning: bridgeRunning,
                                    storage: leaseKey.flatMap { storageCache[$0] },
@@ -784,7 +788,7 @@ struct ApiMonitorCommand: AsyncParsableCommand {
         ApiMonitorDeviceInfo(
             id: target.id, name: target.name, platform: target.platform,
             state: "unknown", detail: detail, udid: nil, serial: nil, health: nil, renderMode: nil,
-            inRun: false, inSession: false, kind: target.spec.isPhysical ? "physical" : "virtual",
+            inRun: false, inSession: false, inMCP: false, kind: target.spec.isPhysical ? "physical" : "virtual",
             host: nil, port: nil, recording: false, registered: target.registered,
             machine: MachineDispatch.normalize(target.spec.machine), frozen: false, wired: nil,
             streamedByOther: nil, bridgeRunning: nil, storage: nil,
@@ -953,7 +957,7 @@ struct DeviceRuntimeState {
 
     /// health・renderMode・inRun・recording・frozen は monitor ループだけが知る状態のため引数で受け取る
     /// (list-devices は同じ情報を ApiDeviceEntry として別途組み立てる)
-    func info(health: [String]?, renderMode: String?, inRun: Bool, inSession: Bool,
+    func info(health: [String]?, renderMode: String?, inRun: Bool, inSession: Bool, inMCP: Bool,
                           recording: Bool, host: String? = nil,
                           frozen: Bool = false, streamedByOther: Bool? = nil,
                           bridgeRunning: Bool? = nil,
@@ -964,7 +968,7 @@ struct DeviceRuntimeState {
         ApiMonitorDeviceInfo(id: target.id, name: target.name,
                              platform: target.platform, state: state, detail: detail,
                              udid: iosUdid, serial: androidSerial, health: health, renderMode: renderMode,
-                             inRun: inRun, inSession: inSession,
+                             inRun: inRun, inSession: inSession, inMCP: inMCP,
                              kind: target.spec.isPhysical ? "physical" : "virtual",
                              host: host, port: iosPort,
                              recording: recording, registered: target.registered,
@@ -1088,8 +1092,7 @@ struct ConfirmedDeviceState {
     var missStreak: Int
 }
 
-/// stdin 読み取りスレッド・シグナルハンドラ・メインループの間で共有する停止フラグ
-/// (ApiRunEvents.swift の DebugControlBox と同様 NSLock で保護する)
+/// stdin 読み取りスレッド・シグナルハンドラ・メインループの間で共有する停止フラグ(NSLock で保護する)
 final class StopFlag: @unchecked Sendable {
     private let lock = NSLock()
     private var flag = false

@@ -94,6 +94,9 @@ export interface MonitorDevice {
   /** 対話セッション(MCP・ライブ操作)の使用中の印があるか(ApiMonitorCommand.swift の MCPDeviceLease.holderPID)。
    * ブリッジ監視が数えない・撃たないための入力(monitorBridgeWatchdog.ts)。 */
   readonly inSession: boolean;
+  /** MCP(fleetest-mcp)の印があるか(ApiMonitorCommand.swift の MCPDeviceLease.hasMCPHolder。ライブ操作の印は含まない)。
+   * 実行中のランプの入力(webview/monitor/deviceTiles.js の renderLamp)。 */
+  readonly inMCP: boolean;
   /** このデバイスが画面録画中か。 */
   readonly recording: boolean;
   /** どれかの実行プロファイルの devices に実在するか。false は ApiMonitorCommand.determineStates(includeUnregistered:)
@@ -394,6 +397,7 @@ function isMonitorDevice(value: unknown): value is MonitorDevice {
     (value.renderMode === undefined || value.renderMode === "gpu" || value.renderMode === "cpu") &&
     typeof value.inRun === "boolean" &&
     typeof value.inSession === "boolean" &&
+    typeof value.inMCP === "boolean" &&
     (value.kind === "virtual" || value.kind === "physical") &&
     typeof value.recording === "boolean" &&
     typeof value.registered === "boolean" &&

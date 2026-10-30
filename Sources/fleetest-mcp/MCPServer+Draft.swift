@@ -21,7 +21,22 @@ extension MCPServer {
     func draftScenario(_ args: [String: Any]) throws -> String {
         // **下書きは1台分**: 1つのプロセスで2台を操作した記録は、最後に操作した台の手だけを使う
         // (混ぜると、別の台の画面にしか無いセレクタが1本のシナリオに並ぶ)。残りは header で言う
-        let draftDevice = interactions.latestDevice
+        // `device:` で台を選べる(表記は header の「left out」が名指す鍵そのもの。従えない案内にしない)
+        let askedDevice = (args["device"] as? String).map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .flatMap { $0.isEmpty ? nil : $0 }
+        // 素の serial / udid(`ios:` `android:` を付けない綴り)は、記録の鍵に一意に当たるなら受け付ける
+        var requestedDevice = askedDevice
+        if let asked = requestedDevice, !interactions.deviceKeys.contains(asked) {
+            let bare = interactions.deviceKeys.filter { $0.hasSuffix(":" + asked) }
+            if bare.count == 1, let only = bare.first { requestedDevice = only }
+        }
+        if let requestedDevice, !interactions.deviceKeys.contains(requestedDevice) {
+            let known = interactions.deviceKeys.sorted()
+            return "No interactions recorded for device \"\(requestedDevice)\". "
+                + (known.isEmpty ? "Nothing has been recorded yet."
+                    : "Recorded devices: \(known.joined(separator: ", ")) (use the key exactly as listed, with its ios: / android: prefix).")
+        }
+        let draftDevice = requestedDevice ?? interactions.latestDevice
         let recorded = interactions.scope(all: args["all"] as? Bool == true, device: draftDevice)
         guard !recorded.isEmpty else {
             return "No interactions recorded yet. Drive the app with ft_launch / ft_tap / ft_type"
@@ -33,15 +48,18 @@ extension MCPServer {
         // **範囲は intArgument が見る**(ArgumentBounds.numeric["lastN"] = 1以上。型だけ見て
         // 0 や負を通すと、黙って「全部」か「空」になる)
         let lastN = try Self.intArgument(args, "lastN")
-        let (scope, droppedCount, ignoredNumbers) = InteractionLog.prune(
+        let (prunedScope, droppedCount, ignoredNumbers) = InteractionLog.prune(
             recorded, lastN: lastN,
             drop: try Self.intArrayArgument(args, "drop") ?? [])
-        guard !scope.isEmpty else {
+        guard !prunedScope.isEmpty else {
             return "Every recorded step was pruned away (\(recorded.count) recorded,"
                 + " \(droppedCount) dropped). Call ft_draft_scenario again with a smaller"
                 + " drop list — the numbering is 1-based over the steps shown in the listing."
         }
-        let target = interactions.target(in: scope, device: draftDevice)
+        // drop の番号は lastN で絞った後の並びに振る(範囲の上限も絞った後の件数)
+        let narrowedCount = lastN.map { $0 > 0 ? min($0, recorded.count) : recorded.count } ?? recorded.count
+        let target = interactions.target(in: prunedScope, device: draftDevice)
+        let scope = Self.springBoardTapsAsTodo(Self.terminatesOtherAppAsTodo(prunedScope, target: target.app))
         let unresolved = scope.compactMap(\.unresolved)
         let steps = scope.compactMap(\.step)
         // **解決できなかった手はその場に残す**。まとめて先頭へ出すと action の
@@ -52,7 +70,7 @@ extension MCPServer {
         var stepIndexForListing: [Int] = []
         var resolved = 0
         // 範囲で最初の launch(condition の launchApp() に写る)。先に宣言(irregularHandler)があっても位置 0 とは限らない
-        let firstLaunch = scope.firstIndex(where: \.isLaunch)
+        let firstLaunch = Self.conditionLaunchIndex(in: scope)
         for (position, entry) in scope.enumerated() {
             stepIndexForListing.append(resolved)
             if let described = entry.unresolved {
@@ -60,7 +78,15 @@ extension MCPServer {
                     "TODO: no stable selector — \(described)"
                         + " (step \(position + 1) of the exploration)")
             } else if entry.step != nil {
+                // ツール自身が「効かなかったはず」と警告した手は、印なしで残さない(再生すると DSL の tap は有効になるまで待って押す)
+                if let warning = entry.noEffectWarning {
+                    notesBeforeStep[resolved, default: []].append(
+                        "TODO: the tool warned that this step probably did nothing during the exploration (\(warning));"
+                            + " a scenario's action waits for the target and performs it — check the state before relying on this step")
+                }
                 resolved += 1
+            } else if let todo = entry.todoNote {
+                notesBeforeStep[resolved, default: []].append(todo)
             } else if let note = Self.unrenderedStepNote(entry, position: position, isFirstLaunch: position == firstLaunch,
                                                          target: target.app) {
                 // **DSL の行にならない手も黙って捨てない**(launch / activate / 将来の step なしの記録)。
@@ -68,11 +94,16 @@ extension MCPServer {
                 notesBeforeStep[resolved, default: []].append(note)
             }
         }
-        let sceneBreaks = (try Self.intArrayArgument(args, "scenes") ?? [])
-            .compactMap { number -> Int? in
-                guard number >= 1, number <= stepIndexForListing.count else { return nil }
-                return stepIndexForListing[number - 1]
+        let requestedScenes = try Self.intArrayArgument(args, "scenes") ?? []
+        var seenScenes = Set<Int>()
+        var ignoredScenes: [Int] = []
+        let sceneBreaks = requestedScenes.compactMap { number -> Int? in
+            guard number >= 1, number <= stepIndexForListing.count, seenScenes.insert(number).inserted else {
+                ignoredScenes.append(number)
+                return nil
             }
+            return stepIndexForListing[number - 1]
+        }
         let flow = Flow(name: args["title"] as? String ?? "explored with ft_* (draft)",
                         app: target.app, platform: target.platform,
                         goal: nil, generatedBy: Self.draftGeneratedBy, steps: steps)
@@ -96,10 +127,11 @@ extension MCPServer {
             + " and that is the signal to fill in what this scenario proves.\n"
         let others = interactions.otherDevices(than: draftDevice, all: args["all"] as? Bool == true)
         if others.count > 0 {
-            header += "⚠️ this draft covers only the device you drove last (\(draftDevice ?? "?")):"
+            header += "⚠️ this draft covers only \(requestedDevice != nil ? "the device you named" : "the device you drove last")"
+                + " (\(draftDevice ?? "?")):"
                 + " \(others.count) recorded interaction(s) on other device(s)"
                 + " (\(others.keys.joined(separator: ", "))) were left out. A scenario runs on one device —"
-                + " draft the other one separately.\n"
+                + " draft the other one separately with device: \"<key above>\".\n"
         }
         // SpringBoard への attach はアプリの起動ではない(target と同じ扱い)
         let launchedApps = Set(scope.compactMap(\.bundleID).filter { $0 != MCPServer.springboardBundleID })
@@ -120,9 +152,56 @@ extension MCPServer {
             // **黙って無視しない**: 番号を1つ外しただけで別の手が落ちるので、
             // 「効かなかった指定がある」ことに気付けないと誤った下書きを持ち帰る
             header += "⚠️ drop \(ignoredNumbers.map(String.init).joined(separator: ", "))"
-                + " is out of range (1…\(recorded.count)) and was ignored.\n"
+                + " is out of range (1…\(narrowedCount)) and was ignored.\n"
+        }
+        if !ignoredScenes.isEmpty {
+            header += "⚠️ scenes \(ignoredScenes.map(String.init).joined(separator: ", "))"
+                + " is out of range (1…\(stepIndexForListing.count)) or repeated and was ignored.\n"
         }
         return header + Self.pruningListing(scope) + "\n" + code
+    }
+
+    /// `terminate <bundleID>` の記録で、止めた先が下書きの対象アプリでない手を TODO に落とす。DSL の `terminateApp()` は
+    /// 対象を取らず「いまのアプリ」を止めるので、そのまま書くと別のアプリを止めた手が対象アプリを止める行になる
+    /// (Android の ft_terminate は指定と別のアプリを止めることがあった・何も止めなかった手も記録される)
+    static func terminatesOtherAppAsTodo(_ scope: [InteractionLog.Entry], target: String) -> [InteractionLog.Entry] {
+        let prefix = "terminate "
+        return scope.map { entry in
+            guard entry.step?.action == "terminate", entry.summary.hasPrefix(prefix) else { return entry }
+            let named = String(entry.summary.dropFirst(prefix.count))
+            guard named != target else { return entry }
+            var todo = entry
+            todo.step = nil
+            return todo
+        }
+    }
+
+    /// SpringBoard に向けている間の tap / doubleTap / 長押しを TODO に落とす。シナリオはアプリの木に対して解決するので、
+    /// ホーム画面のアイコンの名前をセレクタにした行は必ず落ちる(アイコンは `tapAppIcon(name)`)。アラートのボタンの場合もあるので両方を言う。
+    /// 向け先は SpringBoard への attach から、別のアプリの記録(launch / activate)までの間
+    static func springBoardTapsAsTodo(_ scope: [InteractionLog.Entry]) -> [InteractionLog.Entry] {
+        var onSpringBoard = false
+        return scope.map { entry in
+            if let bundleID = entry.bundleID { onSpringBoard = bundleID == springboardBundleID }
+            guard onSpringBoard, let step = entry.step,
+                  ["tap", "doubleTap"].contains(step.action ?? "") else { return entry }
+            let name = step.locator?.id ?? step.locator?.label
+            var todo = entry
+            todo.step = nil
+            todo.todoNote = "TODO: the exploration pressed something on SpringBoard here (\(entry.summary)) — "
+                + (name.map { "if it was the home-screen icon of an app, use tapAppIcon(\"\($0)\") " } ?? "if it was an app icon, use tapAppIcon(name) ")
+                + "(a tap selector resolves against the app's tree, not the home screen); if it was a system alert button, close the alert with an irregular handler"
+            return todo
+        }
+    }
+
+    /// 範囲で condition の `launchApp()` に写る launch の位置。**最初の launch でも、それより前に実際の手(宣言以外)が
+    /// あれば nil** —— 先頭へ持ち上げると launch が行にも TODO にもならず、「離脱 → 起動し直し → タップ」が
+    /// 「起動 → … → 離脱 → タップ」に入れ替わる(`all: true` で踏む)。nil のときその launch は TODO(restartApp)で残る
+    static func conditionLaunchIndex(in scope: [InteractionLog.Entry]) -> Int? {
+        guard let index = scope.firstIndex(where: \.isLaunch) else { return nil }
+        let actedBefore = scope[..<index].contains { $0.unresolved != nil || ($0.step != nil && $0.step?.action != "irregularHandler") }
+        return actedBefore ? nil : index
     }
 
     /// DSL の行を持たない記録(step も unresolved も無い)を、行の位置に残す TODO コメントへ直す。
@@ -139,6 +218,10 @@ extension MCPServer {
                 + " once, in condition — if the restart is needed, add restartApp(\"\(app)\") here"
                 + " (it also terminates first)"
         }
+        if entry.summary.hasPrefix("terminate ") {
+            return "TODO: the exploration stopped another app here (\(what)); terminateApp() stops the app under test"
+                + " (\(target.isEmpty ? "unknown" : target)), not that one — drop this step or use terminateApp() only for the scenario's app"
+        }
         if entry.bundleID == MCPServer.springboardBundleID {
             return "TODO: the exploration attached to SpringBoard here (\(what)) to act on the home screen or a"
                 + " system alert, not the app — in a scenario, close the alert with an irregular handler or drop these steps"
@@ -149,6 +232,12 @@ extension MCPServer {
                 + " back, or drop this step"
         }
         return "TODO: no DSL line for \(what) (step \(position + 1) of the exploration)"
+    }
+
+    /// 枠だけ残っていて描かれていない行(⚠️scroll-leftover)の ref。点の下がこれなら下書きはセレクタを書かない
+    /// (再生すると送り戻して別の行を押す)。offscreen は画面内の点を含まないので除く
+    static func leftoverRefs(_ snapshot: SnapshotResponse) -> Set<Int> {
+        Set(ghostFlags(snapshot).filter { $0.value == leftoverMark }.keys)
     }
 
     /// 実体は `FTCore.SelectorNaming.asWritten`(needsEscaping/computeGraded が使うため
@@ -237,7 +326,7 @@ extension MCPServer {
                            coordinate: (x: Double, y: Double)? = nil,
                            duration: Double? = nil, maxGestureSeconds: Double? = nil,
                            scale: Double? = nil, degrees: Double? = nil,
-                           replace: Bool = false) {
+                           replace: Bool = false, noEffectWarning: String? = nil) {
         // tap → type の間に別の操作が入ったら「叩いた欄へ入れる」意図ではない(DSL と同じ規律)。
         // **ref を渡した type も捨てる**: 欄を名指しした後の ref なし type は、その欄の続きであって数手前のタップの続きではない
         // (残すと、画面遷移のタップ → ref つき type → ref なし type が、遷移先の別の欄へ打った。Emulator の E2EX で 2/2)
@@ -282,7 +371,8 @@ extension MCPServer {
             let isDoubleTap = action == "doubleTap"
             var step: FlowStep
             if let tree = lastSnapshots[Self.sessionKey(args)],
-               let graded = PointTarget.writableSelector(atX: coordinate.x, y: coordinate.y, in: tree) {
+               let graded = PointTarget.writableSelector(atX: coordinate.x, y: coordinate.y, in: tree,
+                                                         notDrawn: Self.leftoverRefs(tree)) {
                 step = FlowStep(action: isDoubleTap ? "doubleTap" : "tap",
                                 locator: FTSelector.parse(graded.selector).primary)
                 step.note = DraftNotes.joined(
@@ -327,9 +417,10 @@ extension MCPServer {
         }
         let detail = [selector.map { "\"\($0)\"" }, text.map { "\"\($0)\"" }, direction]
             .compactMap { $0 }.joined(separator: " ")
-        recordAction(InteractionLog.Entry(
-            step: step, unresolved: nil,
-            summary: detail.isEmpty ? action : "\(action) \(detail)"), args: args)
+        var entry = InteractionLog.Entry(step: step, unresolved: nil,
+                                         summary: detail.isEmpty ? action : "\(action) \(detail)")
+        entry.noEffectWarning = noEffectWarning
+        recordAction(entry, args: args)
     }
 
     /// 撮ったスナップショットの `#id` をプロジェクトの台帳へ足す(ft_dry_run が綴り誤りの照合に使う。

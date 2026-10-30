@@ -104,6 +104,11 @@ extension StepExecutor {
         /// 具体名で言うための材料。`suggestedScrollFrame` とは別 —— あちらは reverseSweeps が
         /// 実際に拾い直した容器、こちらは探索を試す前から木にあった宣言候補)
         var directionMatchedScrollFrameCandidate: String?
+        /// 明示 scrollFrame の容器が**探索の軸と違う軸にしか動かない**(横の一覧を縦に払った等)と木から言える。
+        /// `stoppedUnmoving` の文が縦の逆向きを勧める誤誘導を避けるためだけに持つ(`scrollFrameRunsOtherAxis`)
+        var scrollFrameOtherAxis: Bool = false
+        /// 逆走査に許した遊びドラッグの本数(`reverseSweepDragBudget`)。失敗文が「up to N」と言う
+        var reverseSweepBudget: Int?
         /// 見つけた要素(found のときだけ)。scrollTo が「掴んだ要素」として返す
         /// (無いと DSL の `scrollTo` が lastElement を空で上書きしていた)
         var element: ElementInfo? = nil
@@ -221,10 +226,16 @@ extension StepExecutor {
                 // 反対の**スクロールの向き**はその rawValue そのもの。引数名はコマンドで違う(scrollTo = `direction:` /
                 // tap・exist 等 = `scroll:`。MCP の ft_scroll_to は `direction`、ft_batch は DSL の行なので同じ名前で通じる)
                 let oppositeArgument = step.action == "scrollTo" ? "direction" : "scroll"
+                // **渡した容器が別の軸にしか動かないなら、逆向きを勧めない**(横の一覧に縦の逆向きを勧めても動かない)。
+                // 軸の向きは一覧の並びから言うだけで、どちらへ送るかは対象の側による
+                let tail = result?.scrollFrameOtherAxis == true
+                    ? "the scrollFrame container scrolls \(vertical ? "horizontally" : "vertically"), not \(vertical ? "vertically" : "horizontally"),"
+                        + " so search along its own axis with \(oppositeArgument): \(vertical ? ".left / .right" : ".up / .down")"
+                    : "the opposite direction was not searched — if the element"
+                        + " is on that side, search with \(oppositeArgument): .\(direction.rawValue)"
                 stopped = " (nothing moved at all during the search — either the swipes did not reach a"
                     + " scrolling area or it was already at its end in this direction; the tool cannot tell which,"
-                    + " and raising maxSwipes will not help; the opposite direction was not searched — if the element"
-                    + " is on that side, search with \(oppositeArgument): .\(direction.rawValue))"
+                    + " and raising maxSwipes will not help; \(tail))"
             }
         } else {
             stopped = ""
@@ -275,10 +286,16 @@ extension StepExecutor {
         // 逆走査を撃った失敗だけ(数に入らない遅いドラッグが走り、画面が戻されていることを見せる)。
         // **「reached its end」「not reaching a scrolling area」を含めない**: 順方向の事実を言う別の分岐の語
         let sweepNote = result?.reverseSweepRan == true
-            ? " — then a reverse sweep of up to \(Self.reverseSweepMaxSwipes) slow drags the opposite way"
-              + " (not counted in the \(swipes) above) also found nothing, so the screen is left at the swept-back position"
+            ? " (then a reverse sweep of up to \(result?.reverseSweepBudget ?? Self.reverseSweepMaxSwipes) slow drags the opposite way"
+              + " (not counted in the \(swipes) above) also found nothing, so the screen is left at the swept-back position)"
             : ""
-        return "element not found after \(swipes) scroll(s)\(stopped)\(sweepNote): \(step.locatorSummary)"
+        // 入れ子で外側の一覧が動いた失敗(動かなかった形は上の stopped が言う)。払いが届いたのは scrollFrame ではない
+        let otherAxisNote = result?.scrollFrameOtherAxis == true && result?.stoppedUnmoving != true
+            ? " (the scrollFrame container scrolls \(vertical ? "horizontally" : "vertically"), not \(vertical ? "vertically" : "horizontally"):"
+              + " the swipes moved the enclosing scroll area, not the scrollFrame — search along its own axis with"
+              + " \(step.action == "scrollTo" ? "direction" : "scroll"): \(vertical ? ".left / .right" : ".up / .down"))"
+            : ""
+        return "element not found after \(swipes) scroll(s)\(stopped)\(otherAxisNote)\(sweepNote): \(step.locatorSummary)"
             + sheetHint + keyboardHint + scrollFrameHint
     }
 
@@ -353,6 +370,9 @@ extension StepExecutor {
     /// ときは待たない。尽きたとき(描き足しが 1.0 秒を超える)は途中で端と確定し、後段の exist が
     /// 「送った先に無い」で落ちる
     static let edgeClaimGraceAfterMove: Duration = .milliseconds(1000)
+    /// 利用者の `waitSeconds:` の間、何も動かない探索が次の1本を送るまでの間隔(`edgeClaimGraceAfterMove` の半分)。
+    /// 上限は `waitSeconds` 自身。尽きたら従来の「nothing moved at all」を言う(予算を使い切った事実が失敗文の所要時間に出る)
+    static let unmovedBudgetPollInterval: Duration = .milliseconds(500)
 
     /// `scrollToEdge` が端と認めるまでに必要な「署名が不変だった周回数」。
     ///
@@ -501,11 +521,48 @@ extension StepExecutor {
     /// 勧めても意味が無い(逆も同じ)。名指しできない(id もラベルも無い)候補は除く
     static func directionMatchedScrollFrameCandidate(in snapshot: SnapshotResponse,
                                                      vertical: Bool) -> String? {
-        ScrollFrameCandidates.candidates(in: snapshot).first {
-            guard $0.selector != nil else { return false }
-            return vertical ? $0.visible.height >= $0.visible.width
-                            : $0.visible.width > $0.visible.height
+        ScrollFrameCandidates.candidates(in: snapshot).first { candidate in
+            guard candidate.selector != nil else { return false }
+            // **申告した軸が縦横比に勝つ**: 横向きの低い縦の一覧(2282x411)は縦横比では横の容器に見え、勧められずに終わっていた
+            let actions = snapshot.elements.first { $0.ref == candidate.ref }?.scrollActions
+            if declaresAxis(actions, vertical: vertical) { return true }
+            if declaresOnlyOtherAxis(actions, vertical: vertical) { return false }
+            return vertical ? candidate.visible.height >= candidate.visible.width
+                            : candidate.visible.width > candidate.visible.height
         }?.selector
+    }
+
+    /// 逆走査の遊びドラッグの本数。**通り過ぎるのは最後の1本だけ**(動いた探索の後の逆走査の趣旨)なので、最後に動いた1本の移動量を
+    /// 1本のドラッグ(容器の `reverseSweepSpanRatio`)で戻せる本数 + 1 に限る。移動量が測れない(共通の id が無い = 容器を丸ごと
+    /// 飛び越した)ときは上限まで。上限は `reverseSweepMaxSwipes`
+    static func reverseSweepDragBudget(lastSwipeTravel: Double?, container: FTRect, vertical: Bool) -> Int {
+        let extent = vertical ? container.height : container.width
+        guard let travel = lastSwipeTravel, extent > 0 else { return reverseSweepMaxSwipes }
+        let perDrag = extent * reverseSweepSpanRatio
+        return min(reverseSweepMaxSwipes, max(1, Int((travel / perDrag).rounded(.up)) + 1))
+    }
+
+    /// 明示 scrollFrame の容器が、探索の軸(`vertical`)と**違う軸にしか動かない**か。申告した向きがあればそれが全て、
+    /// 無ければ中の子の並び(同じ段に横へ並ぶ = 横)で言う。**縦横比は使わない**(横向きの低い縦の一覧が横に見える)。
+    /// 言い切れなければ false(従来の文言)
+    static func scrollFrameRunsOtherAxis(step: FlowStep, in snapshot: SnapshotResponse, vertical: Bool) -> Bool {
+        guard step.scrollFrame != nil || step.scrollFrameRect != nil,
+              let container = scrollContainerElement(step: step, in: snapshot) else { return false }
+        if let actions = container.scrollActions, declaresAxis(actions, vertical: true) || declaresAxis(actions, vertical: false) {
+            return declaresOnlyOtherAxis(actions, vertical: vertical)
+        }
+        let f = container.frame
+        let children = snapshot.elements.filter {
+            $0.ref != container.ref && $0.frame.width > 0 && $0.frame.height > 0
+                && $0.frame.x >= f.x - 1 && $0.frame.y >= f.y - 1
+                && $0.frame.x + $0.frame.width <= f.x + f.width + 1 && $0.frame.y + $0.frame.height <= f.y + f.height + 1
+        }
+        // 3 つ未満では並びと言えない。起点の座標が 2 点以内に揃うのを「同じ段・同じ列」と数える
+        guard children.count >= 3 else { return false }
+        func spread(_ values: [Double]) -> Double { (values.max() ?? 0) - (values.min() ?? 0) }
+        let xs = spread(children.map(\.frame.x)), ys = spread(children.map(\.frame.y))
+        let alongX = ys <= 2 && xs > 2, alongY = xs <= 2 && ys > 2
+        return vertical ? alongX : alongY
     }
 
     /// **スクロール探索の本体**。`scrollTo` コマンドと、`tap(scroll:)` / `exist(scroll:)` の
@@ -517,6 +574,7 @@ extension StepExecutor {
     func runScrollSearch(step: FlowStep, recoverOnMiss: Bool = true,
                          phase: inout PhaseAccumulator) async throws -> ScrollSearchResult {
         let clock = ContinuousClock()
+        let searchStart = clock.now
         let direction = FTSwipeDirection(rawValue: step.direction ?? "") ?? .up
         // 負値だと 0...(-1) が ClosedRange 生成で trap(クラッシュ)するため 0 で下限クランプ
         let maxSwipes = max(0, step.maxSwipes ?? tunables.defaultMaxSwipes)
@@ -536,6 +594,14 @@ extension StepExecutor {
         var lastMoveAt: ContinuousClock.Instant?
         // 打ち切りの理由文を分けるためだけの記録(ScrollSearchResult.contentEverMoved 参照)
         var contentEverMoved = false
+        // 逆走査の門だけに使う「中身が実際にずれたか」(`ScrollGeometry.contentShifted`)。contentEverMoved は署名の差(ラベル・値の
+        // 変化・端のバウンスも含む)なので、これで逆走査を撃つと端から動かなかった探索が逆走査へ入る
+        var contentShiftedEver = false
+        // 直近に動いた1本の移動量(逆走査の本数の上限を決める。`reverseSweepDragBudget`)
+        var lastSwipeTravel: Double?
+        // 明示 scrollFrame の容器が探索の軸と違う軸にしか動かないと最初の木から言えるか(入れ子で払いが外側へ伝わる形)。
+        // 動いたのは外側の一覧なので、逆走査(容器の推測は外側になる)を撃たず、失敗文でこの事実を言う
+        var frameOtherAxis = false
         var truncatedDuringSearch = 0
         // スクロールした容器(中身が入れ替わった領域)。逆走査の刻みの基準
         var scrolledContainer: FTRect?
@@ -545,6 +611,10 @@ extension StepExecutor {
         var sheetExpandTried = false
         // 進む先の縁に付いた要素を見つけて同じ向きへ送り直したか(1 探索に 1 回。下の touchesLeadingEdge の分岐)
         var leadingEdgeNudged = false
+        // 見切れの寄せ(下の isClippedByViewport 分岐)を撃った直後の周回か・寄せを撃っても木が変わらなかった連続回数。
+        // 容器の外(キーボードの下・固定バー)にある対象は、寄せを何本撃っても可視域へ入らず maxSwipes まで空振りしていた
+        var justSentClipRecovery = false
+        var clipRecoveryUnmoved = 0
         for attempt in 0...maxSwipes {
             // **1周目だけは静止を待ってから撮る**。直前の操作がプログラム的な
             // アニメーションスクロール(「先頭へ」等)だと、ブリッジの整定はすり抜けることがあり
@@ -581,6 +651,10 @@ extension StepExecutor {
                                                               in: snapshot.elements, screen: snapshot.screen).frame
             // **周回ごとに記録する**(最終木では消えている情報。ScrollSearchResult の宣言参照)
             truncatedDuringSearch = max(truncatedDuringSearch, snapshot.truncatedCount)
+            if attempt == 0 {
+                frameOtherAxis = Self.scrollFrameRunsOtherAxis(step: step, in: snapshot,
+                                                                vertical: direction == .up || direction == .down)
+            }
             if let previousSnapshot {
                 scrolledContainer = Self.changedContentContainer(before: previousSnapshot,
                                                                  after: snapshot)
@@ -588,6 +662,11 @@ extension StepExecutor {
                                                   vertical: direction == .up || direction == .down)
                     ?? scrolledContainer
             }
+            if justSentClipRecovery, let previousSnapshot {
+                clipRecoveryUnmoved = Self.contentSignature(previousSnapshot.elements)
+                    == Self.contentSignature(snapshot.elements) ? clipRecoveryUnmoved + 1 : 0
+            }
+            justSentClipRecovery = false
             // **1回の移動量が容器を超えると要素を飛び越す**(スクロール探索は行き過ぎた要素を
             // 拾い直さない)。実測して超えていたら次の刻みを詰める。
             //
@@ -643,6 +722,7 @@ extension StepExecutor {
                 let pagesPerSwipe = typeDriver != nil
                     && AppUIFrameworkQuery.hostsOwnTouches(element, app: uiFramework) == true
                 if attempt < maxSwipes,
+                   clipRecoveryUnmoved < Self.unmovedRoundsToStopSearch,
                    Self.isClippedByViewport(element, screen: viewport) {
                     // **寄せる前にも fail-fast を通す**(未検出側と同じ判定)。ここを飛ばすと
                     // 解決できない明示 scrollFrame のまま viewport が画面全体へ落ち、寄せの1本が
@@ -683,6 +763,7 @@ extension StepExecutor {
                         swipes += 1
                         leftInertia = true
                         previousSnapshot = snapshot
+                        justSentClipRecovery = true
                         continue
                     }
                     let finger = FTSwipeDirection(rawValue: recovery.direction ?? "") ?? direction
@@ -692,6 +773,7 @@ extension StepExecutor {
                     if !swipeLeavesNoInertia(swipedViaXCUITest: swipedViaXCUITest) { leftInertia = true }
                     swipes += 1
                     previousSnapshot = snapshot
+                    justSentClipRecovery = true
                     continue
                 }
                 // **進む先の縁に付いている = 枠が見えている部分へ切り詰められている**ことがある(Android の Flutter は
@@ -778,6 +860,9 @@ extension StepExecutor {
             if attempt == maxSwipes, let earlier = previousSnapshot,
                Self.contentSignature(earlier.elements) != Self.contentSignature(snapshot.elements) {
                 contentEverMoved = true
+                if ScrollGeometry.contentShifted(before: earlier.elements, after: snapshot.elements, vertical: vertical) {
+                    contentShiftedEver = true
+                }
                 previousSnapshot = snapshot
             }
             if attempt < maxSwipes {
@@ -811,6 +896,16 @@ extension StepExecutor {
                         phase.waitMs += Self.ms(clock.now - waitStart)
                         unmovedRounds = Self.unmovedRoundsToStopSearch - 1
                     }
+                    // **利用者が `waitSeconds:` を書いたのに何も動かないままなら、その予算の間は端と確定しない**
+                    // (読み込み中の骨組みの一覧は数秒後に伸びる。1.5 秒で「何も動かない」と断ると予算を使い切らずに赤になった)。
+                    // 書かれていなければ従来どおり(既定の待ちで毎回の失敗探索を遅くしない)。動いた後の停止は端なので対象外
+                    if unmovedRounds >= Self.unmovedRoundsToStopSearch, !contentEverMoved, let budget = step.timeout,
+                       clock.now - searchStart < .seconds(budget) {
+                        let waitStart = clock.now
+                        try await Task.sleep(for: Self.unmovedBudgetPollInterval)
+                        phase.waitMs += Self.ms(clock.now - waitStart)
+                        unmovedRounds = Self.unmovedRoundsToStopSearch - 1
+                    }
                     if unmovedRounds >= Self.unmovedRoundsToStopSearch {
                         // **打ち切る前に整定まで待って確かめる**(Flutter/Android で
                         // 誤発火): a11y ツリーは遅れて公開されるので、**動いている最中でも
@@ -820,6 +915,8 @@ extension StepExecutor {
                         let confirmed = try await settledSignature(phase: &phase)
                         if Self.contentSignature(confirmed.snapshot.elements)
                             != Self.contentSignature(snapshot.elements) {
+                            if ScrollGeometry.contentShifted(before: snapshot.elements, after: confirmed.snapshot.elements,
+                                                             vertical: vertical) { contentShiftedEver = true }
                             snapshot = confirmed.snapshot
                             previousSnapshot = snapshot
                             unmovedRounds = 0
@@ -879,6 +976,8 @@ extension StepExecutor {
                                                         containerIsPartialHeight: containerIsPartialHeight,
                                                         maxTruncatedDuringSearch: truncatedDuringSearch,
                                                         keyboardFrame: stoppedKeyboard)
+                        result.scrollFrameOtherAxis = Self.scrollFrameRunsOtherAxis(
+                            step: step, in: confirmed.snapshot, vertical: vertical)
                         // 未指定の全画面探索が的外れな案内(シート展開・端到達)を出す前に、
                         // 探索方向に合う宣言済みの容器を名指しできないか確かめる
                         if step.scrollFrame == nil {
@@ -889,7 +988,7 @@ extension StepExecutor {
                         // **順方向で1度も動かなかったら逆走査しない**: 逆走査は飛び越しの救済で、動いていなければ
                         // 何も通り過ぎていない。撃つと指定と逆の向きを探す別の機能になり、`scrollTo(direction: .up)` が
                         // 先頭から下の要素を見つけて成功する(「上にある」の確認にならない)
-                        guard contentEverMoved, recoverOnMiss, step.containerInference ?? true,
+                        guard contentShiftedEver, !frameOtherAxis, recoverOnMiss, step.containerInference ?? true,
                               // 半開きシートで呼び手が展開・再試行するなら、逆走査はそちらの
                               // 再試行(全画面高)に譲る(defersPartialSheetRecovery の宣言参照)
                               !(defersPartialSheetRecovery && containerIsPartialHeight),
@@ -901,8 +1000,12 @@ extension StepExecutor {
                         // 既定経路(scrollFrame 未指定)は刻みがブリッジ任せで縮められないので、
                         // ここでだけ推測した容器で細刻みの逆走査を掛ける
                         // (通常の送りには触らない = 2度撤回した「暗黙の座標化」にならない)
+                        let sweepBudget = Self.reverseSweepDragBudget(lastSwipeTravel: lastSwipeTravel, container: container,
+                                                                      vertical: vertical)
+                        result.reverseSweepBudget = sweepBudget
                         let recoveredBySweep = try await reverseSweep(step: step, container: container,
-                                                                      searching: direction, phase: &phase)
+                                                                      searching: direction, maxDrags: sweepBudget,
+                                                                      phase: &phase)
                         // 撃てた本数で決める(最初の1本が撃てずに諦めた回に「逆走査した」と言わない)
                         result.reverseSweepRan = reverseSweepDragsSent > 0
                         if let recovered = recoveredBySweep {
@@ -920,9 +1023,14 @@ extension StepExecutor {
                 } else {
                     // **比較が成立した回だけ**「動いた」と数える(1周目は previousSnapshot が
                     // 無いので、ここへ来ても何とも比べていない)
-                    if previousSnapshot != nil {
+                    if let earlier = previousSnapshot {
                         contentEverMoved = true
                         lastMoveAt = clock.now
+                        if ScrollGeometry.contentShifted(before: earlier.elements, after: snapshot.elements, vertical: vertical) {
+                            contentShiftedEver = true
+                        }
+                        // 逆走査の本数の根拠: 最後に動いた1本の移動量(共通の id が無く測れなければ nil = 上限まで)
+                        lastSwipeTravel = Self.measuredTravel(before: earlier, after: snapshot, vertical: vertical)
                     }
                     unmovedRounds = 0
                 }
@@ -960,13 +1068,18 @@ extension StepExecutor {
         // 横カルーセルで 2/10 残った。既に通り過ぎている公算が高い局面で、失敗経路限定なので
         // 正常系のコストはゼロ。ゲートは stoppedUnmoving 側の逆走査と同じ)
         var reverseSweepRan = false
+        var exhaustedSweepBudget: Int?
         // 順方向で1度も動かなかったら撃たない(端で打ち切った側の guard と同じ理由)
-        if contentEverMoved, recoverOnMiss, step.containerInference ?? true,
+        if contentShiftedEver, !frameOtherAxis, recoverOnMiss, step.containerInference ?? true,
            let latest = previousSnapshot,
            let container = (scrolledContainer ?? Self.overflowingContainer(in: latest))
                .flatMap({ ScrollGeometry.intersection($0, latest.screen) }) {
+            let sweepBudget = Self.reverseSweepDragBudget(lastSwipeTravel: lastSwipeTravel, container: container,
+                                                          vertical: direction == .up || direction == .down)
+            exhaustedSweepBudget = sweepBudget
             let recoveredBySweep = try await reverseSweep(step: step, container: container,
-                                                          searching: direction, phase: &phase)
+                                                          searching: direction, maxDrags: sweepBudget,
+                                                          phase: &phase)
             reverseSweepRan = reverseSweepDragsSent > 0
             if let recovered = recoveredBySweep {
                 var result = ScrollSearchResult(found: true, fallback: recovered,
@@ -983,6 +1096,8 @@ extension StepExecutor {
                                            hintJumps: hintJumps, swipes: swipes,
                                            reverseSweepRan: reverseSweepRan,
                                            maxTruncatedDuringSearch: truncatedDuringSearch)
+        exhausted.reverseSweepBudget = reverseSweepRan ? exhaustedSweepBudget : nil
+        exhausted.scrollFrameOtherAxis = frameOtherAxis
         if step.scrollFrame == nil, let latest = previousSnapshot {
             exhausted.directionMatchedScrollFrameCandidate =
                 Self.directionMatchedScrollFrameCandidate(in: latest,

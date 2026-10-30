@@ -31,16 +31,20 @@ extension MCPServer {
         }
         let returnTo = launchedBundleIDs[key].flatMap { $0 == Self.springboardBundleID ? nil : $0 }
             ?? lastSnapshots[key]?.sessionBundleID.flatMap { $0 == Self.springboardBundleID ? nil : $0 }
+        // **SpringBoard へ向けた後の失敗(木が読めない・ref が古い・横向きで 422)でも元のアプリへ向け直して抜ける**
+        // (向けたまま抜けると、以後の ft_snapshot は「ホーム画面の木」・ft_status は springboard と言い続ける)
+        func reattachOnFailure() async { if let app = returnTo { try? await d.attach(bundleID: app) } }
         try await d.launch(bundleID: Self.springboardBundleID)
-        let board = try await d.snapshot()
+        let board: SnapshotResponse
+        do { board = try await d.snapshot() } catch { await reattachOnFailure(); throw error }
         // **アラートの中の button だけ**を見る(ホーム画面にも同じ文字のアイコンがありうる)
         let inAlert = Self.systemAlertButtons(in: board)
         guard let button = inAlert.first(where: { $0.label == label }) else {
-            if let app = returnTo { try? await d.attach(bundleID: app) }
+            await reattachOnFailure()
             throw MCPError("alertButton: the alert \(title) listed \"\(label)\" but SpringBoard's tree has"
                 + " no such button inside an alert (it may have just closed) — nothing was tapped")
         }
-        try await d.tap(ref: button.ref)
+        do { try await d.tap(ref: button.ref) } catch { await reattachOnFailure(); throw error }
         recordAction(InteractionLog.Entry(
             step: nil,
             unresolved: "pressed \"\(label)\" on the system alert \(title) — in a scenario, declare it with"

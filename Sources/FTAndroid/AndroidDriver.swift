@@ -215,9 +215,12 @@ public final class AndroidDriver: AppDriver {
             throw DriverError.badResponse(status: Int(result.status),
                 body: "failed to clear app data (is \(bundleID) installed?): \(result.tail)")
         }
+        // **消したのがセッションのアプリのときだけ控えを外す**(別のアプリの消去で控えを外すと、宛先省略の terminate が
+        // 何も止めずに終わる)。控えの復元は refs を空にする前(空だと古い refs まで戻る)
+        restoreStateIfNeeded()
         refCenters = [:]
         domBridgeRefs = [:]
-        currentPackage = nil
+        if currentPackage == bundleID { currentPackage = nil }
         persistState()
     }
 
@@ -419,6 +422,44 @@ public final class AndroidDriver: AppDriver {
         // pm list packages は前方一致で引くので、行の完全一致で判定する
         return result.output.split(separator: "\n")
             .contains { $0.trimmingCharacters(in: .whitespaces) == "package:\(bundleID)" }
+    }
+
+    /// プロセスが走っているか(`pidof`)。**判定できないときは nil**(adb 不調を「走っていない」と断じない)。
+    /// 動いていないアプリの `am force-stop` も終了コード 0 で黙るので、止めたと言う前後の確認に使う
+    public func isRunning(bundleID: String) -> Bool? {
+        guard AndroidPackageName.isShellSafe(bundleID),
+              let result = try? adbProbe(["shell", "pidof", bundleID], timeout: Self.deviceAnswerTimeoutSeconds)
+        else { return nil }
+        let pids = result.output.trimmingCharacters(in: .whitespacesAndNewlines)
+        if result.status == 0 { return !pids.isEmpty }
+        // pidof は該当無しで 1 を返す(出力は空)。それ以外の失敗は判定不能
+        return result.status == 1 && pids.isEmpty ? false : nil
+    }
+
+    /// OS が常駐させるパッケージ(`dumpsys package` の flags に PERSISTENT。systemui・phone 等)か。**判定できないときは nil**。
+    /// force-stop しても OS が再起動し、止めている間は画面(ステータスバー・通知)が崩れるので、テスト対象としては止めない
+    public func isPersistentPackage(bundleID: String) -> Bool? {
+        guard AndroidPackageName.isShellSafe(bundleID),
+              let result = try? adbProbe(["shell", "dumpsys", "package", bundleID], timeout: Self.deviceAnswerTimeoutSeconds),
+              result.status == 0 else { return nil }
+        return Self.packageDumpIsPersistent(result.output)
+    }
+
+    /// system のパッケージか(`-s` に居て `-3` に居ない)。**判定できないときは nil**。更新が当たった system アプリは両方に出ることがあり、
+    /// その場合は user 側を採る(`listPackages` と同じ規則)
+    public func isSystemPackage(bundleID: String) -> Bool? {
+        guard let all = try? listPackages(includeSystem: true) else { return nil }
+        guard let match = all.first(where: { $0.id == bundleID }) else { return nil }
+        return !match.isUser
+    }
+
+    /// `dumpsys package <pkg>` の出力に PERSISTENT フラグがあるか(`flags=[ … ]` または古い版の `pkgFlags=[ … ]` の行)
+    static func packageDumpIsPersistent(_ dump: String) -> Bool {
+        dump.split(separator: "\n").contains { line in
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            return (trimmed.hasPrefix("flags=[") || trimmed.hasPrefix("pkgFlags=["))
+                && trimmed.split(whereSeparator: { $0 == " " || $0 == "[" || $0 == "]" }).contains("PERSISTENT")
+        }
     }
 
     public func launch(bundleID: String) async throws {
@@ -702,7 +743,7 @@ public final class AndroidDriver: AppDriver {
     public func tap(ref: Int) async throws {
         restoreStateIfNeeded()
         guard let center = refCenters[ref] else {
-            throw DriverError.badResponse(status: 404, body: "unknown reference number [\(ref)]. Take a snapshot first")
+            throw DriverError.staleRef(detail: "unknown reference number [\(ref)]; nothing was sent — take a snapshot first")
         }
         try refuseIfStepExpectationContradicts(ref)
         try await tap(x: center.0, y: center.1)
@@ -1270,7 +1311,7 @@ public final class AndroidDriver: AppDriver {
     public func press(ref: Int, duration: Double) async throws {
         restoreStateIfNeeded()
         guard let center = refCenters[ref] else {
-            throw DriverError.badResponse(status: 404, body: "unknown reference number [\(ref)]. Take a snapshot first")
+            throw DriverError.staleRef(detail: "unknown reference number [\(ref)]; nothing was sent — take a snapshot first")
         }
         try refuseIfStepExpectationContradicts(ref)
         // tap(ref:) と同じくホスト側で座標解決してブリッジへは x/y で送る(ブリッジ再起動で
@@ -1421,6 +1462,23 @@ public final class AndroidDriver: AppDriver {
             }
             currentPackage = nil
             persistState()  // 消さないと別プロセスの再 terminate が古い package を force-stop する
+        }
+    }
+
+    /// **指定したパッケージを force-stop する**(`terminate()` は状態ファイルに残った前回の起動先を止めるので、
+    /// このセッションで起動していないアプリを名指しした ft_terminate が別のアプリを止めていた)。
+    /// セッションのアプリを止めたときは控えも消す
+    public func terminate(bundleID package: String) async throws {
+        try AndroidPackageName.require(package)
+        let result = try adbAnswering(["shell", "am", "force-stop", package])
+        guard result.status == 0 else {
+            throw DriverError.badResponse(status: Int(result.status),
+                body: "failed to stop \(package): \(result.tail)")
+        }
+        restoreStateIfNeeded()
+        if currentPackage == package {
+            currentPackage = nil
+            persistState()
         }
     }
 

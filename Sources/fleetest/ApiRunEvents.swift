@@ -6,18 +6,6 @@ import FTAndroid
 import FTCore
 import FTRemote
 
-/// stdin 読み取りスレッドと ScenarioHost.run(onControl コールバック)の間で
-/// ScenarioRunControl を受け渡す小箱(いずれか片方のスレッドから読み書きされる)
-final class DebugControlBox: @unchecked Sendable {
-    private let lock = NSLock()
-    private var _control: ScenarioRunControl?
-
-    var control: ScenarioRunControl? {
-        get { lock.lock(); defer { lock.unlock() }; return _control }
-        set { lock.lock(); defer { lock.unlock() }; _control = newValue }
-    }
-}
-
 /// fleetest api run の冒頭イベント。internal: ApiRunMachineFanout が複数機械分をまとめて1回だけ emit する
 struct ApiRunStartedEvent: Encodable {
     let kind = "runStarted"

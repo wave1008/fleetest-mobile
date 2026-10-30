@@ -220,6 +220,9 @@ struct ApiMonitorDeviceInfo: Codable {
     /// 拡張のブリッジ監視が数えない・撃たないための入力(使用中の端末は start-device が止めずに断るので、
     /// 数えると修復を積んで失敗する誤警告になる = MN-84.8)。leaseStateDir 未解決時は常に false
     let inSession: Bool
+    /// MCP(fleetest-mcp)の印が生きているなら true(ライブ操作の印は含まない)。拡張の実行中のランプの入力
+    /// (vscode-fleetest/src/webview/monitor/deviceTiles.js の renderLamp)。leaseStateDir 未解決時は常に false
+    let inMCP: Bool
     /// デバイスの実体種別("virtual" / "physical")。iOS 実機は fleetest-simstream が
     /// CoreSimulator 私有 API のため画面配信できない等、扱いが変わるので拡張側が分岐する
     let kind: String

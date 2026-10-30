@@ -77,10 +77,12 @@ final class SystemAlertSnapshotNoteTests: XCTestCase {
             ElementInfo(ref: ref, type: type, identifier: nil, label: label, value: nil, placeholder: nil,
                         enabled: true, frame: FTRect(x: 40, y: Double(100 + ref * 50), width: 300, height: 44), depth: depth)
         }
+        // ボタン(y=250)を枠の中に持つアラート(ボタン一覧はアラートの枠の中だけ = AlertTreeScope.buttonLabels)
+        var alert = el(2, "alert", "安全に目的地に到達するために", depth: 1)
+        alert.frame = FTRect(x: 20, y: 180, width: 360, height: 140)
         driver.snapshotResponse = SnapshotResponse(sessionBundleID: "com.example.app",
             screen: FTRect(x: 0, y: 0, width: 402, height: 874),
-            elements: [el(1, "button", "背面のボタン", depth: 1), el(2, "alert", "安全に目的地に到達するために", depth: 1),
-                       el(3, "button", "OK", depth: 2)], truncatedCount: 0)
+            elements: [el(1, "button", "背面のボタン", depth: 1), alert, el(3, "button", "OK", depth: 2)], truncatedCount: 0)
         let text = combinedText(try await server.call(tool: "ft_snapshot", args: [:]))
         XCTAssertTrue(text.contains("buttons: \"OK\""), text)
         XCTAssertTrue(text.contains("[3] button \"OK\""), text)

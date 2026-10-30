@@ -412,6 +412,12 @@ extension MCPServer {
             processEvidence: androidProcessEvidenceForSwitch(
                 launched: switchedLaunched, snapshot: snapshot, driver: driver, args: args),
             stoppedByTool: toolStoppedBundleIDs[Self.sessionKey(args)])
+            // セッションが SpringBoard のまま、木がほぼ空(ステータスバーだけ)= ホーム画面から開いたアプリを見ていない
+            + (snapshot.sessionBundleID == Self.springboardBundleID
+                && Self.unrepresentedScreenFraction(snapshot) >= Self.unrepresentedScreenCaveatThreshold
+                ? "note: this session is attached to SpringBoard and its tree is nearly empty — an app opened from the"
+                    + " home screen is not the session's app. Point the session at it with ft_launch <bundleId> resume: true.\n"
+                : "")
         // **launch 系ツールの直後だけ・一度だけ** system alert を確かめる
         // (systemAlertProbePending 参照。DSL の noteAppLaunched と同じ設計)。
         // **先に鍵を消してから probe する** —— この呼び出し自体が非同期で待つため、
@@ -979,8 +985,9 @@ extension MCPServer {
         guard let advisory = keyboardOcclusion.advisory(for: target) else { return nil }
         return "refusing to act on \(RefGuard.describe(target)): \(advisory). On XCUITest the finger"
             + " would press a key and type into the focused field; the in-app bridge rejects it (422)."
-            + " Close the keyboard with ft_type pressEnter: true (iOS) / ft_navigate back (Android), or"
-            + " ft_scroll_to the element, then take a fresh ft_snapshot"
+            + " Close the keyboard with ft_hide_keyboard (it sends no Enter; ft_navigate back on Android), or"
+            + " ft_scroll_to the element, then take a fresh ft_snapshot. ft_type pressEnter: true also closes it"
+            + " on some screens but fires the field's action, and in a multiline field it adds a newline instead"
     }
 
     /// **システムアラートが前面にある間、ref の操作は断る**(ref 操作 = ft_tap / ft_type / ft_clear_input /
@@ -1281,11 +1288,13 @@ extension MCPServer {
             // 揃って動いていればスクロール等の画面全体の移動、その要素だけならレイアウト変化。
             // 切り分けの手掛かりとして出す(外部フィードバック。severity は低いとのこと)
             let cause = RefGuard.movedTogether(target, found,
-                                               before: lastRendered, after: fresh.elements)
+                                               before: lastRendered, after: fresh.elements,
+                                               ownActionSince: actedSinceTakenFrom)
             return (found.ref, originNote
                 + RefGuard.preTapWarnings(found, keyboardOcclusion: keyboardOcclusion,
                                         overlayWindows: overlayWindows)
-                + RefGuard.movedNote(found: found, moved: moved, cause: cause) + straddle + labelNote)
+                + RefGuard.movedNote(found: found, moved: moved, cause: cause,
+                                   unit: Self.platformName(args) == "android" ? "px" : "pt") + straddle + labelNote)
         }
     }
 
@@ -1858,7 +1867,13 @@ extension MCPServer {
         // ここだけは解決後の要素ではなく渡された式が正しい下書きになる
         var scrollStep = FlowStep(action: "scrollTo", locator: selector.primary)
         scrollStep.direction = direction.swipe.rawValue
-        if args["scrollFrame"] != nil { scrollStep.note = "scrollFrame was used during exploration" }
+        // **セレクタで指せた容器は値ごと残す**(捨てると、通った探索が容器違いで通らない行になる)。
+        // 矩形でしか指せなかった(ref で渡して一意なセレクタが無い)ときだけ注記に落とす
+        if let locator = step.scrollFrame {
+            scrollStep.scrollFrame = locator
+        } else if args["scrollFrame"] != nil {
+            scrollStep.note = "scrollFrame was used during exploration"
+        }
         // 一覧に**スワイプ方向を出さない**: `direction.swipe` は指の動き(下を読むなら up)で、
         // 読み手が指定した意味方向とは逆になる。一覧は「どの手か」を見分けるためのものなので、
         // 逆向きの語を出すと `drop:` の選択を誤らせる

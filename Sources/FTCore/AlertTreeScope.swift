@@ -23,10 +23,12 @@ public enum AlertTreeScope {
         return only
     }
 
-    /// アラートの中の押せる要素のラベル(注記に並べる)
+    /// アラートの中の押せる要素のラベル(注記に並べる)。**アラートの枠に収まるものだけ** —— 入力欄つきの
+    /// アラートではキーボード(予測変換の候補)が部分木に入り、ボタンとして並んでしまう
     public static func buttonLabels(of alert: ElementInfo, in snapshot: SnapshotResponse) -> [String] {
         LocatorResolver.descendants(of: alert, in: snapshot.elements)
             .filter { BridgeSnapshotThinning.operableTypes.contains($0.type) }
+            .filter { TapTargetGeometry.contains(alert.frame, $0.frame) }
             .compactMap { $0.label.map(SnapshotRenderer.displayText) }.filter { !$0.isEmpty }
     }
 }

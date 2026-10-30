@@ -709,6 +709,11 @@ public enum RunProfileSetOverride {
                     throw RunProfileSetOverrideError.outOfRange(
                         key: key, value: rawValue, reason: "must be a positive number of seconds")
                 }
+                if key == "recordBitrateKbps", !(1...RunProfileDocument.maxRecordBitrateKbps).contains(value) {
+                    throw RunProfileSetOverrideError.outOfRange(
+                        key: key, value: rawValue,
+                        reason: "must be between 1 and \(RunProfileDocument.maxRecordBitrateKbps) (kbps)")
+                }
                 result[key] = .int(value)
             case .double:
                 guard let value = Double(rawValue) else {
@@ -723,6 +728,11 @@ public enum RunProfileSetOverride {
                 }
                 result[key] = .double(value)
             case .string:
+                // reportDir の空文字は resolvePath で基準ディレクトリそのものになり、レポートが散らばる
+                if key == "reportDir", RunProfileDocument.isBlankReportDir(rawValue) {
+                    throw RunProfileSetOverrideError.outOfRange(
+                        key: key, value: rawValue, reason: "must not be empty (omit it to use reports/)")
+                }
                 result[key] = .string(rawValue)
             }
         }
@@ -757,11 +767,21 @@ extension RunProfileDocument {
         record && !hasRecordingSession
     }
 
+    /// `reportDir` / `--report-dir` が空(空白のみ含む)か。resolve・`--set`・専用フラグ・validate-profile の判定の唯一の定義元
+    public static func isBlankReportDir(_ raw: String) -> Bool {
+        raw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    /// recordBitrateKbps の上限。根拠: `screenrecord --bit-rate` は bps の32ビット整数で、使う側が `* 1000` するため、
+    /// `Int.max / 1000` を超える値は掛け算で trap し、`Int32.max / 1000` を超える値は screenrecord が受け付けない。
+    /// 超えた指定は 0 以下と同じく既定へ落とす(`--set` は事前に断る)
+    public static let maxRecordBitrateKbps = Int(Int32.max) / 1000
+
     /// 0 以下の指定は無意味なので既定へ落とす。`ProfileResolver.resolve`(--profile あり)と
     /// profile-less の録画構成(Fleetest.swift が `DeviceIndependentRunSettings.recordBitrateKbps`
     /// から組み立てる)が同じ既定(`VideoRecordingConfig.defaultBitrateKbps`)を共有する唯一の定義元
     public static func effectiveRecordBitrateKbps(_ raw: Int?) -> Int {
-        raw.map { $0 > 0 ? $0 : VideoRecordingConfig.defaultBitrateKbps }
+        raw.map { (1...maxRecordBitrateKbps).contains($0) ? $0 : VideoRecordingConfig.defaultBitrateKbps }
             ?? VideoRecordingConfig.defaultBitrateKbps
     }
 
@@ -1156,6 +1176,8 @@ public enum ProfileError: Error, LocalizedError {
     case duplicateDeviceName(name: String, deviceMachine: String?, run: String)
     case missingBundleID(platform: String, appProfile: String)
     case invalidWipeDataThreshold(run: String)
+    /// 空(空白のみ含む)の `reportDir`。resolvePath が "" をプロジェクトルートそのものに解くので、レポートがルート直下へ散らばる
+    case emptyReportDir(run: String)
     case invalidLocale(run: String)
     /// iosMode / devices[].mode が `IOSMode.all` のどれでもない(device = nil は iosMode)
     case invalidIOSMode(run: String, device: String?, value: String)
@@ -1203,6 +1225,8 @@ public enum ProfileError: Error, LocalizedError {
                 + " (add it in the \(platform) section)"
         case .invalidWipeDataThreshold(let run):
             return "wipeDataThresholdGB in run profile \(run) must be a positive number (GB)"
+        case .emptyReportDir(let run):
+            return "reportDir in run profile \(run) must not be empty (omit it to use reports/)"
         case .invalidLocale(let run):
             return "locale in run profile \(run) must look like ja_JP"
         case .invalidIOSMode(let run, let device, let value):
@@ -1623,6 +1647,9 @@ public enum ProfileResolver {
             }
         }
 
+        if let raw = runDoc.reportDir, RunProfileDocument.isBlankReportDir(raw) {
+            throw ProfileError.emptyReportDir(run: runName)
+        }
         let reportDir = reportDirectory(runDoc.reportDir, project: project)
 
         let wipeDataThresholdGB = runDoc.wipeDataThresholdGB ?? 8
@@ -1771,6 +1798,13 @@ public enum ProfileResolver {
                 if let threshold = doc.wipeDataThresholdGB, threshold <= 0 {
                     errors.append("\"wipeDataThresholdGB\" must be a positive number (GB)")
                 }
+                if let raw = doc.reportDir, RunProfileDocument.isBlankReportDir(raw) {
+                    errors.append("\"reportDir\" must not be empty (omit it to use reports/)")
+                }
+                if let kbps = doc.recordBitrateKbps, !(1...RunProfileDocument.maxRecordBitrateKbps).contains(kbps) {
+                    warnings.append("\"recordBitrateKbps\" is \(kbps); a value of 0 or less, or above \(RunProfileDocument.maxRecordBitrateKbps), is ignored"
+                        + " and the default (\(VideoRecordingConfig.defaultBitrateKbps) kbps) is used")
+                }
                 // 負値・0・NaN はホストの watchdog(ScenarioHost.watchdogDuration)まで
                 // 届くと壊れた/意味の無い挙動になる(0 秒 watchdog・即トリガー)
                 if let scenarioTimeout = doc.scenarioTimeout, scenarioTimeout < 1 {
@@ -1871,5 +1905,25 @@ public enum ProfileResolver {
             warnings += checkKeys(section, allowed: AppProfileSection.knownKeys, context: "\(context) \(key)")
         }
         return warnings
+    }
+}
+
+extension ProfileError {
+    /// `ProfileResolver.validate`(単体ファイル検査)が同じ原因を別の文言で既に出す解決エラーか。
+    /// validate-profile は解決まで通す(段ごとにしか出ない誤りを隠さない)ので、この判定で同じ原因の2行目を除く。
+    /// 静的検査に無い誤り(iosMode・noEnabledDevices・アプリプロファイル側の読み込み失敗 等)は false = 必ず出す。
+    /// `runFileName` = 検証中の実行プロファイルのファイル名(拡張子なし)。別ファイル(アプリプロファイル)の
+    /// decodeFailed は静的検査が見ていないので false
+    public func isCoveredByStaticRunValidation(runFileName: String) -> Bool {
+        switch self {
+        case .emptyReportDir, .duplicateDeviceName, .missingAppReference, .missingDevices,
+             .invalidWipeDataThreshold, .invalidLocale, .physicalDeviceMissingIdentifier:
+            return true
+        case .decodeFailed(let url, _):
+            return url.deletingPathExtension().lastPathComponent == runFileName
+                && url.deletingLastPathComponent().lastPathComponent == ProfileFileKind.run.directoryName
+        default:
+            return false
+        }
     }
 }
