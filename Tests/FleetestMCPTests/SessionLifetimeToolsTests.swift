@@ -1,6 +1,7 @@
 // ft_terminate / ft_clear_app_data / ft_logs / ft_install の寿命まわりの規律(純粋関数とソース走査)。
 
 import XCTest
+import FTCore
 @testable import fleetest_mcp
 
 final class SessionLifetimeToolsTests: XCTestCase {
@@ -47,5 +48,19 @@ final class SessionLifetimeToolsTests: XCTestCase {
         XCTAssertNotNil(springBoard)
         let plain = await server.clearAppDataSystemTargetRefusal("com.example.app", driver: fake, args: [:])
         XCTAssertNil(plain)
+    }
+
+    /// iOS の Apple のアプリはドライバを作る前に断る(作ると、ブリッジの居ない udid でランナーの自動起動を払ってから断っていた)
+    func testAppleAppIsRefusedBeforeTheDriverIsMade() async {
+        let made = LockedValue(false)
+        let server = MCPServer(write: { _ in }, makeDriver: { _ in made.withLock { $0 = true }; return FakeDriver() },
+                               recordSnapshot: { _, _, _ in })
+        do {
+            _ = try await server.call(tool: "ft_clear_app_data", args: ["bundleId": "com.apple.mobilesafari"])
+            XCTFail("断らなかった")
+        } catch {
+            XCTAssertTrue(error.localizedDescription.contains("Apple system app"), error.localizedDescription)
+        }
+        XCTAssertFalse(made.value, "ドライバを作ってから断った")
     }
 }

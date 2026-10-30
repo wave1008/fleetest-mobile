@@ -14,6 +14,8 @@ final class MCPDesignReviewFixesTests: XCTestCase {
     override func setUp() {
         super.setUp()
         driver = FakeDriver()
+        // 木のアプリは前面に居る(本物どおり。ft_batch は最後に前面を照会し、居なければ「前面を離れた」と言う)
+        driver.foregroundBundleID = "com.example.app"
         let fake = driver!
         server = MCPServer(write: { _ in }, makeDriver: { _ in fake }, recordSnapshot: { _, _, _ in })
         server.settleWaitSeconds = 0

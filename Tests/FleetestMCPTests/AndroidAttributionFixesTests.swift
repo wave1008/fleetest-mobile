@@ -56,6 +56,6 @@ final class AndroidAttributionFixesTests: XCTestCase {
         XCTAssertTrue(java.contains("installed but disabled"))
         XCTAssertTrue(java.contains("stoppedForeground"))
         // ref なしの入力・消去も、焦点が残ったまま IME が閉じた欄を張り直してから撃つ(emu9 F1 の ft_type ref なし)
-        XCTAssertEqual(java.components(separatedBy: "InputInjector.tapFocusedEditableIfImeHidden(ua(), instrumentation.getContext());").count - 1, 2)
+        XCTAssertEqual(java.components(separatedBy: "InputInjector.tapFocusedEditableIfImeHidden(ua());").count - 1, 2)
     }
 }

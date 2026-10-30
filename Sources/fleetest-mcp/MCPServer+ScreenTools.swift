@@ -413,21 +413,10 @@ extension MCPServer {
             + (await snapshotAfterBody(args, outsideTheAppTree: false)))
     }
 
-    /// 消去の後の木で、消した欄と同じ欄を引き直す(nil = 撃たない)。順は ①空でない identifier と型が同じ要素が1つ
-    /// ②型と枠が同じ要素が1つ ②' 型と空でない placeholder / ラベルが同じ要素が1つ ③焦点のある同じ型の要素が1つ(id の無い欄が消去で動いた形)。DSL は
-    /// `StepExecutor.relocateAfterClear`(ロケータ依存)。MCP は ref 指定なのでロケータを持たない
+    /// 消去の後の木で、消した欄と同じ欄を引き直す(nil = 撃たない)。判定は DSL と共有(`ClearedFieldRelocation.relocate`。
+    /// MCP は ref 指定なのでロケータを持たない)
     static func relocateAfterClear(_ element: ElementInfo, in elements: [ElementInfo]) -> ElementInfo? {
-        func only(_ matches: [ElementInfo]) -> ElementInfo? { matches.count == 1 ? matches[0] : nil }
-        if let id = element.identifier, !id.isEmpty {
-            return ClearedFieldRelocation.byIdentifier(element, id: id, in: elements)
-        }
-        if let same = only(elements.filter { $0.type == element.type && $0.frame == element.frame }) { return same }
-        // id が無く枠も動いた欄(キーボードで持ち上がるアラートの入力欄)は、空でない placeholder / ラベルが同じ1つ
-        if let hint = [element.placeholder, element.label].compactMap({ $0 }).first(where: { !$0.isEmpty }),
-           let same = only(elements.filter { $0.type == element.type && ($0.placeholder == hint || $0.label == hint) }) {
-            return same
-        }
-        return only(elements.filter { $0.type == element.type && $0.focused == true })
+        ClearedFieldRelocation.relocate(element, in: elements)
     }
 
     func ftClearInput(_ args: [String: Any]) async throws -> [[String: Any]] {

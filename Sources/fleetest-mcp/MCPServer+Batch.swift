@@ -830,8 +830,6 @@ extension MCPServer {
                 processEvidence: androidProcessEvidenceForSwitch(
                     launched: launched, snapshot: tree, driver: batchDriver, args: args),
                 stoppedByTool: toolStoppedBundleIDs[Self.sessionKey(args)]).isEmpty { return true }
-            // 前面の照会は、このセッションが起動したアプリの木のときだけ(起動していないアプリを「落ちたかも」と言う根拠が無い)
-            guard let launched, tree.sessionBundleID == launched else { return false }
             return !(await Self.backgroundedSessionNote(tree, driver: batchDriver)).isEmpty
         }
         // 全手を撃った後の読みが失敗した(落ちた・前面を離れた)。手の一覧は捨てない —— 捨てると撃ち直しを誘う(届いた手の二重実行)

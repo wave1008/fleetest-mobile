@@ -929,7 +929,8 @@ extension StepExecutor {
                     var relocated = Self.relocateAfterClear(element, step: step, in: current)
                     var relocatedSnapshot = current
                     if relocated == nil, KeyboardWait.isShown(current),
-                       case .closed = try await closeKeyboardWithoutSideEffects(step: step, phase: &phase),
+                       // 閉じる手の失敗は握る: 投げると「消した・打っていない」の失敗文(clearLostTargetMessage)が生のエラーに化ける
+                       case .closed? = try? await closeKeyboardWithoutSideEffects(step: step, phase: &phase),
                        let reread = try? await actingDriver.snapshot() {
                         // キーボードが欄を押し下げて木から消す形(横向き・全画面 IME・CMP)。人は閉じてから打てる
                         // ので、撃つ前の規則(reachPastKeyboard)と同じ副作用の無い閉じ方(Enter は送らない)で閉じて一度だけ引き直す。
@@ -1547,16 +1548,10 @@ extension StepExecutor {
         case driver(AppDriver)
     }
 
-    /// 消去の後の木で、消した欄と**同じ欄**を引き直す(nil = 撃たない)。順は ①空でない identifier と型が同じ要素が1つ
-    /// ②ロケータの解決結果で型が同じもの ③型と枠が同じ要素が1つ。**ロケータの結果をそのまま採らない** —— ラベル・値で
-    /// 指したロケータは、欄を空にすると現れるヒントの文字(別の staticText になる実装がある = E2E-CMP の iOS)に当たりうる
+    /// 消去の後の木で、消した欄と**同じ欄**を引き直す(nil = 撃たない)。判定は MCP と共有(`ClearedFieldRelocation.relocate`)
     static func relocateAfterClear(_ element: ElementInfo, step: FlowStep, in snapshot: SnapshotResponse) -> ElementInfo? {
-        func only(_ matches: [ElementInfo]) -> ElementInfo? { matches.count == 1 ? matches[0] : nil }
-        if let id = element.identifier, !id.isEmpty {
-            return ClearedFieldRelocation.byIdentifier(element, id: id, in: snapshot.elements)
-        }
-        if let (found, _) = LocatorResolver.resolve(step: step, in: snapshot), found.type == element.type { return found }
-        return only(snapshot.elements.filter { $0.type == element.type && $0.frame == element.frame })
+        ClearedFieldRelocation.relocate(element, in: snapshot.elements,
+                                        locate: { LocatorResolver.resolve(step: step, in: snapshot)?.0 })
     }
 
     static func clearLostTargetMessage(_ step: FlowStep) -> String {

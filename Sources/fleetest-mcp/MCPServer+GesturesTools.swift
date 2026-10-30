@@ -200,31 +200,46 @@ extension MCPServer {
             + (await snapshotBody(rotated, driver: rotateDriver, args: args, foldsSelectorTables: true)))
     }
 
-    /// DSL の `hideKeyboard()` と同じ StepExecutor のアクションを撃つ(ft_batch と同じ経路)。
-    /// **executor の「次の解決でキーボードが木から消えるのを待つ」は1回の呼び出しで捨てられる**ので、
-    /// Android ではここで待ってから返す(次の ft_tap が下端の要素を掴めるように)
-    /// 副作用の無い閉じ方(ft_hide_keyboard と同じ実行器。iOS はキーボードの上の空きを叩く・Android は戻るキー。Enter へは進まない =
-    /// 消したばかりの欄で確定させない)。閉じたときだけ true。replace の引き直しが使う
-    func closeKeyboardWithoutEnter(_ driver: AppDriver, args: [String: Any]) async -> Bool {
+    /// ft_hide_keyboard と replace の引き直しが共有する閉じ方の実行器。iOS はキーボードの上の空きを叩く・Android は戻るキー。
+    /// **Enter へは進まない**(消したばかりの欄・入力中の欄で確定させない)
+    func hideKeyboardExecutor(_ driver: AppDriver, args: [String: Any]) async -> (executor: StepExecutor, isAndroid: Bool) {
         let (isAndroid, uiFramework) = await resolveExecutorHints(driver, args: args)
         let executor = StepExecutor(driver: driver, releasesScrollTouch: !isAndroid,
                                     isAndroid: isAndroid, tunables: RunTunables(), uiFramework: uiFramework)
         executor.hideKeyboardFallsBackToEnter = false
-        let outcome = await executor.execute(FlowStep(action: "hideKeyboard"))
-        return StepExecutor.isSuccess(outcome.status) && !executor.hideKeyboardFoundNoKeyboard
+        return (executor, isAndroid)
     }
 
+    /// replace の引き直しの前に、欄を押し出しているキーボードを閉じる。閉じたときだけ true。Android は木からキーボードが
+    /// 消えるのを待ってから返す(dumpsys は閉じても木は数秒残す = 直後の読みで欄がまだ見えない)
+    func closeKeyboardWithoutEnter(_ driver: AppDriver, args: [String: Any]) async -> Bool {
+        let (executor, isAndroid) = await hideKeyboardExecutor(driver, args: args)
+        let outcome = await executor.execute(FlowStep(action: "hideKeyboard"))
+        guard StepExecutor.isSuccess(outcome.status), !executor.hideKeyboardFoundNoKeyboard else { return false }
+        if isAndroid { _ = await awaitKeyboardLeftTree(driver) }
+        return true
+    }
+
+    /// DSL の `hideKeyboard()` と同じ StepExecutor のアクションを撃つ(ft_batch と同じ経路)。
+    /// **executor の「次の解決でキーボードが木から消えるのを待つ」は1回の呼び出しで捨てられる**ので、
+    /// Android ではここで待ってから返す(次の ft_tap が下端の要素を掴めるように)
     func ftHideKeyboard(_ args: [String: Any]) async throws -> [[String: Any]] {
         let hideDriver = try await driver(args)
-        let (isAndroid, uiFramework) = await resolveExecutorHints(hideDriver, args: args)
-        // **直前の手が type なら、キーボードが上がるのを待ってから判定する**: type はキーボードの表示を待たずに返り、
-        // ft_batch の type は次の呼び出しへ出現待ちの印を渡さない。この executor は新しいので type の印も持たず、
-        // 上がる前の木を読むと「出ていない」と答えて実際は出たまま(実機 3/3)。出ていれば1枚読むだけ
-        // 待つかはこのセッションの印(ft_type / ft_batch の type が立てる)と、DSL と同じ判定(改行で終わる type は閉じる側)で決める
-        if pendingTypeKeyboardChecks[Self.sessionKey(args)] != nil,
-           let fresh = try? await freshSnapshot(hideDriver, args: args) {
-            _ = try? await consumePendingTypeKeyboardCheck(fresh, driver: hideDriver, args: args)
+        // **このセッションの直前の手が type なら、キーボードが上がるのを待ってから判定する**: type はキーボードの表示を待たずに返り、
+        // 上がる前の木を読むと「出ていない」と答えて実際は出たまま(実機 3/3)。印は ft_type / ft_batch の type が立てる。
+        // **iOS の木はキーボードが現れるまで枠を持たない**ので出現の判定(shouldAwaitAppearance)に頼らず上限まで見る。
+        // 改行で終わる type(IME アクション = 閉じる側)の後は待たない。出ていれば1枚読むだけ
+        let pendingType = pendingTypeKeyboardChecks[Self.sessionKey(args)]
+        pendingTypeKeyboardChecks[Self.sessionKey(args)] = nil
+        if let pending = pendingType, !pending.typedNewline {
+            let deadline = Date().addingTimeInterval(KeyboardWait.appearSeconds)
+            while let snapshot = try? await hideDriver.snapshot(bypassingCache: hideDriver.supportsCacheBypass),
+                  !StepExecutor.keyboardOnScreen(snapshot.keyboardFrame, screen: snapshot.screen),
+                  Date() < deadline {
+                try? await Task.sleep(for: .seconds(KeyboardWait.pollSeconds))
+            }
         }
+        let (executor, isAndroid) = await hideKeyboardExecutor(hideDriver, args: args)
         // **何も送らなかったときは OS に依らず同じ答えにし、下書きにも残さない**
         // 何も送っていないので操作前の木と比べない(比べると「操作が効かなかったかも」と矛盾する注記を出し、待ちも払う)
         // Android は送らなかった回も木からキーボードが消えるのを待つ(dumpsys は閉じても木は数秒残す = 次の ft_tap が下端を見失う)
@@ -233,9 +248,6 @@ extension MCPServer {
             return text("The keyboard was not shown; nothing was sent.\(treeNote)" + waitForWithoutSnapshotAfterNote(args)
                 + (await snapshotAfterBody(args, outsideTheAppTree: true)))
         }
-        let executor = StepExecutor(driver: hideDriver, releasesScrollTouch: !isAndroid,
-                                    isAndroid: isAndroid, tunables: RunTunables(), uiFramework: uiFramework)
-        executor.hideKeyboardFallsBackToEnter = false
         let outcome = await executor.execute(FlowStep(action: "hideKeyboard"))
         guard StepExecutor.isSuccess(outcome.status) else {
             let reason: String

@@ -11,4 +11,22 @@ public enum ClearedFieldRelocation {
         guard TypeReadback.isTextInput(element) else { return nil }
         return only(sameId.filter { TypeReadback.isTextInput($0) })
     }
+
+    /// 消去の後の木で、消した欄と**同じ欄**を引き直す(nil = 撃たない)。DSL(`StepExecutor.relocateAfterClear`)と MCP(ft_type)が
+    /// 同じ順で引く: ①空でない identifier(`byIdentifier`)②`locate`(DSL はロケータの解決結果。型が同じときだけ採る ——
+    /// ラベル・値で指したロケータは、欄を空にすると現れるヒントの文字に当たりうる。MCP は ref 指定なので nil)
+    /// ③型と枠が同じ要素が1つ ④型と空でない placeholder / ラベルが同じ要素が1つ(id の無い欄がキーボードで動いた形 = アラートの入力欄)
+    /// ⑤焦点のある同じ型の要素が1つ
+    public static func relocate(_ element: ElementInfo, in elements: [ElementInfo],
+                                locate: (() -> ElementInfo?)? = nil) -> ElementInfo? {
+        func only(_ matches: [ElementInfo]) -> ElementInfo? { matches.count == 1 ? matches[0] : nil }
+        if let id = element.identifier, !id.isEmpty { return byIdentifier(element, id: id, in: elements) }
+        if let found = locate?(), found.type == element.type { return found }
+        if let same = only(elements.filter { $0.type == element.type && $0.frame == element.frame }) { return same }
+        if let hint = [element.placeholder, element.label].compactMap({ $0 }).first(where: { !$0.isEmpty }),
+           let same = only(elements.filter { $0.type == element.type && ($0.placeholder == hint || $0.label == hint) }) {
+            return same
+        }
+        return only(elements.filter { $0.type == element.type && $0.focused == true })
+    }
 }

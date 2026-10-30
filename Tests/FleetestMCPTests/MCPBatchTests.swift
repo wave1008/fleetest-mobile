@@ -19,6 +19,8 @@ final class MCPBatchTests: XCTestCase {
     override func setUp() {
         super.setUp()
         driver = FakeDriver()
+        // 木のアプリは前面に居る(本物どおり。ft_batch は最後に前面を照会し、居なければ「前面を離れた」と言う)
+        driver.foregroundBundleID = "com.example.app"
         let fake = driver!
         server = MCPServer(write: { _ in }, makeDriver: { _ in fake },
                            recordSnapshot: { _, _, _ in })
@@ -373,8 +375,6 @@ final class MCPBatchTests: XCTestCase {
                        ElementInfo(ref: 2, type: "button", identifier: "done", label: "Done", value: nil, placeholder: nil,
                                    enabled: false, frame: FTRect(x: 10, y: 300, width: 100, height: 40), depth: 1)],
             truncatedCount: 0)
-        // 本物では launch したアプリが前面に居る(FakeDriver の launch は前面を記録しない)
-        driver.foregroundBundleID = "com.example.app"
         let result = body(try await server.call(tool: "ft_batch",
                                                 args: ["steps": "tap '#next'; tap '#done'", "launch": "com.example.app"]))
         XCTAssertTrue(result.contains("step(s) 2 may have done nothing"), result)
@@ -390,6 +390,15 @@ final class MCPBatchTests: XCTestCase {
         let screenLines = text.components(separatedBy: "\n").filter { $0.hasPrefix("screen:") }
         XCTAssertEqual(screenLines.count, 1, text)
         XCTAssertTrue(text.contains("id=login_btn"), text)
+    }
+
+    /// ft_launch していないセッション(起動済みのアプリに attach しただけ)でも、手の後にアプリが前面に居なければ passed と言わない
+    /// (XCUITest はアプリの古い木を返し続けるので、木の bundle の食い違いでは拾えない = 前面の照会が要る)
+    func testABatchWithoutLaunchStillNoticesTheAppLeftTheFront() async throws {
+        driver.foregroundBundleID = "com.apple.mobilesafari"
+        let text = body(try await server.call(tool: "ft_batch", args: steps("tap '#login_btn'")))
+        XCTAssertFalse(text.contains("All 1 step(s) passed"), text)
+        XCTAssertTrue(text.contains("no longer in front"), text)
     }
 
     /// 配列形の steps は廃止(ユーザー決定・表記は1つ)。書き換え方を添えて弾く

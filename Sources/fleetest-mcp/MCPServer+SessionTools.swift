@@ -464,12 +464,14 @@ extension MCPServer {
     /// テスト対象でないシステムのアプリは撃つ前に断る(nil = 撃ってよい)。**iOS の Apple のアプリ**(`com.apple.*`・SpringBoard)は
     /// データを消せず入れ直しもできない。**Android のシステムのパッケージ**は連絡先・メッセージ等の利用者データを1回の承認で消せる
     /// ので、このセッションが起動したもの(テスト対象)以外を断る。`com.apple.` は Android では普通のパッケージ名(Apple Music 等)
+    static func appleSystemAppRefusal(_ bundleID: String) -> String? {
+        guard bundleID == MCPServer.springboardBundleID || bundleID.hasPrefix("com.apple.") else { return nil }
+        return "\(bundleID) is an Apple system app (the home screen, Safari, Settings …), not an app under test —"
+            + " its data cannot be wiped by this tool and it cannot be reinstalled. Nothing was sent."
+    }
+
     func clearAppDataSystemTargetRefusal(_ bundleID: String, driver: AppDriver, args: [String: Any]) async -> String? {
-        guard let android = driver as? AndroidDriver else {
-            guard bundleID == MCPServer.springboardBundleID || bundleID.hasPrefix("com.apple.") else { return nil }
-            return "\(bundleID) is an Apple system app (the home screen, Safari, Settings …), not an app under test —"
-                + " its data cannot be wiped by this tool and it cannot be reinstalled. Nothing was sent."
-        }
+        guard let android = driver as? AndroidDriver else { return Self.appleSystemAppRefusal(bundleID) }
         guard launchedBundleIDs[Self.sessionKey(args)] != bundleID else { return nil }
         let box = UncheckedTransfer(android)
         let probe = await Self.runOffCooperativePool(name: "fleetest-mcp-clear-app-data") {
@@ -484,6 +486,11 @@ extension MCPServer {
         resetOnceNotes(forScope: noteScope)
         let bundleID = try Self.requiredStringArgument(args, "bundleId")
         if let refusal = Self.bridgeSelfRefusal(tool: "ft_clear_app_data", bundleID: bundleID) { throw MCPError(refusal) }
+        // Apple のアプリはドライバを作る前に断る(作るとブリッジの自動起動を払ってから断ることになる)。Android の宛先は下で判定する
+        if (args["platform"] as? String) != "android", args["serial"] == nil,
+           let refusal = Self.appleSystemAppRefusal(bundleID) {
+            throw MCPError(refusal)
+        }
         let clearAppDataDriver = try await driver(args)
         if let refusal = await clearAppDataSystemTargetRefusal(bundleID, driver: clearAppDataDriver, args: args) {
             throw MCPError(refusal)

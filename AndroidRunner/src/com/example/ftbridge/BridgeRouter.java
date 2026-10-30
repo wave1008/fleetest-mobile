@@ -386,7 +386,7 @@ final class BridgeRouter implements BridgeHttpServer.Handler {
             // resource-id を渡す: キーボードの開閉で座標がズレても同じ要素を追跡し直すため
             InputInjector.setTextAppendingAt(ua(), center[0], center[1], refIds.get(ref), text, TEXT_INPUT_CONFIRM_BUDGET_MS);
         } else {
-            InputInjector.tapFocusedEditableIfImeHidden(ua(), instrumentation.getContext());
+            InputInjector.tapFocusedEditableIfImeHidden(ua());
             InputInjector.setTextAppending(ua(), text);
         }
         settle();
@@ -413,7 +413,7 @@ final class BridgeRouter implements BridgeHttpServer.Handler {
             tapUnlessAlreadyFocused(center, refIds.get(ref));
             InputInjector.clearTextAt(ua(), center[0], center[1], refIds.get(ref), TEXT_INPUT_CONFIRM_BUDGET_MS);
         } else {
-            InputInjector.tapFocusedEditableIfImeHidden(ua(), instrumentation.getContext());
+            InputInjector.tapFocusedEditableIfImeHidden(ua());
             InputInjector.clearFocused(ua(), TEXT_INPUT_CONFIRM_BUDGET_MS);
         }
         settle();
@@ -1209,9 +1209,12 @@ final class BridgeRouter implements BridgeHttpServer.Handler {
                 shell("cmd statusbar collapse");
             }
             if (attemptLaunch(bundleID)) return ok();
+            // 言えるのは回復を試す前に測った状態だけ(読めなかった欄は書かない)
+            StringBuilder measured = new StringBuilder();
+            if (interactive != null) measured.append(interactive ? "; before the retry the screen was on" : "; before the retry the screen was off (it was woken)");
+            if (locked != null) measured.append(locked ? ", keyguard locked (dismissal was requested)" : ", keyguard not locked");
             throw new BridgeException(500, "the app never came to the foreground: " + bundleID
-                    + " (com.android.systemui stayed in front; screen on: " + interactive
-                    + ", keyguard locked: " + locked + "; it was not force-stopped)");
+                    + " (com.android.systemui stayed in front" + measured + "; systemui was not force-stopped)");
         }
         if (stuck != null && !stuck.equals(bundleID) && !stuck.equals(self) && !stuck.equals(home)) {
             shell("am force-stop " + stuck);
