@@ -200,7 +200,7 @@ function aveCell(live) {
   return withTip(cell, tips.join('\n'));
 }
 
-/** Rendering: この機械で今凍結(❄️)・白紙(○)・文字消え(🫥)にあるデバイスの数。0 の種類は出さず、全部 0・不明なら空欄。
+/** Rendering: この機械で今凍結(❄️)・白紙(○)・文字消え(T)にあるデバイスの数。0 の種類は出さず、全部 0・不明なら空欄。
  *  数字は注意の色(.mh-rendering-count)。説明は種類ごとにホバー(タイルと run ボードと同じ文言) */
 const RENDERING_KINDS = [
   ['frozen', 'wvMonitor.tile.frozen', 'wvMonitor.tile.frozenTitle'],
@@ -218,7 +218,10 @@ function renderingCell(live) {
     if (!(count > 0)) continue;
     const part = document.createElement('span');
     part.className = 'mh-rendering-part';
-    part.append(document.createTextNode(t(markKey)), chip('mh-rendering-count', String(count)));
+    const mark = document.createElement('span');
+    mark.textContent = t(markKey);
+    mark.classList.toggle('screen-mark-textless', kind === 'textless');
+    part.append(mark, chip('mh-rendering-count', String(count)));
     setHoverTip(part, t(titleKey));
     cell.appendChild(part);
   }

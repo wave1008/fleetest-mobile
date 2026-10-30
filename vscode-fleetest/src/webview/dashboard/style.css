@@ -482,6 +482,7 @@ select.dash-since:focus,
 /* Rendering 列: 絵文字は地の色・数字だけ注意の色(td.mh-warn と同じ警告色のトークン) */
 .mh-rendering { white-space: nowrap; }
 .mh-rendering-part { margin-right: 8px; }
+.mh-rendering-part .screen-mark-textless { color: #9a9a9a; font-family: "Times New Roman", Times, serif; font-weight: normal; }
 .mh-rendering-count { margin-left: 2px; color: var(--vscode-editorWarning-foreground, #cca700); font-weight: bold; font-variant-numeric: tabular-nums; }
 .mh-num { display: inline-block; text-align: right; font-variant-numeric: tabular-nums; }
 .mh-num-3 { min-width: 3ch; }
@@ -495,7 +496,7 @@ td.mh-warn { color: var(--vscode-editorWarning-foreground, #cca700); font-weight
   color: #ffffff;
 }
 .dh-chip-frozen {
-  color: var(--vscode-errorForeground, #f14c4c);
+  color: #4fc1ff; /* ❄️ に合わせた水色。ユーザー指定 */
 }
 .dh-chip-health {
   background-color: var(--vscode-editorWarning-foreground, #cca700);

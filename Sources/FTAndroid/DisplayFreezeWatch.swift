@@ -11,8 +11,8 @@
 //   デバイスを再起動する)。確認の後に凍結でなければ SUT を前面へ戻す(後続のシナリオへ背面の状態を渡さない)
 // - 回復の順(Android Emulator): sleep/wake(約 4 秒。ホスト GPU の合成バッファの固着にはこれで足りる実測 =
 //   AndroidHealthProbe.repairBlankDisplay)→ 絵がまだ同じならゲストの再起動(adb reboot・約 1 分)→ ブートを
-//   確認できなければ Emulator の停止と起動。iOS Simulator = shutdown → boot(run 前トリアージの凍結回復と同じ)。
-//   再起動した後は絵で確かめない(ブリッジが死んでいて撮れない)= 次の境目の撮影が新しい基準になる
+//   確認できなければ Emulator の停止と起動。iOS Simulator = 全面が黒いときだけ backboardd の起こし直し(絵で確かめる)
+//   → shutdown → boot(run 前トリアージの凍結回復と同じ)。再起動した後は絵で確かめない(ブリッジが死んでいて撮れない)= 次の境目の撮影が新しい基準になる
 // - 陽性対照: DisplayFreezeDetector.frozenFrameInjectionKey(撮影を固定の絵に差し替える。回復まで本当に撃つ)
 
 import FTBridgeClient
@@ -26,7 +26,7 @@ public actor DisplayFreezeWatch {
     /// 確認で背面に回した SUT を前面へ戻す(bundle ID / パッケージ名が分からなければ何もしない)
     public typealias Restore = @Sendable (RunWorker, String?) async -> Void
     /// 回復を順に撃ち、**撃った回復の種類**を返す(nil = 何も撃てなかった)。`stillFrozen` は「今撮ると凍結時と同じ絵か」
-    /// (撮れなければ true = 直ったと言えない)。sleep/wake の後だけ呼ぶ(再起動の後はブリッジが居ない)
+    /// (撮れなければ true = 直ったと言えない)。sleep/wake の後だけ呼ぶ(再起動の後はブリッジが居ない)。iOS は使わない(ブリッジを止めた後なので OS の撮影で確かめる = `SimulatorDisplayServer`)
     public typealias Repair = @Sendable (RunWorker, _ stillFrozen: @Sendable () async -> Bool,
                                          _ log: @escaping @Sendable (String) -> Void) async -> WorkerRecoveryKind?
 
@@ -205,10 +205,10 @@ public actor DisplayFreezeWatch {
     }
 
     /// OS 側の撮影(simctl io screenshot)。終了コードが 0 で中身があるときだけ返す
-    static func simulatorScreenshot(udid: String) -> Data? {
+    static func simulatorScreenshot(udid: String, timeout: Double = captureBudgetSeconds) -> Data? {
         let path = TemporaryDirectory.url.appendingPathComponent("ft-display-freeze-\(udid)-\(UUID().uuidString).png").path
         defer { try? FileManager.default.removeItem(atPath: path) }
-        guard let result = SimulatorActiveDisplay.simctlScreenshot(udid: udid, path: path, timeout: captureBudgetSeconds),
+        guard let result = SimulatorActiveDisplay.simctlScreenshot(udid: udid, path: path, timeout: timeout),
               result.status == 0,
               let data = try? Data(contentsOf: URL(fileURLWithPath: path)), !data.isEmpty else { return nil }
         return data
@@ -250,9 +250,12 @@ public actor DisplayFreezeWatch {
             return await repairEmulator(serial: serial, label: worker.label, stillFrozen: stillFrozen, locale: locale, log: log)
         }
         guard let udid = worker.connection.udid else { return nil }
-        log("🔁 \(worker.label): rebooting the simulator (shutdown → boot)")
         // 先にこの機のブリッジを止める(掴んだまま落とすと shutdown がランナーの teardown を待つ。recoverFrozenIOSWorkers と同じ)
         _ = BridgeLauncher.stopMatching(udid: udid, repoRoot: repoRoot)
+        if await ProfileWorkerFactory.restartSimulatorDisplayServer(udid: udid, label: worker.label, log: log) {
+            return .displayServerRestart
+        }
+        log("🔁 \(worker.label): rebooting the simulator (shutdown → boot)")
         _ = try? Shell.run(["xcrun", "simctl", "shutdown", udid])
         try? SimulatorBoot.ensureBooted(udid: udid, log: log)
         log("✅ \(worker.label): simulator is back")

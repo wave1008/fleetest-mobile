@@ -122,6 +122,7 @@ export const webviewDashboardStrings = {
   "wvDashboard.deviceHealth.recovery.runnerRestart": { ja: "ランナーの起動し直し", en: "Runner restart" },
   "wvDashboard.deviceHealth.recovery.workerRevive": { ja: "ワーカーの復帰", en: "Worker revive" },
   "wvDashboard.deviceHealth.recovery.displaySleepWake": { ja: "表示の sleep/wake", en: "Display sleep/wake" },
+  "wvDashboard.deviceHealth.recovery.displayServerRestart": { ja: "描画の再起動", en: "Display server restart" },
   "wvDashboard.deviceHealth.recovery.deviceRestart": { ja: "デバイスの再起動", en: "Device restart" },
 
   // insights.js

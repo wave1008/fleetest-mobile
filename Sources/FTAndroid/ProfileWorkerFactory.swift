@@ -1352,7 +1352,20 @@ public enum ProfileWorkerFactory {
         return note
     }
 
-    /// 凍結したシミュレータを **shutdown → boot** で戻し、**ブリッジを張り直した**
+    /// 再起動の前の段: backboardd を起こし直し、絵が戻れば true。呼び手はブリッジを止めてから呼ぶ
+    public static func restartSimulatorDisplayServer(udid: String, label: String,
+                                                     log: @escaping @Sendable (String) -> Void) async -> Bool {
+        log("🔧 \(label): trying the display server (backboardd) before rebooting")
+        let drawn = await SimulatorDisplayServer.restartAndWaitForDrawing(
+            run: { (try? Shell.run(SimulatorDisplayServer.command(udid: udid), timeout: 30))?.status == 0 },
+            capture: { DisplayFreezeWatch.simulatorScreenshot(udid: udid, timeout: $0) },
+            sleep: { try? await Task.sleep(nanoseconds: UInt64($0 * 1_000_000_000)) })
+        log(drawn ? "✅ \(label): the display is drawing again without a reboot"
+                  : "⚠️ \(label): the display server did not bring the screen back (or the screen was not blank)")
+        return drawn
+    }
+
+    /// 凍結したシミュレータを **backboardd の起こし直し**(戻らなければ **shutdown → boot**)で戻し、**ブリッジを張り直した**
     /// ワーカー一覧を返す(BlankWorkerTriage の `recover:` にそのまま渡せる形)。
     ///
     /// シミュレータを落とす前に**その機のブリッジを止める**(掴んだままだと shutdown が約50秒
@@ -1362,11 +1375,12 @@ public enum ProfileWorkerFactory {
     /// **2台ずつ**戻す: 一斉 boot は凍結の相関要因そのもので、start-device の「同時2台」と同じ理屈。
     /// udid はワーカーの connection から採る(label は表示用で simctl には渡せない)。
     ///
+    /// `triesDisplayServer`: 再起動の前に backboardd を試すか(既定値を置かない)。**録画の解放は false** = 解く根拠は再起動だけで、画面は健全
     /// 呼び手は iOS の供給のレーン(fleetest の `ProfileSupplyLanes.ios`)の1箇所 —— run / api run の全経路がそこを通る。
     /// 呼び手ごとに持っていた頃に1経路だけ入れて穴を空けている(`BlankWorkerRecoveryWiringTests`)
     public static func recoverFrozenIOSWorkers(
         labels: [String], workers: [RunWorker], resolved: ResolvedProfile, repoRoot: URL,
-        apps: [String: ResolvedAppTarget], log: @escaping @Sendable (String) -> Void
+        apps: [String: ResolvedAppTarget], triesDisplayServer: Bool, log: @escaping @Sendable (String) -> Void
     ) async -> [RunWorker]? {
         let targets = frozenIOSTargets(labels: labels, workers: workers)
         guard !targets.isEmpty else {
@@ -1378,13 +1392,14 @@ public enum ProfileWorkerFactory {
             await withTaskGroup(of: Void.self) { group in
                 for (label, udid) in slice {
                     group.addTask {
-                        log("→ \(label): rebooting the simulator (shutdown → boot)")
-                        // **先にこの機のブリッジを止める**。掴んだまま落とすと `simctl shutdown` が
+                        // **先にこの機のブリッジを止める**(backboardd の起こし直しでも落ちる)。掴んだまま落とすと `simctl shutdown` が
                         // XCUITest ランナーの teardown を待って **約50秒**かかり(止めてからなら約5秒)、
                         // 生き残ったランナーが再ブート後に再接続してくるので張り直しも遅い
                         // (実測・3周とも一致: 96.5s → 34.6s)。
                         // 止めるのは**この udid のブリッジだけ**(他機・他セッションは巻き込まない)
                         _ = BridgeLauncher.stopMatching(udid: udid, repoRoot: repoRoot)
+                        if triesDisplayServer, await restartSimulatorDisplayServer(udid: udid, label: label, log: log) { return }
+                        log("→ \(label): rebooting the simulator (shutdown → boot)")
                         _ = try? Shell.run(["xcrun", "simctl", "shutdown", udid])
                         // boot 完了まで待つ(待たずに注入すると launch が失敗する)。同時起動の枠もここで掛かる
                         try? SimulatorBoot.ensureBooted(udid: udid, log: log)
@@ -1414,7 +1429,7 @@ public enum ProfileWorkerFactory {
 
     /// 録画ありの run で、**端末側に録画セッションが残った iOS シミュレータ**を再起動して解く
     /// (HostRecordingProbe の宣言)。再起動は凍結の回復と同じ `recover`(既定は
-    /// recoverFrozenIOSWorkers = ブリッジ停止 → shutdown → boot → 張り直し)。
+    /// recoverFrozenIOSWorkers の再起動だけ = ブリッジ停止 → shutdown → boot → 張り直し)。
     ///
     /// **デバイスを外さない** —— 録画は付帯機能なので、解けなかったデバイスもテストは走らせる(録画だけ
     /// IOSSimulatorVideoRecorder.start が警告して飛ばす)。**不明のデバイスは再起動しない**
@@ -1435,7 +1450,7 @@ public enum ProfileWorkerFactory {
         let probeOne = probe ?? { await HostRecordingProbe.probe(udid: $0, workDir: workDir) }
         let recoverWith = recover ?? { labels, current in
             await recoverFrozenIOSWorkers(labels: labels, workers: current, resolved: resolved,
-                                          repoRoot: repoRoot, apps: apps, log: log)
+                                          repoRoot: repoRoot, apps: apps, triesDisplayServer: false, log: log)
         }
         let busy = await busyRecordingLabels(workers, probe: probeOne)
         guard !busy.isEmpty else { return workers }
@@ -1481,7 +1496,8 @@ public enum ProfileWorkerFactory {
     /// udid の無い個体も落とす
     static func frozenIOSTargets(labels: [String],
                                  workers: [RunWorker]) -> [(label: String, udid: String)] {
-        workers.filter { labels.contains($0.label) && $0.platform == "ios" }
+        // 実機は撃たない(backboardd の起こし直しも shutdown も Simulator だけ。ユーザー決定)
+        workers.filter { labels.contains($0.label) && $0.platform == "ios" && !$0.connection.physical }
             .compactMap { worker in
                 guard let udid = worker.connection.udid else { return nil }
                 return (worker.label, udid)

@@ -329,7 +329,7 @@ FM を呼ぶ構成だったかは `fmTextVisibilityCheck || screenLooksLike` で
 | scenarioID | String? | `requeued` / `retryLimit` / `circuitHeld` の対象 |
 | reason | String | 英語・人間可読 |
 | cause | String? | **`degraded`/`requeued`/`retryLimit`/`circuitHeld` だけ持つ**理由の分類(生成箇所が型から決める。`reason` の文字列を後から解析しない)。値は `frozen`(画面の凍結)/ `deviceGone`(デバイスが消えた。offline/not found)/ `bridgeUnreachable`(ブリッジに届かない)/ `bridgeTakenOver`(ブリッジが別のデバイスのものになった)/ `consecutiveFailures`(連続失敗)(**前の run から引き継いだ連続失敗を含むことがある**。`reason` に「including N carried over from earlier runs」と出る。台帳は `<repo>/.fleetest/lane-streak-<platform:デバイス論理名>.json`。通ると消え(離脱では消さない)、中断で終わった失敗は持ち越さない)/ `accessibilityFault`(一時的なアクセシビリティ異常)/ `noResponse`(接続できない・status に応答しない)。**写像できない reason は省略**(2026-09-27 より前の記録には無い) |
-| recovery | String? | **`recovered` だけ持つ**回復の種類。値は `runnerRestart`(XCUITest ランナーを同じポートで起動し直した)/ `workerRevive`(離脱したワーカーの論理デバイスを復帰させた)/ `displaySleepWake`(止まった表示を sleep/wake で戻した。Android Emulator だけ。2026-10-18 より)/ `deviceRestart`(止まった表示のデバイスを再起動した = Emulator はゲストの再起動か停止→起動・Simulator は shutdown→boot。2026-10-18 より)。後の 2 つは**シナリオの境目の表示の確認**(`DisplayFreezeWatch`。同じ絵が 60 秒以上返り、home を押しても変わらなかった)が撃ったもので、同じ事象の `requeued`/`degraded`(cause `frozen`・reason「a frozen display (…)」)と対で出る(下記の注記参照) |
+| recovery | String? | **`recovered` だけ持つ**回復の種類。値は `runnerRestart`(XCUITest ランナーを同じポートで起動し直した)/ `displayServerRestart`(全面が黒い Simulator の backboardd を起こし直して戻した)/ `workerRevive`(離脱したワーカーの論理デバイスを復帰させた)/ `displaySleepWake`(止まった表示を sleep/wake で戻した。Android Emulator だけ。2026-10-18 より)/ `deviceRestart`(止まった表示のデバイスを再起動した = Emulator はゲストの再起動か停止→起動・Simulator は shutdown→boot。2026-10-18 より)。`displayServerRestart` と後の 2 つは**シナリオの境目の表示の確認**(`DisplayFreezeWatch`。同じ絵が 60 秒以上返り、home を押しても変わらなかった)が撃ったもので、同じ事象の `requeued`/`degraded`(cause `frozen`・reason「a frozen display (…)」)と対で出る(下記の注記参照) |
 
 **`degradedWorkers` と `workerAnomalies` は同じ事象**(前者が人向けの1行、後者が機械可読)。
 片方だけ増えることはない。
@@ -337,13 +337,13 @@ FM を呼ぶ構成だったかは `fmTextVisibilityCheck || screenLooksLike` で
 **`preRunExcluded` / `preRunRepaired` は既存の `blankExclusions` / `blankRepairs`(label だけの表示用の2欄)と同じ事実の worker 鍵つき版**(既存の2欄は消さない)。**生成は triage 直後・triage 前のワーカー一覧(label→論理名が引ける)がまだ手元にある場所でだけ行う**(`WorkerAnomalyRecord.preRunTriage`)。`fleetest run --profile` と `api run` は同じ供給の実装(`ProfileSupplyLanes`)を通るので、両 OS の除外が `blankExclusions` と `preRunExcluded` の両方に載る(2026-10-20 より前の `fleetest run --profile` の記録は iOS の除外を `blankExclusions` に載せていない)。
 
 **`recovered`/`recovery` が捉えるのは実装にある回復経路のうち4つ**(`runnerRestart` / `workerRevive` /
-`displaySleepWake` / `deviceRestart`)。
+`displaySleepWake` / `displayServerRestart` / `deviceRestart`)。
 Android の凍結事後判定(`AndroidHealthProbe.observeBlankAndRepair`)が試みる sleep/wake 修復は、
 成否が「このシナリオ失敗を凍結起因と判定するか」の bool 1つに畳み込まれてしまい、run.json へ
 「修復が効いたか」を別に運ぶ経路が無いため、**`recovered` に含めていない**
-(修復を試みたことは workerLog の1行にだけ残る)。iOS の run 前 blank 回復(simctl shutdown→boot)は
+(修復を試みたことは workerLog の1行にだけ残る)。iOS の run 前 blank 回復(全面が黒いときの backboardd の起こし直し → simctl shutdown→boot)は
 `preRunRepaired` の側で表現する。run **中**にデバイスそのものを再起動するのは**シナリオの境目の表示の確認**
-(`DisplayFreezeWatch`)だけで、それが `deviceRestart`。**撃った事実**であって効いたかは
+(`DisplayFreezeWatch`)だけで、それが `displayServerRestart`(絵が戻ったと確かめた回だけ)と `deviceRestart`。**撃った事実**であって効いたかは
 判定しない(効いたかは次のシナリオの合否と、次の境目の確認が答える)。
 
 ### appCrash(`AppCrashRecord`。`scenarios/*.json` のみ)

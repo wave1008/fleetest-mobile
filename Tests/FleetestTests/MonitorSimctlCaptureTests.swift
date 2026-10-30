@@ -58,6 +58,27 @@ final class MonitorSimctlCaptureTests: XCTestCase {
     }
 }
 
+// 配信中の台は撮らない。ただし凍結を確定した台を外すと、絵が戻っても ❄️ が解けない
+final class MonitorSimctlFrozenCaptureTests: XCTestCase {
+    func testAStreamedDeviceIsCapturedOnlyWhileFrozenAtTheProbeInterval() {
+        let now = Date(timeIntervalSince1970: 1000)
+        XCTAssertFalse(ApiMonitorCommand.wantsSimctlCapture(suppressed: true, frozen: false, lastProbeAt: nil, now: now))
+        XCTAssertTrue(ApiMonitorCommand.wantsSimctlCapture(suppressed: true, frozen: true, lastProbeAt: nil, now: now))
+        XCTAssertTrue(ApiMonitorCommand.wantsSimctlCapture(suppressed: false, frozen: false, lastProbeAt: now, now: now))
+        XCTAssertFalse(ApiMonitorCommand.wantsSimctlCapture(suppressed: true, frozen: true, lastProbeAt: now.addingTimeInterval(-5), now: now))
+        XCTAssertTrue(ApiMonitorCommand.wantsSimctlCapture(suppressed: true, frozen: true, lastProbeAt: now.addingTimeInterval(-6), now: now))
+    }
+
+    func testAConfirmedFreezeClearsOnTheFirstDrawnFrame() {
+        var debounce = MonitorFrozenDebounce(confirmThreshold: 2)
+        debounce.record(uniformBlank: true, id: "a")
+        debounce.record(uniformBlank: true, id: "a")
+        XCTAssertTrue(debounce.isConfirmed(id: "a"))
+        debounce.record(uniformBlank: false, id: "a")
+        XCTAssertFalse(debounce.isConfirmed(id: "a"))
+    }
+}
+
 // ---- 撮る対象かの判定(isSimctlCaptureTarget)----
 // **ブリッジの無いデバイスの state は登録の有無で割れる** —— 未登録の合成デバイスは "connected"、
 // 台帳に載っているデバイスは "booted"。connected だけを見ていた頃は、台帳に載っていてブリッジを

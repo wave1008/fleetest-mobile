@@ -57,6 +57,22 @@ final class FrozenIOSRecoveryTests: XCTestCase {
         XCTAssertEqual(targets.map(\.udid), ["UDID-a"])
     }
 
+    // 録画の解放は再起動だけが根拠(画面は健全なので backboardd の段を通すと何も解けないまま再起動を飛ばす)
+    func testOnlyTheFrozenPathTriesTheDisplayServer() throws {
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        let factory = try String(contentsOf: root.appendingPathComponent("Sources/FTAndroid/ProfileWorkerFactory.swift"), encoding: .utf8)
+        let lanes = try String(contentsOf: root.appendingPathComponent("Sources/fleetest/ProfileSupplyLanes.swift"), encoding: .utf8)
+        XCTAssertTrue(factory.contains("triesDisplayServer: false"))
+        XCTAssertFalse(factory.contains("triesDisplayServer: true"))
+        XCTAssertTrue(lanes.contains("triesDisplayServer: true"))
+    }
+
+    func testPhysicalDevicesAreNeverTargets() {
+        let physical = RunWorker(label: "p", platform: "ios", driver: NullDriver(),
+                                 connection: DriverConnection(platform: "ios", port: 8123, udid: "UDID-p", physical: true))
+        XCTAssertTrue(ProfileWorkerFactory.frozenIOSTargets(labels: ["p"], workers: [physical]).isEmpty)
+    }
+
     /// **Android は simctl の対象にしない**(修復は別経路が済ませている)。
     /// **udid を持たせて確かめる** —— udid nil の Android で試すと platform の判定を消しても
     /// compactMap が落として素通しする(2026-08-09 の変異テストで実際に素通しした)

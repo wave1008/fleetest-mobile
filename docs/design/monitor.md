@@ -619,9 +619,9 @@ backboardd のこのエラーは、モニターが画面を配信しているデ
 入れる)**。3つとも常設で、**見出し行はどこを押しても開閉**(run ボードのヘッダと同じ規律。
 三角は状態の表示で文字は常に ▶)。
 
-- **描画の状態の表示**(白紙 ○・文字消え 🫥。凍結 ❄️ とは別。描画崩壊の公表 = dsl-execution.md「描画崩壊の検査」): タイルと拡大表示の絵の真ん中の印は
+- **描画の状態の表示**(白紙 ○・文字消え T。凍結 ❄️ とは別。描画崩壊の公表 = dsl-execution.md「描画崩壊の検査」。印の大きさはタイルも拡大表示も 14px = ユーザー指定): タイルと拡大表示の絵の真ん中の印は
   `devices[].screenState`(`blank` / `textless` / `null`。必須欄)、重なったら凍結 → 白紙 → 文字消えの順に重いほうを出す。
-  run ボードの `❌` の後ろの `❄️N ○N 🫥N` は**その run の中でその状態を検出したデバイスの数**(`RunProgressRecord.frozenDevices` / `blankDevices` /
+  run ボードの `❌` の後ろの `❄️N ○N TN` は**その run の中でその状態を検出したデバイスの数**(`RunProgressRecord.frozenDevices` / `blankDevices` /
   `textlessDevices`。同じデバイスは何度起きても1・0 の種類は出さない)。凍結は離脱の経路(`retireUnusable`)、白紙・文字消えは子の step
   イベントの注記(`StepNote` の `screen-blank` / `screen-textless`)から親が数える。ダッシュボード「マシンの健全性」の `Rendering` 列は
   **そのマシンで今**の数(拡張のデバイス一覧から `renderingCountsOf` が数える = タイルの印と同じ判定。別経路で数えない)

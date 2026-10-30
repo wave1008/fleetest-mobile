@@ -473,7 +473,7 @@ test("Rendering 列: 0 の種類は出さず、全部 0 なら空欄。種類ご
   const byLabel = Object.fromEntries(rowsOf(document).map((tr) => [labelOf(tr), tr]));
   const cellOf = (label) => byLabel[label].children[3];
   assert.equal(cellOf("local").textContent, "", "全部 0 なら空欄");
-  assert.equal(cellOf("m2").textContent, "❄️1○2🫥3");
+  assert.equal(cellOf("m2").textContent, "❄️1○2T3");
   assert.equal(cellOf("m3").textContent, "○1", "0 の種類と未接続の台は出さない");
   const parts = [...cellOf("m2").querySelectorAll(".mh-rendering-part")];
   assert.equal(parts.length, 3);

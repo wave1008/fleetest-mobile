@@ -90,6 +90,23 @@ function fakeTileHeight(document, height) {
   }
 }
 
+test("低いペインでは画面の状態の印を見えている範囲の高さで置く", (t) => {
+  const { window, document } = createWebview();
+  t.after(() => window.close());
+  const visible = () => document.getElementById("grid").style.getPropertyValue("--tile-visible-h");
+  sendDevices(window, 2);
+  fakeTileHeight(document, 306);
+  sendDevices(window, 2);
+  assert.equal(visible(), "218px", "全部見えていれば絵の高さ");
+  fakeTileHeight(document, 150); // 150 - 88 = 62px しか見えない(絵は下限の 120px)
+  sendDevices(window, 2);
+  assert.equal(tileImageHeight(document), "120px");
+  assert.equal(visible(), "62px");
+  fakeTileHeight(document, 90);
+  sendDevices(window, 2);
+  assert.equal(visible(), "18px", "印が切れない高さは残す");
+});
+
 test("タブ非表示中に devices が届いても --tile-image-h を書き換えない", (t) => {
   const { window, document } = createWebview();
   t.after(() => window.close());

@@ -42,6 +42,8 @@ public enum WorkerRecoveryKind: String, Codable, Sendable {
     case workerRevive
     /// 止まった表示を sleep/wake で戻した(DisplayFreezeWatch。Android Emulator だけ)
     case displaySleepWake
+    /// 全面が黒いシミュレータの backboardd を起こし直して戻した(再起動なし。Simulator だけ)
+    case displayServerRestart
     /// 止まった表示のデバイスを再起動した(Emulator = ゲストの再起動か停止→起動 / Simulator = shutdown → boot)
     case deviceRestart
 }

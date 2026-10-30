@@ -365,6 +365,14 @@ extension ApiMonitorCommand {
             && !state.target.spec.isPhysical
     }
 
+    /// 配信で映っている台は撮らない。**凍結を確定した台だけは `capturePlan` と同じ間隔で撮る**(解除は撮った絵でしか起きない)
+    static func wantsSimctlCapture(suppressed: Bool, frozen: Bool, lastProbeAt: Date?,
+                                   probeInterval: TimeInterval = frozenProbeIntervalSeconds, now: Date = Date()) -> Bool {
+        guard suppressed else { return true }
+        guard frozen else { return false }
+        return lastProbeAt.map { now.timeIntervalSince($0) >= probeInterval } ?? true
+    }
+
     /// ブリッジを持たない iOS シミュレータを **1サイクルに1台だけ** simctl で撮るための選択。
     /// **最後に撮ってから最も経ったデバイス**を返し、そのデバイスの時計を進める(順繰り)。
     ///

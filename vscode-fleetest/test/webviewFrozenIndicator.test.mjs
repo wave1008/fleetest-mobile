@@ -92,7 +92,7 @@ test("白紙・文字消えも同じ場所に出し、凍結を優先する", (t
   t.after(() => window.close());
   sendDevices(window, [{ screenState: "blank" }, { screenState: "textless" }, { frozen: true, screenState: "blank" }]);
   const badges = [...document.querySelectorAll("#grid .frame-wrap .badge-frozen")];
-  assert.deepEqual(badges.map((el) => el.textContent), ["○", "🫥", "❄️"]);
+  assert.deepEqual(badges.map((el) => el.textContent), ["○", "T", "❄️"]);
   assert.ok(badges.every((el) => el.style.display !== "none"));
 });
 

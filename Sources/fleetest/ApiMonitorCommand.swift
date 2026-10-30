@@ -510,6 +510,7 @@ struct ApiMonitorCommand: AsyncParsableCommand {
             // (リモート機・ポーリングモード)。ここを塞がないと、
             // 「落ちたときはポーリングへ落ちる」が iOS では成立しない(実害)。
             // 抑制中(= そのタイルは配信で映っている)のデバイスは重い simctl を撃つ理由が無いので外す。
+            // **ただし凍結を確定した台は残す** —— 解除は撮った絵でしか起きないので、外すと絵が戻っても ❄️ が消えない(配らず観測だけ)
             // 実機は simctl で撮れないので対象外(そちらは devicepoll がブリッジ経由で撮る)。
             //
             // **"booted" も対象**。ブリッジの無いデバイスの state は登録の有無で割れる ——
@@ -518,7 +519,9 @@ struct ApiMonitorCommand: AsyncParsableCommand {
             // 「接続中」のまま永久に埋まらなかった(実行プロファイル未選択の一覧で顕在化)
             let simctlCandidates = states.filter { state in
                 Self.isSimctlCaptureTarget(state: state)
-                    && !control.isFrameSuppressed(state.target.id)
+                    && Self.wantsSimctlCapture(suppressed: control.isFrameSuppressed(state.target.id),
+                                               frozen: frozenDebounce.isConfirmed(id: state.target.id),
+                                               lastProbeAt: lastFrozenProbeAt[state.target.id])
             }
             let simctlPickID = Self.simctlCapturePick(ids: simctlCandidates.map(\.target.id),
                                                       lastCapturedAt: &lastSimctlCaptureAt)
@@ -533,8 +536,11 @@ struct ApiMonitorCommand: AsyncParsableCommand {
             var deliverIDs = Set(plan.filter(\.deliver).map(\.id))
             var plannedIDs = Set(plan.map(\.id))
             if let simctlPickID {
-                // 抑制されていないデバイスだけを候補にしてあるので、撮ったら必ず配る
-                deliverIDs.insert(simctlPickID)
+                if control.isFrameSuppressed(simctlPickID) {
+                    lastFrozenProbeAt[simctlPickID] = Date()
+                } else {
+                    deliverIDs.insert(simctlPickID)
+                }
                 plannedIDs.insert(simctlPickID)
             }
 
@@ -1033,6 +1039,8 @@ struct MonitorFrozenDebounce {
     func verdict(id: String, physical: Bool = false) -> FrozenVerdict {
         FrozenVerdict.observe(uniformBlank: confirmedIDs.contains(id), physical: physical)
     }
+
+    func isConfirmed(id: String) -> Bool { confirmedIDs.contains(id) }
 
     /// デバイスの記憶を破棄(接続断・デバイス消滅のとき呼ぶ)。
     /// **接続が切れたら忘れる** —— 落ちている機を凍結として数え続けない

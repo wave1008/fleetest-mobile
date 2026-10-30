@@ -142,8 +142,8 @@ export const exploreHealStrings = {
   },
   "exploreHeal.dashboard.colMhRendering": { ja: "Rendering", en: "Rendering" },
   "exploreHeal.dashboard.colMhRenderingTitle": {
-    ja: "このマシンで今、凍結(❄️)・白紙(○)・文字消え(🫥)にあるデバイスの数。0 の種類は出しません。マウスを載せた数字ごとに説明が出ます",
-    en: "Devices on this machine that are right now frozen (❄️), blank (○) or missing text (🫥). Kinds with 0 are not shown. Hover a number for its explanation",
+    ja: "このマシンで今、凍結(❄️)・白紙(○)・文字消え(T)にあるデバイスの数。0 の種類は出しません。マウスを載せた数字ごとに説明が出ます",
+    en: "Devices on this machine that are right now frozen (❄️), blank (○) or missing text (T). Kinds with 0 are not shown. Hover a number for its explanation",
   },
   "exploreHeal.dashboard.colMhFmDead": { ja: "FM 停止", en: "FM dead" },
   "exploreHeal.dashboard.colMhFmDeadTitle": {

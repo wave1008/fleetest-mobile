@@ -37,7 +37,7 @@ import {
   ACTIONS_PER_SECOND_PER_SEGMENT, ActionTachometer, easeToward, segmentLevel, segmentCount, METER_SEGMENTS, segmentTier,
 } from '../../actionTachometerModel';
 
-// run ボードの ❄️ ○ 🫥(RunBoardRun の欄名・絵文字・説明。説明の文言はタイルと同じ)
+// run ボードの ❄️ ○ T(RunBoardRun の欄名・絵文字・説明。説明の文言はタイルと同じ)
 const RUN_DEVICE_STATES = [
   ['frozenDevices', 'wvMonitor.tile.frozen', 'wvMonitor.tile.frozenTitle'],
   ['blankDevices', 'wvMonitor.tile.blank', 'wvMonitor.tile.blankTitle'],
@@ -795,7 +795,10 @@ function updateRow(row, run) {
       if (!(run[kind] > 0)) continue;
       const stateEl = document.createElement('span');
       stateEl.className = 'run-board-counts-state';
-      stateEl.textContent = `${t(markKey)}${run[kind]}`;
+      const markEl = document.createElement('span');
+      markEl.textContent = t(markKey);
+      markEl.classList.toggle('screen-mark-textless', kind === 'textlessDevices');
+      stateEl.append(markEl, String(run[kind]));
       setHoverTip(stateEl, t(titleKey));
       row.countsEl.append(stateEl);
     }

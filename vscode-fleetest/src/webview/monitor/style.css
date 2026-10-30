@@ -960,6 +960,12 @@ body.vscode-dark .tacho-trend-dot { filter: drop-shadow(0 0 2px var(--tacho-line
   /* 右の経過 / 残りから離す(ユーザー決定)。列の gap(8px)に足して 14px */
   margin-right: 6px;
 }
+/* 文字消えの印 T(絵文字ではなく文字なので色と太さをここで決める)。対向: deviceTiles.js・runBoard.js・machineHealth.js */
+.screen-mark-textless {
+  color: #9a9a9a;
+  font-family: "Times New Roman", Times, serif;
+  font-weight: normal;
+}
 .run-board-counts-failed {
   margin-left: 6px;
 }
@@ -1365,7 +1371,7 @@ html.select-all-guard * {
   left: 50%;
   transform: translate(-50%, -50%);
   z-index: 2;
-  font-size: 30px;
+  font-size: 14px;
   line-height: 1;
   padding: 0;
   margin: 0;
@@ -1374,8 +1380,13 @@ html.select-all-guard * {
   color: inherit;
   filter: drop-shadow(0 0 4px rgba(0, 0, 0, 0.8));
 }
-.lane-preview-frame .badge-frozen {
-  font-size: 64px;
+/* 線の細い書体は ○ の暗いぼかしに負けて読めない。濃いめのグレーに、明るく狭い縁を付ける */
+.badge-frozen.screen-mark-textless {
+  color: #555555;
+  filter: drop-shadow(0 0 1px #ffffff) drop-shadow(0 0 1px #ffffff);
+}
+.frame-wrap .badge-frozen {
+  top: calc(var(--tile-visible-h, var(--tile-image-h, 240px)) / 2);
 }
 .badge-running {
   background-color: var(--vscode-charts-blue, #0078d4);
@@ -1470,6 +1481,7 @@ html.select-all-guard * {
   display: flex;
   align-items: center;
   gap: 6px;
+  padding-left: 12px; /* 左下の点灯マーク(.tile > .run-lamp)とチップを重ねない */
   flex: 0 0 18px;
   height: 18px;
   overflow: hidden;
@@ -1709,9 +1721,9 @@ html.select-all-guard * {
   transition: opacity 0.8s ease;
 }
 .run-lamp[data-on="1"] { opacity: 1; pointer-events: auto; }
-/* ラインビューのタイルでは、タイルの padding 8px の内側・マシン名の段(16px)の縦中央 */
 .tile { position: relative; }
-.tile > .run-lamp { left: 8px; top: 12px; }
+/* タイルは左下(ユーザー指定)。低いペインでもタイルの枠の中に見える */
+.tile > .run-lamp { left: 8px; top: auto; bottom: 9px; }
 @media (prefers-reduced-motion: reduce) {
   .run-lamp { transition: none; }
 }

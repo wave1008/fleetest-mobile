@@ -217,6 +217,9 @@ function applyCanvasAspect(entry) {
   }
 }
 
+// 印(font-size 14px)が切れずに収まる高さ。これより低いペインでは絵の上端に寄せる
+const MIN_VISIBLE_FOR_BADGE = 18;
+
 // タイル実測高さから --tile-image-h を算出(タイル幅はこの高さ×アスペクト比で決まる)。
 // スプリッター移動・リサイズ・タイル生成のたびに呼び直す必要がある。
 export function relayoutTiles() {
@@ -227,7 +230,11 @@ export function relayoutTiles() {
   if (raw === null) {
     return;
   }
-  grid.style.setProperty('--tile-image-h', Math.max(MIN_TILE_IMAGE_HEIGHT, raw) + 'px');
+  const imageHeight = Math.max(MIN_TILE_IMAGE_HEIGHT, raw);
+  grid.style.setProperty('--tile-image-h', imageHeight + 'px');
+  // 低いペインでは絵の下側が隠れる。画面の状態の印は**見えている範囲**の中央に置く(.frame-wrap .badge-frozen)
+  grid.style.setProperty('--tile-visible-h',
+    Math.min(imageHeight, Math.max(MIN_VISIBLE_FOR_BADGE, raw)) + 'px');
 }
 
 // ペイン高さから決まる画像の高さ。**下限クランプ前**の値で、負にもなりうる
@@ -373,7 +380,7 @@ function createTile(device) {
   // 実行中/キュー待ち/録画中のバッジはタイル左下(フッター先頭)。録画は実行中の右(ユーザー指定)。
   footer.append(runningBadge, recordingBadge, queuedBadge, stateBadge, spacer, renderBadge);
 
-  // 点灯マーク(左上・マシン名の段の左端)。**段の中に入れない** —— 段はグリッドビューの見出しへ複製される
+  // 点灯マーク(タイルの左下。拡大表示は左上)。**段の中に入れない** —— 段はグリッドビューの見出しへ複製される
   // (renderMirrorHeader)ので、中に入れると拡大表示に二重に出る。絶対配置なので中央寄せの段を動かさない
   const lampEl = document.createElement('span');
   lampEl.className = 'run-lamp';
@@ -621,6 +628,7 @@ function paintScreenBadge(el, device) {
   el.style.display = keys ? 'inline-block' : 'none';
   if (keys && (el.textContent !== t(keys[0]) || el.dataset.tip !== t(keys[1]))) {
     el.textContent = t(keys[0]);
+    el.classList.toggle('screen-mark-textless', keys[0] === 'wvMonitor.tile.textless');
     el.dataset.tip = t(keys[1]);
     setHoverTip(el, t(keys[1]));
   }

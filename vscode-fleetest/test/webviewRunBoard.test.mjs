@@ -1202,7 +1202,7 @@ test("サーバー: 準備中の段階 services は「サーバーを起動中�
   assert.equal(document.querySelector(".run-board-counts").textContent, "サーバーを起動中");
 });
 
-test("run ボード: ❌ の後ろに ❄️ ○ 🫥 の数を並べ(0 の種類は出さない)、種類ごとにホバーの説明が付く", (t) => {
+test("run ボード: ❌ の後ろに ❄️ ○ T の数を並べ(0 の種類は出さない)、種類ごとにホバーの説明が付く", (t) => {
   const { window, document } = createWebview();
   t.after(() => window.close());
   post(window, monitorRunsMessage({ runs: [{
@@ -1210,7 +1210,7 @@ test("run ボード: ❌ の後ろに ❄️ ○ 🫥 の数を並べ(0 の種�
   }] }));
   const counts = runRows(document)[0].querySelector(".run-board-counts");
   const states = [...counts.querySelectorAll(".run-board-counts-state")];
-  assert.deepEqual(states.map((el) => el.textContent), ["❄️1", "🫥2"]);
+  assert.deepEqual(states.map((el) => el.textContent), ["❄️1", "T2"]);
   assert.equal(counts.querySelector(".run-board-counts-failed").nextElementSibling, states[0], "❌ の直後に並ぶ");
   assert.match(states[0].getAttribute("data-hover-tip") || "", /凍結/);
   assert.match(states[1].getAttribute("data-hover-tip") || "", /文字消え/);

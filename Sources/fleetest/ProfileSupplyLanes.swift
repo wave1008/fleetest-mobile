@@ -121,14 +121,14 @@ enum ProfileSupplyLanes {
                 wipeOnInsufficientStorage: resolved.wipeDataOnBloat, locale: resolved.locale,
                 supplyStage: supplyStage, log: log)
             PhaseLog.mark("ios-workers-installed")
-            // 画面だけ死んだシミュレータを投入前に回復させる(BlankWorkerTriage)。回復は simctl shutdown→boot で
+            // 画面だけ死んだシミュレータを投入前に回復させる(BlankWorkerTriage)。回復は backboardd の起こし直し(全面が黒いとき)か simctl shutdown→boot で
             // ブリッジごと死ぬので、張り直し(buildIOSWorkers の呼び直し)までが1セット
             let recovered = await BlankWorkerTriage.excludeBlankScreenWorkers(
                 ws,
                 recover: { @Sendable frozen, currentWorkers in
                     await ProfileWorkerFactory.recoverFrozenIOSWorkers(
                         labels: frozen, workers: currentWorkers, resolved: resolved,
-                        repoRoot: repoRoot, apps: resolved.apps, log: log)
+                        repoRoot: repoRoot, apps: resolved.apps, triesDisplayServer: true, log: log)
                 },
                 // 判定をモニターへ配る(DeviceFrozenStore)。run が知っている凍結をモニターが知らない状態を作らない
                 stateDir: stateDir,
