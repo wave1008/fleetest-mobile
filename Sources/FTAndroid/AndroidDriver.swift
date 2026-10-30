@@ -770,7 +770,21 @@ public final class AndroidDriver: AppDriver {
         restoreStateIfNeeded()
         try refuseIfStepExpectationContradicts(ref)
         let target = bridgeRef(ref)
-        try await withoutStepExpectation { try await withBridge { try await $0.clearInput(ref: target) } }
+        do {
+            try await withoutStepExpectation { try await withBridge { try await $0.clearInput(ref: target) } }
+        } catch let error as DriverError {
+            throw Self.noFocusFrontAdvice(after: error, front: noInputFocusFront(after: error),
+                                          lastTreePackage: lastTreeForegroundPackage ?? currentPackage) ?? error
+        }
+    }
+
+    /// 入力フォーカス不在で落ちた直後の前面。**シェードはアプリ窓を覆うだけで最前面のアプリは下のまま**なので
+    /// 窓の並びから覆いを見る(`topmostAppPackage` だけではシェードの下のアプリが返る)。照会は「フォーカス不在」の回だけ・不明は nil
+    private func noInputFocusFront(after error: DriverError) -> String? {
+        guard case .badResponse(_, let body) = error, body.contains(Self.noInputFocusMarker),
+              let result = try? adbAnswering(["shell", "dumpsys", "window", "windows"]), result.status == 0 else { return nil }
+        return AndroidForegroundWindows.shadeCovering(dumpsys: result.output)
+            ? "com.android.systemui" : AndroidForegroundWindows.topmostAppPackage(dumpsys: result.output)
     }
 
     /// ホストの ref をブリッジが知っている ref へ写す(DOM 由来だけ差し替わる。domBridgeRefs 参照)。
@@ -845,7 +859,11 @@ public final class AndroidDriver: AppDriver {
             // 本文が空でも ref があれば SET_TEXT を通し、対象ノードへのフォーカス確立を維持する
             try await withoutStepExpectation { try await withBridge { try await $0.type(ref: target, text: main) } }
         } catch let error as DriverError {
-            throw Self.typeNoFocusAdvice(after: error, hadRef: ref != nil) ?? error
+            // 前面が systemui(通知シェード・クイック設定・ロック画面・アシスタント)ならそれが入力フォーカスを持っている。
+            // 照会は「フォーカス不在」で落ちた回だけ(正常系には掛からない)
+            let front = ref == nil ? noInputFocusFront(after: error) : nil
+            throw Self.typeNoFocusAdvice(after: error, hadRef: ref != nil, front: front,
+                                         lastTreePackage: lastTreeForegroundPackage ?? currentPackage) ?? error
         }
         try await pressEnter()
     }
@@ -859,15 +877,37 @@ public final class AndroidDriver: AppDriver {
     /// しかも容器のほうが id を持つので、`#id` を書くと容器に解決する。
     /// 読み手が次に打つ手が分かる形にする = **セレクタを取る `type` へ寄せる**
     /// (解決とフォーカスをツール側が引き受ける)。ref 付きで落ちた場合は別の話なので触らない
-    static func typeNoFocusAdvice(after error: DriverError, hadRef: Bool) -> DriverError? {
+    /// `front` = 落ちた直後の前面パッケージ(不明は nil)。`com.android.systemui` なら、欄が無いのではなく覆いが
+    /// 入力フォーカスを持っている(シェードを開いたままの ft_type が「ref でタップせよ」と言い、ref のタップは覆いで断られる袋小路だった)
+    static func typeNoFocusAdvice(after error: DriverError, hadRef: Bool, front: String? = nil,
+                                  lastTreePackage: String? = nil) -> DriverError? {
         guard !hadRef, case .badResponse(let status, let body) = error,
               body.contains(noInputFocusMarker) else { return nil }
+        if let advice = noFocusFrontAdvice(after: error, front: front, lastTreePackage: lastTreePackage) { return advice }
         return DriverError.badResponse(status: status, body: body
             + " — nothing was tapped into focus. On Android an input is often a container"
             + " (TextInputLayout) wrapping the editable field (TextInputEditText), and the id"
             + " usually sits on the container, so tapping it does not move input focus."
             + " Write type(<selector>, \"…\") instead: it resolves the editable field and"
             + " focuses it (e.g. type(\".textField[1]\", \"…\"))")
+    }
+
+    /// 欄ではなく前面が原因のフォーカス不在(type / clearInput 共通)。前面からは言えないとき nil
+    static func noFocusFrontAdvice(after error: DriverError, front: String?, lastTreePackage: String?) -> DriverError? {
+        guard case .badResponse(let status, let body) = error, body.contains(noInputFocusMarker) else { return nil }
+        if front == "com.android.systemui" {
+            return DriverError.badResponse(status: status, body: body
+                + " — com.android.systemui (the notification shade, quick settings, the lock screen or an assistant) is"
+                + " in front and holds the input focus, so the field is not the problem. Close it first"
+                + " (ft_navigate back, or unlock the device), then retry.")
+        }
+        // 直近の木のアプリが前面から消えている(落ちた・離れた)と、欄の話ではない
+        if let front, let lastTreePackage, front != lastTreePackage {
+            return DriverError.badResponse(status: status, body: body
+                + " — \(front) is in front, not \(lastTreePackage) (the app of the last tree): that app may have crashed or"
+                + " been left, so there is no field to type into. ft_snapshot shows what is on screen; ft_launch the app to come back.")
+        }
+        return nil
     }
 
     /// 末尾の改行1つだけを分離する(text 全体が "\n" のときは分離しない=本文なしの pressEnter 相当に

@@ -32,6 +32,8 @@ extension StepExecutor {
                                fingerprint: LocatorFingerprint? = nil,
                                phase: inout PhaseAccumulator) async throws -> StepOutcome {
         var step = step
+        // 前のステップの swipe が残した慣性(このステップの swipe が立て直す分とは別。swipeInertiaPending の doc)
+        let inertiaFromPriorStep = takeSwipeInertia()
         // waitForSettle は待ちの上限を必ず持たせてから解決する(ft_batch は waitSeconds 省略時に nil で来る)。
         // **上限の無いステップの解決は、容器の外の残骸(ghost)を戻すために容器を送る** = 待つだけのコマンドが画面を動かす。
         // 探す時間も waitSeconds ではなく約 0.7 秒(3回)になる
@@ -410,6 +412,45 @@ extension StepExecutor {
         // 救済が走った 18 件のうち **4 件が失敗**、走らなかった 22 件は **0 件**(p≈0.03)。
         // しかも失敗時の対象は容器のど真ん中(y=519〜534 / 容器 230..692)で座標は正しい。
         // 探索終端と**同じ順序**で肩代わり → 静止 → 掴み直しを行う
+        // **直前のステップの swipe が慣性を残したまま、いまそのリストの中の要素を押す**ときも同じ空打ちで吸う。
+        // 撃たないと tap が慣性を止めるだけで、`ok` のまま押せていない(CMP の iOS。swipeInertiaPending の doc)。
+        // 探索で撃った場合(ghostSwipes / searchSwiped)は探索側の空打ちが吸っているので重ねない。
+        // 木を撮り直して座標を引き直す理由と「待たない」理由は settleAfterFind と同じ(慣性の途中の空打ちが止める役も担う)
+        // **容器の外の要素には撃たない**(動いていない物に約 1.3 秒払う)。**Flutter には撃たない** —— 空打ち自身が慣性を作り(FD-2.2)、
+        // この経路が無くても DSL の tap は 6/6 正しく押せた(空打ちを切った対照。CMP は 11/16 が押せていない)
+        if inertiaFromPriorStep, uiFramework != .flutter, ghostSwipes == 0, !searchSwiped, !grabsOnly, Self.interactsByTouch(action),
+           var target = resolved?.0, shouldEmptyDrag(for: target),
+           ContainerGeometry.clippingContainer(of: target, in: snapshot.elements,
+                                               inferring: step.containerInference ?? true) != nil {
+            if driver.treeLagsBehindMotion {
+                start = clock.now
+                let fresh = try await freshSnapshot(.afterOwnMove)
+                phase.snapshotMs += Self.ms(clock.now - start)
+                if let (moved, _) = LocatorResolver.resolve(step: step, in: fresh) {
+                    target = moved
+                    snapshot = fresh
+                }
+            }
+            let x = target.frame.centerX
+            let y = min(target.frame.centerY,
+                        snapshot.screen.y + snapshot.screen.height - Self.bottomUncoveredBand - 1)
+            if Self.emptyDragIsSafe(x: x, y: y, of: target, in: snapshot.elements, screen: snapshot.screen),
+               let end = Self.emptyDragEnd(of: target, x: x, y: y, searching: nil, screen: snapshot.screen) {
+                await emptyDrag(x: x, y: y, toX: end.x, toY: end.y)
+                let settled = try await settledSignature(phase: &phase)
+                snapshot = settled.snapshot
+                // 取り直せないなら撃たずに失敗(下の空打ち後の分岐と同じ理由: 古い ref のまま撃つと別の要素を押して ok になる)
+                guard let refreshed = LocatorResolver.resolve(step: step, in: snapshot) else {
+                    return StepOutcome(status: failed(.notFound,
+                        "the element was found, but the drag that absorbs the previous swipe's momentum"
+                        + " changed the screen and it is gone from the tree (the drag may have fired a"
+                        + " row or button under it). Nothing was tapped: the earlier reference would now"
+                        + " point at another element"))
+                }
+                resolved = refreshed
+            }
+        }
+
         if ghostSwipes > 0, ghostLeftInertia, let target = resolved?.0, shouldEmptyDrag(for: target) {
             let x = target.frame.centerX
             let y = min(target.frame.centerY,

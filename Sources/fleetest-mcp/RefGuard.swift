@@ -235,6 +235,15 @@ enum RefGuard {
         guard let advisory = TapTargetGeometry.offscreenAdvisory(for: element, screen: screen) else {
             return ""
         }
+        // 中心が画面の上端より上なら「何も起きない」と言い切らない: iOS はその点がステータスバーへ寄り、
+        // OS の scrollsToTop が一覧を先頭へ戻す(実測 9/9 で効いた。座標の経路は同じ点を断る)
+        let centreY = element.frame.y + element.frame.height / 2
+        if centreY < screen.y - TapTargetGeometry.offscreenCentreTolerance {
+            return " (warning: \(describe(element)) — its centre (\(Int(element.frame.x + element.frame.width / 2)),"
+                + " \(Int(centreY))) is outside the visible screen, above its top edge, so the element itself is not"
+                + " tapped; on iOS the touch can land on the status bar instead, which scrolls a list back to its top"
+                + " (the screen may have changed). Bring it into view with ft_scroll_to and re-snapshot)"
+        }
         return " (warning: \(describe(element)) — \(advisory);"
             + " bring it into view with ft_scroll_to and re-snapshot)"
     }

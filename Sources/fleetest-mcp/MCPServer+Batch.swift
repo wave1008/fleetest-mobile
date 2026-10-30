@@ -750,7 +750,8 @@ extension MCPServer {
                 case .passed, .passedViaFallback, .healed:
                     reason = "could not confirm the result"
                 }
-                lines.append("\(index + 1). \(plan.summary) — FAILED (\(ms)ms): \(Self.batchWritableAdvice(reason))" + refNote)
+                lines.append("\(index + 1). \(plan.summary) — FAILED (\(ms)ms): \(Self.batchWritableAdvice(reason))" + refNote
+                    + Self.batchDeliveryUnknownNote(failureKind: outcome.failureKind))
                 // **止まった位置と、そこで見えている画面を一緒に返す**(scrollTo の failure と
                 // 同じ形: throw で isError にする — 呼び手が要求した手が最後まで実行されなかった
                 // という点で、要素へ届かなかった scrollTo と同種の失敗)
@@ -917,6 +918,17 @@ extension MCPServer {
               let frame = Range(match.range(at: 2), in: reason) else { return reason }
         return reason.replacingCharacters(in: full, with: "putting a scrollTo '<target>' scrollFrame: \(reason[frame])"
             + " direction: <the direction you gave scroll:> step before it (ft_batch cannot write withScroll* blocks)")
+    }
+
+    /// **ドライバへ届かなかった失敗の手は「届いたか分からない」**。`driverUnreachable` は接続拒否(撃つ前に断られた = 届いていない)と
+    /// 応答の途中の切断・時限切れ(端末で実行済みのことがある。実測: ランナーを処理中に落とすと FAILED の tap が +1 になっていた)を
+    /// 区別せずに運ぶ(`StepFailureKind` は事実の経路だけ)ので、ここでは拒否の場合を除いて撃ち直しを勧めない側に倒す。
+    /// 拒否だったかは直前の失敗の文が言う(文言の一致では決めない)。ft_batch は撃ち直しを勧めない
+    static func batchDeliveryUnknownNote(failureKind: StepFailureKind?) -> String {
+        guard failureKind == .driverUnreachable else { return "" }
+        return "\n   (the connection to the driver failed during this step: unless the error above says the connection was"
+            + " refused — nothing listening, so the step was never sent — this step may already have been performed."
+            + " Check the screen before repeating it; do not simply run the step again)"
     }
 
     /// 結論の行。ok でも何も起きていないかもしれない手(`suspects` = 手の番号)があれば「passed」と言わない

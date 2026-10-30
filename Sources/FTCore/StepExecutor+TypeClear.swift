@@ -54,6 +54,7 @@ extension StepExecutor {
         var stagnantRounds = 0
         var previous: String?
         var retypes = 0
+        var beforeRetype: String?
         // 直前の追送を撃った時点の値。追送の後も同じ値なら、それ以上撃っても重複するだけ
         var valueAtLastResend: String?
         var checkedScreenForTypedText = false
@@ -88,6 +89,18 @@ extension StepExecutor {
             let plan = TypeReadback.plan(expected: target, actual: actual,
                                          protectedPrefixCount: target == expected ? priorCount : 0)
             switch plan {
+            case .unverifiable where TypeReadback.retypeBrokeField(retypes: retypes, expected: target, actual: actual),
+                 .retype where retypes >= TypeReadback.maxRetypes:
+                switch TypeReadback.retypeEnd(actual: actual, previous: previous, beforeRetype: beforeRetype) {
+                case .accept:
+                    noteCodesThisStep.insert(.typeRetypeAbandoned)
+                    return nil
+                case .readAgain:
+                    break
+                case .fail:
+                    return "the field does not hold the typed text after retyping"
+                        + " (expected \(expected.count) character(s)); not retyped again"
+                }
             case .done, .unverifiable:
                 return nil
             case .resend where valueAtLastResend == actual:
@@ -128,10 +141,6 @@ extension StepExecutor {
                 // 読み返しで撮り直した後なので、その木の ref で撃つ(element.ref は別の要素を指しうる)
                 try await driver.type(ref: liveRef, text: missing)
                 phase.actionMs += Self.ms(clock.now - start)
-            case .retype where retypes >= TypeReadback.maxRetypes:
-                // 打ち直しても同じ形 = アプリ側の加工。v104 より前と同じく受理する(TypeReadback.maxRetypes)
-                noteCodesThisStep.insert(.typeRetypeAbandoned)
-                return nil
             case .deleteExcess, .retype:
                 // in-app はバックスペースを送れないので、丸ごとクリアしてから全文を打ち直す
                 // (handleClear と同じ 422 系の判断。clearInput のケースの既存実装と同じ API 形)。
@@ -139,6 +148,7 @@ extension StepExecutor {
                 // 打ち直しが起きた回数 = 誤検知の監視。TypeReadback.Plan.retype)
                 if case .retype = plan {
                     retypes += 1
+                    beforeRetype = actual
                     noteCodesThisStep.insert(.typeRetyped)
                 }
                 let start = clock.now

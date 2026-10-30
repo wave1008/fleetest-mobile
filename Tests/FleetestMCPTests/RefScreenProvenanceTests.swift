@@ -115,14 +115,14 @@ final class RefScreenProvenanceTests: XCTestCase {
     func testDoesNotBlameExternalActorsWhenThisSessionActedSinceTheRefWasTaken() {
         let message = note(selector, lifecycle, actedSinceTakenFrom: true)
         XCTAssertTrue(message.contains("this session's own actions"), message)
-        XCTAssertFalse(message.contains("nothing this session did"), message)
+        XCTAssertFalse(message.contains("no action since that snapshot changed it"), message)
         XCTAssertFalse(message.contains("another process or a person"), message)
     }
 
     /// **陰性**: 従来どおり、外部要因の可能性を言う(このセッションが何もしていない形)
     func testStillBlamesExternalActorsWhenThisSessionDidNotAct() {
         let message = note(selector, lifecycle, actedSinceTakenFrom: false)
-        XCTAssertTrue(message.contains("nothing this session did"), message)
+        XCTAssertTrue(message.contains("no action since that snapshot changed it"), message)
     }
 
     /// **その木が自分の操作の直後の読みなら、外部要因を名指ししない**(読み込みの途中だった可能性を言う)
@@ -136,7 +136,7 @@ final class RefScreenProvenanceTests: XCTestCase {
     /// 外部要因の注記は回数で黙らせない(別の事実を言うので)
     func testTheReadRightAfterOwnActionNoteIsSaidOnlyOnce() {
         XCTAssertEqual(note(selector, lifecycle, takenRightAfterOwnAction: true, loadingNoteShownBefore: true), "")
-        XCTAssertTrue(note(selector, lifecycle, loadingNoteShownBefore: true).contains("nothing this session did"))
+        XCTAssertTrue(note(selector, lifecycle, loadingNoteShownBefore: true).contains("no action since that snapshot changed it"))
     }
 
     // MARK: - 地図の地点(畳まれる飾りの葉)
@@ -236,7 +236,7 @@ final class RefScreenProvenanceTests: XCTestCase {
         let result = try await server.call(tool: "ft_tap", args: ["ref": 350])
         let text = try XCTUnwrap(result.first?["text"] as? String)
         XCTAssertTrue(text.contains("this session's own actions"), text)
-        XCTAssertFalse(text.contains("nothing this session did"), text)
+        XCTAssertFalse(text.contains("no action since that snapshot changed it"), text)
     }
 
     /// **配線**: 自分の ft_tap の snapshotAfter で読んだ木から ref を採り、その後で木が変わった(読み込みの続き)
@@ -301,6 +301,6 @@ final class RefScreenProvenanceTests: XCTestCase {
         driver.scriptedSnapshots = [settled, settled]
         let result = try await server.call(tool: "ft_tap", args: ["ref": ref])
         let text = try XCTUnwrap(result.first?["text"] as? String)
-        XCTAssertTrue(text.contains("nothing this session did"), text)
+        XCTAssertTrue(text.contains("no action since that snapshot changed it"), text)
     }
 }

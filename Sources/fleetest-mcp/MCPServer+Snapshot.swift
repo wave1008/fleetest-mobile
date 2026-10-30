@@ -276,8 +276,8 @@ extension MCPServer {
         }
         let cause = actedSinceTakenFrom
             ? "this session's own actions since that snapshot are the likely cause"
-            : "nothing this session did changed it — the app itself, another process or a"
-                + " person moved the screen on"
+            : "no action since that snapshot changed it — a list still coasting from an earlier swipe, the app"
+                + " itself, another process or a person moved the screen on"
         return " note: [\(ref)] came from a snapshot whose tree no longer matches the current one,"
             + " and \(cause). It still matched \(RefGuard.describe(matched)), but that"
             + " can be the same-looking element of a different screen. Take a fresh ft_snapshot."
@@ -1730,11 +1730,19 @@ extension MCPServer {
             case .passed, .passedViaFallback, .healed:
                 reason = "could not confirm the result"
             }
+            // **失敗の応答にも、成功経路と同じ「木が別のアプリのものだ」を付ける**(アプリが落ちて別のアプリが前面に出た回、
+            // 失敗文だけが的外れな対処を言っていた)。同じ判定・同じ文言(switchedAppNote)
+            let failedLaunched = launchedBundleIDs[Self.sessionKey(args)]
+            let failedSwitched = Self.switchedAppNote(
+                launched: failedLaunched, snapshot: after,
+                processEvidence: androidProcessEvidenceForSwitch(
+                    launched: failedLaunched, snapshot: after, driver: scrollDriver, args: args),
+                stoppedByTool: toolStoppedBundleIDs[Self.sessionKey(args)])
             // **fail-fast(scrollFrame 未解決)は別の文で伝える**: 通常の「did not reach the
             // element」はスワイプを何本か送った前提の文言で、fail-fast は1本も送っていないので
             // そのままでは誤解を招く(StepNote.scrollFrameMissing = DSL と共有した判定)
             if outcome.notes.contains(.scrollFrameMissing) {
-                throw MCPError(scrollFrameLabelNote + "scrollTo \"\(selectorText)\": \(reason)"
+                throw MCPError(failedSwitched + scrollFrameLabelNote + "scrollTo \"\(selectorText)\": \(reason)"
                     // fail-fast はスワイプを撃たない = 読み直した木が今の画面(覚えていた木は古いことがある)
                     + Self.scrollAlternativesHint(after))
             }
@@ -1778,7 +1786,7 @@ extension MCPServer {
                     + " read the screen it should be on with ft_snapshot maxElements:"
                     + " \(BridgeAPI.maxSnapshotElementsCeiling) before concluding it is not there.\n"
                 : ""
-            throw MCPError(scrollFrameLabelNote + sheetNote + containerGoneNote
+            throw MCPError(failedSwitched + scrollFrameLabelNote + sheetNote + containerGoneNote
                 + truncatedDuringSearch
                 + Self.scrollTimingNote(totalMs: Int((timingClock.now - timingStart)
                                                      / .milliseconds(1)),

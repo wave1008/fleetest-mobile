@@ -264,7 +264,8 @@ final class RemoteSetupTests: XCTestCase {
                 + " && swift build --product fleetest-simstream"
                 + " && swift build --product fleetest-androidstream"
                 + " && swift build --product fleetest-devicepoll"
-                + " && swift build --product fleetest-services'")
+                + " && swift build --product fleetest-services"
+            + " && swift build --product fleetest-mcp'")
     }
 
     func testAlignRevisionCommandRemovesHelperWhenFetchFails() throws {

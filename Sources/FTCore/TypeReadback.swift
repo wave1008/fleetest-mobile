@@ -56,7 +56,7 @@ public enum TypeReadback {
         if actual.hasPrefix(expected) { return .deleteExcess(actual.count - expected.count) }
         // **前方一致の後にしか置けない**: `hel` は `hello123` の部分列でもあり、先に見ると
         // 今自己修復できている「末尾の欠落 → 追送」を全文打ち直しに変えてしまう。
-        // 落ちた文字が空白だけなら読めない空白(上の規則)と区別できないので諦める
+        // 落ちた文字が空白だけなら読めない空白(上の規則)と区別できないので諦める。ただし欄が空白を1つでも返しているなら読める欄
         if isSubsequenceDroppingVisibleCharacters(actual, of: expected, protectedPrefixCount: protectedPrefixCount) {
             return .retype
         }
@@ -64,10 +64,28 @@ public enum TypeReadback {
     }
 
     /// 1回の type で全文を打ち直す上限(ランナー・ホストの両消費者が共有)。
-    /// **1 = 打ち直しても同じ形で欠けるなら、それは打鍵の落ちではなくアプリ側の加工**
-    /// (数字だけ通す欄が英字を捨てる等)。2回目以降は v104 より前と同じく検証を諦めて受理する ——
-    /// 上限が無いと加工する欄で「消す→打つ→同じ値」が停滞に達し、緑だった step が 422 になる
+    /// **1 = 打ち直しても同じ形で欠けるなら、それは打鍵の落ちではなくアプリ側の加工**として受理する
+    /// (数字だけ通す欄が英字を捨てる等)。上限が無いと加工する欄で「消す→打つ→同じ値」が停滞に達し、緑だった step が 422 になる。
+    /// **上げない・形が違うときも超えない**: 重ねると RN の加工する欄の 8/12 が値を壊したまま ok になった(`123` → `12312`)。代償は同じ位置が2回続けて落ちる形の
+    /// 見逃し(RN の iOS で 2/55。docs/open-issues.md)
     public static let maxRetypes = 1
+
+    /// 上限まで打ち直した後の始末。**打ち直す前と同じ値へ戻ったときだけ**アプリ側の加工として受理する。
+    /// 違う値は、まだ動いている(打ち直しの途中の値を 123 → 12 と読んだ)か壊れたかなので、**打鍵せずに読み直し**、止まっても違えば失敗する
+    /// (重ねて打ち直すと加工する欄の値が壊れる)。`previous` は直前の周回の読み
+    public enum RetypeEnd: Equatable { case accept, readAgain, fail }
+
+    public static func retypeEnd(actual: String, previous: String?, beforeRetype: String?) -> RetypeEnd {
+        if actual == beforeRetype { return .accept }
+        return actual == previous ? .fail : .readAgain
+    }
+
+    /// 打ち直した後の値を `plan` が `.unverifiable` と読んだとき、受理してはいけないか。打ち直す前は部分列で説明できた値が
+    /// 説明できなくなった = 消し切れず欄を壊した(`123` → `1233`)形で、加工ではない。読めない空白だけの差は受理のまま
+    public static func retypeBrokeField(retypes: Int, expected: String, actual: String) -> Bool {
+        retypes > 0 && expected.trimmingCharacters(in: .whitespacesAndNewlines)
+            != actual.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
 
     /// 読み返しが目標にする値。**既定は `expected`(撃つ前の値 + 本文)**で、それが前方一致で説明できない
     /// ときだけ「撃った文字だけ」(`typedOnly`)を候補にする。ホスト(`StepExecutor.readbackTarget`)と
@@ -112,7 +130,8 @@ public enum TypeReadback {
         return prior.hasSuffix(excess)
     }
 
-    /// `actual` が `expected` の順序を保った真部分列で、落ちた文字に空白でないものが含まれるか
+    /// `actual` が `expected` の順序を保った真部分列で、落ちた文字に空白でないものが含まれるか。
+    /// 空白だけが落ちた形も、`actual` の語の間に空白が残っていれば真(`foo bar baz` → `foobar baz` = この欄は空白を読み返せる)
     /// `protectedPrefixCount` 以内(expected の先頭 = 撃つ前から欄にあった値)の欠落があれば false
     public static func isSubsequenceDroppingVisibleCharacters(_ actual: String, of expected: String,
                                                               protectedPrefixCount: Int = 0) -> Bool {
@@ -130,7 +149,8 @@ public enum TypeReadback {
             position += 1
         }
         guard index == actual.endIndex else { return false }
-        return dropped.contains { !$0.isWhitespace && !$0.isNewline }
+        if dropped.contains(where: { !$0.isWhitespace && !$0.isNewline }) { return true }
+        return actual.trimmingCharacters(in: .whitespacesAndNewlines).contains { $0.isWhitespace }
     }
 
     /// 読み返しの対象になる型(値がテキストとして読める要素)。ここに無い型は検証せず素通しする

@@ -107,6 +107,10 @@ extension StepExecutor {
         /// 明示 scrollFrame の容器が**探索の軸と違う軸にしか動かない**(横の一覧を縦に払った等)と木から言える。
         /// `stoppedUnmoving` の文が縦の逆向きを勧める誤誘導を避けるためだけに持つ(`scrollFrameRunsOtherAxis`)
         var scrollFrameOtherAxis: Bool = false
+        /// 「動かなくなった」と判定した時点で、**探索の対象のアプリが前面に居なかった**ときの前面の名前
+        /// (iOS で前面を答えられないドライバでは "another app")。nil = 前面に居た・確かめられなかった。
+        /// 木が変わらない理由が「端」ではなく「前面を奪われた」だったのに、失敗文が端と言い切っていた
+        var appLeftForeground: String? = nil
         /// 見つけた要素(found のときだけ)。scrollTo が「掴んだ要素」として返す
         /// (無いと DSL の `scrollTo` が lastElement を空で上書きしていた)
         var element: ElementInfo? = nil
@@ -200,20 +204,28 @@ extension StepExecutor {
         // **fail-fast は別の文**: 実際にはスワイプを1本も送っていないので、通常の
         // 「N 回振って見つからなかった」は嘘になる
         if result?.scrollFrameMissing == true {
-            return Self.scrollFrameFailFastMessage(step, action: "search", swipes: result?.swipes ?? 0)
+            let base = Self.scrollFrameFailFastMessage(step, action: "search", swipes: result?.swipes ?? 0)
+            guard let front = result?.appLeftForeground else { return base }
+            return base + " The app was not in the foreground at that point (\(front) was in front: the screen went off,"
+                + " a shade or another app came up), so the container did not vanish from the app — bring the app back"
+                + " with launch and search again."
         }
         let direction = FTSwipeDirection(rawValue: step.direction ?? "") ?? .up
         let vertical = direction == .up || direction == .down
         let limit = max(0, step.maxSwipes ?? defaultMaxSwipes)
         // 打ち切ったときは**実際の回数**を出す(上限を名乗ると「8回も振ったのに」と読めてしまう)
-        let swipes = result?.stoppedUnmoving == true ? (result?.swipes ?? limit) : limit
+        let swipes = result?.stoppedUnmoving == true || result?.appLeftForeground != nil ? (result?.swipes ?? limit) : limit
         // **「stopped early」と言わない**。旧文言は「途中で諦めた」としか
         // 読めず、実際には**リストの末尾に着いていた**回(iOS の設定アプリで実測)を欠陥と
         // 受け取らせ、maxSwipes を上げた再試行を誘っていた。上げても結果は変わらないので明言する。
         // **2形を分ける**: `contentEverMoved`(順方向)で「動いた末の停止」か「1度も動かなかった」か。
         // 後者では逆走査を撃たない(runScrollSearch の guard)ので、反対側は探していないと言う
         let stopped: String
-        if result?.stoppedUnmoving == true {
+        if let front = result?.appLeftForeground {
+            // 端とも「何も動かなかった」とも言わない: 前面が別のアプリになった間の払いは、木が変わらないだけで端の証拠にならない
+            stopped = " (the app was not in the foreground when the search stopped — \(front) was in front — so the"
+                + " screen did not show where the list ends; bring the app back with launch and search again)"
+        } else if result?.stoppedUnmoving == true {
             if result?.contentEverMoved == true {
                 stopped = " (the scroll area reached its end — the content stopped moving,"
                     + " so raising maxSwipes will not help)"
@@ -295,6 +307,18 @@ extension StepExecutor {
             : ""
         return "element not found after \(swipes) scroll(s)\(stopped)\(otherAxisNote)\(sweepNote): \(step.locatorSummary)"
             + sheetHint + keyboardHint + scrollFrameHint
+    }
+
+    /// 探索の対象のアプリ(`sessionBundleID`)が前面に居ないとき、前面の名前を返す。居る・確かめられない(ドライバが
+    /// 答えない・照会が失敗)は nil = 従来どおり端の判定へ進む(嘘を足さない)。
+    /// 前面を名指しできないドライバ(iOS)は `isAppForeground` だけで判断し、名前は "another app"
+    func frontAppIfSessionAppLeft(_ sessionBundleID: String?) async -> String? {
+        guard let bundleID = sessionBundleID, !bundleID.isEmpty else { return nil }
+        if let front = (try? await driver.foregroundAppID()) ?? nil, !front.isEmpty {
+            return front == bundleID ? nil : front
+        }
+        guard let inFront = try? await driver.isAppForeground(bundleID: bundleID), !inFront else { return nil }
+        return "another app"
     }
 
     /// `notExist(scroll:)` の裏返し: スクロール探索中に見つかってしまったら不在検証は失敗
@@ -598,6 +622,9 @@ extension StepExecutor {
         // 容器の外(キーボードの下・固定バー)にある対象は、寄せを何本撃っても可視域へ入らず maxSwipes まで空振りしていた
         var justSentClipRecovery = false
         var clipRecoveryUnmoved = 0
+        // 探索を始めた時点で木が名乗っていたアプリ。Android は木の持ち主が前面と一緒に替わるので、
+        // 打ち切るときの「前面は探索の対象のままか」を現在の木ではなくこちらで引く(frontAppIfSessionAppLeft)
+        var searchBundleID: String?
         for attempt in 0...maxSwipes {
             // **1周目だけは静止を待ってから撮る**。直前の操作がプログラム的な
             // アニメーションスクロール(「先頭へ」等)だと、ブリッジの整定はすり抜けることがあり
@@ -615,6 +642,7 @@ extension StepExecutor {
                 snapshot = try await consumePendingTypeKeyboardCheck(snapshot, phase: &phase)
                 // hideKeyboard の後も同じ(閉じかけのキーボードの木で判断すると、要らない送りや早すぎる停止になる)
                 snapshot = try await consumePendingHideKeyboardWait(snapshot, phase: &phase)
+                searchBundleID = snapshot.sessionBundleID
             } else {
                 let start = clock.now
                 // **スワイプ直後は必ずキャッシュを捨てて撮る**(Android のみ実費。iOS は素通し)。
@@ -856,10 +884,13 @@ extension StepExecutor {
                 // (scrollContainer は殺しスイッチ時に常に nil を返すため、それをそのまま使うと
                 // legacy 指定時に「セレクタが実在するのに matched nothing」と誤検知する)
                 if Self.scrollFrameUnresolved(step, in: snapshot) {
-                    return ScrollSearchResult(found: false, fallback: nil, viaXCUITest: viaXCUITest,
-                                              hintJumps: hintJumps, swipes: swipes,
-                                              scrollFrameMissing: true,
-                                              maxTruncatedDuringSearch: truncatedDuringSearch)
+                    var missing = ScrollSearchResult(found: false, fallback: nil, viaXCUITest: viaXCUITest,
+                                                     hintJumps: hintJumps, swipes: swipes,
+                                                     scrollFrameMissing: true,
+                                                     maxTruncatedDuringSearch: truncatedDuringSearch)
+                    // 容器が消えた理由が「前面を奪われた(消灯・シェード・別のアプリ)」なら、それを言う(払いを送った後だけ)
+                    if swipes > 0 { missing.appLeftForeground = await frontAppIfSessionAppLeft(searchBundleID) }
+                    return missing
                 }
                 if let earlier = previousSnapshot,
                    Self.contentSignature(earlier.elements)
@@ -900,6 +931,15 @@ extension StepExecutor {
                             unmovedRounds = 0
                             contentEverMoved = true
                             continue
+                        }
+                        // **前面を奪われていたなら、端とは言わず、展開も逆走査も撃たない**(別のアプリの上へ払い続けない)。
+                        // 木が変わらない = 端、は自アプリが前面に居る間だけ成り立つ。確かめるのは打ち切る局面の1回だけ
+                        if let front = await frontAppIfSessionAppLeft(searchBundleID ?? snapshot.sessionBundleID) {
+                            var left = ScrollSearchResult(found: false, fallback: nil, viaXCUITest: viaXCUITest,
+                                                          hintJumps: hintJumps, swipes: swipes,
+                                                          maxTruncatedDuringSearch: truncatedDuringSearch)
+                            left.appLeftForeground = front
+                            return left
                         }
                         // シート展開ヒントは**対象の容器がボトムシートの幾何に合う**ときだけ
                         // (全画面リストの末尾到達・シートの無い画面で毎回誤って出すのを防ぐゲート。

@@ -42,3 +42,32 @@ final class TypeNoFocusAdviceTests: XCTestCase {
             hadRef: false))
     }
 }
+
+/// 前面が覆い(systemui)・別のアプリのときは、欄の話ではなく前面の話をする
+final class TypeNoFocusFrontAdviceTests: XCTestCase {
+    private let noFocus = "no-input-focus: nothing has input focus (tap the field by ref first)"
+
+    private func body(front: String?, last: String?) -> String? {
+        guard case .badResponse(_, let b)? = AndroidDriver.typeNoFocusAdvice(
+            after: .badResponse(status: 500, body: noFocus), hadRef: false, front: front, lastTreePackage: last)
+        else { return nil }
+        return b
+    }
+
+    func testSystemUIInFrontIsNamedNotTheField() throws {
+        let b = try XCTUnwrap(body(front: "com.android.systemui", last: "com.app"))
+        XCTAssertTrue(b.contains("notification shade"), b)
+        XCTAssertFalse(b.contains("TextInputEditText"), b)
+    }
+
+    func testAnotherAppInFrontSaysTheAppWentAway() throws {
+        let b = try XCTUnwrap(body(front: "com.other", last: "com.app"))
+        XCTAssertTrue(b.contains("com.other is in front, not com.app"), b)
+        XCTAssertFalse(b.contains("TextInputEditText"), b)
+    }
+
+    func testSameAppInFrontKeepsTheContainerAdvice() throws {
+        let b = try XCTUnwrap(body(front: "com.app", last: "com.app"))
+        XCTAssertTrue(b.contains("TextInputEditText"), b)
+    }
+}

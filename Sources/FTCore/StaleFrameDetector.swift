@@ -67,4 +67,15 @@ public enum StaleFrameDetector {
         guard let knownStaleImageHash else { return false }
         return hashBytes(png) == knownStaleImageHash
     }
+
+    /// FM が読んだ文字が、**その要素の1つ前に緑だった値**(期待文字列と違う)なら、絵が古いまま木だけ新しくなった形。
+    /// 全バイト比較(`judge`)は1回しか機会が無く、1画素でも違うと基準が上書きされて以後発火しない穴を、文字で塞ぐ。
+    /// 前の値と無関係な文字が描かれていれば false(従来どおり赤)。読んだ文字が無い・前の値が無い・前の値が今の期待と
+    /// 同じ(= 古い絵ではなく単なる不一致)も false。誤読は `TranscriptMatch.judge` の許容に任せる(OCR は足さない)
+    public static func showsPreviousValue(observed: String, expected: String, previous: String?) -> Bool {
+        guard let previous else { return false }
+        let p = TranscriptMatch.normalize(previous)
+        guard !p.isEmpty, p != TranscriptMatch.normalize(expected) else { return false }
+        return TranscriptMatch.judge(transcript: observed, expected: previous).state == .fullyVisible
+    }
 }

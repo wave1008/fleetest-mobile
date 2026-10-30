@@ -18,6 +18,11 @@ final class ForegroundWindowsTests: XCTestCase {
         }.joined(separator: "\n")
     }
 
+    func testShadeCoveringFollowsTheWindowVisibility() {
+        XCTAssertTrue(AndroidForegroundWindows.shadeCovering(dumpsys: dump([("NotificationShade", true), ("StatusBar", true)])))
+        XCTAssertFalse(AndroidForegroundWindows.shadeCovering(dumpsys: dump([("NotificationShade", false), ("StatusBar", true)])))
+    }
+
     func testReportsNothingWhenOnlyChromeIsInFront() {
         let text = dump([
             ("ScreenDecorOverlay", false), ("Taskbar", true), ("NotificationShade", false),

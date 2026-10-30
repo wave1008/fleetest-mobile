@@ -33,15 +33,21 @@ extension MCPServer {
     /// 「同じポートで別のランナーに変わった」ことも、ここにしか現れない
     static let bridgeRebuiltNote =
         "⚠️ the xcuitest bridge on this device had died (nothing was listening) and was rebuilt"
-        + " before this call ran. The app was relaunched, so the screen is back at its start"
-        + " and every ref from an earlier ft_snapshot is gone — take a fresh one."
+        + " before this call ran. Every ref from an earlier ft_snapshot is gone — take a fresh one."
+        + " " + appStateNotChecked
+
+    /// 起動し直したのはランナーだけ。provision はアプリを起動しない(実測: アプリの pid は前後で不変・画面も入力値も残る)ので、
+    /// 「アプリが起動し直された・画面が最初に戻った」とは言わない。アプリが生きていたかはここでは確かめていない
+    static let appStateNotChecked =
+        "Only the runner was restarted; whether the app under test is still running was not checked."
+        + " If the screen is not what you expect, ft_launch with resume: true brings the app back without resetting its state."
 
     /// 畳み込みの中でランナーを起動し直した呼び出しの応答(成功なら先頭・失敗ならエラー文の先頭)に載せる
     /// (`bridgeRebuiltNote` と同じ理由で本文に出す。起動し直した直後の ref 操作が失敗した回こそ ref の消失を言う必要がある)
     static let bridgeStartedForUDIDNote =
         "⚠️ no xcuitest bridge was running on this simulator (nothing listened for its udid), so one was started"
-        + " before this call ran. The app was relaunched, so the screen is back at its start and every ref from an"
-        + " earlier ft_snapshot is gone — take a fresh one."
+        + " before this call ran. Every ref from an earlier ft_snapshot is gone — take a fresh one."
+        + " " + appStateNotChecked
 
     func dispatchRetryingAfterBridgeRecovery(tool: String, args: [String: Any]) async throws -> [[String: Any]] {
         do {
@@ -95,7 +101,8 @@ extension MCPServer {
         let heldByAnotherSession = Self.heldByAnotherSession(udid: udid, repoRoot: repoRoot)
         guard Self.shouldAttemptXCUITestBridgeRecovery(
             isConnectionRefused: isConnectionRefused, bridge: bridges[key],
-            alreadyFailedThisSession: bridgeRecoveryFailed.contains(key),
+            alreadyFailedThisSession: BridgeRecoveryFailureLedger.blocksRetry(
+                remembered: bridgeRecoveryFailed.contains(key), key: key),
             isPhysical: SimulatorCatalog.isPhysical(udid: udid), heldByAnotherSession: heldByAnotherSession)
         else {
             if isConnectionRefused, heldByAnotherSession {
@@ -115,8 +122,10 @@ extension MCPServer {
             return true
         } catch {
             bridgeRecoveryFailed.insert(key)
+            BridgeRecoveryFailureLedger.record(key: key, detail: error.localizedDescription)
             Self.logStderr("bridge recovery: could not rebuild the xcuitest bridge on port \(port)"
-                + " for \(udid) (\(error.localizedDescription)) — not retried again this session")
+                + " for \(udid) (\(error.localizedDescription)) — retried after"
+                + " \(Int(BridgeRecoveryFailureLedger.retryCooldownSeconds))s")
             return false
         }
     }
@@ -141,7 +150,8 @@ extension MCPServer {
         let heldByAnotherSession = Self.heldByAnotherSession(udid: udid, repoRoot: repoRoot)
         guard Self.shouldRebuildMissingSimulatorBridge(
             lookup: diagnosis.lookup, nothingListens: Self.nothingListensFor(diagnosis),
-            alreadyFailedThisSession: sessions[sessionKey]?.simulatorBridgeRebuildFailedUDIDs.contains(udid) ?? false,
+            alreadyFailedThisSession: BridgeRecoveryFailureLedger.blocksRetry(
+                remembered: sessions[sessionKey]?.simulatorBridgeRebuildFailedUDIDs.contains(udid) ?? false, key: udid),
             heldByAnotherSession: heldByAnotherSession)
         else {
             if heldByAnotherSession {
@@ -157,15 +167,19 @@ extension MCPServer {
             guard let provisioned = try await BridgeProvisioner(repoRoot: repoRoot)
                 .provision(devices: [(udid, spec)], log: Self.logStderr).first else {
                 sessions[sessionKey, default: DeviceSession()].simulatorBridgeRebuildFailedUDIDs.insert(udid)
-                Self.logStderr("bridge recovery: provisioning returned no bridge for \(udid) — not retried again this session")
+                BridgeRecoveryFailureLedger.record(key: udid, detail: "provisioning returned no bridge")
+                Self.logStderr("bridge recovery: provisioning returned no bridge for \(udid) — retried after"
+                    + " \(Int(BridgeRecoveryFailureLedger.retryCooldownSeconds))s")
                 return nil
             }
             Self.logStderr("bridge recovery: started the xcuitest bridge on port \(provisioned.port) for \(udid)")
             return provisioned.port
         } catch {
             sessions[sessionKey, default: DeviceSession()].simulatorBridgeRebuildFailedUDIDs.insert(udid)
+            BridgeRecoveryFailureLedger.record(key: udid, detail: error.localizedDescription)
             Self.logStderr("bridge recovery: could not start the xcuitest bridge for \(udid)"
-                + " (\(error.localizedDescription)) — not retried again this session")
+                + " (\(error.localizedDescription)) — retried after"
+                + " \(Int(BridgeRecoveryFailureLedger.retryCooldownSeconds))s")
             return nil
         }
     }
@@ -226,5 +240,42 @@ extension MCPServer {
             Self.logStderr("⚠️ \(udid): could not restart SpringBoard / the xcuitest bridge on port \(port) (\(reason))")
             return ""
         }
+    }
+}
+
+/// 自動の起動し直しの失敗の控え(事実だけ: いつ・何と言って失敗したか)。プロセス内の台帳で、鍵は
+/// 接続拒否の入口が sessionKey・udid の畳み込みの入口が udid。
+/// **失敗を永久に覚えない**: 失敗の原因が一時的な衝突(空きに見えたポートを run の in-app ブリッジに取られた等)でも
+/// 「このセッションでは再挑戦しない」が MCP の寿命いっぱい続き、全ツールが「no running bridge」を返し続けた。
+/// 一方で環境そのものが壊れている端末へ呼び出しごとに分単位のビルドを撃たない規律は残す —— 間隔を空けて再挑戦する。
+enum BridgeRecoveryFailureLedger {
+    struct Entry { let at: Date; let detail: String }
+    private static let entries = LockedValue<[String: Entry]>([:])
+
+    /// 失敗の後に次の再挑戦を許すまでの間隔[秒]。根拠: 同じ型の失敗の再生を持つ Android ブリッジの失敗キャッシュ
+    /// (`AndroidDriver.unavailableRetryInterval` = 60)と揃える。失敗1回のコストは起動の待ちを含め数十秒〜分なので、
+    /// 呼び出しごとの再挑戦(嵐)は防ぎつつ、分単位で待たされない長さ
+    static let retryCooldownSeconds: TimeInterval = 60
+
+    static func record(key: String, detail: String, now: Date = Date()) {
+        entries.withLock { $0[key] = Entry(at: now, detail: detail) }
+    }
+
+    static func entry(key: String) -> Entry? { entries.withLock { $0[key] } }
+
+    /// 失敗の記憶が再挑戦をまだ止めるか。記憶が無ければ止めない。記憶が有って控えが無い(控えより前に立った旗)は止める。
+    /// 控えが有れば間隔の間だけ止める
+    static func blocksRetry(remembered: Bool, key: String, now: Date = Date()) -> Bool {
+        guard remembered else { return false }
+        guard let entry = entry(key: key) else { return true }
+        return now.timeIntervalSince(entry.at) < retryCooldownSeconds
+    }
+
+    /// 「no running bridge」へ添える1文。止めている間だけ(間隔を過ぎた失敗は次の呼び出しで再挑戦されるので言わない)
+    static func note(key: String, now: Date = Date()) -> String {
+        guard let entry = entry(key: key), now.timeIntervalSince(entry.at) < retryCooldownSeconds else { return "" }
+        let ago = max(0, Int(now.timeIntervalSince(entry.at).rounded()))
+        return " An automatic restart of its XCUITest bridge was tried \(ago)s ago and failed: \(entry.detail)."
+            + " It is tried again automatically after \(Int(retryCooldownSeconds))s."
     }
 }

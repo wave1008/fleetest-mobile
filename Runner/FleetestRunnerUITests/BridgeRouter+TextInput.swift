@@ -146,6 +146,7 @@ extension BridgeRouter {
         var stagnantRounds = 0
         var rounds = 0
         var retypes = 0
+        var beforeRetype: String?
         var retypeAbandoned = false
         var consumedByApp = false
         // 直前の追送を撃った時点の値。追送の後も同じ値なら、それ以上撃っても重複するだけ(ホストの verifyTypedText と同じ規律)
@@ -154,8 +155,10 @@ extension BridgeRouter {
         let elementsBeforeTyping = Array(refElements.values)
         let deadline = Date().addingTimeInterval(Self.typeBudgetSeconds)
         loop: while true {
-            ResponseMeasurement.noteInjection()
-            app.typeText(pending)
+            if !pending.isEmpty {  // 空 = 打ち直しの結果を読み直すだけの周回(TypeReadback.retypeEnd)
+                ResponseMeasurement.noteInjection()
+                app.typeText(pending)
+            }
             rounds += 1
             // 読めない・曖昧 = 検証不能なので受理する(TypeReadback.value 参照)
             guard let actual = try awaitCommit(app, target: target,
@@ -169,6 +172,18 @@ extension BridgeRouter {
                                                              protectedPrefixCount: priorCount)
             switch TypeReadback.plan(expected: readbackTarget, actual: actual,
                                      protectedPrefixCount: readbackTarget == expected ? priorCount : 0) {
+            case .unverifiable where TypeReadback.retypeBrokeField(retypes: retypes, expected: readbackTarget, actual: actual),
+                 .retype where retypes >= TypeReadback.maxRetypes:
+                switch TypeReadback.retypeEnd(actual: actual, previous: previous, beforeRetype: beforeRetype) {
+                case .accept:
+                    retypeAbandoned = true
+                    break loop
+                case .readAgain:
+                    pending = ""
+                case .fail:
+                    throw BridgeError(422, "the field does not hold the typed text after retyping"
+                        + " (\(actual.count) character(s) against the expected \(expected.count)); not retyped again")
+                }
             case .done, .unverifiable:
                 break loop
             case .resend where valueAtLastResend == actual:
@@ -199,14 +214,11 @@ extension BridgeRouter {
                 pending = missing
             case .deleteExcess(let count):
                 pending = String(repeating: XCUIKeyboardKey.delete.rawValue, count: count)
-            case .retype where retypes >= TypeReadback.maxRetypes:
-                // 打ち直しても同じ形 = アプリ側の加工。v104 より前と同じく受理する(TypeReadback.maxRetypes)
-                retypeAbandoned = true
-                break loop
             case .retype:
                 // 中央の欠落 = 消してから全文を打ち直す(.deleteExcess と同じ機構。TypeReadback.Plan.retype)
                 pending = String(repeating: XCUIKeyboardKey.delete.rawValue, count: actual.count) + readbackTarget
                 retypes += 1
+                beforeRetype = actual
             }
             stagnantRounds = (actual == previous) ? stagnantRounds + 1 : 0
             previous = actual

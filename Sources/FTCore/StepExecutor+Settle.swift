@@ -6,6 +6,12 @@ import Foundation
 
 extension StepExecutor {
 
+    /// 前のステップの swipe が残した慣性を取り出して下げる(ステップの入口で1回)
+    func takeSwipeInertia() -> Bool {
+        defer { swipeInertiaPending = false }
+        return swipeInertiaPending
+    }
+
     /// swipe を通常ドライバ→(typeDriverGestures 申告/ラッチ済みなら最初から、501 ならキャッチしてから)
     /// typeDriver の順で試す。swipe は ref を使わないので要素再解決は不要。
     /// 戻り値: true = typeDriver(XCUITest)経由で実行した
@@ -617,6 +623,7 @@ extension StepExecutor {
     /// 直後の tap/press が空振りする)。空打ちは補助でありこれ自体の失敗はステップの失敗にしない
     /// (両経路とも失敗したら黙って進む = `try?` と同じ扱い)
     func emptyDrag(x: Double, y: Double, toX: Double, toY: Double) async {
+        swipeInertiaPending = false
         try? await dragWithFallback(fromX: x, fromY: y, toX: toX, toY: toY,
                                     pressSeconds: FlowStep.defaultDragPressSeconds, durationSeconds: Self.emptyDragSeconds)
     }
@@ -661,12 +668,14 @@ extension StepExecutor {
             let start = clock.now
             try await td.swipe(direction, intent: intent, path: path)
             phase.actionMs += Self.ms(clock.now - start)
+            swipeInertiaPending = !swipeLeavesNoInertia(swipedViaXCUITest: true)
             return true
         }
         do {
             let start = clock.now
             try await driver.swipe(direction, intent: intent, path: path)
             phase.actionMs += Self.ms(clock.now - start)
+            swipeInertiaPending = !swipeLeavesNoInertia(swipedViaXCUITest: false)
             return false
         } catch {
             // 「このブリッジでは不可」(501 / ルート不明 404)だけ XCUITest へ回す。
@@ -678,6 +687,7 @@ extension StepExecutor {
             try await td.swipe(direction, intent: intent, path: path)
             phase.actionMs += Self.ms(clock.now - start)
             if path == nil { swipeFallbackLatched = true } else { pathSwipeFallbackLatched = true }
+            swipeInertiaPending = !swipeLeavesNoInertia(swipedViaXCUITest: true)
             return true
         }
     }

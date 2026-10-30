@@ -464,7 +464,8 @@ final class MCPToolCallTests: XCTestCase {
     func testStatusRendersReadyDeviceAndSession() async throws {
         driver.foregroundBundleID = "com.example.app"
         let content = try await server.call(tool: "ft_status", args: [:])
-        XCTAssertEqual(driver.calls, ["status", "foregroundAppID"])
+        // 覆いの照会は前面の答えの前に毎回撃つ(通知センターが覆っていても /appstate は前面と答えることがある)
+        XCTAssertEqual(driver.calls, ["status", "systemUICovering", "foregroundAppID"])
         let text = try XCTUnwrap(content.first?["text"] as? String)
         XCTAssertTrue(text.contains("iPhone 17"), text)
         XCTAssertTrue(text.contains("com.example.app"), text)
@@ -662,7 +663,8 @@ final class MCPToolCallTests: XCTestCase {
 
     func testSwipeParsesDirection() async throws {
         _ = try await server.call(tool: "ft_swipe", args: ["finger": "left"])
-        XCTAssertEqual(driver.calls, ["swipe(left)"])
+        // status は自前描画の iOS か(慣性の注記)を決める材料(resolveExecutorHints)
+        XCTAssertEqual(driver.calls, ["swipe(left)", "status"])
     }
 
     func testPressUsesDefaultDurationWhenOmitted() async throws {

@@ -56,7 +56,7 @@ final class ClearInputFailureRecordingTests: XCTestCase {
         let result = try await server.call(tool: "ft_type", args: ["ref": 350, "text": "x"])
         let text = try XCTUnwrap(result.first?["text"] as? String)
         XCTAssertTrue(text.contains("this session's own actions"), text)
-        XCTAssertFalse(text.contains("nothing this session did"), text)
+        XCTAssertFalse(text.contains("no action since that snapshot changed it"), text)
     }
 
     /// **配線の精度**: 失敗した clearInput は sessionActionCounts をちょうど1回だけ進める

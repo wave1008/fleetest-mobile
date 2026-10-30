@@ -85,6 +85,24 @@ final class TypeReadbackTargetTests: XCTestCase {
         XCTAssertTrue(outcome.notes.contains(.typeRetyped), "\(outcome.notes)")
     }
 
+    /// 打ち直しても違う形で欠けたら、重ねずに失敗する(重ねるほど加工する欄の値が壊れる)
+    func testTypeStepFailsInsteadOfRetypingAgainWhenTheShapeChanged() async {
+        let driver = ReadbackSequenceDriver(values: ["", "hllo123", "helo123", "helo123"])
+        let outcome = await StepExecutor(driver: driver, isAndroid: false, tunables: RunTunables()).execute(
+            FlowStep(action: "type", locator: FlowLocator(id: "field"), text: "hello123"))
+        XCTAssertFalse(StepExecutor.isSuccess(outcome.status), "\(outcome.status)")
+        XCTAssertEqual(driver.clears, TypeReadback.maxRetypes)
+        XCTAssertFalse(outcome.notes.contains(.typeRetypeAbandoned), "\(outcome.notes)")
+    }
+
+    /// 打ち直しで欄が説明できない値になったら ok にしない(`123` → `1233` = 消し切れなかった)
+    func testTypeStepFailsWhenRetypingBrokeTheField() async {
+        let driver = ReadbackSequenceDriver(values: ["", "123", "1233", "1233"])
+        let outcome = await StepExecutor(driver: driver, isAndroid: false, tunables: RunTunables()).execute(
+            FlowStep(action: "type", locator: FlowLocator(id: "field"), text: "1a2b3c"))
+        XCTAssertFalse(StepExecutor.isSuccess(outcome.status), "\(outcome.status)")
+    }
+
     /// 収束した打ち直しには「諦めた」注記が立たない(逆向き)
     func testConvergedRetypeIsNotMarkedAbandoned() async {
         let driver = ReadbackSequenceDriver(values: ["", "hllo123", "hello123"])

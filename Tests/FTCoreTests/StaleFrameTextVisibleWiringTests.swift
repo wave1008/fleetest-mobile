@@ -40,11 +40,12 @@ final class StaleFrameTextVisibleWiringTests: XCTestCase {
             let windowStart = body.index(hit.lowerBound, offsetBy: -500, limitedBy: body.startIndex)
                 ?? body.startIndex
             let window = String(body[windowStart..<hit.lowerBound])
-            XCTAssertTrue(window.contains("staleFrameShowsExpectedText("),
+            // 3つ目の口(読めた文字が1つ前の緑の値 = showsPreviousValue)は、期待と違う文字が読めたことが入口の条件
+            XCTAssertTrue(window.contains("staleFrameShowsExpectedText(") || window.contains("showsPreviousValue("),
                           "stale-screenshot の見送り(\(sites) 箇所目)の前に期待する文字の確認が無い")
             searchFrom = hit.upperBound
         }
-        XCTAssertEqual(sites, 2, "occlusionFlip の stale-screenshot の見送りの数が変わった —— 増えた口も確認を通すか見直す")
+        XCTAssertEqual(sites, 3, "occlusionFlip の stale-screenshot の見送りの数が変わった —— 増えた口も確認を通すか見直す")
     }
 
     func testTheCheckOnlyTrustsAWholeReading() throws {

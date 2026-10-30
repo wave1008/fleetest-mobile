@@ -793,8 +793,8 @@ extension MCPServer {
     /// 即座に撃ち直しても同じ答えなので、それを捨てないよう明言する
     static func noReadableWindowHint(_ error: Error) -> String {
         guard DriverError.isNoReadableWindow(error) else { return "" }
-        return " This is a transient device-side condition, not an app or tool bug — it clears on"
-            + " its own (observed 13-37s). Retrying the exact same call again immediately will"
+        return " This is usually a transient device-side condition that clears on its own (observed 13-37s),"
+            + " but it also happens while the app's main thread is stuck (an ANR — check ft_logs). Retrying the exact same call again immediately will"
             + " most likely return this same error, so wait a few seconds first. Bringing the app"
             + " back to the foreground tends to clear it faster: ft_navigate target: \"home\", or"
             + " ft_launch."

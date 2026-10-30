@@ -881,7 +881,8 @@ extension MCPServer {
         guard diagnosis.listeningButUnresponsive.isEmpty else {
             return Self.bridgeBusyOnUDIDMessage(udid: udid, diagnosis: diagnosis)
         }
-        return "no running bridge is on udid \(udid). ft_list_devices shows which devices have one;"
+        return "no running bridge is on udid \(udid).\(BridgeRecoveryFailureLedger.note(key: udid))"
+            + " ft_list_devices shows which devices have one;"
             + " \(Self.bridgeUpSuggestion(udid: udid, lookup: diagnosis.lookup))"
             + " (a device without a bridge cannot be driven from MCP)"
     }

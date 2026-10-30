@@ -218,12 +218,22 @@ extension MCPServer {
             try await typeDriver.clearInput(ref: targetRef.map { nativeRef($0, args: args) })
             if let priorElement, let content, !content.isEmpty {
                 // 生読み(adoptSnapshot を通さない = 世代・settle-lite の基準を壊さない)。返る ref は native
-                var afterClear = try? await typeDriver.snapshot(bypassingCache: typeDriver.supportsCacheBypass)
+                // **読みの失敗は「欄が見つからない」に化けさせない**: 消去は済んでいて、読めなかっただけ(接続断・503・422)。
+                // 元のエラーを抱えたまま投げる = dispatcher が接続断の案内(届いたか分からない等)を足せる
+                func readAfterClear() async throws -> SnapshotResponse {
+                    do { return try await typeDriver.snapshot(bypassingCache: typeDriver.supportsCacheBypass) }
+                    catch {
+                        throw MCPAnnotatedError(underlying: error, suffix: " — replace: the field was cleared, then reading the"
+                            + " screen failed, so nothing was typed. Once the driver answers again, ft_snapshot and"
+                            + " ft_type the new text")
+                    }
+                }
+                var afterClear: SnapshotResponse? = try await readAfterClear()
                 var refoundField = afterClear.flatMap { Self.relocateAfterClear(priorElement, in: $0.elements) }
                 if refoundField == nil, let shown = afterClear, KeyboardWait.isShown(shown),
                    await closeKeyboardWithoutEnter(typeDriver, args: args) {
                     // キーボードが欄を押し下げて木から消す形(横向き・全画面 IME・CMP)。DSL と同じく閉じて一度だけ引き直す
-                    afterClear = try? await typeDriver.snapshot(bypassingCache: typeDriver.supportsCacheBypass)
+                    afterClear = try await readAfterClear()
                     refoundField = afterClear.flatMap { Self.relocateAfterClear(priorElement, in: $0.elements) }
                     if refoundField != nil {
                         note += " (closed the keyboard — the field was not on the screen while it was up)"
@@ -332,8 +342,15 @@ extension MCPServer {
                 }
                 if wantsReplace {
                     // 失敗の文言は「何も送っていない」だが、replace の消去は済んでいる(欄は空)
+                    // 接続が応答の途中で切れた手(bridgeUnreachable)は打鍵が届いている/途中まで入っていることがある
+                    // (実測: 「cleared before this failure」だけだと、欄に全文が入っていたのに空と読める)
+                    var maybeTyped = false
+                    if let driverError = error as? DriverError, case .bridgeUnreachable = driverError { maybeTyped = true }
                     throw MCPAnnotatedError(underlying: error,
-                                            suffix: " — replace: the field had already been cleared before this failure")
+                                            suffix: maybeTyped
+                                                ? " — replace: the field had already been cleared before this failure, and the"
+                                                    + " new text may already have been typed (fully or in part) — ft_snapshot to read the field before typing again"
+                                                : " — replace: the field had already been cleared before this failure")
                 }
                 throw error
             }

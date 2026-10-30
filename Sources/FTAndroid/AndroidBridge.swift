@@ -89,6 +89,11 @@ extension AndroidDriver {
                 // キャッシュしない: 再生は到達不能の決まり文句で包まれる。判定は lease を読むだけで安い
                 Self.setRegistry(key, nil)
                 throw held
+            } catch let forward as ForwardStepFailure {
+                // キャッシュしない: 嵐防止が守るのは probe 2s + 起動待ち最大 10s の段で、adb forward の失敗は
+                // 端末が見えない(USB の一瞬の断で `device not found`)ときに即返る。復帰後も 60 秒同じ失敗を再生していた
+                Self.setRegistry(key, nil)
+                throw forward.underlying
             } catch {
                 Self.setRegistry(key, .unavailable(
                     retryAfter: Date().addingTimeInterval(Self.unavailableRetryInterval),
@@ -245,8 +250,13 @@ extension AndroidDriver {
 
     // MARK: - セットアップ
 
+    /// `ensureForward` の失敗の目印(`ensureBridge` が失敗キャッシュに載せないために区別する)。包むのは startBridge だけで、
+    /// `ensureBridge` の setup が外して `underlying` を投げ直す(呼び手には包まれた形で届かない)
+    private struct ForwardStepFailure: Error { let underlying: Error }
+
     private func startBridge() async throws -> BridgeClient {
-        let hostPort = try ensureForward()
+        let hostPort: UInt16
+        do { hostPort = try ensureForward() } catch { throw ForwardStepFailure(underlying: error) }
         // 計時ログは instrumentation 引数なので**起動時にしか切り替わらない**。稼働中ブリッジを
         // そのまま使うと、on 側は「1行も出ない = 待ちが無かった」と誤読し、off 側は計測が
         // 終わった後もログを出し続ける。**希望と食い違うときは必ず起動し直す**(両方向)
@@ -262,8 +272,12 @@ extension AndroidDriver {
         // **他のセッション(run・MCP)が使っているデバイスのブリッジは作り直さない**(下の force-stop が
         // そのセッションの instrumentation ごと落とす)。計時フラグだけが違うなら作り直さずそのまま使う
         // (計時はログの有無だけ)。呼び手が run(とその子 = シナリオ)なら MCP から引き取ったデバイスでも立て直す
+        // **ブリッジのプロセスが無いと確かめられたときは断らない**: 落とすブリッジが無いので、起動し直しても誰の接続も落とさない。
+        // 断ると、双方の MCP が「相手が使っている」と断り合い、ブリッジが居ないまま回復しなかった(`pidof` が空 = false。
+        // 読めなかった(nil)は居ないと言えないので従来どおり断る)
         if let serial, let stateDir = (try? RepoRoot.find())?.appendingPathComponent(".fleetest"),
-           RunnerAccessibilityHealth.hasForeignLeaseUnlessOwnRun(key: serial, stateDir: stateDir) {
+           RunnerAccessibilityHealth.hasForeignLeaseUnlessOwnRun(key: serial, stateDir: stateDir),
+           probed != nil || Self.isBridgeRunning(serial: serial, timeout: Self.deviceAnswerTimeoutSeconds) != false {
             if let (client, version, _) = probed, version == Self.expectedBridgeVersionCode {
                 return client
             }

@@ -42,6 +42,11 @@ public enum AndroidForegroundWindows {
         windowBlocks(dumpsys).contains { $0.visible && $0.name.hasPrefix("InputMethod") }
     }
 
+    /// 通知シェード・クイック設定・ロック画面の窓が**表示中**か(閉じると isVisible=false で残る。Android 15 Emulator で実測)
+    public static func shadeCovering(dumpsys: String) -> Bool {
+        windowBlocks(dumpsys).contains { $0.visible && $0.name == "NotificationShade" }
+    }
+
     /// `Window #N Window{... 名前}:` ブロックを (名前, isVisible) の並び(z 順)に分解する。
     /// overlaying / keyboardVisible の共通パーサ(可視性判定はここ1箇所)
     private static func windowBlocks(_ dumpsys: String) -> [(name: String, visible: Bool)] {

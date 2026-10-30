@@ -39,7 +39,8 @@ final class StreamHelperNamingTests: XCTestCase {
         let command = RemoteSetupPlan.alignRevisionCommand(
             layout: RemoteLayout(base: "/Users/ci/fleetest-runner", issuer: "alice", home: "/Users/ci"),
             revision: "abc123", helperPath: "/tmp/fleetest-align/fleetest", developerDir: nil)
-        let builds = ["fleetest", "fleetest-simstream", "fleetest-androidstream", "fleetest-devicepoll", "fleetest-services"]
+        let builds = ["fleetest", "fleetest-simstream", "fleetest-androidstream", "fleetest-devicepoll", "fleetest-services",
+                      "fleetest-mcp"]
             .map { "swift build --product \($0)" }.joined(separator: " && ")
         let buildCommand = "git checkout 'abc123' && " + builds
         XCTAssertTrue(command.hasSuffix("--build-command \(RemoteShell.quote(buildCommand))"))

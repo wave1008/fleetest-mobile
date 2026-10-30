@@ -30,9 +30,13 @@ extension MCPServer {
                 try await swipeDriver.swipe(direction)
                 recordInteraction(action: "swipe", resolvedRef: nil, args: args,
                                   direction: direction.rawValue)
+                // 自前描画(Compose・Flutter)の iOS は、swipe が慣性の途中で返り、続く tap は慣性を止めるだけで押下にならない
+                // (負荷テストの実測: 慣性の途中の ref の tap は CMP 7/8・Flutter 5/5 で `done` のまま未選択)。
+                // 待つ・空打ちで吸うのは DSL の tap の仕事(StepExecutor の swipeInertiaPending)で、ここは言うだけ
+                let coastingNote = await selfRenderedCoastingNote(swipeDriver, args: args)
                 // **「動いた」と断言しない**(back と同じ理由)。スワイプは端に着いて
                 // いれば1px も動かないし、スクロールできない画面では何も起きない
-                return text("swipe \(direction.rawValue) sent." + frontWarning
+                return text("swipe \(direction.rawValue) sent." + frontWarning + coastingNote
                     + Self.changedHint(args, otherwise: " If anything moved, the old refs are stale"
                         + " — take a fresh ft_snapshot before using any ref")
                     + waitForWithoutSnapshotAfterNote(args) + (await snapshotAfterBody(args, outsideTheAppTree: false)))
@@ -118,6 +122,15 @@ extension MCPServer {
             + Self.changedHint(args, otherwise: " If anything moved, the old refs are stale"
                 + " — take a fresh ft_snapshot before using any ref")
             + waitForWithoutSnapshotAfterNote(args) + (await snapshotAfterBody(args, outsideTheAppTree: false)))
+    }
+
+    /// 自前描画の iOS で swipe の直後に付ける注記(上の doc)。Android・UIKit 系・不明なアプリでは空
+    func selfRenderedCoastingNote(_ driver: AppDriver, args: [String: Any]) async -> String {
+        let hints = await resolveExecutorHints(driver, args: args)
+        guard !hints.isAndroid, hints.uiFrameworkHint?.isSelfRendered == true else { return "" }
+        return " The list may still be coasting: a tap now can land on a moving row and only stop it"
+            + " (the call returns `done` without pressing anything). Take a fresh ft_snapshot until the frames stop"
+            + " changing, then tap."
     }
 
     func ftRotate(_ args: [String: Any]) async throws -> [[String: Any]] {

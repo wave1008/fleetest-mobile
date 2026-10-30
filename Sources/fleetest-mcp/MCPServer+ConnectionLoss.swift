@@ -28,7 +28,8 @@ extension MCPServer {
                                                mayHaveTakenEffect: Self.mayHaveTakenEffect(tool: tool))
         }
         if let serial = connectedAndroidSerials[key] {
-            return await androidConnectionLostHint(error, key: key, connection: connection, serial: serial)
+            return await androidConnectionLostHint(error, key: key, connection: connection, serial: serial,
+                                                   mayHaveTakenEffect: Self.mayHaveTakenEffect(tool: tool))
         }
         return ""
     }
@@ -83,17 +84,32 @@ extension MCPServer {
                 // その分岐は `bridgeBusyHint` が bridge で持っている
                 if probe == .transportFailed, bridge != "inapp" {
                     return Self.bridgeWedgedHint(connection: connection)
+                        + Self.deliveryUnknownNote(mayHaveTakenEffect: mayHaveTakenEffect)
                 }
                 return Self.bridgeBusyHint(connection: connection, bridge: bridge,
                                            mayHaveTakenEffect: mayHaveTakenEffect)
             case .stillUnclear:
-                return ""
+                return Self.deliveryUnknownNote(mayHaveTakenEffect: mayHaveTakenEffect)
             case .vanished:
                 return connectionLostAndForget(key: key, connection: connection, running: running)
+                    + Self.deliveryUnknownNote(mayHaveTakenEffect: mayHaveTakenEffect)
             }
         default:
             return ""
         }
+    }
+
+    /// **応答の途中で切れた接続(`DriverError.bridgeUnreachable`)の手は「届いたか分からない」**。
+    /// 要求を送った後に切れた手(`.networkConnectionLost`)は端末で実行されていることがある(実測: ランナーを処理中に
+    /// 落とすと tap のカウンタが +1 になっていた)。「Cannot reach the driver」だけだと読み手は失敗と読んで撃ち直し、二重に押す・打つ。
+    /// **届いていないと確定しているのは `DriverError.bridgeConnectionRefused`(撃つ前に断られた)だけ**なので、
+    /// 呼び手は `bridgeUnreachable` の枝でだけ付ける(文言の一致では決めない)。
+    /// 読むだけのツールには付けない(撃ち直しても害が無い)。busy の文言は自前で同じことを言う
+    static func deliveryUnknownNote(mayHaveTakenEffect: Bool) -> String {
+        guard mayHaveTakenEffect else { return "" }
+        return "\nThe connection was cut after the request may already have been sent, so it is unknown whether"
+            + " this action was performed — take an ft_snapshot and check the screen before repeating it"
+            + " (repeating a tap, type or swipe that did go through would do it twice)."
     }
 
     /// iOS の2分岐(bridgeConnectionRefused/.vanished)の共通尾部(掃討で統合): 記憶を
@@ -108,9 +124,13 @@ extension MCPServer {
         let bridge = connectedPorts[key].flatMap {
             Self.resolvedBridge(known: bridges[key], port: $0, repoRoot: try? RepoRoot.find())
         }
+        // **実機で接続拒否 = この Mac 側の待ち受け(USB トンネル iproxy)が無い**ことしか言えない。ランナーの生死は確かめていない
+        // (トンネルだけが消えた形では udid を名指しして呼ぶだけで張り直され、ランナーもセッションも生きていた)
+        let tunnelOnly = udid.flatMap { SimulatorCatalog.isPhysical(udid: $0) } == true
         forgetConnection(key)
         return Self.connectionLostMessage(connection: connection, running: running,
-            sameDevice: Self.deviceName(forUDID: udid, in: running), bridge: bridge)
+            sameDevice: Self.deviceName(forUDID: udid, in: running), bridge: bridge,
+            udid: udid, tunnelOnly: tunnelOnly)
     }
 
     /// Android(serial 経由のブリッジ)の死活。**iOS のような安価な「待受しているか」判定が無い**
@@ -121,10 +141,14 @@ extension MCPServer {
     /// (ここを経由しないと、死んだ serial への省略呼び出しがセッション中ずっと
     /// 同じ死んだ serial へ再ダイヤルされ続ける)
     func androidConnectionLostHint(_ error: Error, key: String, connection: String,
-                                   serial: String) async -> String {
+                                   serial: String, mayHaveTakenEffect: Bool) async -> String {
+        // 届いたか分からないのは bridgeUnreachable(送った後に切れた・時限切れ)だけ。refused は撃つ前に断られた確定
+        let deliveryNote: String
         switch error {
-        case DriverError.bridgeUnreachable, DriverError.bridgeConnectionRefused, DriverError.badResponse:
-            break
+        case DriverError.bridgeUnreachable:
+            deliveryNote = Self.deliveryUnknownNote(mayHaveTakenEffect: mayHaveTakenEffect)
+        case DriverError.bridgeConnectionRefused, DriverError.badResponse:
+            deliveryNote = ""
         default:
             return ""
         }
@@ -136,9 +160,9 @@ extension MCPServer {
         // (state=device だけの connectedSerials だと、offline の端末を「does not list it」と言い宛先まで捨てる)
         guard let listed = try? AndroidDeviceCatalog.listedSerialStates(),
               Self.androidSerialVanished(serial, connected: Array(listed.keys))
-        else { return "" }
+        else { return deliveryNote }
         forgetConnection(key)
-        return "\nThe Android device behind \(connection) is no longer connected (adb devices"
+        return deliveryNote + "\nThe Android device behind \(connection) is no longer connected (adb devices"
             + " does not list it — unplugged, or the emulator was shut down). Reconnect it, then"
             + " target it again with serial: (or omit it once only one device is connected)."
     }
@@ -306,7 +330,8 @@ extension MCPServer {
     /// `bridge` は呼び手が resolvedBridge で解いて渡す(既定値を置かない = 渡し忘れをコンパイルで止める)。
     /// in-app ブリッジは対象アプリの中に居るので、XCUITest のランナーとは死に方も戻し方も違う
     static func connectionLostMessage(connection: String, running: [BridgeDiscovery.Found],
-                                      sameDevice: String? = nil, bridge: String?) -> String {
+                                      sameDevice: String? = nil, bridge: String?,
+                                      udid: String? = nil, tunnelOnly: Bool = false) -> String {
         let now = running.isEmpty
             ? "no iOS bridge is running now"
             : "running bridges now: \(Self.runningBridgesSummary(running, sameDevice: sameDevice))"
@@ -315,10 +340,20 @@ extension MCPServer {
                 + " under test, so the app exiting (a crash, ft_terminate, or being replaced in the"
                 + " foreground) takes it with it. \(now). ft_launch your app again to bring it back."
         }
-        return "\nThe XCUITest runner behind \(connection) exited — a second runner on the same"
-            + " simulator kicks out the first, and the app under test crashing takes an in-app"
-            + " bridge with it. \(now). Start one with `fleetest bridge up`; the session does not"
-            + " survive, so ft_launch your app again."
+        // 戻し方は udid を名指しして言う(引数なしの `bridge up` は既定の端末を起こす = 別の機になりうる)
+        let target = udid.map { "udid \($0)" } ?? "the device's udid"
+        let bridgeUp = "`fleetest bridge up --device \(udid ?? "<udid>")`"
+        if tunnelOnly {
+            return "\nNothing is listening on this Mac's end of \(connection) — on a physical device that is the USB tunnel"
+                + " (iproxy), and the XCUITest runner itself was not checked: it may well still be running."
+                + " Call again naming the device (pass \(target)): the tunnel is re-opened for it. \(now)."
+                + " Only if that fails, start the runner with \(bridgeUp)."
+        }
+        return "\nThe XCUITest runner behind \(connection) is no longer listening — it exited (a second runner on the"
+            + " same simulator kicks out the first, and the app under test crashing takes an in-app"
+            + " bridge with it). \(now). Start one with \(bridgeUp). The runner's session does not survive:"
+            + " if the app under test is still running, ft_launch with resume: true brings it back with its state;"
+            + " otherwise ft_launch your app again. This session's remembered device was dropped — pass \(target)."
     }
 
     /// **同じ端末を先に、残りは件数へ畳む**(純粋関数)。`sameDevice` が分かるとき(死んだ接続の

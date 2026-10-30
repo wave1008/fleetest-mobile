@@ -495,6 +495,10 @@ public final class StepExecutor {
     /// occlusion-guard が古いと判定した絵のハッシュ(同じ絵のままなら次のステップでも判定しない。
     /// StaleFrameDetector.isKnownStale)。新しい絵で判定したら消す
     var knownStaleGuardImageHash: Int?
+    /// occlusion-guard が緑で抜けた要素(identifier)→ そのとき期待した文字列。FM が読んだ文字が「1つ前の緑の値」なら古い絵として扱う材料(StaleFrameDetector.showsPreviousValue)。操作では消さない
+    var lastGreenTextByElement: [String: String] = [:]
+    /// 直前の swipe が慣性を残しうる(`swipeWithFallback` が立て、`emptyDrag` が下げ、次のステップの入口の `takeSwipeInertia` が読んで下げる)
+    var swipeInertiaPending = false
     /// 直近の occlusionFlip が「絵が古い」で降りた(nil を返した)か。待ちのループを持つ呼び手(exists・テキスト比較)は
     /// これを「まだ整定していない」と読み、締め切りまで待って撮り直す(素通りは締め切りを過ぎても古いときだけ)。
     /// ループの無い select は素通りのまま(掴むだけ)

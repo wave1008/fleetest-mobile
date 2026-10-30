@@ -87,9 +87,10 @@ final class DriverErrorMessageTests: XCTestCase {
         let text = DriverErrorMessage.connectionRefused(context: iosXCUITestPhysical, detail: "refused")
         XCTAssertEqual(text,
             "Connection to the driver was refused (nothing listening on the port). If this happened"
-                + " mid-run, the XCUITest runner most likely stopped, or the physical device"
-                + " disconnected (USB/Wi-Fi) — on xcuitest the bridge runs in a separate process from"
-                + " the app under test, so a crashed app alone would not explain this."
+                + " mid-run, either the XCUITest runner stopped or the link to the physical device"
+                + " was lost (USB/Wi-Fi) — the note in the detail says which when the transport can"
+                + " tell. On xcuitest the bridge runs in a separate process from the app under test,"
+                + " so a crashed app alone would not explain this."
                 + " If the app has not been started yet, check: fleetest bridge up. Detail: refused")
     }
 
@@ -127,7 +128,7 @@ final class DriverErrorMessageTests: XCTestCase {
         for context in [iosXCUITestSimulator, iosXCUITestPhysical] {
             let text = DriverErrorMessage.connectionRefused(context: context, detail: "refused")
             XCTAssertFalse(text.contains("app under test most likely exited or crashed"), text)
-            XCTAssertTrue(text.contains("XCUITest runner most likely stopped"), text)
+            XCTAssertTrue(text.contains("XCUITest runner"), text)
         }
     }
 

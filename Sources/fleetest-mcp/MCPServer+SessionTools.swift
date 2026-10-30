@@ -38,8 +38,22 @@ extension MCPServer {
         // **session と「いま前面にあるもの」は別物**(外部フィードバック)。
         // session はブリッジが掴んでいるアプリで、ft_navigate home の後も変わらない。
         // 前面の照会は 1 往復で済むので、シナリオ冒頭の appIs 相当をここで賄えるようにする
-        let foreground = await Self.foregroundNote(status.sessionBundleID,
-                                                   driver: try await driver(args))
+        // **session がこのセッションの起動したアプリと違うなら、前面が「yes」でも別のアプリ**(Android はアプリが死ぬと
+        // ブリッジの session が下から出たアプリへ付け替わり、`foregroundNote` は付け替え後の session を前面と照合して yes と答えていた。
+        // ft_snapshot の「NOT the app you launched」と同じ事実を言う)
+        let foreground: String
+        if let launched = launchedBundleIDs[statusKey], let current = status.sessionBundleID, current != launched {
+            foreground = " / foreground: no (the session now points at \(current), not \(launched), the app this session"
+                + " launched — \(launched) may have crashed or been left; ft_snapshot says which, ft_launch \(launched) to come back)"
+        } else if let covering = try? await driver(args).systemUICovering(), covering.covering,
+                  covering.marker == "SBCoverSheetWindow" {
+            // iOS(XCUITest ブリッジだけが答える): 端末がロックされている・通知センターが降りている間は、アプリは
+            // 前面のまま木に答えるか、`/appstate` が false を返す。どちらも「別のアプリかホーム画面」とは言えない
+            foreground = " / foreground: no (the lock screen or the notification centre is drawn over the app —"
+                + " unlock the device or dismiss it, then ft_launch the bundleId with resume: true if the app is not back)"
+        } else {
+            foreground = await Self.foregroundNote(status.sessionBundleID, driver: try await driver(args))
+        }
         return text(withPendingWarnings(
             "ready: \(status.ready) / \(status.device) (\(status.osVersion))\(endpoint)"
             + " / session: \(session)\(foreground)\(await Self.fmLivenessNote())", args: args))

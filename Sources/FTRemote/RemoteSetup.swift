@@ -207,14 +207,15 @@ public enum RemoteSetupPlan {
     /// **ヘルパーを省かない** —— `fleetest` だけをビルドすると、そのランナーのタイルは状態は届くのに
     /// 映像が1枚も来ない(`api device-stream` が exec 対象を見つけられず即死し、拡張は
     /// 「映像なし」で諦める)。名前の定義元は `StreamHelpers`。**中継 `fleetest-services` も省かない** ——
-    /// 無いとランナーで動く run-setup.sh / run-teardown.sh がサービスに触れない(`ServiceGatewayWire.relayProductName`)
+    /// 無いとランナーで動く run-setup.sh / run-teardown.sh がサービスに触れない(`ServiceGatewayWire.relayProductName`)。
+    /// **`fleetest-mcp` も省かない** —— 古いまま残ると、ブリッジが新しいランナー機で版ガードが全ツールを断る
     ///
     /// `developerDir` はディスパッチと同じ `XcodeSelection.resolve` で選んだ Xcode(nil = ambient)。**ビルドもその Xcode で行う**
     /// —— 渡さないとランナーの `xcode-select` の既定でビルドし、そこがコマンドラインツールだと FoundationModels のマクロが無くて
     /// 落ちる(M1mini で実測: Xcode を入れ替えた後の既定がコマンドラインツールだった)。既定値は置かない
     public static func alignRevisionCommand(layout: RemoteLayout, revision: String, helperPath: String,
                                             developerDir: String?) -> String {
-        let builds = (["fleetest"] + StreamHelpers.all + [ServiceGatewayWire.relayProductName])
+        let builds = (["fleetest"] + StreamHelpers.all + [ServiceGatewayWire.relayProductName, "fleetest-mcp"])
             .map { "swift build --product \($0)" }
             .joined(separator: " && ")
         let buildCommand = "git checkout \(RemoteShell.quote(revision)) && " + builds

@@ -210,7 +210,10 @@ extension StepExecutor {
             sd = RegionInk.luminanceStdDev(pngData: screenshot, frame: element.frame, screen: screen)
             if let value = sd, value >= occlusionInkThreshold {
                 // 入力欄・ボタンは枠や背景で構造が出るので、文字が描けた証拠にするのは文字の型だけ
-                if RenderCollapse.textTypes.contains(element.type.lowercased()) { pixelsShowedTextThisStep = true }
+                if RenderCollapse.textTypes.contains(element.type.lowercased()) {
+                    pixelsShowedTextThisStep = true
+                    noteGreenText(element: element, expectedText: expectedText)
+                }
                 return nil
             }
         }
@@ -420,6 +423,18 @@ extension StepExecutor {
         if merged.visible {
             notePartialVisibility(merged.state)
             pixelsShowedTextThisStep = true
+            if merged.state == .fullyVisible { noteGreenText(element: element, expectedText: expectedText) }
+            return nil
+        }
+        // FM が読んだ文字が「この要素の1つ前の緑の値」なら、文字の不一致ではなく古い絵として既存の経路へ合流する
+        // (締め切りまで撮り直し、最後まで古ければ素通り + stale-screenshot。判定は StaleFrameDetector.showsPreviousValue)
+        if v.state == TranscriptMatch.State.textMismatch.rawValue,
+           let id = Self.greenTextKey(element),
+           StaleFrameDetector.showsPreviousValue(observed: v.observedText, expected: expectedText,
+                                                 previous: lastGreenTextByElement[id]) {
+            knownStaleGuardImageHash = memoImageHash
+            noteCodesThisStep.insert(.staleScreenshot)
+            guardFrameStaleThisEval = true
             return nil
         }
         // observedText は原因切り分けの鍵: 空なら「FM に画像が渡っていない/白紙を見た」
@@ -531,6 +546,16 @@ extension StepExecutor {
     }
 
     /// 緑の判定のうち、先頭だけ読めた形を注記に残す(FM の判定と OCR だけの判定の両方から呼ぶ)
+    /// 緑で抜けた要素の文字を控える(`lastGreenTextByElement`)。操作では消さない —— 操作を挟んだ後の古い絵を見分ける材料
+    private func noteGreenText(element: ElementInfo, expectedText: String) {
+        guard let id = Self.greenTextKey(element) else { return }
+        lastGreenTextByElement[id] = expectedText
+    }
+
+    static func greenTextKey(_ element: ElementInfo) -> String? {
+        element.identifier.flatMap { $0.isEmpty ? nil : $0 }
+    }
+
     private func notePartialVisibility(_ state: TranscriptMatch.State?) {
         switch state {
         case .partiallyHidden: noteCodesThisStep.insert(.textPartiallyHidden)

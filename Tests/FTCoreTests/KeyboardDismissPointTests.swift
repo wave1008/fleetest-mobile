@@ -78,7 +78,8 @@ final class KeyboardDismissPointTests: XCTestCase {
     func testIOSHideKeyboardFallsBackToTheTreeWhenTheBridgeCannotTell() async throws {
         let log = CallLog()
         let driver = FakeAppDriver(name: "primary", log: log, snapshotElements: [form()])
-        driver.keyboardFrames = [keyboard, nil]
+        // 木だけで決める点は、続けて2回の木が同じ点を選んでから叩く(木がキーボードの枠に追いつく前の点を叩かない)
+        driver.keyboardFrames = [keyboard, keyboard, nil]
         let executor = StepExecutor(driver: driver, isAndroid: false, tunables: RunTunables())
         let outcome = await executor.execute(FlowStep(action: "hideKeyboard"))
         guard case .passed = outcome.status else { return XCTFail("\(outcome.status)") }

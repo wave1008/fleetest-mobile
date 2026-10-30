@@ -755,9 +755,13 @@ extension StepExecutor {
         var lastReason = ""
         var point: KeyboardDismissPoint.Choice?
         var unconfirmed = false
+        // 木だけで決める経路(XCUITest)で前回の木が選んだ点。次の木も同じ点を選んだときだけ叩く
+        var unconfirmedSeen: KeyboardDismissPoint.Choice?
         var before: SnapshotResponse
         var keyboard: FTRect
         searching: while true {
+            var nextUnconfirmed: KeyboardDismissPoint.Choice?
+            defer { unconfirmedSeen = nextUnconfirmed }
             var start = clock.now
             before = try await freshSnapshot(.afterOwnMove)
             phase.snapshotMs += Self.ms(clock.now - start)
@@ -782,7 +786,15 @@ extension StepExecutor {
                     // 答えられないブリッジ(XCUITest)は木だけで決める。別のウィンドウは木の overlayWindowFrames で
                     // 除いてある。木に載らないステータスバーは、木に載る最も上の要素より上を叩かないことで避ける
                     if let contentTop = Self.topmostElementY(before), candidate.y >= contentTop {
-                        point = candidate; unconfirmed = true; break searching
+                        // 木だけで決める点は、続けて2回の木で同じ点が選ばれてから叩く(キーボードの枠と木のレイアウトが
+                        // 食い違っている間 = 下にあるはずのタブが枠の裏にいる木では、空きが実際には押せる部品の上になる)
+                        if let seen = unconfirmedSeen, seen.x == candidate.x, seen.y == candidate.y {
+                            point = candidate; unconfirmed = true; break searching
+                        }
+                        nextUnconfirmed = candidate
+                        lastReason = "the tree and the keyboard frame had not settled (the spot to tap changed between two"
+                            + " reads)"
+                        break
                     }
                     lastReason = "this bridge cannot check a spot for a status bar or another window, and every"
                         + " empty spot is above the topmost element in the tree"

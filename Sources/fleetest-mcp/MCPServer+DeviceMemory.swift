@@ -188,7 +188,8 @@ extension MCPServer {
                                   otherPlatform: String?) -> String {
         let sorted = survivors.sorted()
         let left = sorted.isEmpty
-            ? " The \(deviceNoun) this session had targeted are no longer reachable."
+            ? " The \(deviceNoun) this session had targeted are no longer reachable under the remembered address"
+                + " (a failed call drops it from this session's memory; it does not mean the device is down)."
             : " This session still has \(sorted.count) reachable \(unitNoun)"
                 + " (\(sorted.prefix(rememberedDeviceListCap).joined(separator: ", ")))."
         let crossed = otherPlatform.map {
