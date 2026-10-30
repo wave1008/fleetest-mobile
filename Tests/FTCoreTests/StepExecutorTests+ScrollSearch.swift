@@ -131,6 +131,15 @@ extension StepExecutorTests {
         let high = framed(ref: 2, id: "nav_pager", x: 0, y: 118, width: 402, height: 56)
         let down = try XCTUnwrap(StepExecutor.emptyDragEnd(of: high, x: 201, y: 146, searching: nil, screen: screen))
         XCTAssertEqual(down.y, 178, "上半分の行は下へ抜く")
+        // **探索の向きがあれば、その指の向きへ抜く**(探索と逆へ抜くと、指の向きで変わる画面 = 隠れるバーが戻る。
+        // E2EY-Flutter: 中心より上で止まった行への空打ちが指を下へ動かした)
+        let upper = framed(ref: 5, id: "row_h_40", x: 0, y: 300, width: 402, height: 56)
+        XCTAssertEqual(try XCTUnwrap(StepExecutor.emptyDragEnd(of: upper, x: 201, y: 328, searching: "up", screen: screen)).y, 296)
+        let upperDown = try XCTUnwrap(StepExecutor.emptyDragEnd(of: upper, x: 201, y: 328, searching: "down", screen: screen))
+        XCTAssertEqual(upperDown.y, 360, "指が下向きの探索なら下へ抜く")
+        // 指の向きに余地が無ければ逆へ(撃てないより良い): 上端に張り付いた行
+        let top = framed(ref: 6, id: "top", x: 0, y: 2, width: 402, height: 56)
+        XCTAssertEqual(try XCTUnwrap(StepExecutor.emptyDragEnd(of: top, x: 201, y: 30, searching: "up", screen: screen)).y, 62)
         // **押す点が下端の帯で頭打ちになった行**(run の赤: 行 822〜・押す点 825 → 矩形の 4pt 外の 818 = 7pt しか動かず、
         // Compose のタッチの遊び(10pt)に収まって上の行のタップになった)は、軸に沿って 22pt 以上動かす
         let clamped = framed(ref: 4, id: "nav_infinite", x: 0, y: 822, width: 402, height: 52)

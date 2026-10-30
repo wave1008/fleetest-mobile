@@ -558,11 +558,12 @@ extension StepExecutor {
             return emptyDragEndY(of: element, screen: screen).map { (x, $0) }
         }
         if let toX = emptyDragEndX(of: element, from: x, screen: screen) { return (toX, y) }
-        // **横に抜けられない全幅の行は縦に抜く**(画面の中心へ寄る向き)。撃たないと容器が次の1タッチを吸ったまま
-        // で、直後のタップが黙って空振りする(E2EX-CMP のホーム = 全幅の ListItem: tap が緑のまま遷移せず次で赤)。
+        // **横に抜けられない全幅の行は縦に抜く**(探索の指の向きを先に・向きが無ければ画面の中心へ寄る向き)。撃たないと容器が
+        // 次の1タッチを吸ったままで、直後のタップが黙って空振りする(E2EX-CMP のホーム = 全幅の ListItem: tap が緑のまま遷移せず次で赤)。
         // 縦の抜きは容器がスクロールとして消費して中身が半行ぶん動くが、呼び手は撃った後に整定を待って解決し直す
-        // ので座標は追いつき、中心へ寄る向きなら対象は画面から出ない
-        guard let endY = emptyDragEndY(of: element, screen: screen) else { return nil }
+        // ので座標は追いつく。**探索と逆の向きへ抜かない** —— 指の向きで変わる画面(隠れるバー)が元へ戻る
+        // (E2EY-Flutter: 流れ続けて中心より上で止まった行への2回目の空打ちが指を下へ動かし、バーが現れた。144 周で 2 回)
+        guard let endY = emptyDragEndY(of: element, screen: screen, finger: direction) else { return nil }
         return alongAxisEmptyDragEndY(from: y, preferred: endY, screen: screen).map { (x, $0) }
     }
 
@@ -589,12 +590,15 @@ extension StepExecutor {
 
     /// 横の探索で使う縦の抜き先(`emptyDragEndX` の縦版。矩形のすぐ外で離す = クリックとして成立させない)。
     /// 下端の a11y 空白帯には降ろさない
-    static func emptyDragEndY(of element: ElementInfo, screen: FTRect) -> Double? {
+    /// `finger` = 探索の指の向き(縦のとき)。その側に余地があれば先に採る
+    static func emptyDragEndY(of element: ElementInfo, screen: FTRect, finger: String? = nil) -> Double? {
         let below = element.frame.y + element.frame.height + 4
         let above = element.frame.y - 4
         let belowOK = below <= screen.y + screen.height - Self.bottomUncoveredBand - 1
         let aboveOK = above >= screen.y + 1
-        // 画面の中心へ寄る向きを先に採る(中身が動くなら対象が画面から出ない側へ)
+        if finger == FTSwipeDirection.up.rawValue, aboveOK { return above }
+        if finger == FTSwipeDirection.down.rawValue, belowOK { return below }
+        // 向きが無ければ画面の中心へ寄る向きを先に採る(中身が動くなら対象が画面から出ない側へ)
         let lowerHalf = element.frame.centerY > screen.y + screen.height / 2
         if lowerHalf { return aboveOK ? above : (belowOK ? below : nil) }
         return belowOK ? below : (aboveOK ? above : nil)
