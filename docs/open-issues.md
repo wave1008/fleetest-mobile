@@ -253,16 +253,6 @@
 - 次に見るもの: 赤の回のタップの直前の木の時刻列(払った後の整定の各周回)
 - 2026-10-20 の棚卸し(M1Ultra・8 台並列 × 3 周): 24 回中 2 回(同じ形)
 
-### OI-36 E2EY-CMP の XCUITest で「スワイプの距離で結果が変わること」S0020(行幅の 9 割を払って削除)が断続的に `action=none`
-- 状態: 再現済み
-- 確認: コミット未記録(2026-10-28)
-- 経緯: 10/26 の xcuitest で 4 台中 3 台・10/28 のフル(xcuitest)で 4 台中 1 台・その直後の M1Max の全台 1 回ずつで 8 台中 1 台
-
-- 形: `swipeBy("#sw_row_4", dxRatio: -0.9, dyRatio: 0, durationSeconds: 0.4)` の後、`#txt_swipe_actions_result` が
-  `action=row4:delete` にならず `action=none` のまま(行は消えない)。inapp-boost モード・Android では出ていない
-- 未確認: XCUITest が合成したドラッグの速さ・終点が、Compose の SwipeToDismiss の閾値(位置か速さ)を超えていない回が
-  あるのか、指を離した後の慣性で戻っているのか。`fleetest results frames` で失敗した回のコマを見るのが次の一手
-
 ### OI-38 E2EX-iOS の長押しメニューの項目で `inapp-tap-outside-hit-area` が出るが、本物の指でも押せる
 - 状態: 再現済み
 - 確認: 88f8bf8c(2026-10-28)

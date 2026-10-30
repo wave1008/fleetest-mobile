@@ -58,7 +58,8 @@ class スワイプの距離で結果が変わること {
             }
             scene(2, "4 行目を行幅の大半まで払う") {
                 action {
-                    swipeBy("#sw_row_4", dxRatio: -0.9, dyRatio: 0, durationSeconds: 0.4)
+                    // 速い払いは手前の錨(ボタンが出た位置)で止まる(XCUITest 8 台で 0.4 秒は 19% が削除まで届かない・1.5 秒は 50 回中 0)
+                    swipeBy("#sw_row_4", dxRatio: -0.9, dyRatio: 0, durationSeconds: 1.5)
                 }.expectation {
                     select("#txt_swipe_actions_result").textIs("action=row4:delete", waitSeconds: 5)
                     select("#txt_swipe_actions_count").textIs("rows=5")
