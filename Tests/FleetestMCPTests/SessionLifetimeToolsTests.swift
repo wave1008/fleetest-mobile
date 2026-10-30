@@ -63,4 +63,15 @@ final class SessionLifetimeToolsTests: XCTestCase {
         }
         XCTAssertFalse(made.value, "ドライバを作ってから断った")
     }
+
+    /// Android の宛先では `com.apple.` を Apple のアプリとして断らない(Apple Music for Android 等は普通のパッケージ)
+    func testAnAndroidTargetIsNotRefusedAsAnAppleApp() async {
+        let server = MCPServer(write: { _ in }, makeDriver: { _ in FakeDriver() }, recordSnapshot: { _, _, _ in })
+        do {
+            _ = try await server.call(tool: "ft_clear_app_data",
+                                      args: ["serial": "emulator-5554", "bundleId": "com.apple.android.music"])
+        } catch {
+            XCTAssertFalse(error.localizedDescription.contains("Apple system app"), error.localizedDescription)
+        }
+    }
 }

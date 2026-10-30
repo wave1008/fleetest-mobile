@@ -928,10 +928,17 @@ extension StepExecutor {
                     }
                     var relocated = Self.relocateAfterClear(element, step: step, in: current)
                     var relocatedSnapshot = current
-                    if relocated == nil, KeyboardWait.isShown(current),
-                       // 閉じる手の失敗は握る: 投げると「消した・打っていない」の失敗文(clearLostTargetMessage)が生のエラーに化ける
-                       case .closed? = try? await closeKeyboardWithoutSideEffects(step: step, phase: &phase),
-                       let reread = try? await actingDriver.snapshot() {
+                    // 閉じる手の失敗は握る: 投げると「消した・打っていない」の失敗文(clearLostTargetMessage)が生のエラーに化ける。
+                    // **中断だけは投げ直す**(run の停止を「欄が見つからない」に化けさせない)
+                    var keyboardClosed = false
+                    if relocated == nil, KeyboardWait.isShown(current) {
+                        do {
+                            if case .closed = try await closeKeyboardWithoutSideEffects(step: step, phase: &phase) { keyboardClosed = true }
+                        } catch is CancellationError {
+                            throw CancellationError()
+                        } catch {}
+                    }
+                    if keyboardClosed, let reread = try? await actingDriver.snapshot() {
                         // キーボードが欄を押し下げて木から消す形(横向き・全画面 IME・CMP)。人は閉じてから打てる
                         // ので、撃つ前の規則(reachPastKeyboard)と同じ副作用の無い閉じ方(Enter は送らない)で閉じて一度だけ引き直す。
                         // 引き直しは撃つ側のドライバで撮り直した木で(ref はそのドライバの最後の木の中でだけ有効)

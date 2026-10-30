@@ -471,7 +471,9 @@ extension MCPServer {
     }
 
     func clearAppDataSystemTargetRefusal(_ bundleID: String, driver: AppDriver, args: [String: Any]) async -> String? {
-        guard let android = driver as? AndroidDriver else { return Self.appleSystemAppRefusal(bundleID) }
+        guard let android = driver as? AndroidDriver else {
+            return Self.platformName(args) == "android" ? nil : Self.appleSystemAppRefusal(bundleID)
+        }
         guard launchedBundleIDs[Self.sessionKey(args)] != bundleID else { return nil }
         let box = UncheckedTransfer(android)
         let probe = await Self.runOffCooperativePool(name: "fleetest-mcp-clear-app-data") {
@@ -487,8 +489,8 @@ extension MCPServer {
         let bundleID = try Self.requiredStringArgument(args, "bundleId")
         if let refusal = Self.bridgeSelfRefusal(tool: "ft_clear_app_data", bundleID: bundleID) { throw MCPError(refusal) }
         // Apple のアプリはドライバを作る前に断る(作るとブリッジの自動起動を払ってから断ることになる)。Android の宛先は下で判定する
-        if (args["platform"] as? String) != "android", args["serial"] == nil,
-           let refusal = Self.appleSystemAppRefusal(bundleID) {
+        // プラットフォームは他の道具と同じ判定(明示・宛先・profile・FLEETEST_PLATFORM)で決める
+        if Self.platformName(args) != "android", let refusal = Self.appleSystemAppRefusal(bundleID) {
             throw MCPError(refusal)
         }
         let clearAppDataDriver = try await driver(args)
