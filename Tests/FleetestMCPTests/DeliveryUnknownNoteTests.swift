@@ -44,7 +44,7 @@ final class DeliveryUnknownNoteTests: XCTestCase {
 
     /// 投げられた case が不明と決めているなら「拒否なら送っていない」の留保を付けない(本文の "nothing is listening" と重なり二重実行へ誘導した)
     func testThrownUnknownCaseCarriesNoRefusedReservation() {
-        let context = DriverErrorContext(bridge: .ios, physicalDevice: true)
+        let context = DriverErrorContext(bridge: .iosXCUITest, physicalDevice: true)
         for thrown in [DriverError.bridgeUnreachable(context: context, detail: "x"),
                        DriverError.deliveryUnknown(context: context, detail: "x")] {
             let note = MCPServer.batchDeliveryUnknownNote(failureKind: .driverUnreachable, thrown: thrown)

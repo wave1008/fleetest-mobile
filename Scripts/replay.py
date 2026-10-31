@@ -120,6 +120,9 @@ def round_problems(mcp, target, form):
     problems, tree, reply = [], "", ""
     for step in form["steps"]:
         name, arguments = step
+        if name == "$wait":   # 画面の動き(通知センターの出現等)が終わるのを待つ。短いと面が出る前に判定して別の理由で赤になる
+            time.sleep(arguments["seconds"])
+            continue
         if name == "$killApp":
             kill_app(target, arguments["bundleId"])
             time.sleep(arguments.get("seconds", 1))

@@ -324,7 +324,8 @@ final class MCPToolCallTests: XCTestCase {
         _ = try await server.call(tool: "ft_navigate", args: ["target": "back"])
         _ = try await server.call(tool: "ft_navigate", args: ["target": "home"])
         _ = try await server.call(tool: "ft_navigate", args: ["target": "appSwitcher"])
-        XCTAssertEqual(driver.calls, ["back", "home", "appSwitcher"])
+        // appSwitcher は開いたかを聞く(systemUICovering)
+        XCTAssertEqual(driver.calls.filter { !$0.hasPrefix("systemUICovering") }, ["back", "home", "appSwitcher"])
     }
 
     func testNavigateRejectsAnUnknownTarget() async {

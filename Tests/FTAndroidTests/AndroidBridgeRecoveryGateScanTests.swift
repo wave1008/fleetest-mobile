@@ -29,11 +29,11 @@ final class AndroidBridgeRecoveryGateScanTests: XCTestCase {
     /// ブリッジのプロセスが無いと確かめられたら、他のセッションの印があっても起動し直す
     func testAbsentBridgeProcessIsNotRefusedAsHeldByAnotherSession() throws {
         let c = try code()
-        guard let r = c.range(of: "hasForeignLeaseUnlessOwnRun(key: serial, stateDir: stateDir),") else {
+        guard let r = c.range(of: "hasForeignLeaseUnlessOwnRun(key: serial, stateDir: stateDir) {") else {
             return XCTFail("門が見当たらない")
         }
         let cond = String(c[r.upperBound...].prefix(200))
-        XCTAssertTrue(cond.contains("probed != nil || Self.isBridgeRunning("), cond)
+        XCTAssertTrue(cond.contains("probed != nil ? true : Self.isBridgeRunning("), cond)
         XCTAssertTrue(cond.contains("!= false"), cond)
     }
 }

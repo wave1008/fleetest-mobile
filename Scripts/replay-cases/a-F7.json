@@ -2,7 +2,7 @@
   "id": "a-F7",
   "finding": "通知センターを降ろした後の ft_navigate appSwitcher が実際はアプリへ戻るだけなのに、以後の ft_snapshot に偽の「NOT what is on screen」が付き続ける",
   "platform": "ios",
-  "redNote": "直しの前後の赤は未確認(コンパイルしていない・デバイス未実行)。Simulator の iOS 27 で通知センターを ft_drag で降ろす形",
+  "redConfirmed": true,
   "setup": [
     [
       "ft_launch",

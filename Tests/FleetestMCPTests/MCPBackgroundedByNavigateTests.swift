@@ -81,7 +81,7 @@ final class MCPBackgroundedByNavigateTests: XCTestCase {
     func testNavigateRecordsOnlyTheBackgroundingTargets() throws {
         let source = try MCPServerSourceText.combined()
         XCTAssertTrue(compact(source).contains(compact(
-            "if target == \"home\" || target == \"appSwitcher\" {backgroundedByNavigate.insert(")),
+            "if target == \"home\" || (target == \"appSwitcher\" && switcherSeen != false) {backgroundedByNavigate.insert(")),
                       "ft_navigate が背面化を記録していない")
     }
 

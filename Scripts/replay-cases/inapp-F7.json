@@ -2,23 +2,42 @@
   "id": "inapp-F7",
   "finding": "遷移した tap の直後のロケータ無し type が、遷移前の行の枠に重なった無関係な欄へ打って緑",
   "platform": "ios",
-  "redNote": "直し(InputFocusRescue.currentFrame が遷移後の木に居ない id で nil)を外した版では未確認。XCUITest 経路の形のみ(in-app は MCP から撃てない。in-app の形は fleetest run --scenario で)",
   "setup": [
-    ["ft_launch", { "bundleId": "com.ftester.e2ex.ios" }]
+    [
+      "ft_launch",
+      {
+        "bundleId": "com.ftester.e2ex.ios"
+      }
+    ]
   ],
   "reset": [
-    ["ft_launch", { "bundleId": "com.ftester.e2ex.ios" }]
+    [
+      "ft_launch",
+      {
+        "bundleId": "com.ftester.e2ex.ios"
+      }
+    ]
   ],
   "rounds": 10,
   "forms": [
     {
       "name": "遷移する tap の直後にロケータ無し type(欄は叩いていない)",
       "steps": [
-        ["ft_batch", { "steps": "tap '#nav_inputs'; type 'x'" }]
+        [
+          "ft_batch",
+          {
+            "steps": "tap '#nav_inputs' scroll: .down; type 'x'"
+          }
+        ]
       ],
       "allowErrors": true,
-      "expect": ["focus=none"],
-      "reject": ["focus=second", "auto=x"]
+      "expect": [
+        "focus=none"
+      ],
+      "reject": [
+        "focus=second",
+        "auto=x"
+      ]
     }
   ]
 }

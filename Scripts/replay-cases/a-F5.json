@@ -2,7 +2,7 @@
   "id": "a-F5",
   "finding": "アプリスイッチャーが出ている間の ft_batch tap が覆いを言わず ok",
   "platform": "ios",
-  "redNote": "直しの前後の赤は未確認(コンパイルしていない・デバイス未実行)。Simulator の iOS 27 で通知センターを ft_drag で降ろす形",
+  "redConfirmed": true,
   "setup": [
     [
       "ft_launch",

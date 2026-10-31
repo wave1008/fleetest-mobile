@@ -2,7 +2,6 @@
   "id": "a-F1",
   "finding": "通知センターが降りている間、ft_snapshot / ft_tap が「another app is」と言い切り ft_status と食い違う",
   "platform": "ios",
-  "redNote": "直しの前後の赤は未確認(コンパイルしていない・デバイス未実行)。Simulator の iOS 27 で通知センターを ft_drag で降ろす形",
   "setup": [
     [
       "ft_launch",
@@ -36,6 +35,12 @@
           }
         ],
         [
+          "$wait",
+          {
+            "seconds": 1.5
+          }
+        ],
+        [
           "ft_snapshot",
           {}
         ]
@@ -56,6 +61,12 @@
             "fromY": 2,
             "toX": 30,
             "toY": 600
+          }
+        ],
+        [
+          "$wait",
+          {
+            "seconds": 1.5
           }
         ],
         [
@@ -82,6 +93,12 @@
             "fromY": 2,
             "toX": 30,
             "toY": 600
+          }
+        ],
+        [
+          "$wait",
+          {
+            "seconds": 1.5
           }
         ],
         [
