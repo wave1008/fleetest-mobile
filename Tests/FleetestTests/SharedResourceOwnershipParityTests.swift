@@ -121,6 +121,9 @@ final class SharedResourceOwnershipParityTests: XCTestCase {
 
     /// 免除(理由つき)。**足すときは、なぜここが持ち主判定を持たなくてよいかを書くこと**
     private static let deviceGateExemptions: Set<String> = [
+        // ②止まった起動の後始末。`bootstatus -b` が 600 秒返らない = SpringBoard の上がらない台で、シナリオの動ける状態に無い。
+        // 待っている相手が居ても、Shutdown へ戻すのがその相手にとっても回復になる(同じ起動の撃ち直し)
+        "SimulatorBoot.ensureBooted",
         // ③ライブ操作の自動起動・起動し直し。対象は呼び出し元(ライブ操作のセッション)が指した
         // その1台だけ。他のセッションが使っているデバイスは関数の先頭で hasForeignLease が断る
         // (ForeignLeaseAutoRestartGateTests。自動起動の門は deviceGateMarkers の語彙とは別)

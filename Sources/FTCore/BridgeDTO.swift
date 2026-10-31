@@ -129,7 +129,7 @@ public enum BridgeAPI {
     ///   **開いたスイッチャーが閉じてアプリに戻る**
     ///
     /// **窓 `SBSwitcherWindow:Main` は CC・通知センターが開いていても木に居続け、木の順で最初に来る**
-    /// (実測 2026-11-01: Simulator は常に isHittable=false・SE3 は平常時 true、CC を開くと false)。
+    /// (実測: Simulator は常に isHittable=false・SE3 は平常時 true、CC を開くと false)。
     /// OR 述語の `firstMatch` 1件で判定すると、触れないこの窓が先に当たって `nil` を返し
     /// **CC が覆いと言えなかった**(Simulator 6/6・SE3 5/5)。**目印は `coveringCandidateOrder` の順に1つずつ見る**
     ///
@@ -178,7 +178,7 @@ public enum BridgeAPI {
     /// **旗付き以降を全部残す**のは、popover 形式の確認ダイアログが旗付きの暗幕(`_UIPopoverDimmingView`)の**次の兄弟**に
     /// 本体を載せるため(旗付きの1つだけを残すと選択肢が木から消える。実測)。
     /// in-app の木はこれを知らず、確認ダイアログ・全画面カバー・アラート・メニューの背面の要素を木に載せ続けて
-    /// exist / tap が XCUITest と逆になった(実測 2026-11-01 Simulator iOS 27.0 / E2EX-iOS: 4形とも背面の兄弟
+    /// exist / tap が XCUITest と逆になった(実測 Simulator iOS 27.0 / E2EX-iOS: 4形とも背面の兄弟
     /// `UITransitionView` / `_UIContextMenuContainerView` が `accessibilityViewIsModal == true`。
     /// 確認ダイアログは popover 形式で hitTest が背面のボタンに当たる = hit view では見分けられない)。
     /// 見えない(hidden / alpha < 0.01)view の旗は数えない(メニューの出入りで alpha 0 の旗付き view が残る)
@@ -445,7 +445,7 @@ extension FocusLanding {
 
     /// **直前の ref の tap が、いま叩き直している欄へ焦点を立てていたか**(`landed` を通さずに焦点の着地とする)。
     /// 叩き直しは焦点のある欄を叩くので受け口が動かない。Flutter の値入りの欄は木で `other`(入力欄と申告されない)・
-    /// 木の枠は欄の実際の箱より小さく下にずれ(実測 2026-11-01 E2EX-Flutter: 木 (16,271 370x10)・受け口は箱の左上 (16,249))、
+    /// 木の枠は欄の実際の箱より小さく下にずれ(実測 E2EX-Flutter: 木 (16,271 370x10)・受け口は箱の左上 (16,249))、
     /// 受け口は動かない 1x1 なので、枠への包含でも「動いたか」でも着地と読めず、`tap(A); tap(B); type("x")` の救済が
     /// 409 になった(inapp F9)。「動かなかった」だけで通すと、前の欄を内側に含む容器を叩いて焦点が動かなかった形
     /// (前の欄へ打つ)と区別できないので、次の2つが揃うときだけ true(呼び手は、その tap の後に type / clear / 別の tap を

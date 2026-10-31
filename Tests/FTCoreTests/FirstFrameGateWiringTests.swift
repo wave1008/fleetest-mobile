@@ -28,7 +28,7 @@ final class FirstFrameGateWiringTests: XCTestCase {
     func testNoteAppLaunchedArmsTheGate() throws {
         let text = compact(try source("FTCore/StepExecutor.swift"))
         XCTAssertTrue(text.contains(compact("""
-            funcnoteAppLaunched(){armUnregisteredSystemAlertProbe()firstFrameGatePending=truependingLaunchSettle=true}
+            funcnoteAppLaunched(bundleID:String?=nil){ifletbundleID{launchedBundleID=bundleID}armUnregisteredSystemAlertProbe()firstFrameGatePending=truependingLaunchSettle=true}
             """)),
             "noteAppLaunched() が firstFrameGatePending を arm していない")
         XCTAssertFalse(text.contains(compact("""
@@ -47,7 +47,7 @@ final class FirstFrameGateWiringTests: XCTestCase {
             "launch 系コマンドの一覧が変わっている(systemAlertProbePending と同じ一覧のはず)")
         XCTAssertTrue(text.contains(compact("""
             if let command, ["launchApp", "restartApp", "clearAppData", "installApp"].contains(command) {
-                executor.noteAppLaunched()
+                executor.noteAppLaunched(bundleID: launchedBundleID)
             }
             """)),
             "launch 系コマンドの直後で executor.noteAppLaunched() を呼んでいない")

@@ -207,7 +207,7 @@ public enum TypeReadback {
 
     /// **叩いて焦点を取り戻したあと、カーソルを末尾へ送ってから打つ・消す対象か**(複数行の欄で、値が既にあるもの)。
     /// Compose Multiplatform(iOS)の複数行は、焦点を取り戻すとカーソルが先頭へ戻り、叩く位置(右端でも)を変えても動かない
-    /// (実測 2026-11-01 E2EX-CMP: `type(欄,"L3"); type(別の欄,"p"); type(欄,"x")` が `xL3`・右端を2回叩いて `y` も `yL3`)。
+    /// (実測 E2EX-CMP: `type(欄,"L3"); type(別の欄,"p"); type(欄,"x")` が `xL3`・右端を2回叩いて `y` も `yL3`)。
     /// 打ち足しが先頭へ入り(読み返しは文字の集合しか見ず通る)、clearInput は先頭への delete が空振りして4周で不発になった。
     /// Cmd+↓ は文書の末尾へ動かす(同じ実測で `L3y`)。1行の欄は叩いた位置で末尾に着く形なので送らない
     public static func needsCursorAtEndAfterRefocus(_ element: ElementInfo) -> Bool {
