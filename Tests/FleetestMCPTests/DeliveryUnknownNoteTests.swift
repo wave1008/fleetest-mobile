@@ -14,12 +14,12 @@ final class DeliveryUnknownNoteTests: XCTestCase {
     }
 
     func testBatchNoteOnlyForDriverUnreachableFailures() {
-        XCTAssertTrue(MCPServer.batchDeliveryUnknownNote(failureKind: .driverUnreachable)
+        XCTAssertTrue(MCPServer.batchDeliveryUnknownNote(failureKind: .driverUnreachable, thrown: nil)
             .contains("may already have been performed"))
         for kind in StepFailureKind.allCases where kind != .driverUnreachable {
-            XCTAssertEqual(MCPServer.batchDeliveryUnknownNote(failureKind: kind), "", "\(kind)")
+            XCTAssertEqual(MCPServer.batchDeliveryUnknownNote(failureKind: kind, thrown: nil), "", "\(kind)")
         }
-        XCTAssertEqual(MCPServer.batchDeliveryUnknownNote(failureKind: nil), "")
+        XCTAssertEqual(MCPServer.batchDeliveryUnknownNote(failureKind: nil, thrown: nil), "")
     }
 
     /// ソース走査: replace の消去の後の読みは try? で nil に畳まない(接続断が「欄が見つからない」に化けた)
@@ -31,5 +31,14 @@ final class DeliveryUnknownNoteTests: XCTestCase {
         let end = try XCTUnwrap(source.range(of: "relocatedNativeRef = refound.ref"))
         let region = String(source[start.lowerBound..<end.lowerBound])
         XCTAssertFalse(region.contains("try? await typeDriver.snapshot"))
+    }
+
+    func testBatchNoteFollowsTheThrownCase() {
+        let context = DriverErrorContext(bridge: .android, physicalDevice: false)
+        XCTAssertEqual(MCPServer.batchDeliveryUnknownNote(
+            failureKind: .driverUnreachable, thrown: .notDelivered(context: context, detail: "x")), "")
+        XCTAssertTrue(MCPServer.batchDeliveryUnknownNote(
+            failureKind: .driverError, thrown: .deliveryUnknown(context: context, detail: "x"))
+            .contains("may already have been performed"))
     }
 }

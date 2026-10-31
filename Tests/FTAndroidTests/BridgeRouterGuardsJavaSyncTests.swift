@@ -1,7 +1,7 @@
 // Android ブリッジ(AndroidRunner/)の3つの門をソース走査で固定する。
 // ①handleLaunch の前面掃除は SYSTEM_DIALOG_PACKAGES(権限ダイアログ・systemui 等)を force-stop しない
 //   —— 殺すとアプリの権限フローが壊れ「前面に来ない」を自分で作る。集合はホスト
-//   (Sources/fleetest-mcp/MCPServer+Driver.swift の systemDialogPackages)と同期する
+//   (Sources/FTCore/ForegroundState.swift の systemDialogPackages)と同期する
 // ②既定スワイプ・ピンチの基準矩形に 1080x2400 の固定値を置かない(snapshot 前の swipe が
 //   別解像度で画面外を払っていた)
 // ③QuietWaiter は既定 IME(Settings.Secure.DEFAULT_INPUT_METHOD)へ静穏対象を追従させない
@@ -58,8 +58,8 @@ final class BridgeRouterGuardsJavaSyncTests: XCTestCase {
 
     /// ホストの systemDialogPackages の全エントリが Java 側の集合に居る(片方だけ変えない)
     func testSystemDialogPackagesMatchTheHostList() throws {
-        let host = try source("Sources/fleetest-mcp/MCPServer+Driver.swift")
-        let hostDecl = try body(of: "static let systemDialogPackages: Set<String> = [", in: host,
+        let host = try source("Sources/FTCore/ForegroundState.swift")
+        let hostDecl = try body(of: "public static let systemDialogPackages: Set<String> = [", in: host,
                                 terminator: "\n    ]")
         let hostEntries = hostDecl.components(separatedBy: "\"").enumerated()
             .filter { $0.offset % 2 == 1 }.map(\.element)

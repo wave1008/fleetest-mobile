@@ -786,7 +786,7 @@ extension MCPServer {
                 }
                 lines.append("\(index + 1). \(plan.summary) — FAILED (\(ms)ms): \(Self.batchWritableAdvice(reason))"
                     + (outcome.driverFallback.map { " (\($0))" } ?? "") + refNote
-                    + Self.batchDeliveryUnknownNote(failureKind: outcome.failureKind))
+                    + Self.batchDeliveryUnknownNote(failureKind: outcome.failureKind, thrown: outcome.thrownDriverError))
                 // **止まった位置と、そこで見えている画面を一緒に返す**(scrollTo の failure と
                 // 同じ形: throw で isError にする — 呼び手が要求した手が最後まで実行されなかった
                 // という点で、要素へ届かなかった scrollTo と同種の失敗)
@@ -970,8 +970,14 @@ extension MCPServer {
     /// 応答の途中の切断・時限切れ(端末で実行済みのことがある。実測: ランナーを処理中に落とすと FAILED の tap が +1 になっていた)を
     /// 区別せずに運ぶ(`StepFailureKind` は事実の経路だけ)ので、ここでは拒否の場合を除いて撃ち直しを勧めない側に倒す。
     /// 拒否だったかは直前の失敗の文が言う(文言の一致では決めない)。ft_batch は撃ち直しを勧めない
-    static func batchDeliveryUnknownNote(failureKind: StepFailureKind?) -> String {
-        guard failureKind == .driverUnreachable else { return "" }
+    /// `thrown` が分かれば case で決める(撃つ前に断られた手には言わない・ブリッジ以外の理由で不明な手にも言う)
+    static func batchDeliveryUnknownNote(failureKind: StepFailureKind?, thrown: DriverError?) -> String {
+        switch thrown {
+        case .notDelivered?, .bridgeConnectionRefused?: return ""
+        case .deliveryUnknown?, .bridgeUnreachable?: break
+        default:
+            guard failureKind == .driverUnreachable else { return "" }
+        }
         return "\n   (the connection to the driver failed during this step: unless the error above says the connection was"
             + " refused — nothing listening, so the step was never sent — this step may already have been performed."
             + " Check the screen before repeating it; do not simply run the step again)"

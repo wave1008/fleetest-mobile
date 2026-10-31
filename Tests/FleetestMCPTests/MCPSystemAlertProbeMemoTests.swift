@@ -48,7 +48,8 @@ final class MCPSystemAlertProbeMemoTests: XCTestCase {
         _ = try await server.call(tool: "ft_tap", args: ["ref": 1])
         _ = try await server.call(tool: "ft_tap", args: ["ref": 1])
 
-        XCTAssertEqual(driver.calls.filter { $0.hasPrefix("systemUICovering") }.count, 1, "\(driver.calls)")
+        // ft_snapshot の1回(覆いを言う)+ タップの1回
+        XCTAssertEqual(driver.calls.filter { $0.hasPrefix("systemUICovering") }.count, 2, "\(driver.calls)")
         XCTAssertEqual(driver.calls.filter { $0 == "systemAlert" }.count, 2, "\(driver.calls)")
     }
 
@@ -62,7 +63,15 @@ final class MCPSystemAlertProbeMemoTests: XCTestCase {
         driver.snapshotResponse = screen([element(x: 50)])
         _ = try await server.call(tool: "ft_tap", args: ["ref": 1])
 
-        XCTAssertEqual(driver.calls.filter { $0.hasPrefix("systemUICovering") }.count, 2, "\(driver.calls)")
+        XCTAssertEqual(driver.calls.filter { $0.hasPrefix("systemUICovering") }.count, 3, "\(driver.calls)")
+    }
+
+    /// **ft_snapshot も覆いを言う**: 木はアプリのものなので、黙ると覆われた画面を今の画面として読ませる
+    func testSnapshotNamesTheCoveringSurface() async throws {
+        driver.snapshotResponse = screen([element(x: 10)])
+        driver.systemUICoveringResponse = SystemUICoveringResponse(covering: true, marker: "SBCoverSheetWindow")
+        let reply = try await server.call(tool: "ft_snapshot", args: [:])
+        XCTAssertTrue(Self.text(reply).contains("is drawn over the app right now"), Self.text(reply))
     }
 
     /// **キャッシュされた答えも実際の警告を運ぶ**: 覆う面は、探針を省略した2回目の
@@ -78,7 +87,7 @@ final class MCPSystemAlertProbeMemoTests: XCTestCase {
 
         XCTAssertTrue(Self.text(first).contains("Control Center"), Self.text(first))
         XCTAssertTrue(Self.text(second).contains("Control Center"), Self.text(second))
-        XCTAssertEqual(driver.calls.filter { $0.hasPrefix("systemUICovering") }.count, 1, "\(driver.calls)")
+        XCTAssertEqual(driver.calls.filter { $0.hasPrefix("systemUICovering") }.count, 2, "\(driver.calls)")
     }
 
     /// 出ているアラートは毎回聞いて毎回断る(使い回しで2回目が素通りしない)
