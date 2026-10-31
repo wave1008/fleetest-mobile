@@ -461,8 +461,9 @@ test("再起動しても戻らないデバイスの案内は、どの台かを�
   send({ type: "devices", devices: [device("Pixel 9-05", { rebootAdvised: true }), device("Pixel 9-06", {}),
     device("Pixel 9-07", { machine: "M1Max", rebootAdvised: true })] });
   assert.ok(advice.classList.contains("visible"));
-  assert.match(advice.textContent, /2/);
-  assert.match(advice.textContent, /Pixel 9-05, Pixel 9-07 \(M1Max\)/);
+  assert.match(advice.textContent, /Pixel 9-05 \(\S+\), Pixel 9-07 \(M1Max\)/);
+  assert.match(advice.textContent, /マシン: \S+, M1Max$/, "どのマシンを再起動するかを言う");
+  assert.doesNotMatch(advice.textContent, /台/, "台数は出さない");
   assert.doesNotMatch(advice.textContent, /Pixel 9-06/);
   send({ type: "devices", devices: [device("Pixel 9-05", {})] });
   assert.ok(!advice.classList.contains("visible"));

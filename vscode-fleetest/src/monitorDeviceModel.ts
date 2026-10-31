@@ -752,16 +752,19 @@ export function disabledMachineSet(
 }
 
 /** モニター上部の「再起動しても戻らないデバイス」案内の中身。台が無ければ null(行を出さない)。
- * names は machine 付きの表示名(本文とホバーに出す = どの台かは本文で分かる)。手元は machine 無し。 */
+ * **再起動するのはマシンなので、手元もマシン名で言う**(`localMachineLabel`。名前が無いとどのマシンか分からない)。
+ * machines は重複を畳む。 */
 export function rebootAdviceSummary(
   devices: readonly Pick<MonitorDevice, "name" | "machine" | "rebootAdvised">[],
-): { readonly count: number; readonly names: readonly string[] } | null {
+  localMachineLabel: string,
+): { readonly names: readonly string[]; readonly machines: readonly string[] } | null {
   const advised = devices.filter((device) => device.rebootAdvised === true);
   if (advised.length === 0) {
     return null;
   }
+  const machineOf = (device: { readonly machine?: string }) => device.machine || localMachineLabel;
   return {
-    count: advised.length,
-    names: advised.map((device) => (device.machine ? `${device.name} (${device.machine})` : device.name)),
+    names: advised.map((device) => `${device.name} (${machineOf(device)})`),
+    machines: [...new Set(advised.map(machineOf))],
   };
 }

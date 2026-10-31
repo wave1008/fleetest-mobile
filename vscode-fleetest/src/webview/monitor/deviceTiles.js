@@ -1673,11 +1673,11 @@ export function applyDevices(devices, filter) {
 // (要素を作り直さない・説明文だけ setHoverTip で書く = 周期的な点滅を避ける)
 let rebootAdviceKey = '';
 function renderRebootAdvice(devices) {
-  const summary = rebootAdviceSummary(devices);
-  const key = summary ? summary.count + '\n' + summary.names.join('\n') : '';
+  const summary = rebootAdviceSummary(devices, LOCAL_MACHINE_LABEL);
+  const key = summary ? summary.names.join('\n') : '';
   if (key === rebootAdviceKey) { return; }
   rebootAdviceKey = key;
-  rebootAdvice.textContent = summary ? t('wvMonitor.rebootAdvice.text', { names: summary.names.join(', '), count: summary.count }) : '';
+  rebootAdvice.textContent = summary ? t('wvMonitor.rebootAdvice.text', { names: summary.names.join(', '), machines: summary.machines.join(', ') }) : '';
   rebootAdvice.classList.toggle('visible', summary !== null);
   setHoverTip(rebootAdvice, summary ? summary.names.join('\n') : '');
 }

@@ -1547,14 +1547,15 @@ test("isMonitorFromWebviewMessage: runProfileDevicesSync は add 要素が不正
 });
 
 
-test("rebootAdviceSummary: 戻らなかった台だけを数え、機械付きの名前を返す(無ければ null)", () => {
-  assert.equal(rebootAdviceSummary([{ name: "a", rebootAdvised: false }]), null);
+test("rebootAdviceSummary: 戻らなかった台の名前と再起動するマシンを返す(手元もマシン名で言う・無ければ null)", () => {
+  assert.equal(rebootAdviceSummary([{ name: "a", rebootAdvised: false }], "local"), null);
   assert.deepEqual(
     rebootAdviceSummary([
       { name: "a", rebootAdvised: true },
       { name: "b", machine: "M1Max", rebootAdvised: true },
       { name: "c", rebootAdvised: false },
-    ]),
-    { count: 2, names: ["a", "b (M1Max)"] },
+      { name: "d", machine: "M1Max", rebootAdvised: true },
+    ], "local"),
+    { names: ["a (local)", "b (M1Max)", "d (M1Max)"], machines: ["local", "M1Max"] },
   );
 });
