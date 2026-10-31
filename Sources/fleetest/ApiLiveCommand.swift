@@ -780,7 +780,7 @@ struct ApiLiveServe: AsyncParsableCommand {
                 if let humanLabel { deviceLease?.recordHumanOperation(label: humanLabel, ok: false, at: operatedAt) }
                 let message = await annotated(error, starter: starter, triggering: true, operated: true, port: port)
                 // **annotated の後で読む**: noteConnectionRefused() が idle→starting へ遷移させ得るため
-                let starting = await bridgeStartingFlag(starter)
+                let starting = Self.reportsBridgeStarting(await bridgeStartingFlag(starter), after: error)
                 emitLine(ApiLiveActionResultEvent(ok: false, error: message, app: follower?.sessionTarget,
                                                   dsl: rendered?.line, dslSelector: rendered?.selector,
                                                   bridgeStarting: starting))
@@ -818,14 +818,25 @@ struct ApiLiveServe: AsyncParsableCommand {
     /// 実地: 実機の起動待ち中に probe が transportFailed を返し、「起動中です(自然に直ります)」の
     /// 直後に「自然には直りません: bridge up してください」という矛盾した案内を出した。
     /// **失敗パスでだけ撃つ**(annotated は catch 節からしか呼ばれない = 成功パスへの往復は増えない)
-    /// `operated` = 操作を撃った失敗(観測の失敗は false)。届いたか分からない操作に「もう一度」と言わない = 人が二重に押す
+    /// `operated` = 操作の命令の失敗(観測の失敗は false)。操作の前の読みで落ちた回も含む = 分けられないので届いたか不明の側に倒す。
+    /// 届いたか分からない操作に「もう一度」と言わない = 人が二重に押す
     private func annotated(
         _ error: Error, starter: LiveBridgeAutoStarter?, triggering: Bool, operated: Bool, port: UInt16
     ) async -> String {
         let deliveryUnknown = operated && (error as? DriverError)?.deliveryIsUnknown == true
         let message = await guidance(error, starter: starter, triggering: triggering,
                                      retrySafe: !deliveryUnknown, port: port)
-        return deliveryUnknown ? message + Self.deliveryUnknownHint : message
+        return Self.withDeliveryNote(message, deliveryUnknown: deliveryUnknown)
+    }
+
+    static func withDeliveryNote(_ message: String, deliveryUnknown: Bool) -> String {
+        deliveryUnknown ? message + deliveryUnknownHint : message
+    }
+
+    /// 操作の失敗で `bridgeStarting` を立てるか。**届いたか分からない失敗では立てない**: 拡張は立っていると文言を
+    /// `live.bridgeStartingActionNotice`(表示されたら操作して)へ差し替え、配達の注記が人に届かない(monitorLiveController.ts)
+    static func reportsBridgeStarting(_ starting: Bool, after error: Error) -> Bool {
+        starting && (error as? DriverError)?.deliveryIsUnknown != true
     }
 
     private func guidance(
@@ -917,7 +928,7 @@ struct ApiLiveServe: AsyncParsableCommand {
                 + " rather than timing out — the bridge process itself is gone; only its transport is"
                 + " still holding the port (on a physical device this typically happens when the"
                 + " screen locks, or it leaves USB/Wi-Fi range). This will not recover on its own:"
-                + " run `fleetest bridge up` for this device, then try again."
+                + " run `fleetest bridge up` for this device" + (retrySafe ? ", then try again." : ".")
         case .timedOut:
             // **「切断ではない」と言い切らない**: プローブが時間切れでも、元の失敗が「接続が切れた」なら
             // ランナーが落ちる途中のことがある(実測: 約 10 秒後に接続拒否へ変わった = MN-84.8)。
@@ -925,10 +936,11 @@ struct ApiLiveServe: AsyncParsableCommand {
             return " The device is still connected, but its bridge did not answer a status check in time —"
                 + " most likely it is busy (for example, waiting for the screen to settle can take tens of"
                 + " seconds). " + (retrySafe ? "Wait a moment and try again" : "Wait a moment")
-                + "; if the next try reports the connection as refused, the bridge has exited."
+                + (retrySafe ? "; if the next try reports" : "; if the bridge then reports")
+                + " the connection as refused, the bridge has exited."
         case .notBound:
             return " Nothing is listening on this device's bridge port anymore. Run"
-                + " `fleetest bridge up` for this device, then try again."
+                + " `fleetest bridge up` for this device" + (retrySafe ? ", then try again." : ".")
         case .answered:
             return " The bridge answered just now — the earlier failure looks transient." + (retrySafe ? " Try again." : "")
         }

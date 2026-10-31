@@ -1,5 +1,6 @@
 import XCTest
 import FTBridgeClient
+import FTCore
 @testable import fleetest
 
 /// LIVE-1/LIVE-2: ライブ操作の失敗ヒントの文言選択(純粋関数だけ)。判定そのもの
@@ -45,11 +46,25 @@ final class ApiLiveConnectionHintTextTests: XCTestCase {
 
     /// 届いたか分からない操作の失敗には「もう一度」と言わない(人が効いた操作を二重に押す)
     func testAnUnknownDeliveryIsNotToldToTryAgain() {
-        for probe in [BridgeDiscovery.StatusProbe.answered, .timedOut] {
+        for probe in [BridgeDiscovery.StatusProbe.answered, .timedOut, .transportFailed, .notBound] {
             XCTAssertTrue(ApiLiveServe.bridgeUnreachableHint(probe: probe, retrySafe: true).lowercased().contains("try again"), "\(probe)")
-            XCTAssertFalse(ApiLiveServe.bridgeUnreachableHint(probe: probe, retrySafe: false).lowercased().contains("try again"), "\(probe)")
+            let unsafe = ApiLiveServe.bridgeUnreachableHint(probe: probe, retrySafe: false).lowercased()
+            XCTAssertFalse(unsafe.contains("try again") || unsafe.contains("next try"), unsafe)
         }
+    }
+
+    func testTheDeliveryNoteIsAddedOnlyWhenTheDeliveryIsUnknown() {
+        XCTAssertEqual(ApiLiveServe.withDeliveryNote("m", deliveryUnknown: false), "m")
+        XCTAssertEqual(ApiLiveServe.withDeliveryNote("m", deliveryUnknown: true), "m" + ApiLiveServe.deliveryUnknownHint)
         XCTAssertTrue(ApiLiveServe.deliveryUnknownHint.contains("check the screen"))
+    }
+
+    /// 立てると拡張が文言を差し替え、配達の注記が人に届かない
+    func testAnUnknownDeliveryDoesNotReportTheBridgeAsStarting() {
+        let context = DriverErrorContext(bridge: .iosXCUITest, physicalDevice: false)
+        XCTAssertFalse(ApiLiveServe.reportsBridgeStarting(true, after: DriverError.bridgeUnreachable(context: context, detail: "")))
+        XCTAssertTrue(ApiLiveServe.reportsBridgeStarting(true, after: DriverError.bridgeConnectionRefused(context: context, detail: "")))
+        XCTAssertFalse(ApiLiveServe.reportsBridgeStarting(false, after: DriverError.bridgeConnectionRefused(context: context, detail: "")))
     }
 
     /// 4状態それぞれ違う文言を返すこと(丸めて同じ文言に潰すと状態を見分けた意味が無い)

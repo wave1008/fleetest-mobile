@@ -787,13 +787,7 @@ extension MCPServer {
             }
             let refNote = index == 0 ? (refResolutionNote ?? "") : ""
             guard StepExecutor.isSuccess(outcome.status) else {
-                let reason: String
-                switch outcome.status {
-                case .failed(let message), .skipped(let message), .inconclusive(let message):
-                    reason = message
-                case .passed, .passedViaFallback, .healed:
-                    reason = "could not confirm the result"
-                }
+                let reason = Self.failureReason(outcome)
                 var coveredNote = ""
                 if let thrown = outcome.thrownDriverError { coveredNote = await coveredDriverErrorHint(thrown, args: args) }
                 lines.append("\(index + 1). \(plan.summary) — FAILED (\(ms)ms): \(Self.batchWritableAdvice(reason))"
@@ -993,11 +987,8 @@ extension MCPServer {
             return "\n   (the connection to the driver failed during this step, and whether it was delivered is unknown —"
                 + " it may already have been performed. Check the screen before repeating it; do not simply run the step again)"
         }
-        switch thrown {
-        case .notDelivered?, .bridgeConnectionRefused?: return ""
-        default:
-            guard failureKind == .driverUnreachable else { return "" }
-        }
+        // 投げられた case があるならそれが決めている(上で言わなかった手は未送信か応答あり)
+        guard thrown == nil, failureKind == .driverUnreachable else { return "" }
         return "\n   (the connection to the driver failed during this step: unless the error above says the connection was"
             + " refused — nothing listening, so the step was never sent — this step may already have been performed."
             + " Check the screen before repeating it; do not simply run the step again)"

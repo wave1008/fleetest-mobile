@@ -1653,13 +1653,7 @@ extension MCPServer {
             // ランナーは以後の読み取りを 422 で断る。投げ直すと「何回送って見つからなかったか」が 422 の一文に
             // 置き換わる(ft_batch の失敗の分岐と同じ型)。成功していたら撮れない以上確かめようがないので投げる
             guard !StepExecutor.isSuccess(outcome.status) else { throw error }
-            let reason: String
-            switch outcome.status {
-            case .failed(let message), .skipped(let message), .inconclusive(let message):
-                reason = message
-            case .passed, .passedViaFallback, .healed:
-                reason = "could not confirm the result"
-            }
+            let reason = Self.failureReason(outcome)
             // 元のエラーを抱えたまま投げる(MCPError に畳むと、接続断の案内 = 届いたか分からない・記憶の破棄が出ない)
             throw MCPAnnotatedError(underlying: error, suffix: "",
                                     prefix: scrollFrameLabelNote + "scrollTo \"\(selectorText)\": \(reason)"

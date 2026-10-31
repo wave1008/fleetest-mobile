@@ -74,6 +74,42 @@ final class ConnectionLossDeliveryTests: XCTestCase {
         XCTAssertTrue(MCPServer.executorFailure(StepOutcome(status: .failed("x"))) is MCPError)
     }
 
+    /// 接続拒否は包まない(包むと接続の記憶が消え、次の呼び出しが起動し直せない)
+    func testExecutorFailureLeavesARefusedConnectionForTheNextCall() {
+        let refused = DriverError.bridgeConnectionRefused(context: iosContext, detail: "")
+        XCTAssertTrue(MCPServer.executorFailure(StepOutcome(status: .failed("x"), thrownDriverError: refused)) is MCPError)
+    }
+
+    /// 接続断では閉じたかも分からないので、Enter を勧めない
+    func testAHideKeyboardThatLostTheConnectionDoesNotSuggestEnter() async {
+        let text = await failingHideKeyboardOnIOS(DriverError.bridgeUnreachable(context: iosContext, detail: "connection lost"))
+        XCTAssertTrue(text.contains("hideKeyboard failed: "), text)
+        XCTAssertFalse(text.contains("pressEnter"), text)
+    }
+
+    /// 3つの呼び手が全部 `executorFailure` を通る(戻すと配達の注記が黙って消える)
+    func testEveryDelegatedGestureThrowsThroughExecutorFailure() throws {
+        let path = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("Sources/fleetest-mcp/MCPServer+GesturesTools.swift")
+        let source = try String(contentsOf: path, encoding: .utf8)
+        XCTAssertEqual(source.components(separatedBy: "throw Self.executorFailure(outcome").count - 1, 3)
+        XCTAssertFalse(source.contains("throw MCPError(reason)"))
+    }
+
+    private func failingHideKeyboardOnIOS(_ error: Error) async -> String {
+        let driver = FakeDriver()
+        driver.tapError = error   // iOS はキーボードの外を叩いて閉じる
+        driver.snapshotResponse.keyboardShown = true
+        driver.snapshotResponse.keyboardFrame = FTRect(x: 0, y: 500, width: 390, height: 300)
+        let server = MCPServer(write: { _ in }, makeDriver: { _ in driver }, recordSnapshot: { _, _, _ in })
+        server.connectionFacts = facts()
+        let args: [String: Any] = ["port": 8100]
+        let key = MCPServer.sessionKey(args)
+        server.connections[key] = "port 8100"
+        server.connectedPorts[key] = 8100
+        return await message(of: server, tool: "ft_hide_keyboard", args: args)
+    }
+
     /// 全 case の表(`default` を置かない宣言と対で、配達の二値を等号で固定する)
     func testDeliveryIsUnknownForEveryCase() {
         let unknown: [DriverError] = [.bridgeUnreachable(context: androidContext, detail: ""), .deliveryUnknown(context: androidContext, detail: "")]

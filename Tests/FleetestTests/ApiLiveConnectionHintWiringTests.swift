@@ -61,6 +61,8 @@ final class ApiLiveConnectionHintWiringTests: XCTestCase {
         let code = try source()
         XCTAssertEqual(code.components(separatedBy: "operated: true, port: port)").count - 1, 1)
         XCTAssertEqual(code.components(separatedBy: "operated: false, port: port)").count - 1, 2)
+        XCTAssertTrue(code.contains("retrySafe: !deliveryUnknown"))
+        XCTAssertTrue(code.contains("Self.reportsBridgeStarting(await bridgeStartingFlag(starter), after: error)"))
         let perform = try XCTUnwrap(code.range(of: "try await perform(command: command"))
         let operated = try XCTUnwrap(code.range(of: "operated: true, port: port)"))
         XCTAssertLessThan(perform.lowerBound, operated.lowerBound)

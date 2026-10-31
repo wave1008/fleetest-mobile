@@ -222,22 +222,26 @@ extension MCPServer {
             + (await snapshotBody(rotated, driver: rotateDriver, args: args, foldsSelectorTables: true)))
     }
 
-    /// ft_hide_keyboard と replace の引き直しが共有する閉じ方の実行器。iOS はキーボードの上の空きを叩く・Android は戻るキー。
-    /// **Enter へは進まない**(消したばかりの欄・入力中の欄で確定させない)
-    /// StepExecutor へ委ねた手の失敗を投げる形へ。**投げられた `DriverError` は抱えたまま**(`MCPError` に畳むと配達の注記が出ない)
-    static func executorFailure(_ outcome: StepOutcome, prefix: String = "", suffix: String = "") -> Error {
-        let reason: String
+    /// StepExecutor へ委ねた手の失敗の文
+    static func failureReason(_ outcome: StepOutcome) -> String {
         switch outcome.status {
-        case .failed(let message), .skipped(let message), .inconclusive(let message): reason = message
-        case .passed, .passedViaFallback, .healed: reason = "could not confirm the result"
+        case .failed(let message), .skipped(let message), .inconclusive(let message): return message
+        case .passed, .passedViaFallback, .healed: return "could not confirm the result"
         }
-        let message = prefix + reason + suffix
-        if let cause = outcome.thrownDriverError {
+    }
+
+    /// StepExecutor へ委ねた手の失敗を投げる形へ。**届いたか分からない失敗だけ `DriverError` を抱える**(`MCPError` に畳むと配達の注記が消える)。
+    /// 接続拒否は包まない: 接続の記憶が残れば次の呼び出しが起動し直せる。ここで復帰の撃ち直しへ渡さないのは、手が途中まで届いていることがあるから
+    static func executorFailure(_ outcome: StepOutcome, prefix: String = "", suffix: String = "") -> Error {
+        let message = prefix + failureReason(outcome) + suffix
+        if let cause = outcome.thrownDriverError, cause.deliveryIsUnknown {
             return MCPAnnotatedError(underlying: cause, suffix: "", fullMessage: message)
         }
         return MCPError(message)
     }
 
+    /// ft_hide_keyboard と replace の引き直しが共有する閉じ方の実行器。iOS はキーボードの上の空きを叩く・Android は戻るキー。
+    /// **Enter へは進まない**(消したばかりの欄・入力中の欄で確定させない)
     func hideKeyboardExecutor(_ driver: AppDriver, args: [String: Any]) async -> (executor: StepExecutor, isAndroid: Bool) {
         let (isAndroid, uiFramework) = await resolveExecutorHints(driver, args: args)
         let executor = StepExecutor(driver: driver, releasesScrollTouch: !isAndroid,
@@ -286,7 +290,8 @@ extension MCPServer {
         }
         let outcome = await executor.execute(FlowStep(action: "hideKeyboard"))
         guard StepExecutor.isSuccess(outcome.status) else {
-            throw Self.executorFailure(outcome, prefix: "hideKeyboard failed: ", suffix: isAndroid ? ""
+            // 閉じなかったと確定した失敗だけ別の手を勧める(接続断では閉じたかも分からない・Enter は送信や検索を走らせる)
+            throw Self.executorFailure(outcome, prefix: "hideKeyboard failed: ", suffix: isAndroid || outcome.thrownDriverError != nil ? ""
                 : " — ft_type pressEnter: true may close it, but Return also fires the field's action"
                     + " (submit, search or moving to the next field)")
         }
