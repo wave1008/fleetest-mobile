@@ -83,7 +83,7 @@ CLAUDE.md から移した規則(本文は移設前と同一)。この領域の�
   **割り込みの登録(`InterruptRelay.observing`)は手元の dispatch.lock を取る直前 = run-setup.sh・供給・ビルドより前**
   (run / api run とも1プロセス1回。recorder はビルド後に `attachRecorder` で後付け・オーケストレータは
   `attachLateSubscriber` で合流・`LocalDispatchLock.acquire(interruptCheck:)` に同じ状態を渡して待機用の2組目を立てない)。
-  段の境目で中断を見て既存の早期失敗の出口で抜ける(teardown・ロック解放は defer)。遅く登録すると、その間のシグナル
+  段の境目で中断を見て既存の早期失敗の出口で抜ける(**出口の順序は `RunExitGuard` の1箇所** = 供給の完了待ち → 片付け → dispatch.lock の解放 → 中断の登録の解除。本体の `defer` でロックを外すと、走っている供給・終了スクリプトの横で次の run が取れる = 2026-11-01 に実地で再現)。遅く登録すると、その間のシグナル
   (fan-out の子は ssh 切断の SIGHUP)が OS 既定の即死になり、teardown が走らず dispatch.lock が死んだ pid のまま残り、
   孤児のビルド・供給と次の run が重なる(`InterruptRelayEarlyRegistrationWiringTests`)→ MN-51。
   **限界: `swift build` の実行中の中断は、ビルドが終わってから拾う**(ビルドの子は interruptState に登録していない)。

@@ -22,15 +22,21 @@ extension ProfileRunner {
         var hookSession: RunHookSession?
         var supplyLease: SupplyLeaseHolder?
         private var done = false
+        /// **既定値を置かない**(`api run` の stdout は NDJSON 専用 = 片付けの行を混ぜると契約が壊れる)
+        private let log: (String) -> Void
+
+        init(log: @escaping (String) -> Void) {
+            self.log = log
+        }
 
         func run() {
             guard !done else { return }
             done = true
             supplyLease?.release()
-            if let hookSession { RunHookRunner.end(hookSession) { ConsoleOut.out($0) } }
-            servicesSession?.down { ConsoleOut.out($0) }
-            ProfileWorkerFactory.restoreAnimations(animationRestores) { ConsoleOut.out($0) }
-            ResponseMeasurementMonitorHold.release(responseMonitorHold) { ConsoleOut.out($0) }
+            if let hookSession { RunHookRunner.end(hookSession, log: log) }
+            servicesSession?.down(log: log)
+            ProfileWorkerFactory.restoreAnimations(animationRestores, log: log)
+            ResponseMeasurementMonitorHold.release(responseMonitorHold, log: log)
         }
     }
 
@@ -72,18 +78,6 @@ extension ProfileRunner {
         func settle() async {
             _ = try? await androidTask.value
             _ = await iosTask?.value
-        }
-    }
-
-    /// `fleetest run` がビルドの前に起こした準備の段の持ち場。`defer` の中では待てないので、本体の外側
-    /// (`RunScenarios.run()`)がどの経路で抜けても `settleAndClose()` を1回通す
-    final class EarlySupplyBox {
-        var supply: PreparedSupply?
-
-        func settleAndClose() async {
-            guard let supply else { return }
-            await supply.settle()
-            supply.close()
         }
     }
 
@@ -163,7 +157,7 @@ extension ProfileRunner {
         try Self.rejectIfDevicesLeasedBeforePreparation(resolved: resolved, leaseStateDir: hookStateDir)
         let reportDir = reportDirOverride.map { URL(fileURLWithPath: $0) } ?? resolved.reportDir
         // 以下で作るものは cleanup に積む。途中で throw したら積んだ分だけ片付ける(作り終えたら PreparedSupply.close() が持つ)
-        let cleanup = SupplyCleanup()
+        let cleanup = SupplyCleanup { ConsoleOut.out($0) }
         var handedOver = false
         defer { if !handedOver { cleanup.run() } }
         // レスポンス計測中はモニターを止める(ApiRunCommand.run と同じ)

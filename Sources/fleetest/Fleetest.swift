@@ -511,19 +511,18 @@ struct RunScenarios: AsyncParsableCommand {
             try await asSingleTarget(only).run()
             return
         }
-        // ビルドの前に起こした準備の段は、どの経路(失敗・中断・対象なし)で抜けても、供給のタスクが終わってから片付ける
-        // (`defer` の中では待てないので、本体の外側のここで1回だけ通す。EarlySupplyBox の宣言)
-        let early = ProfileRunner.EarlySupplyBox()
+        // どの経路(失敗・中断・対象なし)で抜けても、供給・片付け・ロックの解放をこの順で通す(RunExitGuard の宣言)
+        let runExit = RunExitGuard()
         do {
-            try await runBody(earlySupply: early)
+            try await runBody(runExit: runExit)
         } catch {
-            await early.settleAndClose()
+            await runExit.finish()
             throw error
         }
-        await early.settleAndClose()
+        await runExit.finish()
     }
 
-    private func runBody(earlySupply early: ProfileRunner.EarlySupplyBox) async throws {
+    private func runBody(runExit: RunExitGuard) async throws {
         // `--set` は validate() で検証済み(未知キー・不正値は既に弾かれている)。
         // **デバイスに依存しない設定は `--profile` の有無に関わらず1つの経路で決まる**
         // (`DeviceIndependentRunSettings`)。`--profile` ありの経路は `ProfileResolver.resolve`
@@ -606,7 +605,7 @@ struct RunScenarios: AsyncParsableCommand {
         // それらもカバーする(runParallel は orchestrator 構築後に attachLateSubscriber で合流する)
         let interruptState = RunInterruptState(recorder: nil)
         let interruptRelay = InterruptRelay.observing { interruptState.requestStop() }
-        defer { interruptRelay.stop() }
+        runExit.stopInterruptRelay = { interruptRelay.stop() }
 
         var dispatchLock: LocalDispatchLock.Holder?
         if !dryRun {
@@ -617,7 +616,7 @@ struct RunScenarios: AsyncParsableCommand {
                 log: { ConsoleOut.out($0) }
             ).acquire(interruptCheck: { interruptState.isStopped })
         }
-        defer { dispatchLock?.release() }
+        runExit.dispatchLock = dispatchLock
         let testProject = try ScenarioHost.project(named: common.project)
         PhaseLog.mark("project-resolved")
 
@@ -680,6 +679,7 @@ struct RunScenarios: AsyncParsableCommand {
         // ProfileRunner+Supply.swift)。台数はいま分かっている本数(`--scenario` の `Class.method` の明示だけ)で絞る。
         // 要らない回は一覧の後に ProfileRunner.run が正確な本数で絞る(並行にしても得が無く、絞り込みだけ緩む)。
         // `--failed` は対象が無ければ何もせず終わるので、開始スクリプトとサービスを空撃ちしないよう外す
+        var earlySupply: ProfileRunner.PreparedSupply?
         if let profile = common.profile, !dryRun, !common.skipBuild, !failed, ScenarioHost.buildNeeded(project: testProject) {
             let full = try ProfileRunner.resolveFullProfile(
                 project: testProject, profileName: profile, setOverrides: profileOverrides,
@@ -689,11 +689,19 @@ struct RunScenarios: AsyncParsableCommand {
             let exactCount = ApiRun.exactScenarioCount(scenarios)
             let estimate: Int? = exactCount > 0 ? exactCount : nil
             ConsoleOut.out("→ Preparing the devices while the scenarios build")
-            early.supply = try await ProfileRunner.prepareSupply(
-                full: full, profileName: profile, iosScenarios: estimate, androidScenarios: estimate,
-                scenarioCount: estimate, broadcast: broadcast,
-                reportDirOverride: reportDir, failureLogDir: nil,
-                supplyProgress: supplyProgress, interruptState: interruptState)
+            do {
+                let supply = try await ProfileRunner.prepareSupply(
+                    full: full, profileName: profile, iosScenarios: estimate, androidScenarios: estimate,
+                    scenarioCount: estimate, broadcast: broadcast,
+                    reportDirOverride: reportDir, failureLogDir: nil,
+                    supplyProgress: supplyProgress, interruptState: interruptState)
+                earlySupply = supply
+                runExit.settle = { await supply.settle() }
+                runExit.close = { supply.close() }
+            } catch {
+                writeJUnitForEarlyFailure(project: testProject, phase: "device supply", error: error)
+                throw error
+            }
         }
         // ビルドはホスト側で 1 回だけ(サブプロセスは自らビルドしない)
         if !common.skipBuild {
@@ -909,11 +917,11 @@ struct RunScenarios: AsyncParsableCommand {
                     workQueue: common.workQueue,
                     supplyProgress: supplyProgress,
                     interruptState: interruptState,
-                    early: early.supply)
+                    early: earlySupply)
                 // 片付け(終了スクリプト・サービス)は結果を書く前に済ませる(準備の段を ProfileRunner.run が持つ回と同じ順)
-                await early.settleAndClose()
+                await runExit.settleAndClose()
             } catch {
-                await early.settleAndClose()
+                await runExit.settleAndClose()
                 // 供給段(ワーカー構築等)の例外は run.json を完了させずに投げていた
                 // (finishedAt 無し = results insights が「クラッシュ/強制終了」に誤分類する)。
                 // ここへ来るのは常にシナリオ実行が

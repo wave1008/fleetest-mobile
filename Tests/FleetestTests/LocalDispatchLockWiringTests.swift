@@ -20,15 +20,17 @@ final class LocalDispatchLockWiringTests: XCTestCase {
         try String(contentsOf: Self.repoRoot.appendingPathComponent(path), encoding: .utf8)
     }
 
-    /// 2つの入口が**どちらも1回だけ**取り、**必ず defer で外す**。
-    /// 片方だけだとその経路の run が緑のままロック無しで走る
+    /// 2つの入口が**どちらも1回だけ**取り、**外すのは本体の外の `RunExitGuard`**(本体の defer で外すと、
+    /// 走っている供給・終了スクリプトの横で次の run が取れる)。片方だけだとその経路の run が緑のままロック無しで走る
     func testBothRunEntryPointsTakeTheLockOnceAndReleaseItOnEveryExit() throws {
         for path in ["Sources/fleetest/Fleetest.swift", "Sources/fleetest/ApiRunCommand.swift"] {
             let text = try source(path)
             XCTAssertEqual(text.components(separatedBy: "LocalDispatchLock(").count - 1, 1,
                            "\(path): 手元のロックを取る箇所が1つでない")
-            XCTAssertTrue(text.contains("defer { dispatchLock?.release() }"),
-                          "\(path): 解放が defer に無い(失敗・中断でロックが残る)")
+            XCTAssertTrue(text.contains("runExit.dispatchLock = dispatchLock"),
+                          "\(path): 解放を RunExitGuard へ渡していない(失敗・中断でロックが残る)")
+            XCTAssertFalse(text.contains("dispatchLock?.release()"),
+                           "\(path): 本体でロックを外している(供給・片付けより先に外れる)")
         }
     }
 

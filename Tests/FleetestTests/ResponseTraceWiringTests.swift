@@ -44,19 +44,19 @@ final class ResponseTraceWiringTests: XCTestCase {
         }
     }
 
-    /// run の取得と復元は準備の段(ProfileRunner+Supply.swift)にある
+    /// run の取得は準備の段(ProfileRunner+Supply.swift)にある。復元は両方とも `SupplyCleanup` の1箇所
     func testBothEntrancesCaptureBeforeAndRestoreAfterTheAnimationSync() throws {
         for path in ["Sources/fleetest/ProfileRunner+Supply.swift", "Sources/fleetest/ApiRunCommand.swift"] {
             let lines = try Self.code(path)
             let capture = try XCTUnwrap(lines.firstIndex { $0.contains("captureAnimationRestore(") }, path)
-            let restore = try XCTUnwrap(lines.firstIndex { $0.contains("restoreAnimations(") }, path)
             XCTAssertEqual(lines.filter { $0.contains("captureAnimationRestore(") }.count, 1, path)
-            XCTAssertEqual(lines.filter { $0.contains("restoreAnimations(") }.count, 1, path)
+            XCTAssertTrue(lines.contains { $0.hasPrefix("cleanup.animationRestores = ") }, "\(path): 片付けへ渡していない")
             // 取得は Android のレーン(開始時の同期 = buildAndroidWorkers を含む)を呼ぶ行より前
             let build = try XCTUnwrap(lines.firstIndex { $0.contains("ProfileSupplyLanes.android(") }, path)
             XCTAssertLessThan(capture, build, "\(path): 同期の後に元の値を読んでいる")
-            _ = restore
         }
+        let supply = try Self.code("Sources/fleetest/ProfileRunner+Supply.swift")
+        XCTAssertEqual(supply.filter { $0.contains("restoreAnimations(") }.count, 1, "片付けの中に復元が無い")
     }
 
     func testSessionNeverReadsAPipeToTheEnd() throws {

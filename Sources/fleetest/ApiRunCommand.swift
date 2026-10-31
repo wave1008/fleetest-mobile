@@ -227,6 +227,18 @@ struct ApiRunCommand: AsyncParsableCommand {
         // 子プロセスを1本も起こす前に(供給の adb なども stdin を受け継ぐ)
         if common.workQueue { _ = WorkQueueStdin.claim() }
         try common.rejectWorkQueueMeasurement(setOverrides: setOverrides)
+        // どの経路で抜けても、供給・片付け・ロックの解放をこの順で通す(RunExitGuard の宣言)
+        let runExit = RunExitGuard()
+        do {
+            try await runBody(runExit: runExit)
+        } catch {
+            await runExit.finish()
+            throw error
+        }
+        await runExit.finish()
+    }
+
+    private func runBody(runExit: RunExitGuard) async throws {
         // pause等のイベントが既定の全バッファに滞留すると読み手(VSCode拡張)と相互待ちになる
         // (ScenarioRunnerMain.swift の --debug 実装と同じ理由)。--debug 以外も常に行バッファにする
         setvbuf(stdout, nil, _IOLBF, 0)
@@ -312,7 +324,7 @@ struct ApiRunCommand: AsyncParsableCommand {
         // (runWithProfileParallel は orchestrator 構築後に attachLateSubscriber で合流する)
         let interruptState = RunInterruptState(recorder: nil)
         let interruptRelay = InterruptRelay.observing { interruptState.requestStop() }
-        defer { interruptRelay.stop() }
+        runExit.stopInterruptRelay = { interruptRelay.stop() }
 
         // **この Mac のロックを、デバイスにもビルドにも触る前に取る**(`fleetest run` と同じ位置・
         // 同じ理由。ユーザー決定「1つのマシンで同時に複数の run は走らせない」)。
@@ -333,7 +345,7 @@ struct ApiRunCommand: AsyncParsableCommand {
                 emitWaiting: LocalDispatchLock.apiRunWaitingEmitter()
             ).acquire(interruptCheck: { interruptState.isStopped })
         }
-        defer { dispatchLock?.release() }
+        runExit.dispatchLock = dispatchLock
 
         // --debug: stdin を専用スレッドで読み行をそのままランナーへ渡す。ScenarioHost.run が
         // 起動直後に onControl で渡す ScenarioRunControl を待つ必要があるため、繋がるまでの行は DebugStdinRelay が貯める
@@ -449,18 +461,11 @@ struct ApiRunCommand: AsyncParsableCommand {
         // 使うデバイスと一致していないと `adb reverse` の宛先がずれる)。
         // **dry-run では撃たない**(`fleetest run` の dry-run 分岐と同じ)—— dry-run は dispatch.lock を取らないので、
         // 走行中の run の依存サービスを run-teardown.sh が落としうる
-        var hookSession: RunHookSession?
+        // 片付けの順序は `fleetest run` と同じ `SupplyCleanup` の1箇所(走るのは本体の外の RunExitGuard)
+        let cleanup = ProfileRunner.SupplyCleanup { logStderr($0) }
+        runExit.close = { cleanup.run() }
         // サービス(scripts/compose.yaml)は開始スクリプトの前に上げ、片付けは終了スクリプトの後
-        // (この defer は下の終了スクリプトの defer より先に書く = 後に走る)
         var servicesSession: ServicesSession?
-        defer { servicesSession?.down { logStderr($0) } }
-        // この defer は関数のスコープに置く(if の中に置くとブロックの終わりで外れる)
-        var responseMonitorHold: ResponseMeasurementMonitorHold.Handle?
-        defer { ResponseMeasurementMonitorHold.release(responseMonitorHold) { logStderr($0) } }
-        // 計測 run が書き換えた Android 実機のアニメーション設定を終了時に戻す(ProfileRunner.run と同じ)。
-        // 取得は開始時の同期(buildAndroidWorkers)より前に行う
-        var animationRestores: [ProfileWorkerFactory.AnimationRestore] = []
-        defer { ProfileWorkerFactory.restoreAnimations(animationRestores) { logStderr($0) } }
         // iOS 実機の計測だけ録る xctrace(開始は供給の後・配布の前、止めて結果へ入れるのは run の後。ProfileRunner.run と同じ)
         var responseTrace: ResponseTraceSession?
         defer { responseTrace?.cleanup() }
@@ -468,20 +473,22 @@ struct ApiRunCommand: AsyncParsableCommand {
             let hookStateDir = (try? RepoRoot.find())?.appendingPathComponent(".fleetest")
             // レスポンス計測中はモニターを止める(ProfileRunner.run と同じ。解除は defer = 中断・エラーでも通る)
             if resolved.responseMeasurement, let hookStateDir {
-                responseMonitorHold = ResponseMeasurementMonitorHold.acquire(stateDir: hookStateDir) { logStderr($0) }
+                cleanup.responseMonitorHold = ResponseMeasurementMonitorHold.acquire(stateDir: hookStateDir) { logStderr($0) }
             }
             // 二重使用は開始スクリプトと破壊的な準備より前に断る(ProfileRunner と同じ判定)
             try ProfileRunner.rejectIfDevicesLeasedBeforePreparation(
                 resolved: resolved, leaseStateDir: hookStateDir)
             // 他の run が使っているデバイスを断った後に取る(断られた run が他人の設定を戻さない)
             if resolved.responseMeasurement {
-                animationRestores = ProfileWorkerFactory.captureAnimationRestore(resolved: resolved)
+                // 取得は開始時の同期(buildAndroidWorkers)より前に行う
+                cleanup.animationRestores = ProfileWorkerFactory.captureAnimationRestore(resolved: resolved)
             }
             servicesSession = try ServicesSession.up(
                 resolved: resolved, stateDir: hookStateDir, options: .forRun(resolved), supplyProgress: supplyProgress,
                 interruptState: interruptState) { logStderr($0) }
+            cleanup.servicesSession = servicesSession
             do {
-                hookSession = try RunHookRunner.begin(
+                cleanup.hookSession = try RunHookRunner.begin(
                     resolved: resolved, stateDir: hookStateDir, services: servicesSession, interrupt: interruptState) { logStderr($0) }
             } catch {
                 // run-setup.sh の失敗 = サービスのログも証跡に残す(記録はまだ無いのでレポートの出力先へ。ProfileRunner.run と同じ)
@@ -489,11 +496,7 @@ struct ApiRunCommand: AsyncParsableCommand {
                 throw error
             }
         }
-        defer {
-            if let hookSession { RunHookRunner.end(hookSession) { logStderr($0) } }
-        }
-        // **run-setup.sh の後で中断を見る**(既存の早期失敗と同じ出口 —— teardown は上の defer が
-        // 撃つ・ロックは dispatchLock の defer が外す)。ここではまだ供給タスクが1つも起きていない
+        // **run-setup.sh の後で中断を見る**(既存の早期失敗と同じ出口 —— 片付けとロックの解放は RunExitGuard)。ここではまだ供給タスクが1つも起きていない
         if interruptState.isStopped {
             throw RunInterruptedBeforeStartError(phase: "the run setup script")
         }
@@ -506,9 +509,8 @@ struct ApiRunCommand: AsyncParsableCommand {
         }
 
         // ワーカー並列実行経路のときだけビルドと並行してワーカー(iOSブリッジ起動/Android照合+
-        // インストール)を先行構築する。build/list/selected の解決が途中で throw した場合、この
-        // Task は待たずプロセスごと終了してよい: detach 起動されたブリッジ(xcodebuild/simctl)は
-        // 常駐資産として残り次回再利用されるため無害
+        // インストール)を先行構築する。build/list/selected の解決が途中で throw しても、この Task が
+        // 終わってから片付ける(走っている供給の横で終了スクリプト・サービスの停止を撃たない = RunExitGuard)
         // Android(serial 照合+インストール確認=数秒)と iOS(ブリッジ供給=壊れたブリッジの
         // 置き換えで数十秒かかりうる)を分離する。Android は先行ワーカーとして即時実行を開始し、
         // iOS は RunOrchestrator の lateWorkers として供給完了後に合流する(実測: 供給待ちで
@@ -523,7 +525,7 @@ struct ApiRunCommand: AsyncParsableCommand {
         // シナリオ実行中しか書かれず、その手前に start-device が割り込む穴が空くため
         let supplyLease = (try? RepoRoot.find())
             .map { SupplyLeaseHolder(stateDir: $0.appendingPathComponent(".fleetest")) }
-        defer { supplyLease?.release() }
+        cleanup.supplyLease = supplyLease
         let androidWorkersTask: Task<[RunWorker], Error>?
         var iosWorkersTask: Task<[RunWorker], Never>?
         if let resolvedProfile, !dryRun, debugOptions == nil {
@@ -555,6 +557,11 @@ struct ApiRunCommand: AsyncParsableCommand {
             }
         } else {
             androidWorkersTask = nil
+        }
+        let supplyTasks = (android: androidWorkersTask, ios: iosWorkersTask)
+        runExit.settle = {
+            _ = try? await supplyTasks.android?.value
+            _ = await supplyTasks.ios?.value
         }
 
         // **ビルドの前にも中断を見る**(供給タスクが既に走っている可能性があるのでキャンセルする)
