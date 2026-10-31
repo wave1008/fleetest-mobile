@@ -45,8 +45,7 @@ final class RunEarlySupplyWiringTests: XCTestCase {
         let lines = try code("Sources/fleetest/ApiRunCommand.swift")
         XCTAssertEqual(lines.filter { $0.hasPrefix("runExit.settle = ") }.count, 1, "供給のタスクを出口へ渡していない")
         XCTAssertFalse(lines.contains { $0.contains("WorkersTask?.cancel()") }, "レーンは cancel を見ず、sleep の待ちだけが消える")
-        XCTAssertEqual(lines.filter { $0.contains("isStopped: { interruptState.isStopped || supplyAbandon.isAbandoned }") }.count, 2,
-                       "供給のレーンへ放棄の印を渡していない")
+        XCTAssertEqual(lines.filter { $0.contains("isStopped: shouldStop") }.count, 2, "供給のレーンへ放棄の印を渡していない")
         XCTAssertEqual(lines.filter { $0.hasPrefix("runExit.close = ") }.count, 1, "片付けを出口へ渡していない")
         let body = try XCTUnwrap(lines.firstIndex { $0.hasPrefix("private func runBody(runExit:") })
         let end = try XCTUnwrap(lines[body...].firstIndex { $0.hasPrefix("private func dispatchToRemoteHost") })
@@ -64,12 +63,30 @@ final class RunEarlySupplyWiringTests: XCTestCase {
         let opener = try XCTUnwrap(lines[..<resolve].lastIndex { !$0.isEmpty })
         XCTAssertEqual(lines[opener], "do {", "プロファイルの解決(appPath の原本のステージング)の失敗を JUnit へ載せていない")
         XCTAssertLessThan(resolve, write)
+        XCTAssertEqual(lines[write - 1], "if !(error is RunInterruptedBeforeStartError) {", "中断は CI の失敗ではない")
     }
 
-    /// 終了スクリプトへ中断の状態を渡さない(中断済みの run の片付けを起動の直後に SIGTERM で止め、控えも消える)
+    /// 早期の供給を使わない回(ビルド不要)も同じ出口へ載せる(本体の defer で片付けると供給を待たず、ロックも先に外れる)
+    func testProfileRunnerHandsItsOwnSupplyToTheExitGuard() throws {
+        let lines = try code("Sources/fleetest/ProfileRunner.swift")
+        XCTAssertTrue(lines.contains("runExit.settle = { await prepared.settle() }"))
+        XCTAssertTrue(lines.contains("runExit.close = { prepared.close() }"))
+        XCTAssertFalse(lines.contains { $0.hasPrefix("defer") && $0.contains("prepared.close()") })
+        let mark = try XCTUnwrap(lines.firstIndex(of: "runExit.supplyAbandon.mark()"), "Android の失敗で iOS の供給を止めていない")
+        XCTAssertEqual(lines[mark + 1], "await prepared.settle()")
+    }
+
+    /// iOS のレーンはインストールの前で止まる(ここを過ぎると数分かかる供給を出口が待つ)
+    func testTheIOSLaneStopsBeforeInstalling() throws {
+        let lines = try code("Sources/fleetest/ProfileSupplyLanes.swift")
+        let install = try XCTUnwrap(lines.firstIndex { $0.contains("try await ProfileWorkerFactory.installIfNeeded(") && $0.hasPrefix("ws = ") })
+        XCTAssertTrue(lines[(install - 6)..<install].contains("if isStopped() {"))
+    }
+
+    /// 既に中断済みの run の終了スクリプトは止めない(起動の直後に SIGTERM で止まり、控えも消える)
     func testTheTeardownScriptIsNotStoppedByTheInterruptedRun() throws {
         let lines = try code("Sources/fleetest/RunHookRunner.swift")
-        XCTAssertFalse(lines.contains { $0.contains("session.interrupt") })
-        XCTAssertEqual(lines.filter { $0.hasPrefix("lease: session.lease, interrupt: nil, log: log)") }.count, 1)
+        XCTAssertTrue(lines.contains("lease: session.lease, interrupt: teardownInterrupt(session.interrupt), log: log)"))
+        XCTAssertTrue(lines.contains("interrupt: teardownInterrupt(interrupt), log: log)"), "setup の失敗の片付けも同じ")
     }
 }

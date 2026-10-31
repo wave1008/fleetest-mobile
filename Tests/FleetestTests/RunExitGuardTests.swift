@@ -91,6 +91,44 @@ final class RunExitGuardTests: XCTestCase {
         XCTAssertEqual(trace.steps, ["supply", "close"])
     }
 
+    /// ArgumentParser の ValidationError も文面が読める(「no scenarios」が理由の行に出る)
+    func testTheStopLineReadsAValidationError() async {
+        var logged: [String] = []
+        try? await RunExitGuard.run(log: { logged.append($0) }) {
+            $0.settle = {}
+            throw ValidationError("no scenarios")
+        }
+        XCTAssertEqual(logged, ["→ Stopping the device supply before cleaning up: no scenarios"])
+    }
+
+    /// 中断は受けた時に言っているので、待つ前の行を出さない
+    func testNoStopLineForAnInterruption() async {
+        var logged: [String] = []
+        try? await RunExitGuard.run(log: { logged.append($0) }) {
+            $0.settle = {}
+            throw RunInterruptedBeforeStartError(phase: "the test")
+        }
+        XCTAssertEqual(logged, [])
+    }
+
+    func testShouldStopSeesTheInterruptionAndTheAbandonment() {
+        let abandon = SupplyAbandon()
+        let check = abandon.shouldStop(RunInterruptState(recorder: nil))
+        XCTAssertFalse(check())
+        abandon.mark()
+        XCTAssertTrue(check())
+    }
+
+    /// 中断済みなら終了スクリプトへ渡さない(登録で止まる)・実行中の中断は受ける(刺さったスクリプトを止める口)
+    func testTeardownKeepsTheInterruptOnlyWhileNotYetStopped() {
+        let running = RunInterruptState(recorder: nil)
+        XCTAssertTrue(RunHookRunner.teardownInterrupt(running) === running)
+        let stopped = RunInterruptState(recorder: nil)
+        stopped.requestStop()
+        XCTAssertNil(RunHookRunner.teardownInterrupt(stopped))
+        XCTAssertNil(RunHookRunner.teardownInterrupt(nil))
+    }
+
     /// ロック前に抜けた経路(何も登録していない)でも落ちない
     func testFinishWithNothingRegisteredIsANoOp() async {
         await RunExitGuard().finish()

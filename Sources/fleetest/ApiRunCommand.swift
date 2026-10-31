@@ -522,7 +522,7 @@ struct ApiRunCommand: AsyncParsableCommand {
         var iosWorkersTask: Task<[RunWorker], Never>?
         if let resolvedProfile, !dryRun, debugOptions == nil {
             let resolved = resolvedProfile
-            let supplyAbandon = runExit.supplyAbandon
+            let shouldStop = runExit.supplyAbandon.shouldStop(interruptState)
             androidWorkersTask = Task {
                 let deviceList = resolved.devices
                     .map { "\($0.name)(\($0.platform))" }.joined(separator: ", ")
@@ -532,7 +532,7 @@ struct ApiRunCommand: AsyncParsableCommand {
                 // 除外されたら投げる = run を止める(ユーザー決定: 全滅は異常)
                 let workers = try await ProfileSupplyLanes.android(
                     resolved: resolved, supplyLease: supplyLease, supplyStage: supplyProgress.reporter,
-                    triage: triageBox, isStopped: { interruptState.isStopped || supplyAbandon.isAbandoned },
+                    triage: triageBox, isStopped: shouldStop,
                     wipeStatus: { self.emitLine(ApiWipeStatusEvent(device: $0, phase: $1)) }) { logSupply($0) }
                 // "🚀 Starting with…" は iOS の合流有無が分かってから1回だけ出す(下の
                 // RunStartLine.text 呼び出し。ここで固定文言を出すと iOS 0 台のプロファイルでも
@@ -545,7 +545,7 @@ struct ApiRunCommand: AsyncParsableCommand {
                     // 遅延参加(1台も合流しなければ配布を止める)か、performanceMode の LaneGate が決める
                     await ProfileSupplyLanes.ios(
                         resolved: resolved, supplyLease: supplyLease, supplyStage: supplyProgress.reporter,
-                        triage: triageBox, isStopped: { interruptState.isStopped || supplyAbandon.isAbandoned }) { logSupply($0) }
+                        triage: triageBox, isStopped: shouldStop) { logSupply($0) }
                 }
             }
         } else {

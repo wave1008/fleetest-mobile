@@ -126,6 +126,11 @@ enum ProfileSupplyLanes {
                 PhaseLog.mark("ios-workers-built")
                 return built
             }
+            // 中断・放棄の後は入れない(シナリオを配らないので、数分かかるインストールを出口が待つだけ)
+            if isStopped() {
+                log("⏹ stopping — skipping the rest of the device supply")
+                return ws
+            }
             // install 全滅の throw は握りつぶさない —— `try?` で受けると失敗前(=古いアプリのまま)の ws へ
             // 静かに戻る。投げれば下の catch がレーンを空にする
             ws = try await ProfileWorkerFactory.installIfNeeded(

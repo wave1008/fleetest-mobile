@@ -308,7 +308,9 @@ enum ProfileRunner {
                     interruptState: RunInterruptState,
                     // ビルドの前に済ませた準備の段(ビルドが要る回に呼び手が渡す。片付けも呼び手が持つ)。
                     // nil なら一覧の後にここで準備する。**既定値を置かない**(渡し忘れで並行にならないまま黙って通る)
-                    early: PreparedSupply?
+                    early: PreparedSupply?,
+                    // 準備の段の待ちと片付けはここへ載せる(本体の defer で片付けると、走っている供給の横で終了スクリプトが動く)
+                    runExit: RunExitGuard
     ) async throws -> (summary: RunSummary, fmSettings: FMSettingsRecord) {
         var items = rawItems
         let runClockStart = Date()
@@ -370,9 +372,10 @@ enum ProfileRunner {
                 iosScenarios: counts.ios, androidScenarios: counts.android,
                 scenarioCount: items.count, broadcast: broadcast, reportDirOverride: reportDirOverride,
                 failureLogDir: recorder?.runDir, supplyProgress: supplyProgress, interruptState: interruptState,
-                supplyAbandon: SupplyAbandon())
+                supplyAbandon: runExit.supplyAbandon)
+            runExit.settle = { await prepared.settle() }
+            runExit.close = { prepared.close() }
         }
-        defer { if early == nil { prepared.close() } }
         let resolved = prepared.resolved
         let reportDir = prepared.reportDir
         let leaseStateDir = prepared.leaseStateDir
@@ -391,7 +394,8 @@ enum ProfileRunner {
         do {
             workers = try await prepared.androidTask.value
         } catch {
-            // 片付け(defer の close)は iOS の準備が終わってから(PreparedSupply.settle の宣言)
+            // 片付けは iOS の準備が終わってから(PreparedSupply.settle の宣言)。もう要らないので段の境目で止める
+            runExit.supplyAbandon.mark()
             await prepared.settle()
             throw error
         }

@@ -692,7 +692,9 @@ struct RunScenarios: AsyncParsableCommand {
                 runExit.settle = { await supply.settle() }
                 runExit.close = { supply.close() }
             } catch {
-                writeJUnitForEarlyFailure(project: testProject, phase: "device supply", error: error)
+                if !(error is RunInterruptedBeforeStartError) {
+                    writeJUnitForEarlyFailure(project: testProject, phase: "device supply", error: error)
+                }
                 throw error
             }
         }
@@ -910,7 +912,7 @@ struct RunScenarios: AsyncParsableCommand {
                     workQueue: common.workQueue,
                     supplyProgress: supplyProgress,
                     interruptState: interruptState,
-                    early: earlySupply)
+                    early: earlySupply, runExit: runExit)
                 // 片付け(終了スクリプト・サービス)は結果を書く前に済ませる(準備の段を ProfileRunner.run が持つ回と同じ順)
                 await runExit.settleAndClose()
             } catch {

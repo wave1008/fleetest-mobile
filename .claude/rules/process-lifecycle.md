@@ -87,7 +87,7 @@ CLAUDE.md から移した規則(本文は移設前と同一)。この領域の�
   (fan-out の子は ssh 切断の SIGHUP)が OS 既定の即死になり、teardown が走らず dispatch.lock が死んだ pid のまま残り、
   孤児のビルド・供給と次の run が重なる(`InterruptRelayEarlyRegistrationWiringTests`)→ MN-51。
   **限界: `swift build` の実行中の中断は、ビルドが終わってから拾う**(ビルドの子は interruptState に登録していない)。
-  **run-setup.sh は `registerChildProcess` で中断を受け(run-teardown.sh は受けない = 中断済みの run の片付けを止めない)、終了は終了通知で待ち(パイプの EOF と独立)、終わったら
+  **run-setup.sh / run-teardown.sh は `registerChildProcess` で中断を受け(run-teardown.sh は既に中断済みなら登録しない = 中断した run の片付けを起動の直後に止めない。`RunHookRunner.teardownInterrupt`)、終了は終了通知で待ち(パイプの EOF と独立)、終わったら
   プロセスグループに残った子孫へ SIGTERM → 2 s → SIGKILL**(`RunHookRunner.sweepProcessGroup`。`setsid` で離脱した子孫は検出できない)。
   gateway(`ServiceGatewayServer`)の子も同じ猶予で止める
   **階層をまたぐ保証(起こした側 → `api run` → シナリオ実行バイナリ)は `CrossLayerTerminationTests` が

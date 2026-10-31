@@ -19,6 +19,7 @@ struct RunHookSession {
     let profile: ResolvedProfile
     let lease: RunHookLeaseFile?
     let inputs: RunHookLaunchInputs
+    let interrupt: RunInterruptState?
 }
 
 /// スクリプト1本を起こすのに要る、run から来る入力(setup と teardown で同じ。孤児の回収は控えから作り直す)
@@ -103,22 +104,28 @@ enum RunHookRunner {
         do {
             try run(hook: resolved.setupHook, contract: resolved, inputs: inputs, lease: lease, interrupt: interrupt, log: log)
         } catch {
-            // setup が落ちたら、そこまでに起きたものを片付けてから投げ直す(中断で落ちた回も片付けは止めない = `end` の宣言)
+            // setup が落ちたら、そこまでに起きたものを片付けてから投げ直す(中断で落ちた回も片付けは撃つ)
             runIgnoringResult(hook: resolved.teardownHook, contract: resolved, inputs: inputs, lease: lease,
-                              interrupt: nil, log: log)
+                              interrupt: teardownInterrupt(interrupt), log: log)
             lease?.remove()
             throw error
         }
-        return RunHookSession(teardown: resolved.teardownHook, profile: resolved, lease: lease, inputs: inputs)
+        return RunHookSession(teardown: resolved.teardownHook, profile: resolved, lease: lease, inputs: inputs,
+                              interrupt: interrupt)
     }
 
     /// 終了スクリプトを撃つ。**run の成否を変えない**(失敗は警告のみ。成果物回収と同じ規律)
     /// —— 片付けの失敗でテスト結果を赤にすると、通ったのか落ちたのかが読めなくなる。
-    /// **中断の状態を渡さない**: 渡すと中断済みの run の片付けを起動の直後に SIGTERM で止める(直後に控えも消えるので回収もされない)
     static func end(_ session: RunHookSession, log: (String) -> Void) {
         runIgnoringResult(hook: session.teardown, contract: session.profile, inputs: session.inputs,
-                          lease: session.lease, interrupt: nil, log: log)
+                          lease: session.lease, interrupt: teardownInterrupt(session.interrupt), log: log)
         session.lease?.remove()
+    }
+
+    /// 終了スクリプトへ渡す中断の状態。**既に中断済みなら渡さない**: 登録は中断済みの子をその場で止めるので、片付けが起動の直後に死に、
+    /// 控えも消えて回収されない。**実行中に届く中断は渡す**(タイムアウトが無いので、刺さったスクリプトを止める口がここだけ)
+    static func teardownInterrupt(_ interrupt: RunInterruptState?) -> RunInterruptState? {
+        interrupt?.isStopped == true ? nil : interrupt
     }
 
     // MARK: - 孤児の回収

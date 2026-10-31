@@ -8,11 +8,16 @@ final class SupplyAbandon: Sendable {
     private let abandoned = LockedValue(false)
     var isAbandoned: Bool { abandoned.withLock { $0 } }
     func mark() { abandoned.withLock { $0 = true } }
+
+    /// 供給のレーンへ渡す「止まるか」(条件を足すならここ1箇所)
+    func shouldStop(_ interruptState: RunInterruptState) -> @Sendable () -> Bool {
+        { [self] in interruptState.isStopped || isAbandoned }
+    }
 }
 
 /// **入口は `run(log:_:)` の1箇所**(`defer` の中では待てない)。順序: 供給のタスクを待つ → 片付け → 進捗の控えを消す →
 /// dispatch.lock の解放 → 中断の登録の解除。本体の `defer` でロックを外すと、走っている供給・終了スクリプトの横で
-/// 次の run がロックを取り、控えを先に消すとロックを握ったままマシンが空いて見える
+/// 次の run がロックを取る。控えもロックの直前に消す(シナリオの前に落ちた回。始まった run の控えは orchestrator の終了が消す)
 final class RunExitGuard {
     /// 供給のタスクが終わるまで待つ。起こしていなければ nil
     var settle: (() async -> Void)?
@@ -29,8 +34,8 @@ final class RunExitGuard {
         do {
             try await body(exit)
         } catch {
-            // 供給の完了を待つ間、落ちた理由が出ないと止まって見える(赤の run の ExitCode は理由を持たない)
-            if exit.settle != nil, !(error is ExitCode) {
+            // 供給の完了を待つ間、落ちた理由が出ないと止まって見える(赤の run の ExitCode は理由を持たない・中断は受けた時に言っている)
+            if exit.settle != nil, !(error is ExitCode), !(error is RunInterruptedBeforeStartError) {
                 log("→ Stopping the device supply before cleaning up: \(error.localizedDescription)")
             }
             await exit.finish()

@@ -209,15 +209,16 @@ extension ProfileRunner {
         // 2つのレーン(手順は ProfileSupplyLanes の1箇所)。Android(照合+インストール=数秒)と
         // iOS(ブリッジ供給=数十秒かかりうる)を別のタスクにし、互いを待たせない(api run と同じ形)
         let progress = supplyProgress.reporter
+        let shouldStop = supplyAbandon.shouldStop(interruptState)
         let androidTask = Task {
             try await ProfileSupplyLanes.android(
                 resolved: resolved, supplyLease: supplyLease, supplyStage: progress,
-                triage: triageBox, isStopped: { interruptState.isStopped || supplyAbandon.isAbandoned }) { ConsoleOut.out($0) }
+                triage: triageBox, isStopped: shouldStop) { ConsoleOut.out($0) }
         }
         let iosTask: Task<[RunWorker], Never>? = resolved.iosDevices.isEmpty ? nil : Task {
             await ProfileSupplyLanes.ios(
                 resolved: resolved, supplyLease: supplyLease, supplyStage: progress,
-                triage: triageBox, isStopped: { interruptState.isStopped || supplyAbandon.isAbandoned }) { ConsoleOut.out($0) }
+                triage: triageBox, isStopped: shouldStop) { ConsoleOut.out($0) }
         }
         handedOver = true
         return PreparedSupply(
