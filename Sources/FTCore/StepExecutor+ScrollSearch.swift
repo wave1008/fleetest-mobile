@@ -212,8 +212,7 @@ extension StepExecutor {
             let base = Self.scrollFrameFailFastMessage(step, action: "search", swipes: result?.swipes ?? 0)
             guard let front = result?.appLeftForeground else { return base }
             return base + " The app was not in the foreground at that point (\(front) was in front: the screen went off,"
-                + " a shade or another app came up), so the container did not vanish from the app — bring the app back"
-                + " with launch and search again."
+                + " a shade or another app came up), so the container did not vanish from the app — \(bringBackAdvice(front: front))."
         }
         let direction = FTSwipeDirection(rawValue: step.direction ?? "") ?? .up
         let vertical = direction == .up || direction == .down
@@ -230,7 +229,7 @@ extension StepExecutor {
         if let front = result?.appLeftForeground {
             // 端とも「何も動かなかった」とも言わない: 前面が別のアプリになった間の払いは、木が変わらないだけで端の証拠にならない
             stopped = " (the app was not in the foreground when the search stopped — \(front) was in front — so the"
-                + " screen did not show where the list ends; bring the app back with launch and search again)"
+                + " screen did not show where the list ends; \(bringBackAdvice(front: front)))"
         } else if result?.stoppedUnmoving == true {
             if result?.contentEverMoved == true {
                 stopped = " (the scroll area reached its end — the content stopped moving,"
@@ -359,22 +358,48 @@ extension StepExecutor {
         return elements.filter { frame(region, containsX: $0.frame.centerX, y: $0.frame.centerY) }
     }
 
-    /// 探索の対象のアプリ(`sessionBundleID`)が前面に居ないとき、前面の名前を返す。居る・確かめられない(ドライバが
-    /// 答えない・照会が失敗)は nil = 従来どおり端の判定へ進む(嘘を足さない)。
-    /// 前面を名指しできないドライバ(iOS)は `isAppForeground` だけで判断し、名前は "another app"
-    func frontAppIfSessionAppLeft(_ sessionBundleID: String?) async -> String? {
+    /// 探索の対象のアプリ(`sessionBundleID`)が前面に居ないとき、前面(または覆っている面)の呼び名を返す。居る・確かめられない
+    /// (ドライバが答えない・照会が失敗)は nil = 従来どおり端の判定へ進む(嘘を足さない)。
+    /// 前面を名指しできないドライバ(iOS)は `isAppForeground` だけで判断し、名前は "another app"。
+    /// `tree` = 打ち切る時点の木。Android はシェード/ロック画面の下でも前面のアプリ名が下のアプリのままなので、
+    /// 木が systemui のものなら木の種別で言う(費用ゼロ)。iOS の覆い(通知センター・スイッチャー等)は
+    /// `systemUICovering` を1回聞く。`asksAppState: false` = 前面の名前・木・覆いだけで言う(/appstate の「前面ではない」は聞かない。
+    /// 成功が正の経路(scrollToEdge)で、名前を言えない iOS の `false` を失敗に倒さないため)(打ち切りの1回だけ。毎手の照会ではない = OI-46)
+    func frontAppIfSessionAppLeft(_ sessionBundleID: String?, tree: SnapshotResponse? = nil,
+                                  asksAppState: Bool = true) async -> String? {
         guard let bundleID = sessionBundleID, !bundleID.isEmpty else { return nil }
-        // 判定は ForegroundState.judge。覆い・シェードの照会は撃たない(探索の打ち切りの1回に費用を足さない)
+        // 判定は ForegroundState.judge
         var facts = ForegroundFacts(launched: nil, sessionBundleID: bundleID)
+        if let tree, let treeSession = tree.sessionBundleID, treeSession != bundleID,
+           ForegroundState.systemDialogPackages.contains(treeSession) {
+            facts.sessionBundleID = treeSession
+            facts.tree = SystemUITreeKind.classify(sessionBundleID: treeSession, identifiers: tree.elements.map(\.identifier))
+        }
         facts.front = await ForegroundState.frontProbe(driver)
-        if facts.front.value == nil {
+        if asksAppState, facts.front.value == nil {
             facts.sessionInForeground = await ForegroundState.inForegroundProbe(driver, bundleID: bundleID)
         }
+        facts.covering = await ForegroundState.coveringProbe(driver)
         switch ForegroundState.judge(facts) {
         case .otherApp(let name): return name ?? "another app"
         case .dialog(let package): return package == bundleID ? nil : package
+        case .covered(let surface): return surface.displayName
+        case .locked: return ForegroundState.lockScreenName
         default: return nil
         }
+    }
+
+    /// `frontAppIfSessionAppLeft` の答えに続ける対処。**前面がシステムのダイアログなら launch を勧めない**
+    /// (launch はアプリを起こし直してダイアログを画面に残す = ループ)。覆い・ロック画面(「the …」)は閉じるのが先
+    static func bringBackAdvice(front: String) -> String {
+        if ForegroundState.systemDialogPackages.contains(front) {
+            return "operate or dismiss that dialog first (launch restarts the app and leaves the dialog on screen), then search again"
+        }
+        if front.hasPrefix("the ") || front.hasPrefix("Control Center") || front.hasPrefix("a system surface") {
+            return "dismiss it first (Android: back closes a shade, a locked screen needs unlocking; iOS: swipe up from the bottom edge"
+                + " or press home), then search again"
+        }
+        return "bring the app back with launch and search again"
     }
 
     /// 失敗経路で「覆われた」と言う前に、アプリが前面を離れていた事実があれば添える。
@@ -382,7 +407,7 @@ extension StepExecutor {
     func leftForegroundSuffix(_ sessionBundleID: String?) async -> String {
         guard let front = await frontAppIfSessionAppLeft(sessionBundleID) else { return "" }
         return " (the app was not in the foreground when this failed — \(front) was in front, so the target was not"
-            + " covered by the app's own UI: bring the app back with launch)"
+            + " covered by the app's own UI: \(Self.bringBackAdvice(front: front)))"
     }
 
     /// `notExist(scroll:)` の裏返し: スクロール探索中に見つかってしまったら不在検証は失敗
@@ -963,7 +988,7 @@ extension StepExecutor {
                                                      scrollFrameMissing: true,
                                                      maxTruncatedDuringSearch: truncatedDuringSearch)
                     // 容器が消えた理由が「前面を奪われた(消灯・シェード・別のアプリ)」なら、それを言う(払いを送った後だけ)
-                    if swipes > 0 { missing.appLeftForeground = await frontAppIfSessionAppLeft(searchBundleID) }
+                    if swipes > 0 { missing.appLeftForeground = await frontAppIfSessionAppLeft(searchBundleID, tree: snapshot) }
                     return missing
                 }
                 // **探索の途中で画面の大きさが変わった(端末が回った)なら、端とは言わず止める**:
@@ -1017,7 +1042,7 @@ extension StepExecutor {
                         }
                         // **前面を奪われていたなら、端とは言わず、展開も逆走査も撃たない**(別のアプリの上へ払い続けない)。
                         // 木が変わらない = 端、は自アプリが前面に居る間だけ成り立つ。確かめるのは打ち切る局面の1回だけ
-                        if let front = await frontAppIfSessionAppLeft(searchBundleID ?? snapshot.sessionBundleID) {
+                        if let front = await frontAppIfSessionAppLeft(searchBundleID ?? snapshot.sessionBundleID, tree: snapshot) {
                             var left = ScrollSearchResult(found: false, fallback: nil, viaXCUITest: viaXCUITest,
                                                           hintJumps: hintJumps, swipes: swipes,
                                                           maxTruncatedDuringSearch: truncatedDuringSearch)

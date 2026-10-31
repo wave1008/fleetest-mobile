@@ -1694,9 +1694,15 @@ extension MCPServer {
     /// `/appstate` へ聞いて「今 前面か」を言う(実機の iPhone 13 では**その照会が
     /// 前面と答えて黙った**実測がある)。こちらは照会に頼らず「ツール自身が背面化させた」
     /// という事実だけで言うので、プラットフォームの答えが当てにならない機械でも必ず出る
-    static func backgroundingNavigationNote(target: String, bridge: String?) -> String {
+    /// `switcherSeen` = appSwitcher を送った直後に SpringBoard へ聞いた答え(false = スイッチャーが見えない。nil = 聞けていない)
+    static func backgroundingNavigationNote(target: String, bridge: String?, switcherSeen: Bool? = nil) -> String {
         guard target == "home" || target == "appSwitcher",
               bridge == nil || bridge == "xcuitest" else { return "" }
+        if target == "appSwitcher", switcherSeen == false {
+            return ". The App Switcher was not seen open: SpringBoard reports no switcher over the app. A notification centre"
+                + " or Control Center that was down is closed by this gesture instead, so the app is probably still in front"
+                + " — check ft_snapshot / ft_screenshot, and send appSwitcher again if you need it"
+        }
         if target == "appSwitcher" {
             return ". The App Switcher opened, but the session still points at the app, so"
                 + " ft_snapshot may keep returning the app's tree, and a tap by ref there could"
@@ -1964,7 +1970,9 @@ extension MCPServer {
         case .locked:
             return "⚠️ This tree is the lock screen / always-on display (\(session)), not \(launched):"
                 + " the device screen went dark or is locked, so it is not a dialog to operate. The"
-                + " next tool call wakes the screen — read the screen again before acting.\n"
+                + " next tool call wakes a dark screen — read the screen again; if the screen is already on and this"
+                + " tree comes back, the device is locked (the tool cannot enter a PIN, pattern or password): unlock it"
+                + " by hand, then ft_launch \(launched) with resume: true.\n"
         case .covered:
             // 通知シェード・クイック設定の要素がある systemui の木。権限ダイアログではなく、アプリは下で生きている
             return "⚠️ \(session) (the notification shade or quick settings) is drawn over \(launched), not a dialog of the app."

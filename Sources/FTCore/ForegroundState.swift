@@ -41,14 +41,28 @@ public enum CoveringSurface: Equatable, Sendable {
     case shade
     case other(String)
 
-    /// `BridgeAPI.systemUICoveringMarkers` の目印から面を引く
+    /// `BridgeAPI.systemUICoveringMarkers` の目印から面を引く。
+    /// **窓の目印は前方一致**: ランナーは接尾辞付き(`SBSwitcherWindow:Main`)で返す(BridgeRouter の前方一致と同じ)
     public static func from(marker: String?) -> CoveringSurface {
         switch marker {
-        case "SBCoverSheetWindow": return .coverSheet
-        case "SBSwitcherWindow": return .appSwitcher
+        case let m? where m.hasPrefix("SBCoverSheetWindow"): return .coverSheet
+        case let m? where m.hasPrefix("SBSwitcherWindow"): return .appSwitcher
         case let m? where m.hasPrefix("cc-"): return .controlCenter
         case let m?: return .other(m)
         case nil: return .other("unknown")
+        }
+    }
+}
+
+extension CoveringSurface {
+    /// 面の呼び名(ft_status・snapshot の注記・DSL の探索の打ち切りが共有する。文の組み立ては呼び手ごと)
+    public var displayName: String {
+        switch self {
+        case .coverSheet: return "the notification centre (or the lock screen)"
+        case .controlCenter: return "Control Center"
+        case .appSwitcher: return "the app switcher"
+        case .shade: return "the notification shade or quick settings"
+        case .other(let marker): return "a system surface (\(marker))"
         }
     }
 }
@@ -104,6 +118,8 @@ public enum SystemUITreeKind: Equatable, Sendable {
 
 public enum ForegroundState {
     public static let springboard = "com.apple.springboard"
+    /// ロック画面の呼び名(`CoveringSurface.displayName` と同じ「the …」の形。DSL の探索の打ち切りが前面の名前の代わりに使う)
+    public static let lockScreenName = "the lock screen"
 
     /// システムダイアログのパッケージ/バンドル ID。これらへの切り替わりは「別アプリに迷い込んだ」ではなく
     /// 「対象アプリの上にシステム UI が出ている」(権限ダイアログを放置して ft_launch し直すループが実害だった)

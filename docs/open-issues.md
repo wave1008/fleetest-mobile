@@ -732,6 +732,24 @@
 - run の前の絞り込み(`Using 1 of 3`)が印のある台を避けない(run F9)
 - DSL の swipePointToPoint は画面外の座標を断らない(ft_batch だけ断る。画面端ちょうどの終点を使うシナリオが赤になるおそれ。mxl F3)
 
+### OI-90 前面と覆いの探索(11/01)でツール側では直せなかったもの
+- 状態: 経路確定
+- 確認: コミット未記録(2026-11-01)
+- 経緯: 発見: 10/31 の探索(a F2・p F14・p F3・p F4・mxa F4・mxa F5。所見は作業ログの findings-*.md)
+
+- **iOS のコントロールセンターが覆いとして検出されない**(Simulator の iOS 27: `/systemui/covering` が `{"covering":false}` 6/6・
+  SE3 実機 iOS 26.6: ft_status が `foreground: yes` 5/5)。目印 `BridgeAPI.systemUICoveringMarkers` の `cc-brightness-slider` /
+  `cc-volume-slider` が Simulator の CC に無い(木は「コントロールを追加」「電源」等)・SE3 は `probeSystemUICovering` が OR 述語の
+  firstMatch 1件だけ見るため、常に hittable な `SBSwitcherWindow:Main` が先に当たり cc-* に届かない疑い(推測)。
+  **直すにはランナー(BridgeRouter)の変更 = ブリッジの版上げが要る**ので、この回は触らない。CC の下の ft_tap(ref) は `done`(実際は CC が閉じるだけ)
+- **Android のロック画面と通知シェードを木から分けられない**(p F3・F4): `SystemUITreeKind.isLockScreenOrAlwaysOn` は bouncer 本体が無い回に
+  `quick_settings` でシェード側へ倒れる。ft_status は木を読まないので `.locked` の文言に届かない。`isKeyguardShowing`(dumpsys window)を
+  `AndroidDriver` に足して `ForegroundFacts` に渡せば直る(読みを足す設計の決定が先)。それまで座標の警告・ft_snapshot の文言は「back が効かなければロック画面」の留保で出す
+- **Android の探索の途中の前面の奪われ方(mxa F4・F5)は、探索の最中に adb でキーを入れる形でしか再現できない**。シェード・権限ダイアログへの対処文は
+  直したが、再生ケースにできていない。シェードは「打ち切りの時点で木が systemui のもの」のときだけ拾う(木が下のアプリのままの実装では拾えない)
+- **scrollToBottom / scrollToTop は、始める前に前面を離れていた形を拾わない**: Android の木のセッションは前面と一緒に替わるので、始点の木がランチャーなら
+  「対象のアプリ」が分からない(拾えるのは送りの途中で離れた形だけ)
+
 ### OI-85 軽い残り(負荷テスト)
 - 状態: 経路確定
 - 確認: コミット未記録(2026-10-30)

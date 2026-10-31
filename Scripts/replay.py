@@ -135,6 +135,7 @@ def round_problems(mcp, target, form):
         if is_error and not form.get("allowErrors"):
             return [f"{name} が失敗: {text[:240]}"]
     problems += [f"応答にあってはいけない: {s}" for s in form.get("replyReject", []) if s in reply]
+    problems += [f"応答に無い: {s}" for s in form.get("replyExpect", []) if s not in reply]
     if form.get("replyOnly"):
         return problems
     time.sleep(form.get("settleSeconds", 1))

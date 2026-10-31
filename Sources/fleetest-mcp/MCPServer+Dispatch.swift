@@ -701,11 +701,13 @@ extension MCPServer {
             let runNote = Self.toolAcceptsDeviceTarget(tool) ? markDeviceInUse(args: resolved) : nil
             // 案内は元のエラーの種類から決める(呼び手が文を足した MCPAnnotatedError でも消さない)
             let cause = (error as? MCPAnnotatedError)?.underlying ?? error
+            // 覆い(通知センター等)による断りは、ランナーの文言(別のアプリ・アラートのボタンを押せ)より先に事実を言う
+            let coveredHint = await coveredDriverErrorHint(cause, args: resolved)
             let hint = await connectionLostHint(cause, args: resolved, tool: tool)
                 + Self.setTextRefusedHint(tool: tool, args: resolved,
                                           message: cause.localizedDescription)
                 + Self.noReadableWindowHint(cause)
-                + Self.systemAlertBlockedHint(cause)
+                + (coveredHint.isEmpty ? Self.systemAlertBlockedHint(cause) : coveredHint)
                 + Self.accessibilityOutageHint(cause)
                 + (runNote.map { " " + $0 } ?? "")
                 + (unknownArgumentNote.isEmpty ? "" : " " + unknownArgumentNote)

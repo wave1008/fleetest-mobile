@@ -1,0 +1,51 @@
+{
+  "id": "a-F8",
+  "finding": "通知センターの上の ft_navigate appSwitcher が「The App Switcher opened」と言うが、実際は通知センターが閉じてアプリが前面に戻るだけ",
+  "platform": "ios",
+  "redNote": "直しの前後の赤は未確認(コンパイルしていない・デバイス未実行)。Simulator の iOS 27 で通知センターを ft_drag で降ろす形",
+  "setup": [
+    [
+      "ft_launch",
+      {
+        "bundleId": "com.ftester.e2e.ios"
+      }
+    ]
+  ],
+  "reset": [
+    [
+      "ft_launch",
+      {
+        "bundleId": "com.ftester.e2e.ios",
+        "resume": true
+      }
+    ]
+  ],
+  "resetSeconds": 1,
+  "rounds": 5,
+  "forms": [
+    {
+      "name": "ft_navigate appSwitcher の応答",
+      "steps": [
+        [
+          "ft_drag",
+          {
+            "fromX": 30,
+            "fromY": 2,
+            "toX": 30,
+            "toY": 600
+          }
+        ],
+        [
+          "ft_navigate",
+          {
+            "target": "appSwitcher"
+          }
+        ]
+      ],
+      "replyOnly": true,
+      "replyReject": [
+        "The App Switcher opened"
+      ]
+    }
+  ]
+}

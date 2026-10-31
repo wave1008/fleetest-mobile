@@ -1354,8 +1354,9 @@ extension MCPServer {
     /// MN-60)。**断らない**(ホーム画面を座標で触る意図があり得る)。
     /// 撃つ**前**に読む(その操作自身がアプリを離れた回に警告しない)。
     /// **判定材料が無いときは黙る**: ft_launch していない・ドライバが前面のアプリ名を答えない。
-    /// **iOS には問い合わせない**(`foregroundAppID` は通信せず nil)—— XCUITest のランナーは前面に無い
-    /// アプリへのジェスチャを自分で断り、in-app は前面から外れると撃てないので、届くのは Android だけ。
+    /// **iOS は前面のアプリ名を問い合わせない**(`foregroundAppID` は通信せず nil)—— XCUITest のランナーは前面に無い
+    /// アプリへのジェスチャを自分で断り、in-app は前面から外れると撃てない。ただし**通知センター・スイッチャーが覆う間は
+    /// アプリが前面のまま座標が覆いに当たる**ので、iOS は SpringBoard の覆い(`systemUICovering`)を1回だけ聞く。
     /// 権限ダイアログ(`systemDialogPackages`)は座標で押すのが正規の操作なので黙る
     static func frontAppWarning(launched: String, front: String?) -> String {
         guard let front, front != launched, !systemDialogPackages.contains(front) else { return "" }
@@ -1370,12 +1371,19 @@ extension MCPServer {
         guard let launched = launchedBundleIDs[Self.sessionKey(args)] else { return "" }
         var facts = ForegroundFacts(launched: launched, sessionBundleID: launched)
         if let android = driver as? AndroidDriver { facts.shadeHoldsInputFocus = await Self.shadeProbe(android) }
+        else { facts.covering = await ForegroundState.coveringProbe(driver) }   // iOS: SpringBoard の覆い(通知センター・スイッチャー等)
         facts.front = await ForegroundState.frontProbe(driver)
         switch ForegroundState.judge(facts) {
         case .covered(.shade):
             return " (warning: the notification shade or quick settings is open over \(launched) (the app this session launched)"
-                + " — this acted on the shade, not the app. ft_navigate back closes it and keeps the app's state,"
+                + " — this acted on the shade, not the app. ft_navigate back closes it and keeps the app's state"
+                // ロック画面の窓も入力フォーカスを持つので、シェードと分けられない(解除が先)
+                + " (if back changes nothing, this is the lock screen: unlock the device first),"
                 + " or ft_snapshot to see what is on screen)"
+        case .covered(let surface):
+            return " (warning: \(Self.coveringSurfaceName(surface)) is drawn over \(launched) (the app this session launched)"
+                + " — this acted on that surface, not the app. Dismiss it first (swipe up from the bottom edge, or"
+                + " ft_navigate home), or ft_snapshot to see what is on screen)"
         case .otherApp(let name?):
             return Self.frontAppWarning(launched: launched, front: name)
         default:
@@ -1390,12 +1398,18 @@ extension MCPServer {
         guard !alreadyWarned, let launched = launchedBundleIDs[Self.sessionKey(args)] else { return "" }
         var facts = ForegroundFacts(launched: launched, sessionBundleID: launched)
         if let android = driver as? AndroidDriver { facts.shadeHoldsInputFocus = await Self.shadeProbe(android) }
+        else { facts.covering = await ForegroundState.coveringProbe(driver) }   // iOS
         facts.front = await ForegroundState.frontProbe(driver)
         switch ForegroundState.judge(facts) {
         case .covered(.shade):
             return " (warning: after the gesture the notification shade or quick settings was open over \(launched)"
                 + " — a touch that starts at the top edge can be taken as the shade gesture. Start the gesture clear of the"
                 + " screen edge; ft_navigate back closes the shade)"
+        case .covered(let surface):
+            return " (warning: after the gesture \(Self.coveringSurfaceName(surface)) was drawn over \(launched)"
+                + " — a touch that starts at a screen edge can be taken as a system gesture (the notification centre from the top,"
+                + " Control Center from the corner, the switcher from the bottom). Start the gesture clear of the screen edge;"
+                + " dismiss the surface first (swipe up from the bottom edge, or ft_navigate home))"
         case .otherApp(let front?):
             return " (warning: after the gesture \(front) was in front, not \(launched) — a touch that starts"
                 + " at a screen edge can be taken as a system gesture (back / home / the shade). Start the gesture"

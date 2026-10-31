@@ -1,0 +1,101 @@
+{
+  "id": "a-F1",
+  "finding": "通知センターが降りている間、ft_snapshot / ft_tap が「another app is」と言い切り ft_status と食い違う",
+  "platform": "ios",
+  "redNote": "直しの前後の赤は未確認(コンパイルしていない・デバイス未実行)。Simulator の iOS 27 で通知センターを ft_drag で降ろす形",
+  "setup": [
+    [
+      "ft_launch",
+      {
+        "bundleId": "com.ftester.e2e.ios"
+      }
+    ]
+  ],
+  "reset": [
+    [
+      "ft_launch",
+      {
+        "bundleId": "com.ftester.e2e.ios",
+        "resume": true
+      }
+    ]
+  ],
+  "resetSeconds": 1,
+  "rounds": 5,
+  "forms": [
+    {
+      "name": "ft_snapshot の拒否文",
+      "steps": [
+        [
+          "ft_drag",
+          {
+            "fromX": 30,
+            "fromY": 2,
+            "toX": 30,
+            "toY": 600
+          }
+        ],
+        [
+          "ft_snapshot",
+          {}
+        ]
+      ],
+      "allowErrors": true,
+      "replyOnly": true,
+      "replyExpect": [
+        "notification centre"
+      ]
+    },
+    {
+      "name": "座標 ft_tap の拒否文",
+      "steps": [
+        [
+          "ft_drag",
+          {
+            "fromX": 30,
+            "fromY": 2,
+            "toX": 30,
+            "toY": 600
+          }
+        ],
+        [
+          "ft_tap",
+          {
+            "x": 200,
+            "y": 400
+          }
+        ]
+      ],
+      "allowErrors": true,
+      "replyOnly": true,
+      "replyExpect": [
+        "notification centre"
+      ]
+    },
+    {
+      "name": "ft_batch の tap の拒否文",
+      "steps": [
+        [
+          "ft_drag",
+          {
+            "fromX": 30,
+            "fromY": 2,
+            "toX": 30,
+            "toY": 600
+          }
+        ],
+        [
+          "ft_batch",
+          {
+            "steps": "tap '#nav_selector'"
+          }
+        ]
+      ],
+      "allowErrors": true,
+      "replyOnly": true,
+      "replyExpect": [
+        "notification centre"
+      ]
+    }
+  ]
+}

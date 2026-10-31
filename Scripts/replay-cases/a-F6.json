@@ -1,0 +1,55 @@
+{
+  "id": "a-F6",
+  "finding": "SpringBoard のセッションで通知センターの実物の木を読むと「アプリの木で画面ではない」と偽の警告が付く",
+  "platform": "ios",
+  "redNote": "直しの前後の赤は未確認(コンパイルしていない・デバイス未実行)。Simulator の iOS 27 で通知センターを ft_drag で降ろす形",
+  "setup": [
+    [
+      "ft_launch",
+      {
+        "bundleId": "com.ftester.e2e.ios"
+      }
+    ]
+  ],
+  "reset": [
+    [
+      "ft_launch",
+      {
+        "bundleId": "com.ftester.e2e.ios",
+        "resume": true
+      }
+    ]
+  ],
+  "resetSeconds": 1,
+  "rounds": 5,
+  "forms": [
+    {
+      "name": "springboard セッションの ft_snapshot",
+      "steps": [
+        [
+          "ft_launch",
+          {
+            "bundleId": "com.apple.springboard"
+          }
+        ],
+        [
+          "ft_drag",
+          {
+            "fromX": 30,
+            "fromY": 2,
+            "toX": 30,
+            "toY": 600
+          }
+        ],
+        [
+          "ft_snapshot",
+          {}
+        ]
+      ],
+      "replyOnly": true,
+      "replyReject": [
+        "NOT what is on screen"
+      ]
+    }
+  ]
+}

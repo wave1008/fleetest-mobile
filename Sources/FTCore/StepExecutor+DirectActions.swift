@@ -166,6 +166,9 @@ extension StepExecutor {
         // 短いドラッグの始点にする「動いた中身」の #id(ref は撮るたびに振り直されるので id で控える。EdgeProbe.path)
         var probeAnchorIDs: Set<String> = []
         var startScreen: FTRect?
+        // 送りを始めた時点で木が名乗っていたアプリと、最後に読んだ木(終わりに「前面は対象のままか」を1回だけ引く)
+        var edgeBundleID: String?
+        var lastEdgeTree: SnapshotResponse?
         for _ in 0..<limit {
             let settled: (signature: String, snapshot: SnapshotResponse, settled: Bool, changed: Bool)
             if let carried {
@@ -174,6 +177,8 @@ extension StepExecutor {
                 settled = try await settledSignature(phase: &phase)
             }
             carried = nil
+            edgeBundleID = edgeBundleID ?? settled.snapshot.sessionBundleID
+            lastEdgeTree = settled.snapshot
             if !settled.settled { sawUnsettled = true }
             // **探索の途中で画面の大きさが変わった(端末が回った)なら、端とは言わず止める**(scrollTo と同じ。座標系が替わると
             // 容器・始点の前提が崩れ、潰れた容器へ上限まで払い続けて ok を返していた)
@@ -314,6 +319,14 @@ extension StepExecutor {
                 }
                 carried = confirm
             }
+        }
+        // **前面を奪われていたなら、端に着いたとも ok とも言わない**(ランチャーの上を払って「端」と確定し、失敗が次の手まで出なかった)。
+        // 木が変わらない = 端、は自アプリが前面に居る間だけ成り立つ。確かめるのは送り終えた後の1回だけ(scrollTo の打ち切りと同じ)
+        if sentSwipes > 0, let front = await frontAppIfSessionAppLeft(edgeBundleID, tree: lastEdgeTree, asksAppState: false) {
+            return StepOutcome(status: failed(.notFound,
+                "\(step.action ?? "scrollToEdge") stopped after \(sentSwipes) swipe(s): the app was not in the foreground"
+                + " (\(front) was in front), so the swipes did not reach its list and the end of the list is not known"
+                + " — \(Self.bringBackAdvice(front: front))"))
         }
         // 上限で抜けたら**端に着いたとは限らない**。黙って成功にすると
         // 「scrollToBottom したのに末尾が無い」の原因が読めなくなる

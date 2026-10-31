@@ -1,0 +1,98 @@
+{
+  "id": "a-F4",
+  "finding": "iOS で端から撃ったジェスチャ・覆いの下の座標操作が無警告 done(p-F8 の座標形を含む)",
+  "platform": "ios",
+  "redNote": "直しの前後の赤は未確認(コンパイルしていない・デバイス未実行)。Simulator の iOS 27 で通知センターを ft_drag で降ろす形。ドラッグ直後はアニメーション中で覆いを聞いても未検出の回がありうる(その形は赤が出る = 検出の限界の記録)",
+  "setup": [
+    [
+      "ft_launch",
+      {
+        "bundleId": "com.ftester.e2e.ios"
+      }
+    ]
+  ],
+  "reset": [
+    [
+      "ft_launch",
+      {
+        "bundleId": "com.ftester.e2e.ios",
+        "resume": true
+      }
+    ]
+  ],
+  "resetSeconds": 1,
+  "rounds": 5,
+  "forms": [
+    {
+      "name": "上端から降ろした ft_drag の応答",
+      "steps": [
+        [
+          "ft_drag",
+          {
+            "fromX": 30,
+            "fromY": 2,
+            "toX": 30,
+            "toY": 600
+          }
+        ]
+      ],
+      "allowErrors": true,
+      "replyOnly": true,
+      "replyExpect": [
+        "notification centre"
+      ]
+    },
+    {
+      "name": "覆いの下の座標 ft_tap",
+      "steps": [
+        [
+          "ft_drag",
+          {
+            "fromX": 30,
+            "fromY": 2,
+            "toX": 30,
+            "toY": 600
+          }
+        ],
+        [
+          "ft_tap",
+          {
+            "x": 200,
+            "y": 400
+          }
+        ]
+      ],
+      "allowErrors": true,
+      "replyOnly": true,
+      "replyExpect": [
+        "notification centre"
+      ]
+    },
+    {
+      "name": "覆いの下の座標 ft_double_tap",
+      "steps": [
+        [
+          "ft_drag",
+          {
+            "fromX": 30,
+            "fromY": 2,
+            "toX": 30,
+            "toY": 600
+          }
+        ],
+        [
+          "ft_double_tap",
+          {
+            "x": 200,
+            "y": 400
+          }
+        ]
+      ],
+      "allowErrors": true,
+      "replyOnly": true,
+      "replyExpect": [
+        "notification centre"
+      ]
+    }
+  ]
+}

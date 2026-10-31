@@ -410,11 +410,23 @@ extension MCPServer {
             let decision = Self.navigatedAwayNote(launched: launchedBundleIDs[Self.sessionKey(args)],
                                                   treeSession: snapshot.sessionBundleID,
                                                   isAndroid: driver is AndroidDriver)
-            if decision.appIsBack { backgroundedByNavigate.remove(Self.sessionKey(args)) }
-            backgroundNote = decision.note
+            // iOS は記録を ft_launch でだけ消していたため、ツール外(simctl launch・手で開く)で戻っても偽の注記が出続けた。
+            // 戻ったと言える証拠(/appstate が前面 + 覆い無し + 木の要素がライブのヒットテストで引き当てられる)が揃ったときだけ消す。
+            // 実機 iPhone 13 のホーム画面は /appstate が前面と答えるが、アプリの要素は引き当てられない(unresolvable)ので消えない
+            if !decision.appIsBack, !(driver is AndroidDriver),
+               await iosAppIsBackOnScreen(snapshot, driver: driver, args: args) {
+                backgroundedByNavigate.remove(Self.sessionKey(args))
+                backgroundNote = ""
+            } else {
+                if decision.appIsBack { backgroundedByNavigate.remove(Self.sessionKey(args)) }
+                backgroundNote = decision.note
+            }
         }
-        // 覆い(iOS のカバーシート・コントロールセンター等)は照会の費用があるので、呼び手が許したときだけ聞く(coveringNote の doc)
-        if probesCovering { backgroundNote = await Self.coveringNote(driver: driver) + backgroundNote }
+        // 覆い(iOS のカバーシート・コントロールセンター等)は照会の費用があるので、呼び手が許したときだけ聞く(coveringNote の doc)。
+        // SpringBoard のセッションは通知センター・スイッチャーそのものを木として読んでいる(正規の読み方)ので、「アプリの木で画面ではない」とは言わない
+        if probesCovering, Self.shouldProbeCovering(sessionBundleID: snapshot.sessionBundleID) {
+            backgroundNote = await Self.coveringNote(driver: driver) + backgroundNote
+        }
         // **すり替わりを先頭に置く**: これが起きているとき、以下の一覧は丸ごと別アプリのもので、
         // ghost 注記も scrollFrame 候補も読む意味が無い
         let switchedLaunched = launchedBundleIDs[Self.sessionKey(args)]
@@ -1065,6 +1077,29 @@ extension MCPServer {
         return "\n" + handleAlertFirst + "."
     }
 
+    /// ランナーの 422(別のアプリが前面・システムアラートが前面)が、実は SpringBoard の覆い(通知センター・スイッチャー等)
+    /// によるものかを聞いて、ft_status と同じ面の名前で言い直す(iOS だけ)。ランナーの文言は固定で覆いを知らない
+    /// (「another app is」「system alert … tap one of its buttons」)ので、**呼び手が覆いの事実を足す**。
+    /// 聞いて覆いが無い・聞けない・422 以外の失敗は空(元の文言のまま)。失敗経路の1回だけ(毎手の照会ではない)
+    func coveredDriverErrorHint(_ error: Error, args: [String: Any]) async -> String {
+        guard let driverError = error as? DriverError, connectedPorts[Self.sessionKey(args)] != nil else { return "" }
+        switch driverError {
+        case .badResponse(let status, _) where status == 422: break
+        case .systemAlertBlocked: break
+        default: return ""
+        }
+        guard let covered = try? await self.driver(args),
+              case .value(let surface?) = await ForegroundState.coveringProbe(covered) else { return "" }
+        return Self.coveredRefusalNote(surface)
+    }
+
+    static func coveredRefusalNote(_ surface: CoveringSurface) -> String {
+        "\nnote: SpringBoard reports \(coveringSurfaceName(surface)) drawn over the app right now — that is what this refusal"
+            + " is about, not a different app and not an alert to answer by pressing its buttons (anything that looks like"
+            + " a button there belongs to that surface). Dismiss it first (swipe up from the bottom edge, or ft_navigate home),"
+            + " then ft_snapshot; ft_launch the bundleId with resume: true if the app is not back."
+    }
+
     // **internal**(MCPServer+ScreenTools.swift の ft_type ref なし失敗経路も使う。他ファイルの
     // 拡張から呼ぶので private のままにできない)。一発物の照会 = target 無しで前面のアラートだけ聞く
     static func frontSystemAlert(driver: AppDriver) async -> String? {
@@ -1098,13 +1133,23 @@ extension MCPServer {
 
     /// 面の呼び名(ft_status・snapshot の注記・タップ後の警告で共有)
     static func coveringSurfaceName(_ surface: CoveringSurface) -> String {
-        switch surface {
-        case .coverSheet: return "the notification centre (or the lock screen)"
-        case .controlCenter: return "Control Center"
-        case .appSwitcher: return "the app switcher"
-        case .shade: return "the notification shade or quick settings"
-        case .other(let marker): return "a system surface (\(marker))"
-        }
+        surface.displayName
+    }
+
+    /// 覆いの注記を出してよい木か。SpringBoard のセッションの木は覆っている面そのもの(アプリの木ではない)
+    static func shouldProbeCovering(sessionBundleID: String?) -> Bool {
+        sessionBundleID != ForegroundState.springboard
+    }
+
+    /// アプリが画面へ戻っていると証拠で言えるか(iOS)。`/appstate` が前面・覆い無し・木の操作できる要素の1つが
+    /// ライブのヒットテストで引き当てられた(`hittable(true)`)の3つが揃ったときだけ true。どれかが聞けない・食い違うなら false
+    func iosAppIsBackOnScreen(_ snapshot: SnapshotResponse, driver: AppDriver, args: [String: Any]) async -> Bool {
+        guard let bundleID = snapshot.sessionBundleID, bundleID != ForegroundState.springboard,
+              case .value(true) = await ForegroundState.inForegroundProbe(driver, bundleID: bundleID),
+              case .value(nil) = await ForegroundState.coveringProbe(driver),
+              let probe = snapshot.elements.first(where: { TapTargetGeometry.platformShouldResolve($0) })
+        else { return false }
+        return (try? await driver.hitTest(ref: nativeRef(probe.ref, args: args))) == .hittable(true)
     }
 
     /// 読みの応答に添える「覆われている」注記。iOS XCUITest だけが答える(他は `.notAnswerable` で黙る)。

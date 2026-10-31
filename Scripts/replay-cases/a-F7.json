@@ -1,0 +1,87 @@
+{
+  "id": "a-F7",
+  "finding": "通知センターを降ろした後の ft_navigate appSwitcher が実際はアプリへ戻るだけなのに、以後の ft_snapshot に偽の「NOT what is on screen」が付き続ける",
+  "platform": "ios",
+  "redNote": "直しの前後の赤は未確認(コンパイルしていない・デバイス未実行)。Simulator の iOS 27 で通知センターを ft_drag で降ろす形",
+  "setup": [
+    [
+      "ft_launch",
+      {
+        "bundleId": "com.ftester.e2e.ios"
+      }
+    ]
+  ],
+  "reset": [
+    [
+      "ft_launch",
+      {
+        "bundleId": "com.ftester.e2e.ios",
+        "resume": true
+      }
+    ]
+  ],
+  "resetSeconds": 1,
+  "rounds": 5,
+  "forms": [
+    {
+      "name": "通知センター → appSwitcher → ft_snapshot",
+      "steps": [
+        [
+          "ft_drag",
+          {
+            "fromX": 30,
+            "fromY": 2,
+            "toX": 30,
+            "toY": 600
+          }
+        ],
+        [
+          "ft_navigate",
+          {
+            "target": "appSwitcher"
+          }
+        ],
+        [
+          "ft_snapshot",
+          {}
+        ]
+      ],
+      "replyOnly": true,
+      "replyReject": [
+        "NOT what is on screen"
+      ]
+    },
+    {
+      "name": "通知センター → appSwitcher → ft_batch の tap + snapshotAfter",
+      "steps": [
+        [
+          "ft_drag",
+          {
+            "fromX": 30,
+            "fromY": 2,
+            "toX": 30,
+            "toY": 600
+          }
+        ],
+        [
+          "ft_navigate",
+          {
+            "target": "appSwitcher"
+          }
+        ],
+        [
+          "ft_batch",
+          {
+            "steps": "tap '#nav_selector'",
+            "snapshotAfter": true
+          }
+        ]
+      ],
+      "allowErrors": true,
+      "replyOnly": true,
+      "replyReject": [
+        "NOT what is on screen"
+      ]
+    }
+  ]
+}

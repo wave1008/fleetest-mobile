@@ -341,7 +341,13 @@ extension MCPServer {
         recordInteraction(action: target, resolvedRef: nil, args: args)
         // **背面へ送ったのはツール自身**という事実だけを覚える(照会に頼らない理由は
         // `backgroundedByNavigate` の doc)。back は画面内で戻るだけのことがあるので数えない
-        if target == "home" || target == "appSwitcher" {
+        // appSwitcher は開いたかを SpringBoard に聞く(iOS)。通知センターが降りていると、この手は通知センターを閉じてアプリへ戻るだけのことがある
+        var switcherSeen: Bool?
+        if target == "appSwitcher", !(navigation is AndroidDriver),
+           case .value(let surface) = await ForegroundState.coveringProbe(navigation) {
+            switcherSeen = surface == .appSwitcher
+        }
+        if target == "home" || (target == "appSwitcher" && switcherSeen != false) {
             backgroundedByNavigate.insert(Self.sessionKey(args))
         }
         // **snapshotAfter を渡されたら木はそちらが撮る**。ここで撮り直すと同じ木を2回
@@ -393,7 +399,8 @@ extension MCPServer {
             + Self.backNoOpNote(target: target, bridge: bridges[Self.sessionKey(args)])
             + backIneffectiveNote
             + Self.backgroundedAppNote(target: target, bridge: bridges[Self.sessionKey(args)])
-            + Self.backgroundingNavigationNote(target: target, bridge: bridges[Self.sessionKey(args)])
+            + Self.backgroundingNavigationNote(target: target, bridge: bridges[Self.sessionKey(args)],
+                                                         switcherSeen: switcherSeen)
             + waitForWithoutSnapshotAfterNote(args) + afterBody)
     }
 

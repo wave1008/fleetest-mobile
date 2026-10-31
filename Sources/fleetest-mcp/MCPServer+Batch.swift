@@ -697,6 +697,16 @@ extension MCPServer {
         }
         executor.keyboardKnownAbsent = sessions[Self.sessionKey(args)]?.keyboardKnownAbsent ?? false
 
+        // **iOS: 通知センター・スイッチャー等が覆っているなら、撃つ前に1回だけ言う**(覆いの下では木が操作の前と同じまま・
+        // セレクタが解決して tap が ok を返すが、座標は覆いに当たる)。触る手があるバッチだけ・警告のみ(断らない)・バッチ1回の照会
+        if !isAndroid, plans.contains(where: { StepExecutor.interactsByTouch($0.step.action ?? "") }),
+           case .value(let surface?) = await ForegroundState.coveringProbe(batchDriver) {
+            lines.append("⚠️ \(Self.coveringSurfaceName(surface)) is drawn over the app right now: the steps below were sent"
+                + " while it was up, so a touch lands on that surface (and may only close it) — an ok line is not evidence"
+                + " that the app reacted. Dismiss it first (swipe up from the bottom edge, or ft_navigate home), then send"
+                + " the batch again.")
+        }
+
         // **ok でも何も起きていないかもしれない手**(行番号)。結論を「passed」と言わない材料
         // (実測: オプションのシートが出てくる途中の tap が飲まれ、disabled の「完了」も ok で "All 4 step(s) passed")
         var suspectSteps: [Int] = []
@@ -784,9 +794,12 @@ extension MCPServer {
                 case .passed, .passedViaFallback, .healed:
                     reason = "could not confirm the result"
                 }
+                var coveredNote = ""
+                if let thrown = outcome.thrownDriverError { coveredNote = await coveredDriverErrorHint(thrown, args: args) }
                 lines.append("\(index + 1). \(plan.summary) — FAILED (\(ms)ms): \(Self.batchWritableAdvice(reason))"
                     + (outcome.driverFallback.map { " (\($0))" } ?? "") + refNote
-                    + Self.batchDeliveryUnknownNote(failureKind: outcome.failureKind, thrown: outcome.thrownDriverError))
+                    + Self.batchDeliveryUnknownNote(failureKind: outcome.failureKind, thrown: outcome.thrownDriverError)
+                    + coveredNote)
                 // **止まった位置と、そこで見えている画面を一緒に返す**(scrollTo の failure と
                 // 同じ形: throw で isError にする — 呼び手が要求した手が最後まで実行されなかった
                 // という点で、要素へ届かなかった scrollTo と同種の失敗)
@@ -799,7 +812,8 @@ extension MCPServer {
                 } catch {
                     throw MCPError(lines.joined(separator: "\n") + stoppedNote
                         + "Could not take a snapshot after the failure: "
-                        + ((error as? LocalizedError)?.errorDescription ?? "\(error)"))
+                        + ((error as? LocalizedError)?.errorDescription ?? "\(error)")
+                        + (await coveredDriverErrorHint(error, args: args)))
                 }
                 recordSnapshot(stopped, batchDriver is AndroidDriver ? "android" : "ios", args)
                 throw MCPError(lines.joined(separator: "\n") + stoppedNote

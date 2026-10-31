@@ -22,6 +22,7 @@
 | `forms[].settleSeconds` | 答え合わせまでの間(秒。既定 1) |
 | `forms[].allowErrors` | true = 手の失敗を食い違いに数えない(断るのが正しい手) |
 | `forms[].replyReject` | 最後の手の応答に在ってはいけない文字列 |
+| `forms[].replyExpect` | 最後の手の応答に在るべき文字列。**SUT の表示で判定できない形(撃った手が警告を出すべきか)だけに使う**。覆いの下の操作は SUT の画面が変わらないので、応答が唯一の観測 |
 | `forms[].replyOnly` | true = 応答だけで判定し、最後の `ft_snapshot` を撃たない(アプリを落とした後の形) |
 | `suite` | `baseline` = 回をまたいで比べる固定の課題(`--suite baseline --record <ndjson>`)。**中身を変えない**(変えると前の回と比べられない) |
 

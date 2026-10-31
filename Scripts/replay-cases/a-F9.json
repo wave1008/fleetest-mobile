@@ -1,0 +1,49 @@
+{
+  "id": "a-F9",
+  "finding": "スイッチャーの下の scrollTo の失敗文が覆いに触れない",
+  "platform": "ios",
+  "redNote": "直しの前後の赤は未確認(コンパイルしていない・デバイス未実行)。Simulator の iOS 27 で通知センターを ft_drag で降ろす形",
+  "setup": [
+    [
+      "ft_launch",
+      {
+        "bundleId": "com.ftester.e2e.ios"
+      }
+    ]
+  ],
+  "reset": [
+    [
+      "ft_launch",
+      {
+        "bundleId": "com.ftester.e2e.ios",
+        "resume": true
+      }
+    ]
+  ],
+  "resetSeconds": 1,
+  "rounds": 5,
+  "forms": [
+    {
+      "name": "switcher → ft_scroll_to",
+      "steps": [
+        [
+          "ft_navigate",
+          {
+            "target": "appSwitcher"
+          }
+        ],
+        [
+          "ft_scroll_to",
+          {
+            "selector": "#nav_diagnostics"
+          }
+        ]
+      ],
+      "allowErrors": true,
+      "replyOnly": true,
+      "replyExpect": [
+        "app switcher"
+      ]
+    }
+  ]
+}

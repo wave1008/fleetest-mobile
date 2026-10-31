@@ -102,4 +102,17 @@ final class ForegroundStateTests: XCTestCase {
         XCTAssertEqual(SystemUITreeKind.classify(sessionBundleID: systemUI, identifiers: []), .systemUIOther)
         XCTAssertEqual(SystemUITreeKind.classify(sessionBundleID: app, identifiers: ["keyguard_pin_view"]), .app)
     }
+
+    /// ランナーが返す目印は接尾辞付き(実物の名前)。完全一致だと「a system surface (SBSwitcherWindow:Main)」になっていた
+    func testRunnerMarkersWithSuffixesMapToTheirSurface() {
+        XCTAssertEqual(CoveringSurface.from(marker: "SBSwitcherWindow:Main"), .appSwitcher)
+        XCTAssertEqual(CoveringSurface.from(marker: "SBSwitcherWindow"), .appSwitcher)
+        XCTAssertEqual(CoveringSurface.from(marker: "SBCoverSheetWindow"), .coverSheet)
+        XCTAssertEqual(CoveringSurface.from(marker: "SBCoverSheetWindow:Main"), .coverSheet)
+        XCTAssertEqual(CoveringSurface.from(marker: "cc-brightness-slider"), .controlCenter)
+        XCTAssertEqual(CoveringSurface.from(marker: "SBOther"), .other("SBOther"))
+        XCTAssertEqual(CoveringSurface.from(marker: nil), .other("unknown"))
+        XCTAssertEqual(CoveringSurface.appSwitcher.displayName, "the app switcher")
+        XCTAssertEqual(CoveringSurface.from(marker: "SBSwitcherWindow:Main").displayName, "the app switcher")
+    }
 }
