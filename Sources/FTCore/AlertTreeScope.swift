@@ -19,14 +19,20 @@ public enum AlertTreeScope {
     /// アラートとその子孫だけの木(ref・枠はそのまま = 一覧の ref でそのまま押せる)
     public static func alertOnly(_ alert: ElementInfo, in snapshot: SnapshotResponse) -> SnapshotResponse {
         var only = snapshot
-        only.elements = [alert] + LocatorResolver.descendants(of: alert, in: snapshot.elements)
+        only.elements = [alert] + subtree(of: alert, in: snapshot)
         return only
+    }
+
+    /// アラートの子孫のうち同じ窓の行。**オーバーレイの窓の行は深さでは見分けられず部分木に並ぶ**(`inOverlayWindow` の違いで外す)
+    private static func subtree(of alert: ElementInfo, in snapshot: SnapshotResponse) -> [ElementInfo] {
+        LocatorResolver.descendants(of: alert, in: snapshot.elements)
+            .filter { ($0.inOverlayWindow == true) == (alert.inOverlayWindow == true) }
     }
 
     /// アラートの中の押せる要素のラベル(注記に並べる)。**アラートの枠に収まるものだけ** —— 入力欄つきの
     /// アラートではキーボード(予測変換の候補)が部分木に入り、ボタンとして並んでしまう
     public static func buttonLabels(of alert: ElementInfo, in snapshot: SnapshotResponse) -> [String] {
-        LocatorResolver.descendants(of: alert, in: snapshot.elements)
+        subtree(of: alert, in: snapshot)
             .filter { BridgeSnapshotThinning.operableTypes.contains($0.type) }
             .filter { TapTargetGeometry.contains(alert.frame, $0.frame) }
             .compactMap { $0.label.map(SnapshotRenderer.displayText) }.filter { !$0.isEmpty }

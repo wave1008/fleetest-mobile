@@ -31,6 +31,34 @@ final class AlertTreeScopeTests: XCTestCase {
             truncatedCount: 0)))
     }
 
+    /// オーバーレイの窓の行はアラートの部分木に並ぶことがある(深さだけでは見分けられない)。窓が違えばアラートの中身ではない
+    func testRowsOfAnotherWindowAreNotPartOfTheAlert() {
+        var alert = el(2, "alert", "確認", depth: 1)
+        alert.frame = FTRect(x: 20, y: 40, width: 340, height: 400)
+        var overlayButton = el(4, "button", "オーバーレイ", depth: 2)
+        overlayButton.inOverlayWindow = true
+        let snapshot = SnapshotResponse(
+            sessionBundleID: "com.example.app", screen: FTRect(x: 0, y: 0, width: 402, height: 874),
+            elements: [el(1, "button", "背面", depth: 1), alert, el(3, "button", "OK", depth: 2), overlayButton],
+            truncatedCount: 0)
+        XCTAssertEqual(AlertTreeScope.alertOnly(alert, in: snapshot).elements.map(\.ref), [2, 3])
+        XCTAssertEqual(AlertTreeScope.buttonLabels(of: alert, in: snapshot), ["OK"])
+    }
+
+    /// アラート自身がオーバーレイの窓に居る形(同じ窓の行は中身)
+    func testAnAlertInsideTheOverlayWindowKeepsItsOwnRows() {
+        var alert = el(2, "alert", "確認", depth: 1)
+        alert.frame = FTRect(x: 20, y: 40, width: 340, height: 400)
+        alert.inOverlayWindow = true
+        var ok = el(3, "button", "OK", depth: 2)
+        ok.inOverlayWindow = true
+        let snapshot = SnapshotResponse(
+            sessionBundleID: "com.example.app", screen: FTRect(x: 0, y: 0, width: 402, height: 874),
+            elements: [alert, ok, el(4, "button", "本体の窓", depth: 2)], truncatedCount: 0)
+        XCTAssertEqual(AlertTreeScope.alertOnly(alert, in: snapshot).elements.map(\.ref), [2, 3])
+        XCTAssertEqual(AlertTreeScope.buttonLabels(of: alert, in: snapshot), ["OK"])
+    }
+
     /// **描かれていない alert(枠が0・画面の外)では木を伏せない**(閉じた後の残りで伏せると、押しても何も起きない
     /// アラートだけの画面が見え続ける)
     func testAnAlertThatIsNotOnScreenIsIgnored() {
