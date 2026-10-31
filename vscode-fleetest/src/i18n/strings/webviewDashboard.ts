@@ -89,7 +89,6 @@ export const webviewDashboardStrings = {
   "wvDashboard.deviceHealth.stateOffline": { ja: "未起動", en: "Not started" },
   "wvDashboard.deviceHealth.stateUnknown": { ja: "不明", en: "Unknown" },
   "wvDashboard.deviceHealth.frozen": { ja: "凍結中", en: "Frozen" },
-  "wvDashboard.deviceHealth.inRun": { ja: "実行中", en: "Running" },
   "wvDashboard.deviceHealth.healthWifiDisabled": { ja: "Wi-Fi 無効", en: "Wi-Fi off" },
   "wvDashboard.deviceHealth.healthClockSkew": { ja: "時計のずれ", en: "Clock skew" },
   "wvDashboard.deviceHealth.healthBlankScreen": { ja: "黒画面", en: "Blank screen" },
@@ -178,8 +177,6 @@ export const webviewDashboardStrings = {
   "wvDashboard.machineHealth.fmNoObservation": { ja: "モニターで観測できていません", en: "Not observed by the monitor" },
   "wvDashboard.machineHealth.visionCalls": { ja: "呼び出し {calls} · 失敗 {failures}", en: "calls {calls} · failures {failures}" },
   "wvDashboard.machineHealth.visionWindowTitle": { ja: "直近 {seconds} 秒の件数", en: "Counts over the last {seconds} s" },
-  "wvDashboard.machineHealth.ocrCompiling": { ja: "コンパイル中", en: "Compiling" },
-  "wvDashboard.machineHealth.ocrCompilingTitle": { ja: "OCR モデルをコンパイルしています", en: "The OCR model is compiling" },
   "wvDashboard.machineHealth.load": { ja: "CPU {cpu} · MEM {mem}", en: "CPU {cpu} · MEM {mem}" },
   "wvDashboard.machineHealth.lastRunTitle": { ja: "最後の run: {time}", en: "Last run: {time}" },
   "wvDashboard.machineHealth.lastFmDeadTitle": {

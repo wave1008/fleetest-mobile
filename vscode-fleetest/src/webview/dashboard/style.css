@@ -473,14 +473,10 @@ select.dash-since:focus,
 .mh-fm-alive { color: var(--vscode-testing-iconPassed, var(--vscode-charts-green, #388a34)); }
 .mh-fm-dead { color: var(--vscode-errorForeground, #f14c4c); font-weight: bold; }
 .mh-fm-unknown { color: var(--vscode-descriptionForeground); }
-.mh-chip-compiling {
-  margin-left: 6px;
-  background-color: var(--vscode-charts-blue, #0078d4);
-  color: #ffffff;
-}
 /* 1Hz で変わる数字の枠(machineHealth.js の fixedWidthMessage)。桁が増えても列幅が変わらないよう等幅数字で右寄せ */
 /* Rendering 列: 絵文字は地の色・数字だけ注意の色(td.mh-warn と同じ警告色のトークン) */
 .mh-rendering { white-space: nowrap; }
+.mh-rendering-slots { display: inline-block; min-width: 15ch; } /* 3種類が並ぶ幅(出入りで列幅が動かない) */
 .mh-rendering-part { margin-right: 8px; }
 .mh-rendering-part .screen-mark-textless { color: #9a9a9a; font-family: "Times New Roman", Times, serif; font-weight: normal; }
 .mh-rendering-count { margin-left: 2px; color: var(--vscode-editorWarning-foreground, #cca700); font-weight: bold; font-variant-numeric: tabular-nums; }
@@ -491,16 +487,15 @@ td.mh-warn { color: var(--vscode-editorWarning-foreground, #cca700); font-weight
 .dh-storage-carried-over { color: var(--vscode-descriptionForeground); }
 .dh-storage-measuring,
 .dh-storage-progress { color: var(--vscode-descriptionForeground); }
-.dh-chip-running {
-  background-color: var(--vscode-charts-blue, #0078d4);
-  color: #ffffff;
+.dh-marks {
+  display: inline-block;
+  min-width: 5ch; /* ❄️ と ⚠ が並ぶ幅 */
 }
 .dh-chip-frozen {
   color: #4fc1ff; /* ❄️ に合わせた水色。ユーザー指定 */
 }
 .dh-chip-health {
-  background-color: var(--vscode-editorWarning-foreground, #cca700);
-  color: #1e1e1e;
+  color: var(--vscode-editorWarning-foreground, #cca700);
 }
 .dh-kind,
 .dh-platform {

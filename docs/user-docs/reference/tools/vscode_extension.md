@@ -193,7 +193,7 @@ Command **"fleetest: Open Results Dashboard"** shows, in the Device Monitor's **
 - **Machine health**: one row per Mac, showing the health of FM (Foundation Models, text and image) and
   OCR / Vision. The "Current state" columns show FM alive / dead / unknown (marked ● / ✕ / ?), the
   hardware video encoder (AVE = Apple Video Encoder) alive / dead / unknown (same marks; hover for the reason of a stop), the recent
-  Vision call and failure counts, whether the OCR model is compiling, and CPU / MEM load. The "Period" columns come from
+  Vision call and failure counts, and CPU / MEM load. The "Period" columns come from
   run history, in the order things happen: runs, slowdowns caused by load, OCR / Vision notes, FM slot waits, FM call
   failures, skipped visibility checks and runs with FM dead (hover for breakdowns and reasons). Cells with failures or stops turn to a warning color.
   Values the monitor cannot observe, or that the records do not carry, show as "–" rather than 0.

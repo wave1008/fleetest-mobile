@@ -175,7 +175,7 @@ test("AVE チップ: 生存・停止・不明を記号で出し、停止は理�
   assert.ok(unknown.classList.contains("mh-fm-unknown"));
 });
 
-test("今の列: Vision の件数・失敗(>0 で警告色)・コンパイル中・負荷", (t) => {
+test("今の列: Vision の件数・失敗(>0 で警告色)・負荷。コンパイル中は出さない(行の幅が崩れる)", (t) => {
   const { window, document, send } = createWebview();
   t.after(() => window.close());
   send(sample("", { visionCalls: 4, visionFailures: 1, ocrCompiling: 1 }));
@@ -185,7 +185,7 @@ test("今の列: Vision の件数・失敗(>0 で警告色)・コンパイル中
   assert.match(vision.textContent, /4/);
   assert.match(vision.textContent, /1/);
   assert.ok(vision.classList.contains("mh-warn"));
-  assert.ok(vision.querySelector(".mh-chip-compiling"));
+  assert.equal(vision.querySelector(".badge"), null);
   assert.match(tipOf(vision), /1/, "窓の秒数");
   assert.equal(local.children[5].textContent, "CPU 34% · MEM 61%");
 });

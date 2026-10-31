@@ -820,15 +820,16 @@ test("デバイスの健全性: 今の状態は色の点+文字、実行中・�
   const a = cellOf("a");
   assert.ok(a.querySelector(".dh-state-dot.dh-state-connected"));
   assert.match(a.textContent, /接続済み/, "色だけでなく文字も出す");
-  assert.ok(a.querySelector(".dh-chip-running"));
+  assert.equal(a.querySelector(".badge"), null, "状態の列に文字のバッジを足さない(列幅が動く)");
+  assert.ok(cellOf("b").querySelector(".dh-marks"), "印が無い行にも枠を置く");
   assert.match(a.querySelector(".dh-chip-frozen").textContent, /❄️/);
-  const flags = [...a.querySelectorAll(".dh-chip-health")].map((c) => c.textContent);
-  assert.deepEqual(flags, ["⚠ Wi-Fi 無効", "⚠ new-flag"], "既知は訳し、未知は原文、metal-errors は出さない");
+  const flags = [...a.querySelectorAll(".dh-chip-health")];
+  assert.deepEqual(flags.map((c) => c.textContent), ["⚠"], "行の中は印1つ");
+  assert.equal(flags[0].getAttribute("aria-label"), "Wi-Fi 無効\nnew-flag", "既知は訳し、未知は原文、metal-errors は出さない");
 
   assert.ok(cellOf("b").querySelector(".dh-state-booted"));
   assert.ok(cellOf("c").querySelector(".dh-state-offline"));
   assert.ok(cellOf("d").querySelector(".dh-state-unknown"), "未知の state は不明として出す");
-  assert.equal(cellOf("b").querySelector(".dh-chip-running"), null);
 });
 
 test("デバイスの健全性: マシンは独立した列で、機械が変わる行に区切りを付け、デバイス列は名前と OS のラベル", (t) => {

@@ -211,6 +211,8 @@ const RENDERING_KINDS = [
 function renderingCell(live) {
   const cell = document.createElement('td');
   cell.className = 'mh-rendering';
+  const slots = chip('mh-rendering-slots', '');
+  cell.appendChild(slots);
   if (!live || live.stale) return cell;
   const rendering = renderingCountsOf(live.machine);
   for (const [kind, markKey, titleKey] of RENDERING_KINDS) {
@@ -223,7 +225,7 @@ function renderingCell(live) {
     mark.classList.toggle('screen-mark-textless', kind === 'textless');
     part.append(mark, chip('mh-rendering-count', String(count)));
     setHoverTip(part, t(titleKey));
-    cell.appendChild(part);
+    slots.appendChild(part);
   }
   return cell;
 }
@@ -238,11 +240,6 @@ function visionCell(live) {
     });
     warn(cell, live.visionFailures > 0);
     setHoverTip(cell, t('wvDashboard.machineHealth.visionWindowTitle', { seconds: String(live.windowTicks) }));
-  }
-  if (live && !live.stale && live.ocrCompiling) {
-    const compiling = chip('badge mh-chip-compiling', t('wvDashboard.machineHealth.ocrCompiling'));
-    setHoverTip(compiling, t('wvDashboard.machineHealth.ocrCompilingTitle'));
-    cell.appendChild(compiling);
   }
   return cell;
 }
@@ -375,7 +372,7 @@ function liveSignature(rows) {
   return JSON.stringify(rows.map((row) => {
     const l = row.live;
     return [row.label, l ? [l.stale, pct(l.cpu), pct(l.memRatio), l.liveness, l.visionCalls, l.visionFailures,
-      l.windowTicks, l.ocrCompiling, l.encoder, renderingCountsOf(l.machine)] : null];
+      l.windowTicks, l.encoder, renderingCountsOf(l.machine)] : null];
   }));
 }
 

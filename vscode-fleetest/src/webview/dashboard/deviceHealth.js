@@ -238,18 +238,22 @@ function stateCell(monitor) {
   const dot = chip('dh-state-dot dh-state-' + state, '●');
   dot.setAttribute('aria-hidden', 'true');
   cell.append(dot, chip('dh-state-label', t(STATE_KEY[state])));
-  if (monitor.inRun) {
-    cell.appendChild(chip('badge dh-chip-running', t('wvDashboard.deviceHealth.inRun')));
-  }
-  if (monitor.frozen) {
-    cell.appendChild(chip('dh-chip-frozen', '❄️ ' + t('wvDashboard.deviceHealth.frozen')));
-  }
+  // 印の枠は幅を固定する(出入りで列幅と表が動かない)。理由はホバーと aria-label
+  const marks = chip('dh-marks', '');
+  const addMark = (className, text, reason) => {
+    const mark = chip(className, text);
+    mark.setAttribute('aria-label', reason);
+    setHoverTip(mark, reason);
+    marks.appendChild(mark);
+  };
+  if (monitor.frozen) addMark('dh-chip-frozen', '❄️', t('wvDashboard.deviceHealth.frozen'));
   // metal-errors はタイルと同じく出さない(全機に同時に出る背景現象。DS-12.4)。
   // 未知の種別は訳さず原文のまま出す(判定しない)
-  for (const flag of Array.isArray(monitor.health) ? monitor.health : []) {
-    if (flag === 'metal-errors') continue;
-    cell.appendChild(chip('badge dh-chip-health', '⚠ ' + (HEALTH_KEY[flag] ? t(HEALTH_KEY[flag]) : flag)));
-  }
+  const reasons = (Array.isArray(monitor.health) ? monitor.health : [])
+    .filter((flag) => flag !== 'metal-errors')
+    .map((flag) => (HEALTH_KEY[flag] ? t(HEALTH_KEY[flag]) : flag));
+  if (reasons.length > 0) addMark('dh-chip-health', '⚠', reasons.join('\n'));
+  cell.appendChild(marks);
   return cell;
 }
 

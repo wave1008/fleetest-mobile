@@ -685,7 +685,6 @@ export function hostMetricsMachines() {
       visionCalls: stats ? stats.calls : null,
       visionFailures: stats ? stats.failures : null,
       windowTicks: row.vision.window.length,
-      ocrCompiling: row.vision.compiling.length > 0 && row.vision.compiling[row.vision.compiling.length - 1],
     };
   });
 }
