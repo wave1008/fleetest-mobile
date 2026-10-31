@@ -55,6 +55,9 @@ def build_targets(suites, xcuitest, suts=None):
     return targets
 
 
+MACHINE_STATE_TIMEOUT = 30   # 秒。ssh の接続 + sysctl と台帳の読みだけ。尽きたら読めなかったと記録して回帰は進める
+
+
 def run_args(targets, record=False):
     args = [FLEETEST, "run"]
     for _, project, profile in targets:
@@ -80,6 +83,48 @@ def command(host, args):
     remote = f"cd {REMOTE_CLONE} && {' '.join(shlex.quote(a) for a in args)}"
     # ログイン shell(zsh -lc)= ~/.zprofile の PATH(Scripts/e2ex.sh の --on と同じ)。-tt = 手元が切れたら向こうへ HUP が届く
     return ["ssh", "-tt", "-o", "BatchMode=yes", host, f"zsh -lc {shlex.quote(remote)}"]
+
+
+def record_machine_states(fleet, run_dir, stage):
+    """全マシンの状態(Scripts/machine-state.py)を machine-state.ndjson へ足す。読めないマシンは読めなかった事実を残し、回帰は止めない"""
+    def read(machine, host):
+        cmd = command(host, ["python3", "Scripts/machine-state.py"])
+        try:
+            out = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True, errors="replace",
+                                 timeout=MACHINE_STATE_TIMEOUT, stdin=subprocess.DEVNULL)
+        except subprocess.TimeoutExpired:
+            return {"machine": machine, "stage": stage, "unread": f"no answer within {MACHINE_STATE_TIMEOUT}s"}
+        except OSError as error:
+            return {"machine": machine, "stage": stage, "unread": str(error)}
+        line = next((l for l in reversed(out.stdout.splitlines()) if l.strip().startswith("{")), None)
+        try:
+            state = json.loads(line) if out.returncode == 0 and line else None
+        except ValueError:
+            state = None
+        if not isinstance(state, dict):
+            # ssh -tt は向こうの stderr を stdout へ混ぜるので両方の末尾を残す
+            tail = (out.stdout + out.stderr).strip()[-200:]
+            return {"machine": machine, "stage": stage, "unread": f"exit {out.returncode}: {tail}"}
+        return {"machine": machine, "stage": stage, **state}
+
+    rows = [None] * len(fleet)
+
+    def fill(i):
+        rows[i] = read(*fleet[i])
+
+    threads = [threading.Thread(target=fill, args=(i,)) for i in range(len(fleet))]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    with open(os.path.join(run_dir, "machine-state.ndjson"), "a") as f:
+        for row in rows:
+            f.write(json.dumps(row, ensure_ascii=False) + "\n")
+    for row in rows:
+        facts = row.get("unread") or " ".join(
+            [f"起動 {row['uptimeSeconds'] / 3600:.1f}h" if "uptimeSeconds" in row else "", f"load {row.get('load1', '?')}"]
+            + [f"{k}={row[k]['state']}" for k in ("fmText", "fmVision", "videoEncoder") if k in row])
+        print(f"   {stage} {row['machine']}: {facts}")
 
 
 def run_logged(cmd, log_path, env):
@@ -161,6 +206,7 @@ def main():
     started = time.time()
     fleet = machines()
     print(f"==> マシン: {', '.join(m for m, _ in fleet)} / 対象: {len(targets)} / ログ: {run_dir}")
+    record_machine_states(fleet, run_dir, "start")
 
     if not opts.skip_build:
         print("==> 段 1: 全マシンで SUT の鮮度を確かめ、要ればビルドします")
@@ -171,6 +217,7 @@ def main():
             for machine, why in failed.items():
                 print(f"   ❌ {machine}: {why}")
             print("❌ SUT をそろえられないマシンがあるので回しません(直すか、設定タブでそのマシンを無効にしてください)")
+            record_machine_states(fleet, run_dir, "end")
             return 1
 
     # 配信を張ったままなら警告だけ出す(止めない)。赤があった回は最後にもう一度言う
@@ -192,6 +239,7 @@ def main():
         print("❌ 見本はあるのに画像分類器を使えなかったシナリオがあります(理由はシナリオ末尾の ⚠️ 行)")
         for path in degraded:
             print(f"   {path}")
+    record_machine_states(fleet, run_dir, "end")
     print(f"全体の所要: {(time.time() - started) / 60:.1f} 分")
 
     all_green = run_ok and witness_ok and not degraded

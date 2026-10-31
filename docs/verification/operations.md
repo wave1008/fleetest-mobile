@@ -268,6 +268,8 @@ Flutter と RN の実機用は **Release 構成**(Flutter の Debug は flutter 
   `--ios-xcuitest` で xcuitest モードの対象も足す・`--suites` で絞るとそのスイートの印だけを書き、`--suts` で絞った回は印を書かない。`--skip-build` で段 1 を飛ばす・
   `--record` で録画する(既定は `--set record=false`)・`--dry-run` で対象と撃つコマンドだけ出す。SUT をそろえられないマシンがあれば回さない(設定タブでそのマシンを無効にすれば外れる)。
   **先に commit → `Scripts/align.sh`**(リモートはアライン済みのコミットで動く)
+  開始と終了で全マシンの状態(起動経過時間・load・FM・Vision・AVE の台帳)を `.fleetest/regress/<時刻>/machine-state.ndjson` へ残す
+  (`Scripts/machine-state.py`。読むだけ・判定は置かない)。**赤の帰属を見る前にここを見る** —— 同じコミットで再起動だけで赤 19 → 全緑になった回がある
 - **`e2e.sh` / `e2ex.sh` / `e2ey.sh` は引数に関係なく「スイート全体」として `Scripts/test-scope-guard.py` が断る**(全実施を頼まれたときだけ
   `FT_FULL_TEST=1`)。絞った確認は `fleetest run --project <P> --profile <prof> --scenario <クラス>` で通るシナリオを名指しする
 - **回帰の分担(ユーザー指示 2026-09-28。`Scripts/regress.py` を使わないときの形)**: E2E はこの Mac(M2Ultra)で `Scripts/e2e.sh --local`、
