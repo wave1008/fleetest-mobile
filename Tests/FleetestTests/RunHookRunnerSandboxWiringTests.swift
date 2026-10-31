@@ -36,10 +36,9 @@ final class RunHookRunnerSandboxWiringTests: XCTestCase {
 
     /// run の2経路がサービスと中断を渡し、`hooks reap` はスクリプトの孤児をサービスの孤児より先に片付ける
     func testBothRunPathsPassTheServicesSessionAndTheReapOrderIsScriptsFirst() throws {
-        for path in ["Sources/fleetest/ProfileRunner+Supply.swift", "Sources/fleetest/ApiRunCommand.swift"] {
-            let text = try source(path)
-            XCTAssertTrue(text.contains("services: servicesSession, interrupt: interruptState"), path)
-        }
+        // 2経路とも `prepareEnvironment` の1箇所を通る(RunPreparationOrderParityTests)
+        let supply = try source("Sources/fleetest/ProfileRunner+Supply.swift")
+        XCTAssertTrue(supply.contains("services: servicesSession, interrupt: interruptState"))
         let hooks = try source("Sources/fleetest/HooksCommand.swift")
         let scripts = try XCTUnwrap(hooks.range(of: "RunHookRunner.reapOrphans("))
         let services = try XCTUnwrap(hooks.range(of: "ServicesReaper.reap("))

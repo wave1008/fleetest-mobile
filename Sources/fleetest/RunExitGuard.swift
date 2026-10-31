@@ -15,7 +15,8 @@ final class SupplyAbandon: Sendable {
     }
 }
 
-/// **入口は `run(log:_:)` の1箇所**(`defer` の中では待てない)。順序: 供給のタスクを待つ → 片付け → 進捗の控えを消す →
+/// **入口は `run(log:_:)` の1箇所**(`defer` の中では待てない)。**結果を書いた後に走る**(終了スクリプトに上限が無いので、先に片付けると
+/// 刺さった回の run.json が残らない)。順序: 供給のタスクを待つ → 片付け → 進捗の控えを消す →
 /// dispatch.lock の解放 → 中断の登録の解除。本体の `defer` でロックを外すと、走っている供給・終了スクリプトの横で
 /// 次の run がロックを取る。控えもロックの直前に消す(シナリオの前に落ちた回。始まった run の控えは orchestrator の終了が消す)
 final class RunExitGuard {
@@ -44,19 +45,10 @@ final class RunExitGuard {
         await exit.finish()
     }
 
-    /// 結果を書く前に片付ける経路も呼ぶ。どちらも1回だけ効く(`finish()` と重ねてよい)
-    func settleAndClose() async {
-        supplyAbandon.mark()
-        let settle = self.settle
-        self.settle = nil
-        await settle?()
-        let close = self.close
-        self.close = nil
-        close?()
-    }
-
     func finish() async {
-        await settleAndClose()
+        supplyAbandon.mark()
+        await settle?()
+        close?()
         removeProgress?()
         dispatchLock?.release()
         stopInterruptRelay?()

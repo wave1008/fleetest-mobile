@@ -144,13 +144,14 @@ final class RunProgressLedgerWiringTests: XCTestCase {
     func testServicesStartupRunsAfterTheFirstLedgerWriteAndReportsItsStage() throws {
         let api = try Self.code("Sources/fleetest/ApiRunCommand.swift")
         let attach = try XCTUnwrap(api.range(of: "entryProgress.attach()"))
-        let up = try XCTUnwrap(api.range(of: "ServicesSession.up("))
+        let up = try XCTUnwrap(api.range(of: "ProfileRunner.prepareEnvironment("))
         XCTAssertTrue(attach.lowerBound < up.lowerBound, "api run がサーバーの起動の後で台帳を書き始めている")
         let box = try XCTUnwrap(api.range(of: "let supplyProgress = RunSupplyProgress()"))
         XCTAssertTrue(box.lowerBound < attach.lowerBound, "箱を入口の書き手より後で作っている")
-        for path in ["Sources/fleetest/ApiRunCommand.swift", "Sources/fleetest/ProfileRunner+Supply.swift"] {
+        for (path, entry) in [("Sources/fleetest/ApiRunCommand.swift", "ProfileRunner.prepareEnvironment("),
+                              ("Sources/fleetest/ProfileRunner+Supply.swift", "ServicesSession.up(")] {
             let text = try Self.code(path)
-            let call = try XCTUnwrap(text.range(of: "ServicesSession.up("), "\(path): サーバーを起動していない")
+            let call = try XCTUnwrap(text.range(of: entry), "\(path): サーバーを起動していない")
             let tail = text[call.upperBound...].prefix(300)
             XCTAssertTrue(tail.contains("supplyProgress: supplyProgress"),
                           "\(path): ServicesSession.up へ段階の箱を渡していない(この経路だけ「サーバーを起動中」が出ない)")

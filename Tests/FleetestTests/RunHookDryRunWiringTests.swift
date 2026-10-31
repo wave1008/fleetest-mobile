@@ -14,13 +14,13 @@ final class RunHookDryRunWiringTests: XCTestCase {
 
     func testApiRunGuardsTheHookCallWithNotDryRun() throws {
         let lines = try source("Sources/fleetest/ApiRunCommand.swift").components(separatedBy: "\n")
-        let calls = lines.indices.filter { lines[$0].contains("RunHookRunner.begin(") }
-        XCTAssertEqual(calls.count, 1, "expected exactly one RunHookRunner.begin call in ApiRunCommand")
+        let calls = lines.indices.filter { lines[$0].contains("ProfileRunner.prepareEnvironment(") }
+        XCTAssertEqual(calls.count, 1, "expected exactly one ProfileRunner.prepareEnvironment call in ApiRunCommand")
         for call in calls {
             guard let guardLine = Self.enclosingIf(of: call, in: lines)
-            else { return XCTFail("RunHookRunner.begin must sit inside an if") }
+            else { return XCTFail("ProfileRunner.prepareEnvironment must sit inside an if") }
             XCTAssertTrue(lines[guardLine].contains("!dryRun"),
-                          "the if around RunHookRunner.begin must exclude dry-run: \(lines[guardLine])")
+                          "the if around ProfileRunner.prepareEnvironment must exclude dry-run: \(lines[guardLine])")
         }
     }
 

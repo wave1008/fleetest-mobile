@@ -98,7 +98,7 @@ final class InterruptRelayEarlyRegistrationWiringTests: XCTestCase {
         let text = try source("Sources/fleetest/ApiRunCommand.swift")
         let registration = try XCTUnwrap(text.range(of: "RunInterruptState(recorder:"))
         let lock = try XCTUnwrap(text.range(of: "LocalDispatchLock("))
-        let setup = try XCTUnwrap(text.range(of: "RunHookRunner.begin("))
+        let setup = try XCTUnwrap(text.range(of: "ProfileRunner.prepareEnvironment("))
         let supply = try XCTUnwrap(text.range(of: "androidWorkersTask = Task"))
         let build = try XCTUnwrap(text.range(of: "try ScenarioHost.build(project: testProject,"))
         XCTAssertLessThan(registration.lowerBound, lock.lowerBound,

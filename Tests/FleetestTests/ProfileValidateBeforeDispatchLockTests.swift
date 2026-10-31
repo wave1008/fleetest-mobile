@@ -59,7 +59,7 @@ final class ProfileValidateBeforeDispatchLockTests: XCTestCase {
     }
 
     /// 書き込み(ワークスペースの雛形・供給)はロックの後のまま —— 前へ出したのは読むだけの
-    /// 判定だけであること。ApiRunCommand は自分の run() の中で直接 WorkspaceScaffold.ensure を
+    /// 判定だけであること。ApiRunCommand は自分の run() の中で直接 prepareWorkspace を
     /// 呼ぶが、RunScenarios はそれを ProfileRunner.run(…) の内側(別ファイル)へ委ねているので、
     /// その呼び出し自体がロックの後にあることを見る
     func testWorkspaceWritesStayAfterTheLockInApiRunCommand() throws {
@@ -68,8 +68,8 @@ final class ProfileValidateBeforeDispatchLockTests: XCTestCase {
         guard let lockRange = body.range(of: "LocalDispatchLock(") else {
             return XCTFail("LocalDispatchLock( not found in run()")
         }
-        guard let scaffoldRange = body.range(of: "WorkspaceScaffold.ensure(") else {
-            return XCTFail("WorkspaceScaffold.ensure( not found in run()")
+        guard let scaffoldRange = body.range(of: "ProfileRunner.prepareWorkspace(") else {
+            return XCTFail("ProfileRunner.prepareWorkspace( not found in run()")
         }
         XCTAssertLessThan(lockRange.lowerBound, scaffoldRange.lowerBound,
                           "workspace scaffolding must stay after the dispatch lock"

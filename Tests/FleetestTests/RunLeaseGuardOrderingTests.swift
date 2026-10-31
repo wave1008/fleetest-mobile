@@ -48,6 +48,10 @@ final class RunLeaseGuardOrderingTests: XCTestCase {
     }
 
     func testApiRunChecksTheLeaseBeforeHooksAndPreparation() throws {
-        try assertGuardComesFirst(in: "Sources/fleetest/ApiRunCommand.swift")
+        // 順序の本体は共有の `prepareEnvironment`(RunPreparationOrderParityTests)。api run は供給のタスクの前にそこを通る
+        let text = try String(contentsOf: Self.repoRoot.appendingPathComponent("Sources/fleetest/ApiRunCommand.swift"), encoding: .utf8)
+        let prepare = try XCTUnwrap(text.range(of: "ProfileRunner.prepareEnvironment("))
+        let lane = try XCTUnwrap(text.range(of: "ProfileSupplyLanes.android("))
+        XCTAssertLessThan(prepare.lowerBound, lane.lowerBound)
     }
 }

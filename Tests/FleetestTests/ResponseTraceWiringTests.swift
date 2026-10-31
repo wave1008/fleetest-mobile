@@ -46,16 +46,15 @@ final class ResponseTraceWiringTests: XCTestCase {
 
     /// run の取得は準備の段(ProfileRunner+Supply.swift)にある。復元は両方とも `SupplyCleanup` の1箇所
     func testBothEntrancesCaptureBeforeAndRestoreAfterTheAnimationSync() throws {
-        for path in ["Sources/fleetest/ProfileRunner+Supply.swift", "Sources/fleetest/ApiRunCommand.swift"] {
-            let lines = try Self.code(path)
-            let capture = try XCTUnwrap(lines.firstIndex { $0.contains("captureAnimationRestore(") }, path)
-            XCTAssertEqual(lines.filter { $0.contains("captureAnimationRestore(") }.count, 1, path)
-            XCTAssertTrue(lines.contains { $0.hasPrefix("cleanup.animationRestores = ") }, "\(path): 片付けへ渡していない")
-            // 取得は Android のレーン(開始時の同期 = buildAndroidWorkers を含む)を呼ぶ行より前
-            let build = try XCTUnwrap(lines.firstIndex { $0.contains("ProfileSupplyLanes.android(") }, path)
-            XCTAssertLessThan(capture, build, "\(path): 同期の後に元の値を読んでいる")
-        }
+        // 取得は Android のレーン(開始時の同期 = buildAndroidWorkers を含む)を呼ぶ行より前
         let supply = try Self.code("Sources/fleetest/ProfileRunner+Supply.swift")
+        let capture = try XCTUnwrap(supply.firstIndex { $0.contains("captureAnimationRestore(") })
+        XCTAssertEqual(supply.filter { $0.contains("captureAnimationRestore(") }.count, 1)
+        XCTAssertTrue(supply.contains { $0.hasPrefix("cleanup.animationRestores = ") }, "片付けへ渡していない")
+        XCTAssertLessThan(capture, try XCTUnwrap(supply.firstIndex { $0.contains("ProfileSupplyLanes.android(") }), "同期の後に元の値を読んでいる")
+        let api = try Self.code("Sources/fleetest/ApiRunCommand.swift")
+        XCTAssertLessThan(try XCTUnwrap(api.firstIndex { $0.contains("ProfileRunner.prepareEnvironment(") }),
+                          try XCTUnwrap(api.firstIndex { $0.contains("ProfileSupplyLanes.android(") }), "api run: 同期の後に元の値を読んでいる")
         XCTAssertEqual(supply.filter { $0.contains("restoreAnimations(") }.count, 1, "片付けの中に復元が無い")
     }
 

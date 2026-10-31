@@ -102,16 +102,7 @@ extension ProfileRunner {
         // (RemoteRunDispatcher.prepareWorkspace)。続けて appPath の原本を apps/ へ
         // ステージング(WorkspaceAppStaging)。**dest も原本も無ければここで throw する**
         // (原本のパスを名指しする。呼び出し側で握り潰さない)
-        if let workspaceRoot = resolvedAll.workspaceRoot {
-            let created = (try? WorkspaceScaffold.ensure(root: workspaceRoot)) ?? []
-            if !created.isEmpty {
-                ConsoleOut.out("→ Created workspace scaffold: " + created.map { "\($0)/" }.joined(separator: ", "))
-            }
-            let staged = try WorkspaceAppStaging.stageWorkspaceApps(resolvedAll)
-            if !staged.isEmpty {
-                ConsoleOut.out("→ Staged app package(s) into the workspace: " + staged.joined(separator: ", "))
-            }
-        }
+        try prepareWorkspace(resolvedAll) { ConsoleOut.out($0) }
         // --device / --device-machine(マシン別サブ実行が自分のぶんだけ回す)。**ホストで絞らないと
         // 別の機械の同名デバイスまで掴む**(filteringDevices の宣言)。0台になったら止める
         let full = resolvedAll.filteringDevices(names: deviceFilter, deviceMachine: deviceMachine)
@@ -124,6 +115,47 @@ extension ProfileRunner {
                 + " (available: \(resolvedAll.devices.map(\.name).joined(separator: ", ")))")
         }
         return full
+    }
+
+    /// ワークスペースの雛形とアプリのステージング(run と api run が共有。**dry-run では呼ばない** = ロックを取らないので走行中の run のアプリを置き換える)
+    static func prepareWorkspace(_ resolved: ResolvedProfile, log: (String) -> Void) throws {
+        guard let workspaceRoot = resolved.workspaceRoot else { return }
+        let created = (try? WorkspaceScaffold.ensure(root: workspaceRoot)) ?? []
+        if !created.isEmpty {
+            log("→ Created workspace scaffold: " + created.map { "\($0)/" }.joined(separator: ", "))
+        }
+        let staged = try WorkspaceAppStaging.stageWorkspaceApps(resolved)
+        if !staged.isEmpty {
+            log("→ Staged app package(s) into the workspace: " + staged.joined(separator: ", "))
+        }
+    }
+
+    /// デバイスに触る前の環境の準備(run と api run が共有。順序はここ1箇所)。二重使用は破壊的な準備より前に断る → 断られた run が
+    /// モニターや他人の設定に触らない。サービスは開始スクリプトの前。作ったものは `cleanup` に積む(途中で投げても積んだ分だけ片付く)。
+    /// **log を既定で ConsoleOut にしない**(`api run` の stdout は NDJSON 専用)
+    static func prepareEnvironment(resolved: ResolvedProfile, stateDir: URL?, cleanup: SupplyCleanup, failureLogDir: URL,
+                                   supplyProgress: RunSupplyProgress, interruptState: RunInterruptState,
+                                   log: @escaping (String) -> Void) throws {
+        try rejectIfDevicesLeasedBeforePreparation(resolved: resolved, leaseStateDir: stateDir)
+        if resolved.responseMeasurement {
+            // レスポンス計測中はモニターを止める
+            cleanup.responseMonitorHold = stateDir.flatMap { ResponseMeasurementMonitorHold.acquire(stateDir: $0, log: log) }
+            // 計測 run が書き換えた Android 実機のアニメーション設定を終了時に戻す。取得は開始時の同期(buildAndroidWorkers)より前
+            cleanup.animationRestores = ProfileWorkerFactory.captureAnimationRestore(resolved: resolved)
+        }
+        // サービス(scripts/compose.yaml)は開始スクリプトの前に上げ、片付けは終了スクリプトの後
+        let servicesSession = try ServicesSession.up(
+            resolved: resolved, stateDir: stateDir, options: .forRun(resolved), supplyProgress: supplyProgress,
+            interruptState: interruptState, log: log)
+        cleanup.servicesSession = servicesSession
+        do {
+            cleanup.hookSession = try RunHookRunner.begin(
+                resolved: resolved, stateDir: stateDir, services: servicesSession, interrupt: interruptState, log: log)
+        } catch {
+            // 失敗の証跡: run-setup.sh が落ちたとき、各サービスのログの末尾を残す
+            servicesSession?.saveLogs(to: failureLogDir, log: log)
+            throw error
+        }
     }
 
     /// 準備の段。`iosScenarios` / `androidScenarios` は台数の見積りに使う本数(nil = 分からないので絞らない・0 = その OS の台を用意しない)、
@@ -157,33 +189,15 @@ extension ProfileRunner {
         // 終了スクリプトは close() で撃つ。プロセスごと殺された場合は lease が残り、次の run と
         // `fleetest hooks reap` が代わりに撃つ
         let hookStateDir = (try? RepoRoot.find())?.appendingPathComponent(".fleetest")
-        // 二重使用は開始スクリプトと破壊的な準備より前に断る(rejectIfDevicesLeasedBeforePreparation)
-        try Self.rejectIfDevicesLeasedBeforePreparation(resolved: resolved, leaseStateDir: hookStateDir)
         let reportDir = reportDirOverride.map { URL(fileURLWithPath: $0) } ?? resolved.reportDir
         // 以下で作るものは cleanup に積む。途中で throw したら積んだ分だけ片付ける(作り終えたら PreparedSupply.close() が持つ)
         let cleanup = SupplyCleanup { ConsoleOut.out($0) }
         var handedOver = false
         defer { if !handedOver { cleanup.run() } }
-        // レスポンス計測中はモニターを止める(ApiRunCommand.run と同じ)
-        cleanup.responseMonitorHold = resolved.responseMeasurement
-            ? hookStateDir.flatMap { ResponseMeasurementMonitorHold.acquire(stateDir: $0) { ConsoleOut.out($0) } }
-            : nil
-        // 計測 run が書き換えた Android 実機のアニメーション設定を終了時に戻す。取得は開始時の同期(buildAndroidWorkers)より前
-        cleanup.animationRestores = resolved.responseMeasurement
-            ? ProfileWorkerFactory.captureAnimationRestore(resolved: resolved) : []
-        // サービス(scripts/compose.yaml)は開始スクリプトの前に上げ、片付けは終了スクリプトの後
-        let servicesSession = try ServicesSession.up(
-            resolved: resolved, stateDir: hookStateDir, options: .forRun(resolved), supplyProgress: supplyProgress,
-            interruptState: interruptState) { ConsoleOut.out($0) }
-        cleanup.servicesSession = servicesSession
-        do {
-            cleanup.hookSession = try RunHookRunner.begin(
-                resolved: resolved, stateDir: hookStateDir, services: servicesSession, interrupt: interruptState) { ConsoleOut.out($0) }
-        } catch {
-            // 失敗の証跡: run-setup.sh が落ちたとき、各サービスのログの末尾を run の記録(無ければレポートの出力先)へ残す
-            servicesSession?.saveLogs(to: failureLogDir ?? reportDir) { ConsoleOut.out($0) }
-            throw error
-        }
+        // 失敗の証跡の置き場は run の記録(無ければレポートの出力先)
+        try Self.prepareEnvironment(resolved: resolved, stateDir: hookStateDir, cleanup: cleanup,
+                                    failureLogDir: failureLogDir ?? reportDir, supplyProgress: supplyProgress,
+                                    interruptState: interruptState) { ConsoleOut.out($0) }
 
         // fm は full から計算する(filteringDevices/limitingDevices/broadcast は devices だけを変える)
         await Self.warnIfFMDegraded(fm: full.fm) { ConsoleOut.out($0) }

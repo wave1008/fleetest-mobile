@@ -60,17 +60,6 @@ final class RunExitGuardTests: XCTestCase {
         XCTAssertEqual(logged, [])
     }
 
-    /// 結果を書く前に片付けた経路でも、ロックの解放はそこでは起きず、出口で片付けを繰り返さない
-    func testSettleAndCloseKeepsTheLockAndRunsOnce() async {
-        let trace = Trace()
-        let exit = RunExitGuard()
-        register(exit, into: trace)
-        await exit.settleAndClose()
-        XCTAssertEqual(trace.steps, ["settle", "close"])
-        await exit.finish()
-        XCTAssertEqual(trace.steps, fullOrder)
-    }
-
     /// 走っている供給を実際に待つ。待つ前に放棄の印を立てる(立てないと段の境目で止まらず最後まで走る)
     func testFinishMarksTheSupplyAbandonedAndWaitsForIt() async {
         let trace = Trace()

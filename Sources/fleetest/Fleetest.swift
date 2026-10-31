@@ -913,10 +913,7 @@ struct RunScenarios: AsyncParsableCommand {
                     supplyProgress: supplyProgress,
                     interruptState: interruptState,
                     early: earlySupply, runExit: runExit)
-                // 片付け(終了スクリプト・サービス)は結果を書く前に済ませる(準備の段を ProfileRunner.run が持つ回と同じ順)
-                await runExit.settleAndClose()
             } catch {
-                await runExit.settleAndClose()
                 // 供給段(ワーカー構築等)の例外は run.json を完了させずに投げていた
                 // (finishedAt 無し = results insights が「クラッシュ/強制終了」に誤分類する)。
                 // ここへ来るのは常にシナリオ実行が

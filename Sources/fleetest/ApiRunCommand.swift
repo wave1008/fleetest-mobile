@@ -367,24 +367,8 @@ struct ApiRunCommand: AsyncParsableCommand {
         // 本数ぶんに削られた外のデバイスが照合されず、同じ打鍵で `fleetest run --dry-run` だけが警告した
         var commandCheckDevices: [CommandTargetCheck.Device] = []
         if let (resolvedAll, full) = preResolvedProfile {
-            // ワークスペースは常に有効(既定 `<project.rootURL>/workspace`。RR-17)
-            // なので毎回雛形作成(ProfileRunner.run と同じ規律。既に揃っていれば
-            // 何もしない。リモートディスパッチは別途ミラー前のローカル側で同じ呼び出しを行う
-            // = RemoteRunDispatcher.prepareWorkspace)。続けて appPath の原本を apps/ へ
-            // ステージング(WorkspaceAppStaging。ProfileRunner.run と同じ規律 ——
-            // dest も原本も無ければ throw する)
-            if let workspaceRoot = resolvedAll.workspaceRoot {
-                let created = (try? WorkspaceScaffold.ensure(root: workspaceRoot)) ?? []
-                if !created.isEmpty {
-                    logStderr("→ Created workspace scaffold: "
-                        + created.map { "\($0)/" }.joined(separator: ", "))
-                }
-                let staged = try WorkspaceAppStaging.stageWorkspaceApps(resolvedAll)
-                if !staged.isEmpty {
-                    logStderr("→ Staged app package(s) into the workspace: "
-                        + staged.joined(separator: ", "))
-                }
-            }
+            // リモートディスパッチは別途ミラー前のローカル側で同じ呼び出しを行う(RemoteRunDispatcher.prepareWorkspace)
+            if !dryRun { try ProfileRunner.prepareWorkspace(resolvedAll) { logStderr($0) } }
             // **回す本数を超える台数を用意しない**(ResolvedProfile.limitingDevices)。
             // ここではシナリオ一覧がまだ無い(ビルドと並行に解決するため。下の先行構築のコメント参照)
             // ので、**確定している情報だけ**で絞る —— 明示 ID(`Class.method`)だけの指定なら
@@ -456,37 +440,16 @@ struct ApiRunCommand: AsyncParsableCommand {
         // 片付けの順序は `fleetest run` と同じ `SupplyCleanup` の1箇所(走るのは本体の外の RunExitGuard)
         let cleanup = ProfileRunner.SupplyCleanup { logStderr($0) }
         runExit.close = { cleanup.run() }
-        // サービス(scripts/compose.yaml)は開始スクリプトの前に上げ、片付けは終了スクリプトの後
-        var servicesSession: ServicesSession?
         // iOS 実機の計測だけ録る xctrace(開始は供給の後・配布の前、止めて結果へ入れるのは run の後。ProfileRunner.run と同じ)
         var responseTrace: ResponseTraceSession?
         defer { responseTrace?.cleanup() }
         if let resolved = resolvedProfile, !dryRun {
             let hookStateDir = (try? RepoRoot.find())?.appendingPathComponent(".fleetest")
-            // レスポンス計測中はモニターを止める(ProfileRunner.run と同じ。解除は片付け = 中断・エラーでも通る)
-            if resolved.responseMeasurement, let hookStateDir {
-                cleanup.responseMonitorHold = ResponseMeasurementMonitorHold.acquire(stateDir: hookStateDir) { logStderr($0) }
-            }
-            // 二重使用は開始スクリプトと破壊的な準備より前に断る(ProfileRunner と同じ判定)
-            try ProfileRunner.rejectIfDevicesLeasedBeforePreparation(
-                resolved: resolved, leaseStateDir: hookStateDir)
-            // 他の run が使っているデバイスを断った後に取る(断られた run が他人の設定を戻さない)
-            if resolved.responseMeasurement {
-                // 取得は開始時の同期(buildAndroidWorkers)より前に行う
-                cleanup.animationRestores = ProfileWorkerFactory.captureAnimationRestore(resolved: resolved)
-            }
-            servicesSession = try ServicesSession.up(
-                resolved: resolved, stateDir: hookStateDir, options: .forRun(resolved), supplyProgress: supplyProgress,
-                interruptState: interruptState) { logStderr($0) }
-            cleanup.servicesSession = servicesSession
-            do {
-                cleanup.hookSession = try RunHookRunner.begin(
-                    resolved: resolved, stateDir: hookStateDir, services: servicesSession, interrupt: interruptState) { logStderr($0) }
-            } catch {
-                // run-setup.sh の失敗 = サービスのログも証跡に残す(記録はまだ無いのでレポートの出力先へ。ProfileRunner.run と同じ)
-                servicesSession?.saveLogs(to: resolved.reportDir) { logStderr($0) }
-                throw error
-            }
+            // **サーバーの起動と開始スクリプトは dry-run で撃たない**(`fleetest run` の dry-run 分岐と同じ)
+            try ProfileRunner.prepareEnvironment(
+                resolved: resolved, stateDir: hookStateDir, cleanup: cleanup,
+                failureLogDir: reportDir.map { URL(fileURLWithPath: $0) } ?? resolved.reportDir,
+                supplyProgress: supplyProgress, interruptState: interruptState) { logStderr($0) }
         }
         // **run-setup.sh の後で中断を見る**(既存の早期失敗と同じ出口 —— 片付けとロックの解放は RunExitGuard)。ここではまだ供給タスクが1つも起きていない
         if interruptState.isStopped {
@@ -496,7 +459,7 @@ struct ApiRunCommand: AsyncParsableCommand {
         // **死活確認は開始スクリプトの後**(ProfileRunner.run と同じ順序)。
         // 依存サービスを run-setup.sh が起動する構成では、先に撃つと毎回必ず「到達できない」と
         // 警告することになり、**本当に落ちているときの警告が埋もれる**(受け手からの報告)
-        if let resolved = resolvedProfile {
+        if let resolved = resolvedProfile, !dryRun {
             await BackendHealthCheck.warnIfUnreachable(resolved: resolved) { logStderr($0) }
         }
 
@@ -734,11 +697,11 @@ struct ApiRunCommand: AsyncParsableCommand {
             // ここへ来るのは常にシナリオ実行が1本も始まる前(供給・レーン検査の throw だけ)なので、
             // total 分すべて未実行という分かっている事実だけを記録してから rethrow する
             // run-setup.sh やサービスの起動の失敗 = サービスのログも証跡に残す(run の記録があるときだけ)
-            if let runDir = recorder?.runDir { servicesSession?.saveLogs(to: runDir) { logStderr($0) } }
+            if let runDir = recorder?.runDir { cleanup.servicesSession?.saveLogs(to: runDir) { logStderr($0) } }
             recorder?.finish(total: selected.count, passed: 0, failed: selected.count,
                              performanceMode: performanceMode, fmSettings: fmSettings,
                              setOverrides: profileOverrides.mapValues(\.token),
-                             servicesWarnings: servicesSession?.warnings ?? [],
+                             servicesWarnings: cleanup.servicesSession?.warnings ?? [],
                              responseMeasurement: resolvedProfile.flatMap(ResponseMeasurementPolicy.runInfo(resolved:)),
                              abortReason: error.localizedDescription)
             // `--failed` が拾えるよう、始まらなかった分を直近失敗として残す(`run` の供給段は
@@ -762,7 +725,7 @@ struct ApiRunCommand: AsyncParsableCommand {
             performanceMode: performanceMode,
             degradedWorkers: outcome.degradedWorkers, blankExclusions: outcome.blankExclusions)
         // 赤の run はサービスのログの末尾も記録へ(ProfileRunner.run と同じ。片付けの前に読む)
-        if outcome.failed > 0, let runDir = recorder?.runDir { servicesSession?.saveLogs(to: runDir) { logStderr($0) } }
+        if outcome.failed > 0, let runDir = recorder?.runDir { cleanup.servicesSession?.saveLogs(to: runDir) { logStderr($0) } }
         // fmSettings は上(do/catch より前)で計算済み —— 供給段の abort 記録もここを使うため
         let slowWorkers = recorder?.finish(total: selected.count * measuredCopies, passed: outcome.passed, failed: outcome.failed,
                          degradedWorkers: outcome.degradedWorkers,
@@ -775,7 +738,7 @@ struct ApiRunCommand: AsyncParsableCommand {
                          performanceMode: performanceMode,
                          fmSettings: fmSettings,
                          setOverrides: profileOverrides.mapValues(\.token),
-                         servicesWarnings: servicesSession?.warnings ?? [],
+                         servicesWarnings: cleanup.servicesSession?.warnings ?? [],
                          responseMeasurement: resolvedProfile.flatMap(ResponseMeasurementPolicy.runInfo(resolved:)),
                          interrupted: outcome.interrupted,
                          abortReason: outcome.abortReason) ?? []

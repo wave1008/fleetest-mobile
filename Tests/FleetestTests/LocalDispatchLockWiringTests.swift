@@ -52,7 +52,7 @@ final class LocalDispatchLockWiringTests: XCTestCase {
     /// `api run` は run フック・ワークスペースのステージング・供給がこの後に来る
     func testTheLockIsTakenBeforeAnythingHeavy() throws {
         for (path, later) in [("Sources/fleetest/Fleetest.swift", "try ScenarioHost.build(project: testProject,"),
-                              ("Sources/fleetest/ApiRunCommand.swift", "RunHookRunner.begin(")] {
+                              ("Sources/fleetest/ApiRunCommand.swift", "ProfileRunner.prepareEnvironment(")] {
             let text = try source(path)
             let acquire = try XCTUnwrap(text.range(of: "LocalDispatchLock("), path)
             let heavy = try XCTUnwrap(text.range(of: later), "\(path): \(later) が見つからない")
@@ -82,7 +82,7 @@ final class LocalDispatchLockWiringTests: XCTestCase {
         let text = try source("Sources/fleetest/ApiRunCommand.swift")
         let acquire = try XCTUnwrap(text.range(of: "LocalDispatchLock("))
         let lease = try XCTUnwrap(
-            text.range(of: "ProfileRunner.rejectIfDevicesLeasedBeforePreparation("))
+            text.range(of: "ProfileRunner.prepareEnvironment("))
         XCTAssertLessThan(acquire.lowerBound, lease.lowerBound)
     }
 
