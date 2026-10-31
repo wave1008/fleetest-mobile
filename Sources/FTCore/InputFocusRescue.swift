@@ -33,18 +33,23 @@ public enum InputFocusRescue {
     /// id が無ければ位置(焦点のある要素の中心が叩いた要素の矩形に入るか)で見る
     public static func focusIsElsewhere(from tapped: ElementInfo, in elements: [ElementInfo]) -> Bool {
         guard let focused = elements.first(where: { $0.focused == true }) else { return true }
+        // 叩いた要素が撮り直した木に居ない = 画面が変わった。焦点が立っているならそこへ送る(別の欄を推測しない)
+        guard let tappedFrame = currentFrame(of: tapped, in: elements) else { return false }
         if let id = tapped.identifier, !id.isEmpty, focused.identifier == id, focused.type == tapped.type {
             return false
         }
-        return !contains(currentFrame(of: tapped, in: elements), centreOf: focused.frame)
+        return !contains(tappedFrame, centreOf: focused.frame)
     }
 
     /// 叩いた要素の**撮り直した木での枠**。キーボードが出ると一覧が押し上げられ(Flutter・View)、叩いた時点の枠のままでは
     /// 焦点のある欄の中心が枠の外に出て「焦点はよそ」と読み、**古い枠の中に来た隣の欄**を選んで打つ。
-    /// id + 型がちょうど1個に決まるときだけ撮り直した木の枠を使い、決まらなければ叩いた時点の枠のまま
-    static func currentFrame(of tapped: ElementInfo, in elements: [ElementInfo]) -> FTRect {
+    /// id + 型がちょうど1個に決まるときだけ撮り直した木の枠を使い、複数なら叩いた時点の枠のまま。
+    /// **id があるのに撮り直した木に1個も無いときは nil**(画面が遷移した: 遷移前の行の枠を残すと、新しい画面の
+    /// 無関係な欄がその枠に重なって救済の入れ先に選ばれ、緑で別の欄へ打つ = inapp F7)。id が無い要素は枠のまま
+    static func currentFrame(of tapped: ElementInfo, in elements: [ElementInfo]) -> FTRect? {
         guard let id = tapped.identifier, !id.isEmpty else { return tapped.frame }
         let same = elements.filter { $0.identifier == id && $0.type == tapped.type }
+        if same.isEmpty { return nil }
         return same.count == 1 ? same[0].frame : tapped.frame
     }
 
@@ -59,7 +64,7 @@ public enum InputFocusRescue {
     /// 容器と中身は数 px ずれることがあり、厳密な包含だと落ちる
     public static func fieldToType(after tapped: ElementInfo,
                                    in elements: [ElementInfo]) -> ElementInfo? {
-        let frame = currentFrame(of: tapped, in: elements)
+        guard let frame = currentFrame(of: tapped, in: elements) else { return nil }
         let candidates = elements.filter {
             SnapshotRenderer.textInputTypes.contains($0.type) && $0.enabled
                 && contains(frame, centreOf: $0.frame)

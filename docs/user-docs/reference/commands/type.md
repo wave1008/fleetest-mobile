@@ -53,7 +53,7 @@ field.type("alice")                // same as type("#login_id", "alice")
   preceding `tap`, it locates the field by name and types into it instead:
 
   ```
-  ✅ type "abc"(typed into textField (the preceding tap did not put a field in focus))
+  ✅ type "abc"(typed into textField (the tree showed no focused field after the preceding tap))
   ```
 
   This recovery only looks at the tree immediately after the tap, only targets the tapped

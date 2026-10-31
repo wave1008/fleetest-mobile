@@ -1119,6 +1119,18 @@ extension StepExecutor {
             if let refusal = nonTextInputPreflightRefusal(element, in: snapshot.elements, action: "clearInput") {
                 return StepOutcome(status: .failed(refusal))
             }
+            // type と同じく、キーボードの下の欄は先に容器を送ってから撃つ(送ってなお下なら下の reachPastKeyboard が閉じる。inapp F8)
+            if let lifted = try await liftCoveredTarget(
+                element, in: snapshot, step: step, verb: "clearing",
+                snapshotSource: switchedToFallbackDriver ? .driver(actingDriver) : .primary, phase: &phase) {
+                guard let liftedElement = lifted.element else {
+                    return StepOutcome(status: failed(.notFound, Self.coverLiftLostMessage(step, verb: "clearing")
+                        + (await leftForegroundSuffix(snapshot.sessionBundleID))))
+                }
+                element = liftedElement
+                snapshot = lifted.snapshot
+                driverFallback = Self.joinNotes(driverFallback, lifted.note)
+            }
             switch try await reachPastKeyboard(
                 element, in: snapshot, step: step, action: "clearInput",
                 snapshotSource: switchedToFallbackDriver ? .driver(actingDriver) : .primary, phase: &phase) {
@@ -1453,7 +1465,7 @@ extension StepExecutor {
     /// **1回では足りないことがあるので、動いている限り最大 `maxLifts` 回送る**
     /// (実測: 191pt 要求して実際の移動は 144pt で、中心がまだ覆いの内側だった)。
     /// 動かなくなったら諦める = 端まで来ている画面で無限に粘らない。
-    /// verb は注記の文言(touching / typing)。判定は共通で、言い回しだけ呼び手が持つ
+    /// verb は注記の文言(touching / typing / clearing)。判定は共通で、言い回しだけ呼び手が持つ
     /// **private ではない**: StepExecutor+Hold.swift の executeHoldStart からも呼ぶ
     func liftCoveredTarget(_ element: ElementInfo, in snapshot: SnapshotResponse,
                            step: FlowStep, verb: String, snapshotSource: CoverLiftSnapshotSource,
@@ -1619,7 +1631,7 @@ extension StepExecutor {
     /// 送った後に対象を見失ったときの失敗文(撃つ前の ref で撃たない理由を言う)
     static func coverLiftLostMessage(_ step: FlowStep, verb: String) -> String {
         "the target was covered, so the container was scrolled before \(verb) it, but the target could not be"
-            + " found on the screen afterwards: \(step.locatorSummary) (nothing was \(verb == "typing" ? "typed" : "touched"))"
+            + " found on the screen afterwards: \(step.locatorSummary) (nothing was \(verb == "typing" ? "typed" : verb == "clearing" ? "cleared" : "touched"))"
     }
 
     /// 座標ドラッグを通常ドライバ →(501/ルート不明404 なら)typeDriver の順で撃つ。

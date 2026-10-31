@@ -636,7 +636,7 @@ extension StepExecutor {
             return StepOutcome(status: .passed,
                                driverFallback: Self.joinNotes(replaceFallbackNote,
                                    "typed into \(TapTargetGeometry.describe(recovered))"
-                                       + " (the preceding tap did not put a field in focus)"))
+                                       + " (the tree showed no focused field after the preceding tap)"))
         }
         // ロケータ有り type(下記 case "type")と同じ規則: "\n" を含むときだけ
         // typeDriver(XCUITest)へ回し、iOS の Return キー既定挙動に揃える(理由は同 case のコメント参照)。

@@ -53,7 +53,7 @@ field.type("alice")                // type("#login_id", "alice") と同じ
   名指しして入れ直します:
 
   ```
-  ✅ type "abc"(typed into textField (the preceding tap did not put a field in focus))
+  ✅ type "abc"(typed into textField (the tree showed no focused field after the preceding tap))
   ```
 
   この復帰処理は**タップ直後の木1枚だけ**を見て、入れ先は「叩いた要素そのもの」か

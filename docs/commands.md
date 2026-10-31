@@ -200,7 +200,7 @@ Android の入力欄は**容器**(Material の `TextInputLayout`)と**中身**(`
 **焦点が立っていなければその欄を名指しして入れ直す**:
 
 ```
-✅ type "abc"(typed into textField (the preceding tap did not put a field in focus))
+✅ type "abc"(typed into textField (the tree showed no focused field after the preceding tap))
 ```
 
 規律は3つ:

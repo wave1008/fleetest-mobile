@@ -240,7 +240,7 @@ final class TypeAfterTapFocusTests: XCTestCase {
     func testACoincidentalRefMatchInTheNewTreeIsNotTheTappedElement() {
         let tapped = container(ref: 8, id: "txtMailAddress")
         let otherFieldWithTheSameRef = field(ref: 8, id: "single", focused: true, y: 100)
-        XCTAssertTrue(InputFocusRescue.focusIsElsewhere(from: tapped, in: [otherFieldWithTheSameRef]))
+        XCTAssertTrue(InputFocusRescue.focusIsElsewhere(from: tapped, in: [tapped, otherFieldWithTheSameRef]))
     }
 
     /// 同じ要素かは id + 型で見る(ref が変わっていても、同じ id の欄に焦点があれば救済しない)

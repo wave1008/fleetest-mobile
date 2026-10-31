@@ -749,6 +749,21 @@
   直したが、再生ケースにできていない。シェードは「打ち切りの時点で木が systemui のもの」のときだけ拾う(木が下のアプリのままの実装では拾えない)
 - **scrollToBottom / scrollToTop は、始める前に前面を離れていた形を拾わない**: Android の木のセッションは前面と一緒に替わるので、始点の木がランチャーなら
   「対象のアプリ」が分からない(拾えるのは送りの途中で離れた形だけ)
+### OI-91 in-app の背面の要素・焦点の受け口(11/1 探索 inapp・mxa)
+- 状態: 経路未確定(デバイスで hitTest の実体を採れていない)
+- 確認: コミット未記録(2026-11-01)
+- 経緯: 発見: 11/1 の探索的テスト(所見は作業ログの findings-inapp.md / findings-mxa.md)
+
+- SwiftUI の confirmationDialog・全画面カバー・アラート・メニューの背面のボタンへの tap が in-app で本当に押される(XCUITest は「cannot resolve」で赤)。
+  confirmationDialog の背面は `hitAreaMiss` が nil(hit view が要素の祖先/子孫に当たる形か・未確認)、全画面カバー中の exist/notExist には注記が付かない、
+  メニュー中の Picker への tap が「scrolled」と言って緑(inapp F1〜F3)。直す手は2つ: in-app の木を前面の窓/提示中のコントローラで刈る(exist/notExist も XCUITest と揃う・
+  SwiftUI のホスティングの構造を実スナップショットで採ってから)/ `reaches` の祖先方向を窓全体を覆う容器では許さない。
+  どちらも hit view の実体を採らずに入れると、緑の普通の tap を赤にするおそれがあるので入れていない
+- Flutter で `tap(欄A); tap(値の入った欄B); type("x")` が in-app で「focus is not on the tapped element」(7回中6回・xcuitest は緑)。
+  受け口が 1x1 で動かず(`movedSinceTap` false)、叩いた要素が入力欄と申告されないと `FocusLanding.landed` が外れる。F6 の救済が焦点の立った欄へ ref 付きで撃ち直す形の実害(inapp F9)
+- CMP(iOS)の複数行へ別の欄を挟んで打ち足すと文字が先頭に入る・clearInput が 4 周で不発(XCUITest ランナーの `tapFieldEndIfHittable` が複数行の縦の中央を押す疑い。mxa F9)
+- Flutter(iOS)の上半分が見えている欄を「中心がキーボードの下」として type / clearInput が断る(中心1点の判定。焦点が既にその欄にあれば押さずに打てる。mxa F10。
+  clearInput が容器を送らない側は inapp F8 として直した)
 
 ### OI-85 軽い残り(負荷テスト)
 - 状態: 経路確定
@@ -757,7 +772,7 @@
 
 - Flutter の横向きで焦点のある欄への ft_type(ref)を断る(d F2)・ft_tap(x,y)が ANR kill を挟んで18秒後に done(d F5)・タブ文字が空白に変わっても Typed(d F8)・長い type の途中の消灯の文言(d F9)・ロック中の ft_screenshot が真っ黒を注記なしで返す(c F7)
 
-### OI-90 探索(11/01)の Android で直さなかったもの
+### OI-92 探索(11/01)の Android で直さなかったもの
 - 状態: 経路確定
 - 確認: コミット未記録(2026-11-01)
 - 経緯: 発見: 11/01 の探索的テスト(所見は作業ログの findings-b.md / findings-p.md)

@@ -33,7 +33,30 @@ final class FocusRescueRelocationTests: XCTestCase {
         let tapped = element(ref: 2, type: "other", id: "dup", y: 1200)
         let a = element(ref: 3, type: "other", id: "dup", y: 100)
         let b = element(ref: 4, type: "other", id: "dup", y: 500)
-        XCTAssertEqual(InputFocusRescue.currentFrame(of: tapped, in: [a, b]).y, 1200)
+        XCTAssertEqual(InputFocusRescue.currentFrame(of: tapped, in: [a, b])?.y, 1200)
+    }
+
+    /// inapp F7: 叩いた行(id 付き)が遷移後の木に居ない。焦点が無いとき、旧画面の枠に重なった無関係な欄を選ばない
+    func testGoneTappedElementPicksNoFieldFromItsOldFrame() {
+        let tapped = element(ref: 2, type: "button", id: "nav_inputs", y: 300)
+        let unrelatedField = element(ref: 7, type: "textField", id: "field_auto", y: 300)
+        XCTAssertNil(InputFocusRescue.currentFrame(of: tapped, in: [unrelatedField]))
+        XCTAssertNil(InputFocusRescue.fieldToType(after: tapped, in: [unrelatedField]),
+                     "叩いた要素が木に無い = 画面が変わった。旧い枠で入れ先を推測しない")
+    }
+
+    /// 叩いた要素が消え、別の欄に焦点があるなら、救済せずその焦点へ送る(検索ボタン → 検索欄の形)
+    func testGoneTappedElementWithFocusElsewhereIsNotRescued() {
+        let tapped = element(ref: 2, type: "button", id: "search_btn", y: 300)
+        let focusedField = element(ref: 9, type: "textField", id: "search_field", y: 50, focused: true)
+        XCTAssertFalse(InputFocusRescue.focusIsElsewhere(from: tapped, in: [focusedField]))
+    }
+
+    /// id の無い叩いた要素は従来どおり叩いた時点の枠で救済する(緑の普通の入力を赤にしない)
+    func testTappedElementWithoutIdKeepsItsFrame() {
+        let tapped = element(ref: 2, type: "other", id: nil, y: 300)
+        let field = element(ref: 7, type: "textField", id: nil, y: 300)
+        XCTAssertEqual(InputFocusRescue.fieldToType(after: tapped, in: [field])?.ref, 7)
     }
 
     func testSideBandMovesStartInsideAndLeavesOthers() {

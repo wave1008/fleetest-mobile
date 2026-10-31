@@ -647,7 +647,7 @@ final class FTInAppBridge {
             InAppSettle.waitOnMain { converged in
                 if !converged, self.requestGeneration == myGeneration { self.lastSettleCapped = true }
                 if self.requestGeneration == myGeneration, InAppRenderCatchUp.pixelPrint(window) == before {
-                    note = (note ?? "") + "; the screen did not change after the synthetic touch"
+                    note = (note ?? "") + "; the screen looked the same when it settled after the synthetic touch (a handler that responds later, such as a React Native onPress, may still act)"
                 }
                 sem.signal()
             }
@@ -983,12 +983,25 @@ final class FTInAppBridge {
         return nil
     }
 
+    /// この ref 付き type のタップで**焦点を取り戻した**(タップ前の受け口が別のビュー)secure 欄に、既に文字があるか。
+    /// タップ前から焦点がその欄にあれば追記が本物の動き(false)。main で呼ぶ(タップの後)
+    private static func refocusedSecureFieldHasText(before: ReceiverMark?) -> Bool {
+        guard let view = FTCurrentTextReceiver() as? UIView,
+              let traits = view as? UITextInputTraits, traits.isSecureTextEntry == true else { return false }
+        if let before, before.id == ObjectIdentifier(view) { return false }
+        let text = (view as? UITextField)?.text ?? (view as? UITextView)?.text
+        return !(text ?? "").isEmpty
+    }
+
     private static func describe(_ rect: CGRect) -> String {
         "(\(Int(rect.minX)),\(Int(rect.minY)) \(Int(rect.width))x\(Int(rect.height)))"
     }
 
     private func handleType(_ body: Data) throws -> InAppHTTPServer.Response {
         let req = try decode(TypeRequest.self, body)
+        // 焦点を取り戻した secure 欄は、本物の最初の打鍵で全消しされてから入る。insertText: はその経路を通らず
+        // 追記になる(inapp F5)ので、同じ状況だけ挿入の直前に空にして本物と揃える
+        var replacesSecureText = false
         if let ref = req.ref {
             try requireExpectedRef(ref, expect: req.expect)
             var point = CGPoint.zero
@@ -999,6 +1012,7 @@ final class FTInAppBridge {
                 FTSynthTap(window, point)
             }
             try requireFocusMoved(ref: ref, tapped: point, before: before, action: "type")
+            replacesSecureText = mainSync { Self.refocusedSecureFieldHasText(before: before) }
         }
         // 末尾の改行1つは本文と分けて **pressEnter と同じ経路**へ流す(「type の末尾改行 = pressEnter」が
         // 契約。Compose は "\n" 完全一致の insertText でだけ IME アクションに変換し、UITextField は
@@ -1013,6 +1027,7 @@ final class FTInAppBridge {
         // 200 を返し呼び出し側は「\n も含めて全部入った」と誤解した(下の 422 で正しく伝える)
         var enterFired = true
         try performWithSettle(operation: "the text input") { _ in
+            if replacesSecureText { _ = FTClearTextInFirstResponder() }
             if hasTrailingNewline {
                 inserted = FTInsertTextIntoFirstResponder(main)
                 enterFired = FTPressEnterOnComposeFirstResponder()
