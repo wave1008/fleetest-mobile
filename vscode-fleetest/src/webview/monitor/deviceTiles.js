@@ -1672,14 +1672,24 @@ export function applyDevices(devices, filter) {
 // 表示フィルタの前の全台から数える(絞り込みで案内が消えない)。毎周期呼ばれるので、中身の鍵が前回と同じなら触らない
 // (要素を作り直さない・説明文だけ setHoverTip で書く = 周期的な点滅を避ける)
 let rebootAdviceKey = '';
+// 本文に並べる台数。案内は上部の1行なので、1マシンの全台が落ちてもラインビューの高さを奪わない数
+const REBOOT_ADVICE_NAMES_SHOWN = 3;
+function rebootAdviceText(summary) {
+  const separator = t('wvMonitor.rebootAdvice.separator');
+  const shown = summary.names.slice(0, REBOOT_ADVICE_NAMES_SHOWN);
+  const hidden = summary.names.length - shown.length;
+  if (hidden > 0) { shown.push(t('wvMonitor.rebootAdvice.more', { count: hidden })); }
+  return t('wvMonitor.rebootAdvice.text', { names: shown.join(separator), machines: summary.machines.join(separator) });
+}
 function renderRebootAdvice(devices) {
-  const summary = rebootAdviceSummary(devices, LOCAL_MACHINE_LABEL);
+  const summary = rebootAdviceSummary(devices, t('wvMonitor.rebootAdvice.localMachine'));
   const key = summary ? summary.names.join('\n') : '';
   if (key === rebootAdviceKey) { return; }
   rebootAdviceKey = key;
-  rebootAdvice.textContent = summary ? t('wvMonitor.rebootAdvice.text', { names: summary.names.join(', '), machines: summary.machines.join(', ') }) : '';
+  rebootAdvice.textContent = summary ? rebootAdviceText(summary) : '';
   rebootAdvice.classList.toggle('visible', summary !== null);
-  setHoverTip(rebootAdvice, summary ? summary.names.join('\n') : '');
+  // 全台はホバーで見る(本文の省略を補う)。省略が無ければ本文の繰り返しなので出さない
+  setHoverTip(rebootAdvice, summary && summary.names.length > REBOOT_ADVICE_NAMES_SHOWN ? summary.names.join('\n') : '');
 }
 
 /** タイルに出すデバイス(= 表示フィルタを両方通したもの)。run ボードのツリーは通さない。 */

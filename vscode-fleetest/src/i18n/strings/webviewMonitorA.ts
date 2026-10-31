@@ -170,9 +170,12 @@ export const webviewMonitorAStrings = {
   // バナーは自動では消えない(読む前に消えるため)。閉じ方を示す
   "wvMonitor.banner.dismissTip": { ja: "クリックで閉じる", en: "Click to dismiss" },
   "wvMonitor.rebootAdvice.text": {
-    ja: "⚠️ 再起動しても戻らないデバイスがあります: {names}。再起動をおすすめするマシン: {machines}",
-    en: "⚠️ Device(s) did not recover after a restart: {names}. Machine(s) to restart: {machines}",
+    ja: "⚠️ マシンの再起動をおすすめします(対象: {machines})。次のデバイスは再起動しても画面が戻りませんでした: {names}",
+    en: "⚠️ Restarting the machine is recommended ({machines}). These devices did not recover after a device restart: {names}",
   },
+  "wvMonitor.rebootAdvice.localMachine": { ja: "ローカル", en: "the local machine" },
+  "wvMonitor.rebootAdvice.separator": { ja: "、", en: ", " },
+  "wvMonitor.rebootAdvice.more": { ja: "ほか{count}台", en: "{count} more" },
   "wvMonitor.banner.copy": { ja: "コピー", en: "Copy" },
   "wvMonitor.banner.copied": { ja: "コピーしました", en: "Copied" },
   "wvMonitor.banner.copyTip": {

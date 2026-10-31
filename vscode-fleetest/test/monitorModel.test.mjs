@@ -1556,6 +1556,6 @@ test("rebootAdviceSummary: 戻らなかった台の名前と再起動するマ�
       { name: "c", rebootAdvised: false },
       { name: "d", machine: "M1Max", rebootAdvised: true },
     ], "local"),
-    { names: ["a (local)", "b (M1Max)", "d (M1Max)"], machines: ["local", "M1Max"] },
+    { names: ["a", "b (M1Max)", "d (M1Max)"], machines: ["local", "M1Max"] },
   );
 });
