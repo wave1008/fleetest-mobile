@@ -95,7 +95,7 @@ FM がアプリを自律探索してシナリオを生成する explore モー�
 - **期限付き実行(`withDeadline` / `raceWithDeadline`)に `withTaskGroup` を使わない**: 構造化並行は
   スコープ終端で**敗者 task の完了を待つ**ため、ウェッジした op(無応答ブリッジ・固着した VT セッション)
   から離脱できず期限そのものが効かなくなる。だから非構造化 Task + 1回限りガード
-  (`DeadlineGuard` / `RecordingRaceGuard`)で組む。
+  (`DeadlineGuard`)で組む。
   **その代償が前方参照の競合**: op 勝利時に満期スリーパーを cancel するには task 参照を前方参照する
   必要があり、`Task { }` の本体は囲みの同期区間と**並行に開始し得る**ので素の `var` では競合する
   (「代入は同期区間で完了するのでレースしない」は成り立たない。ThreadSanitizer で実測・2026-07-30 修正)。

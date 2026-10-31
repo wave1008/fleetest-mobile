@@ -1130,7 +1130,7 @@ public func doUntilTrue(_ title: String, waitSeconds: Double? = nil, intervalSec
         }
     }
     if core.scenarioAborted { return }
-    let durationMs = continuousClockMilliseconds(clock.now - start)
+    let durationMs = DurationConversion.milliseconds(clock.now - start)
     if let failure {
         core.recordStep(description: description, status: .failed(failure.reason), file: "\(file)", line: Int(line),
                         durationMs: durationMs, command: "doUntilTrue", failureKind: failure.kind)
@@ -1179,7 +1179,7 @@ public func procedure(_ title: String,
     }
     core.procedureDepth -= 1
     if core.scenarioAborted { return }
-    let durationMs = continuousClockMilliseconds(clock.now - start)
+    let durationMs = DurationConversion.milliseconds(clock.now - start)
     if let thrown {
         let reason = thrown.localizedDescription
         core.recordStep(description: description, status: .failed(reason), file: "\(file)", line: Int(line),

@@ -128,7 +128,7 @@ actor AndroidScreenVideoRecorder: DeviceVideoRecorderSession {
                                 Self.killOwnScreenrecordCommand(outputPathPrefix: Self.ownOutputPrefix(fileStem: fileStem))],
                                timeout: adbAnswerLimit)
             if let watchTask {
-                _ = await raceWithDeadline(seconds: 20, onTimeout: ()) { await watchTask.value }
+                _ = await DeadlineRace.first(seconds: 20, onTimeout: ()) { await watchTask.value }
             }
         }
         return await source(of: pulledSegments)

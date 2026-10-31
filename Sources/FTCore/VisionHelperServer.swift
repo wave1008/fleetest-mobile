@@ -112,7 +112,7 @@ public enum VisionHelperServer {
         var healthy = false
         var warming = true
         var warmedSince = ContinuousClock.now
-        let pollIntervalMs = Int32(continuousClockMilliseconds(FindImage.prewarmInterval))
+        let pollIntervalMs = Int32(DurationConversion.milliseconds(FindImage.prewarmInterval))
         while !shouldStop() {
             if !healthy, warming {
                 autoreleasepool {

@@ -69,7 +69,7 @@ enum FTSync {
         var grantedExtraSeconds: TimeInterval = 0
         while true {
             guard semaphore.wait(timeout: .now() + max(0, remaining)) == .success else {
-                let excludedSeconds = seconds(DeadlineExclusion.excluded(since: exclusionSnapshot))
+                let excludedSeconds = DurationConversion.seconds(DeadlineExclusion.excluded(since: exclusionSnapshot))
                 let newExtra = excludedSeconds - grantedExtraSeconds
                 guard newExtra > 0 else {
                     task.cancel()
@@ -83,10 +83,6 @@ enum FTSync {
         }
     }
 
-    private static func seconds(_ duration: Duration) -> TimeInterval {
-        let (wholeSeconds, attoseconds) = duration.components
-        return Double(wholeSeconds) + Double(attoseconds) / 1e18
-    }
 
     /// throwing 版(タイムアウト時は nil)
     static func runThrowing<T>(timeout: TimeInterval = FTSync.commandTimeout,

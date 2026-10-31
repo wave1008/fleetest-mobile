@@ -406,7 +406,7 @@ public final class BridgeClient: AppDriver, Sendable {
             stop = try attempt() ?? stop
         }
         guard stop.status == 0 || stop.status == 3 else {
-            let windowSeconds = durationSeconds(hostDownWindow)
+            let windowSeconds = DurationConversion.seconds(hostDownWindow)
             let retried = hostDownRetries > 0
                 ? " (still \"host is down\" after \(hostDownRetries) retr\(hostDownRetries == 1 ? "y" : "ies") over"
                     + " \(FTSeconds.format(windowSeconds))s — the simulator's system shell did not come back)"

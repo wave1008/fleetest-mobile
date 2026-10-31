@@ -1084,7 +1084,7 @@ public final class StepExecutor {
         var ocrMs = 0
     }
 
-    static func ms(_ duration: Duration) -> Int { continuousClockMilliseconds(duration) }
+    static func ms(_ duration: Duration) -> Int { DurationConversion.milliseconds(duration) }
 
     // MARK: - アクション
 

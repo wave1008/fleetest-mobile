@@ -892,8 +892,7 @@ extension MCPServer {
         // 変化を待った時間と、変わった後の安定確認の時間を分ける(waitForChange が平均約 1s で、どちらが主か分からなかった)
         SlowCallWatchdog.mark("confirming the change has settled")
         for _ in 0..<Self.changeSettleRereads {
-            try await Task.sleep(nanoseconds: UInt64(max(0, settleWaitSeconds) * 1_000_000_000))
-            let reread = try await freshSnapshot(driver, args: args)
+            let reread = try await rereadAfterGrace(driver, args: args)
             if Self.looksUnchanged(snapshot, reread) { stable = true; break }
             snapshot = reread
             churn += 1

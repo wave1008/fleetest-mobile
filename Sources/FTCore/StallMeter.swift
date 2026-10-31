@@ -67,7 +67,7 @@ public final class StallMeter: @unchecked Sendable {
     }
 
     func record(overshoot: Duration, pool: Bool) {
-        let ms = continuousClockMilliseconds(overshoot)
+        let ms = DurationConversion.milliseconds(overshoot)
         guard ms >= Self.ignoreBelowMilliseconds else { return }
         lock.lock()
         if pool { poolStall += ms } else { threadStall += ms }

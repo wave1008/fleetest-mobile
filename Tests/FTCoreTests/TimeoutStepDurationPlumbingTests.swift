@@ -26,7 +26,7 @@ final class TimeoutStepDurationPlumbingTests: XCTestCase {
     /// 打ち切り時にホスト側の実測へ落ちる代替が残っていること
     func testTimeoutPathFallsBackToTheHostMeasuredDuration() throws {
         let source = try runtimeSource
-        XCTAssertTrue(source.contains("outcome?.timing?.durationMs\n            ?? continuousClockMilliseconds("),
+        XCTAssertTrue(source.contains("outcome?.timing?.durationMs\n            ?? DurationConversion.milliseconds("),
                       "打ち切り時の durationMs がホスト実測へ落ちていない(FTRuntime.perform)")
         XCTAssertTrue(source.contains("let recordedAt = outcome?.at ?? "),
                       "打ち切り時の at が埋まっていない(FTRuntime.perform)")

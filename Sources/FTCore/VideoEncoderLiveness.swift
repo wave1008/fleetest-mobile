@@ -179,7 +179,7 @@ public enum HardwareEncoderProbe {
                          error: "injected (FT_FAKE_VIDEO_ENCODER_DEAD=1)")
         }
         guard !hung.withLock({ $0 }) else { return nil }
-        let result: String?? = await raceWithDeadline(seconds: deadlineSeconds, onTimeout: String??.none) {
+        let result: String?? = await DeadlineRace.first(seconds: deadlineSeconds, onTimeout: String??.none) {
             await Task.detached { encodeSynthetic() }.value
         }
         let checkedAt = now().timeIntervalSince1970

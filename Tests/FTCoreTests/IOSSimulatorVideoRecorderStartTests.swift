@@ -224,7 +224,7 @@ final class IOSSimulatorVideoRecorderStartTests: XCTestCase {
         let starting = Task { await recorder.start() }
         try await expectEventually(10, "part1 の偽 client が準備を終えるはず") { self.exists(dir.appendingPathComponent("ready-src.mov")) }
         clock.release()
-        let started = await raceWithDeadline(seconds: 20, onTimeout: Bool?.none) { await starting.value }
+        let started = await DeadlineRace.first(seconds: 20, onTimeout: Bool?.none) { await starting.value }
         XCTAssertEqual(started, true, "part1 は期限切れで見張りへ渡り、part2 が撮り始めるはず")
         let part1 = dir.appendingPathComponent("src.mov")
         let temp = dir.appendingPathComponent("src.mov.sb-test")
@@ -252,7 +252,7 @@ final class IOSSimulatorVideoRecorderStartTests: XCTestCase {
         let starting = Task { await recorder.start() }
         try await expectEventually(10) { self.exists(dir.appendingPathComponent("ready-src~smoke.mov")) }
         clock.release()
-        let started = await raceWithDeadline(seconds: 20, onTimeout: Bool?.none) { await starting.value }
+        let started = await DeadlineRace.first(seconds: 20, onTimeout: Bool?.none) { await starting.value }
         XCTAssertEqual(started, false)
         let failure = await recorder.startFailure()
         XCTAssertEqual(failure, .testRecordingDidNotStop)
@@ -280,7 +280,7 @@ final class IOSSimulatorVideoRecorderStartTests: XCTestCase {
         let starting = Task { await recorder.start() }
         try await expectEventually(10) { self.exists(dir.appendingPathComponent("ready-src~smoke.mov")) }
         clock.release()
-        let started = await raceWithDeadline(seconds: 20, onTimeout: Bool?.none) { await starting.value }
+        let started = await DeadlineRace.first(seconds: 20, onTimeout: Bool?.none) { await starting.value }
         XCTAssertEqual(started, false)
         let failure = await recorder.startFailure()
         XCTAssertEqual(failure, .testRecordingDidNotStop)
@@ -312,11 +312,11 @@ final class IOSSimulatorVideoRecorderStartTests: XCTestCase {
         """, to: xcrun)
         let recorder = IOSSimulatorVideoRecorder(udid: "FAKE-\(UUID().uuidString)", workDir: dir, fileStem: "src", xcrunPath: xcrun.path,
                                                  startConfirmLimit: 0.3, stopGraceLimit: 0.3)
-        let started = await raceWithDeadline(seconds: 30, onTimeout: Bool?.none) { await recorder.start() }
+        let started = await DeadlineRace.first(seconds: 30, onTimeout: Bool?.none) { await recorder.start() }
         XCTAssertEqual(started, true, "撮り始めてから終わった part は開始済み(撮り直しの対象)で、開始未確認(startNotConfirmed)ではない")
         let failure = await recorder.startFailure()
         XCTAssertNil(failure)
-        _ = await raceWithDeadline(seconds: 30, onTimeout: RecordingSource?.none) { await recorder.stop() }
+        _ = await DeadlineRace.first(seconds: 30, onTimeout: RecordingSource?.none) { await recorder.stop() }
     }
 
     /// run 前の確認(HostRecordingProbe)も、判定と止める期限を過ぎた client を見張りへ渡し、ファイルを消さずに戻る
@@ -335,7 +335,7 @@ final class IOSSimulatorVideoRecorderStartTests: XCTestCase {
         }
         try await expectEventually(10) { readyName() != nil }
         clock.release()
-        let outcome = await raceWithDeadline(seconds: 20, onTimeout: HostRecordingProbe.Outcome?.none) { await probing.value }
+        let outcome = await DeadlineRace.first(seconds: 20, onTimeout: HostRecordingProbe.Outcome?.none) { await probing.value }
         XCTAssertEqual(outcome, .unknown)
         let name = String(try XCTUnwrap(readyName()).dropFirst("ready-".count))
         let file = dir.appendingPathComponent(name)
@@ -381,7 +381,7 @@ final class IOSSimulatorVideoRecorderStartTests: XCTestCase {
         guard case .watching = outcome else { return XCTFail("\(outcome)") }
         try pipe.fileHandleForReading.close()  // 元の読み手が消えた形
         try Data().write(to: dir.appendingPathComponent("go"))
-        _ = await raceWithDeadline(seconds: 10, onTimeout: ()) { for await _ in exited {} }
+        _ = await DeadlineRace.first(seconds: 10, onTimeout: ()) { for await _ in exited {} }
         if process.isRunning {
             XCTFail("client が 10 秒以内に終わらなかった")  // 生きている Process の terminationReason は例外
         } else {
@@ -457,7 +457,7 @@ final class IOSSimulatorVideoRecorderStartTests: XCTestCase {
         try pipe.fileHandleForReading.close()  // テスト側の読み口も閉じる = 読み手は見張りだけ
         try Data().write(to: dir.appendingPathComponent("go"))
         try await expectEventually(10, "見張りが読み進めないと 256KB を書き切れないはず") { self.exists(dir.appendingPathComponent("flushed")) }
-        _ = await raceWithDeadline(seconds: 10, onTimeout: ()) { for await _ in exited {} }
+        _ = await DeadlineRace.first(seconds: 10, onTimeout: ()) { for await _ in exited {} }
         if process.isRunning {
             XCTFail("client が 10 秒以内に終わらなかった")  // 生きている Process の terminationReason は例外
         } else {
@@ -485,7 +485,7 @@ final class IOSSimulatorVideoRecorderStartTests: XCTestCase {
         watcher.standardError = FileHandle.nullDevice
         let exited = ProcessExitWait.prepare(watcher)
         try watcher.run()
-        _ = await raceWithDeadline(seconds: 5, onTimeout: ()) { for await _ in exited {} }
+        _ = await DeadlineRace.first(seconds: 5, onTimeout: ()) { for await _ in exited {} }
         XCTAssertFalse(watcher.isRunning, "身元が合わない相手にはすぐ終わるはず")
         if !watcher.isRunning { XCTAssertEqual(watcher.terminationStatus, 0) }  // 生きている Process の terminationStatus は例外
         XCTAssertTrue(process.isRunning, "SIGINT を送っていないはず(偽 client は無視するので、送っても分からない = 見張りの終了で見る)")

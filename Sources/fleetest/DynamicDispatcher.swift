@@ -185,7 +185,7 @@ final class DynamicDispatcher: Sendable {
     static func monotonicClock() -> @Sendable () -> Double {
         let origin = ContinuousClock.now
         return {
-            durationSeconds(ContinuousClock.now - origin) * 1000
+            DurationConversion.seconds(ContinuousClock.now - origin) * 1000
         }
     }
 

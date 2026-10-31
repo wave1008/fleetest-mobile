@@ -15,7 +15,7 @@ extension StepExecutor {
     static var defaultLocatorRetrySeconds: Double {
         var backoff = PollBackoff()
         let total = (0..<defaultLocatorRetryAttempts).reduce(Duration.zero) { sum, _ in sum + backoff.nextDelay() }
-        return durationSeconds(total)
+        return DurationConversion.seconds(total)
     }
 
     /// 既定の短い待ち(`waitSeconds:` 省略)のまま見つからなかったときだけ、延ばし方を添える。

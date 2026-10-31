@@ -648,7 +648,7 @@ public enum RegionText {
         let outcome = await TaskBudget.run(budget, onLateFinish: { (r: (readable: Bool, reading: Reading)?, elapsed: Duration) in
             watch.markReturned()
             noteAbandoned(-1)
-            let ms = continuousClockMilliseconds(elapsed)
+            let ms = DurationConversion.milliseconds(elapsed)
             // **ファイルにも残す**(FT_OCR_HANG_SAMPLE=1 のとき): stderr の中継は経路によって
             // 落ちうるが、ファイルは落ちない。読み手は ~/.fleetest/ocr-late/ を集計する
             recordLateFinish(ms: ms, attempts: r?.reading.attempts ?? 0, pixels: r?.reading.pixels ?? 0,

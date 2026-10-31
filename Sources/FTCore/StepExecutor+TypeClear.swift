@@ -197,7 +197,7 @@ extension StepExecutor {
         switch await RegionText.awaitModelCompile(mode: .on) {
         case .alreadyReady: waited = 0
         case .compiled(let d), .finishedUnready(let d), .capped(let d):
-            waited = durationSeconds(d)
+            waited = DurationConversion.seconds(d)
         }
         let deadline = deadline.addingTimeInterval(waited)
         let frame = snapshot.elements.first { $0.ref == element.ref || $0.identifier == element.identifier

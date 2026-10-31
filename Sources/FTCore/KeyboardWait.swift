@@ -11,7 +11,8 @@ public enum KeyboardWait {
     /// 撮り直しの間隔(秒)。根拠: 表示の中央値 0.2 秒の間に 1〜2 回見る
     public static let pollSeconds: Double = 0.15
     /// キーボードが木から消えるのを待つ読み直しの間隔(秒)。`pollSeconds`(出現の実測)・`FocusWait.pollSeconds` とは文脈が別で、
-    /// 同じ値でも流用しない。根拠: Android の木は閉じた後も数秒キーボードを申告するので、これより細かく読んでも早まらず往復だけ増える
+    /// 同じ値でも流用しない。根拠: 消えるまでの実測は Pixel 4a(Android 13)の 0.32 秒から Pixel 3a(Android 12)の約 5.4 秒
+    /// (FD-3)で、短い側の間に2回は見る。尽きたら上限の待ちで打ち切って言う(呼び手)
     public static let goneRereadSeconds: Double = 0.15
 
     /// 隠れたキーボードは nil ではなく画面外(y が画面の下端以上)の矩形で申告されることがある。

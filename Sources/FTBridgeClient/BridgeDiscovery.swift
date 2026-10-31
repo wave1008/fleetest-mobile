@@ -226,7 +226,7 @@ public enum BridgeDiscovery {
             switch error {
             case DriverError.bridgeUnreachable, DriverError.bridgeConnectionRefused:
                 let classification = classifyNoResponse(
-                    elapsedMs: continuousClockMilliseconds(clock.now - start), timeoutSeconds: timeoutSeconds)
+                    elapsedMs: DurationConversion.milliseconds(clock.now - start), timeoutSeconds: timeoutSeconds)
                 // 実測(負荷テスト): 忙しい XCUITest(同 pid のまま quiescence 待ちで
                 // 数十秒ブロック)の listen backlog が溢れると、他クライアントの connect は
                 // connect 直後に切れ、固まった実機の iproxy と同じ指紋になる。loopback だけ

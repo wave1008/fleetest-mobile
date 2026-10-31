@@ -96,7 +96,7 @@ extension FTDriveCore {
                         body: body, timeout: timeout)
         }
         let elapsed = ContinuousClock().now - started
-        let durationMs = continuousClockMilliseconds(elapsed)
+        let durationMs = DurationConversion.milliseconds(elapsed)
         switch outcome {
         case .response(let response):
             // 本文は載せない(長く、秘密を含みうる)。説明の伏せ字化は recordStep が掛ける

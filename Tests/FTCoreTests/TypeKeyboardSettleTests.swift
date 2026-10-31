@@ -225,6 +225,7 @@ final class TypeKeyboardSettleTests: XCTestCase {
     func testKeyboardWaitDefaultsArePinnedToLiterals() {
         XCTAssertEqual(KeyboardWait.appearSeconds, 1.5)
         XCTAssertEqual(KeyboardWait.pollSeconds, 0.15)
+        XCTAssertEqual(KeyboardWait.goneRereadSeconds, 0.15)
     }
 
     func testShouldAwaitAppearanceFlipsOnEachOfTheFourConditions() {

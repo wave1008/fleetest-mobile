@@ -914,7 +914,7 @@ public final class FTDriveCore {
             let clock = ContinuousClock()
             let start = clock.now
             recordStep(description: description, status: .passed, file: filePath, line: Int(line),
-                       durationMs: continuousClockMilliseconds(clock.now - start),
+                       durationMs: DurationConversion.milliseconds(clock.now - start),
                        command: command)
             noteAssertionUnlessSkipped(.passed)
             return PerformResult(status: .passed, element: nil)
@@ -994,7 +994,7 @@ public final class FTDriveCore {
         // **埋めるのは外から見えた2つだけ**。snapshotMs / actionMs / waitMs は打ち切られた側にしか
         // 無いので nil のまま残す(「言えないときは欄ごと省く」——「その他」に丸めない)
         let recordedDurationMs = outcome?.timing?.durationMs
-            ?? continuousClockMilliseconds(hostClock.now - hostStart)
+            ?? DurationConversion.milliseconds(hostClock.now - hostStart)
         let recordedAt = outcome?.at ?? hostFinishedAt
         // driverFallback はロケータの .passedViaFallback とは別物(セレクタは正しくドライバが
         // 変わっただけ、または無言 no-op になり得る経路の注記)。修正提案は出さず、説明文に
@@ -1364,7 +1364,7 @@ public final class FTDriveCore {
         let token = DeadlineExclusion.begin(cap: .milliseconds(delay))
         Thread.sleep(forTimeInterval: Double(delay) / 1000)
         DeadlineExclusion.end(token)
-        let sleptMs = continuousClockMilliseconds(clock.now - start)
+        let sleptMs = DurationConversion.milliseconds(clock.now - start)
         pacedMsTotal.withLock { $0 += sleptMs }
         return sleptMs
     }
@@ -1404,7 +1404,7 @@ public final class FTDriveCore {
             let start = clock.now
             recordStep(description: description, status: .passed,
                        file: filePath, line: Int(line),
-                       durationMs: continuousClockMilliseconds(clock.now - start),
+                       durationMs: DurationConversion.milliseconds(clock.now - start),
                        command: command)
             return .passed
         }
@@ -1433,7 +1433,7 @@ public final class FTDriveCore {
             if launches { await executor.recordPreLaunchFrame() }
             try await body()
         }
-        let elapsedMs = continuousClockMilliseconds(clock.now - start)
+        let elapsedMs = DurationConversion.milliseconds(clock.now - start)
         let status: StepResult.Status
         // 素性は**エラーの型**から採る(文言一致で仕分けない。StepExecutor.failureKind(thrown:))
         var failureKind: StepFailureKind?
@@ -1526,7 +1526,7 @@ public final class FTDriveCore {
             if let wholeScreen, let shot = try? await wholeScreen.screenshot() { return shot }
             return try await driver.screenshot()
         }
-        let elapsedMs = continuousClockMilliseconds(clock.now - start)
+        let elapsedMs = DurationConversion.milliseconds(clock.now - start)
         switch result {
         case .success(let data):
             recordStep(description: description, status: .passed, file: filePath, line: Int(line),

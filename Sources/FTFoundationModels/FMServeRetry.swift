@@ -15,7 +15,7 @@ extension FMServeServer {
             return try await operation(request)
         } catch {
             let classification = retryClassification(error)
-            let elapsed = FMServeActivity.RequestContext.seconds(started.duration(to: ContinuousClock.now))
+            let elapsed = DurationConversion.seconds(started.duration(to: ContinuousClock.now))
             let failure = error as NSError
             // NSError の文言には入力が含まれうるため、診断ログは識別子・型・コード・所要だけにする。
             log("request=\(context.id) kind=\(request.kind.rawValue) attempt=1 failed"
@@ -44,7 +44,7 @@ extension FMServeServer {
         case .refused: status = "refused"
         }
         log("request=\(context.id) kind=\(request.kind.rawValue) retry=1 ended status=\(status)"
-            + " elapsed=\(FMServeActivity.RequestContext.seconds(retryStarted.duration(to: ContinuousClock.now)))s"
+            + " elapsed=\(DurationConversion.seconds(retryStarted.duration(to: ContinuousClock.now)))s"
             + " remaining=\(context.remainingSeconds)s")
         return outcome
     }

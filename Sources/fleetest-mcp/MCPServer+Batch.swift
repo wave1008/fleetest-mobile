@@ -928,9 +928,7 @@ extension MCPServer {
                     try? await Task.sleep(nanoseconds: UInt64(max(0, self.settleWaitSeconds) * 1_000_000_000))
                     return (try? await batchDriver.systemAlert()) ?? first
                 }) {
-                // settle-lite と同じ待ち(snapshotAfterBodyWithStatus 参照。新しい定数は置かない)
-                try await Task.sleep(nanoseconds: UInt64(max(0, self.settleWaitSeconds) * 1_000_000_000))
-                return try await self.freshSnapshot(batchDriver, args: args)
+                try await self.rereadAfterGrace(batchDriver, args: args)
             }
         } catch { return unreadableAfterBatch(error) }
         recordSnapshot(final, batchDriver is AndroidDriver ? "android" : "ios", args)

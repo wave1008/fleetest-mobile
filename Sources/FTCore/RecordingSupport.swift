@@ -21,11 +21,3 @@ public enum ISO8601Millis {
         return formatter.date(from: string)
     }
 }
-
-/// 非同期処理(op)と期限(seconds)のレース。実体は `DeadlineRace.first`。**withTaskGroup は使わない**: 録画プロセスが
-/// 生きている限り stderr 読み取り等の敗者 task が終わらず、スコープの終端の待ちで期限が効かなくなる
-func raceWithDeadline<T: Sendable>(
-    seconds: Double, onTimeout: T, _ op: @escaping @Sendable () async -> T
-) async -> T {
-    await DeadlineRace.first(seconds: seconds, onTimeout: onTimeout, op)
-}

@@ -636,7 +636,7 @@ actor VideoRecordingCoordinator {
         let extract = extractClip
         let (bitrate, full) = (config.bitrateKbps, config.fullResolution)
         let (files, start, end) = (clip.files, clip.clipStartMs, clip.clipEndMs)
-        let outcome: Bool? = await raceWithDeadline(seconds: deadline, onTimeout: Bool?.none) {
+        let outcome: Bool? = await DeadlineRace.first(seconds: deadline, onTimeout: Bool?.none) {
             await extract(files, start, end, bitrate, full, hardware, outputURL)
         }
         releaseExportSlot()

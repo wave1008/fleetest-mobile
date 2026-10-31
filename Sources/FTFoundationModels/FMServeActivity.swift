@@ -21,7 +21,7 @@ final class FMServeActivity: Sendable {
             deadline = ContinuousClock.now.advanced(by: .seconds(max(0, deadlineSeconds)))
         }
 
-        var remainingSeconds: Double { Self.seconds(ContinuousClock.now.duration(to: deadline)) }
+        var remainingSeconds: Double { DurationConversion.seconds(ContinuousClock.now.duration(to: deadline)) }
         var isCancelled: Bool { progress.withLock { $0.cancelled } }
         var wasRejectedForRetirement: Bool { progress.withLock { $0.rejectedForRetirement } }
 
@@ -45,9 +45,6 @@ final class FMServeActivity: Sendable {
         fileprivate func cancel() { progress.withLock { $0.cancelled = true } }
         fileprivate func rejectForRetirement() { progress.withLock { $0.rejectedForRetirement = true } }
 
-        static func seconds(_ duration: Duration) -> Double {
-            durationSeconds(duration)
-        }
     }
 
     struct Snapshot: Equatable, Sendable, CustomStringConvertible {

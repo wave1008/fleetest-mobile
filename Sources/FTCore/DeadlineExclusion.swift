@@ -42,7 +42,7 @@ public enum DeadlineExclusion {
     /// RegionText.awaitModelCompile は既にコンパイル済みなら begin しない)
     public static func begin(cap: Duration) -> Token {
         state.withLock { $0.activeSince = ContinuousClock().now }
-        observer?(.began(capMs: ms(cap)))
+        observer?(.began(capMs: DurationConversion.milliseconds(cap)))
         return Token()
     }
 
@@ -51,7 +51,7 @@ public enum DeadlineExclusion {
         let now = ContinuousClock().now
         let elapsedMs: Int = state.withLock {
             guard let startedAt = $0.activeSince else { return 0 }
-            let elapsed = ms(now - startedAt)
+            let elapsed = DurationConversion.milliseconds(now - startedAt)
             $0.completedMs += elapsed
             $0.activeSince = nil
             return elapsed
@@ -71,11 +71,10 @@ public enum DeadlineExclusion {
         state.withLock {
             var totalMs = $0.completedMs - snap.completedMs
             if let startedAt = $0.activeSince {
-                totalMs += ms(ContinuousClock().now - startedAt)
+                totalMs += DurationConversion.milliseconds(ContinuousClock().now - startedAt)
             }
             return .milliseconds(max(0, totalMs))
         }
     }
 
-    static func ms(_ duration: Duration) -> Int { continuousClockMilliseconds(duration) }
 }

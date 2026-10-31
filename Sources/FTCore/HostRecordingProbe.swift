@@ -105,7 +105,7 @@ public enum HostRecordingProbe {
             for await _ in exitStream {}
             // **判定を読む前に stderr の読み手が末尾まで読み切るのを短く待つ**(終了済みなので EOF はすぐ来る)。
             // busy を言って自分から終わった client を、読み手の遅れで .unknown(= 再起動しない)にしない
-            await raceWithDeadline(seconds: 1, onTimeout: ()) { await reader.value }
+            await DeadlineRace.first(seconds: 1, onTimeout: ()) { await reader.value }
             RecorderWatch.removeOutputs(of: url)
         } else {
             let outcome = IOSSimulatorVideoRecorder.handOff(process, target: target, stderr: stderrHandle, leaving: url,

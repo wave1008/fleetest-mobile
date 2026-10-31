@@ -31,7 +31,7 @@ import Foundation
 // MARK: - Duration → ミリ秒
 
 /// ContinuousClock の Duration → 整数ミリ秒(秒成分×1000 + attoseconds成分から算出。
-/// 1ms = 1e15 attoseconds。Sources/FTCore/StepExecutor.swift の同名ロジックと同じ計算式だが、
+/// 1ms = 1e15 attoseconds。Sources/FTCore/DurationConversion.swift と同じ計算式だが、
 /// このスクリプトは Package.swift 非参加の単体ファイルのためモジュールをまたいで共有できず複製する)
 func milliseconds(_ duration: Duration) -> Int {
     let (seconds, attoseconds) = duration.components

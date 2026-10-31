@@ -1,4 +1,4 @@
-// 期限付きのレース(先に終わった方で決める)。RunOrchestrator の死活確認と、FM の生死確認(FMLivenessProbe)が共有する。
+// 期限付きのレース(先に終わった方で決める)。RunOrchestrator の死活確認・FM の生死確認(FMLivenessProbe)・録画の待ちが共有する。
 
 import Foundation
 

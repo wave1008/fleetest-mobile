@@ -145,7 +145,7 @@ public struct InAppLauncher: Sendable {
         let clock = ContinuousClock()
         let actionStart = clock.now
         try launchViaCoreSimOrSimctl(bundleID: bundleID, environment: env)
-        let actionMs = continuousClockMilliseconds(clock.now - actionStart)
+        let actionMs = DurationConversion.milliseconds(clock.now - actionStart)
         // pid ファイルを持たない in-app ブリッジを bridge down 系コマンドが後始末できるよう記録。
         // **ready を待つ前に書く**: 待っている間に run が中断される・アプリの起動が
         // 遅れて期限を超えると、注入済みで後から待受を始めるアプリが**記録の無い残骸**として
@@ -166,7 +166,7 @@ public struct InAppLauncher: Sendable {
             // 30 秒待った後なので .ips の書き込み遅延(約2秒)はもう待たなくてよい
             throw InAppLauncherError.notReady(crashAnnotated(detail, bundleID: bundleID))
         }
-        let waitMs = continuousClockMilliseconds(clock.now - waitStart)
+        let waitMs = DurationConversion.milliseconds(clock.now - waitStart)
         return LaunchTiming(actionMs: actionMs, waitMs: waitMs)
     }
 
@@ -184,7 +184,7 @@ public struct InAppLauncher: Sendable {
             let clock = ContinuousClock()
             let copyStart = clock.now
             let containerPath = try copyDylibToContainer(signed: signed, bundleID: bundleID)
-            let copyMs = continuousClockMilliseconds(clock.now - copyStart)
+            let copyMs = DurationConversion.milliseconds(clock.now - copyStart)
             return try await launchPhysical(bundleID: bundleID, containerPath: containerPath,
                                             token: token, endpoint: endpoint, setupMs: copyMs)
         }
@@ -223,7 +223,7 @@ public struct InAppLauncher: Sendable {
             throw InAppLauncherError.launchFailed("the app is not injectable (\(info.reason ?? "unknown")); it should have fallen back to XCUITest")
         }
         let containerPath = try copyDylibToContainer(signed: signedNew, bundleID: bundleID)
-        let setupMs = continuousClockMilliseconds(clock.now - setupStart)
+        let setupMs = DurationConversion.milliseconds(clock.now - setupStart)
         let token = BridgeAPI.makeBridgeToken()
         // iproxy トンネルを張り endpoint(token 入り)を台帳へ記録する。XCUITest 実機と同じ経路を流用。
         // **起動より先に張る**(起動は devicectl なのでトンネルに依らず、以降の到達待ちにトンネルが要る)
@@ -256,7 +256,7 @@ public struct InAppLauncher: Sendable {
             env[ProcessEnvironmentKey.webViewDOM] = webViewDOM
         }
         try deviceLaunch(bundleID: bundleID, environment: env)
-        let actionMs = setupMs + continuousClockMilliseconds(clock.now - actionStart)
+        let actionMs = setupMs + DurationConversion.milliseconds(clock.now - actionStart)
         InAppBridgeState.write(stateDir: stateDir, port: port, udid: udid, bundleID: bundleID,
                                sourceDigest: try? BridgeSourceSet.inApp.digest(repoRoot: repoRoot))
         let waitStart = clock.now
@@ -265,7 +265,7 @@ public struct InAppLauncher: Sendable {
         } catch let InAppLauncherError.notReady(detail) {
             throw InAppLauncherError.notReady(crashAnnotated(detail, bundleID: bundleID))
         }
-        return LaunchTiming(actionMs: actionMs, waitMs: continuousClockMilliseconds(clock.now - waitStart))
+        return LaunchTiming(actionMs: actionMs, waitMs: DurationConversion.milliseconds(clock.now - waitStart))
     }
 
 

@@ -276,7 +276,7 @@ actor IOSSimulatorVideoRecorder: DeviceVideoRecorderSession {
         for await _ in exitStream {}
         // **busy を見る前に** stderr の読み手が末尾まで読み切るのを短く待つ(終了済みなので EOF はすぐ来る)。
         // 先に見ると、busy を言って自分から終わった client を読み手の遅れで .refused(= cannotLaunchRecorder)と誤って名乗る
-        await raceWithDeadline(seconds: 1, onTimeout: ()) { for await _ in stderrDone.stream {} }
+        await DeadlineRace.first(seconds: 1, onTimeout: ()) { for await _ in stderrDone.stream {} }
         if sawBusy.value { return .hostRecordingBusy }
         if exitedOnItsOwn, process.terminationStatus != 0 {
             return .refused(status: process.terminationStatus, message: stderrTail.value.joined(separator: " "))
@@ -351,7 +351,7 @@ actor IOSSimulatorVideoRecorder: DeviceVideoRecorderSession {
         if startedAt.value == nil, !process.isRunning {
             // 撮り始めてすぐ終わった client は、読み手が印を置く前に終了が見える。読み切ってから判定する
             // (開始済みなら exit 監視 → finalizePart へ渡す = 撮れた分を捨てない)
-            await raceWithDeadline(seconds: 1, onTimeout: ()) { await reader.value }
+            await DeadlineRace.first(seconds: 1, onTimeout: ()) { await reader.value }
         }
         guard let observedStart = startedAt.value else {
             // 期限の後に撮り始める client もいるので、撮り始める前に無視された SIGINT を送り直す(interruptRecorder)
@@ -450,7 +450,7 @@ actor IOSSimulatorVideoRecorder: DeviceVideoRecorderSession {
             // 停止は SIGINT だけ(強制終了すると moov 未書き込みでファイルが壊れ、
             // 端末側の録画セッションも残る)
             process.interrupt()
-            let exited = await raceWithDeadline(seconds: 15, onTimeout: false) {
+            let exited = await DeadlineRace.first(seconds: 15, onTimeout: false) {
                 await watchTask.value  // handlePartExited(→finalizePart)の完了を待つ
                 return true
             }

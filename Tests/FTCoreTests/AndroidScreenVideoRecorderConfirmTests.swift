@@ -121,7 +121,7 @@ final class AndroidScreenVideoRecorderConfirmTests: XCTestCase {
         let checking = Task { await recorder.ensureRecording() }
         try await Task.sleep(nanoseconds: 100_000_000)
         try Data().write(to: dir.appendingPathComponent("ready3"))
-        let result: Bool? = await raceWithDeadline(seconds: 2, onTimeout: nil) { await checking.value }
+        let result: Bool? = await DeadlineRace.first(seconds: 2, onTimeout: nil) { await checking.value }
         _ = await recorder.stop()
         _ = await checking.value
         XCTAssertEqual(result, true, "第3世代の確認成功で戻り、その録画の終了までは待たない")
@@ -184,7 +184,7 @@ final class AndroidScreenVideoRecorderConfirmTests: XCTestCase {
         let raw = try String(contentsOf: dir.appendingPathComponent("pid-3"), encoding: .utf8)
         let pid = try XCTUnwrap(Int32(raw.trimmingCharacters(in: .whitespacesAndNewlines)))
         XCTAssertEqual(kill(pid, SIGTERM), 0)
-        let result: Bool? = await raceWithDeadline(seconds: 2, onTimeout: nil) { await checking.value }
+        let result: Bool? = await DeadlineRace.first(seconds: 2, onTimeout: nil) { await checking.value }
         _ = await recorder.stop()
         _ = await checking.value
         XCTAssertEqual(result, false, "確認中の第3世代が死んだら、第4世代の確認を待たずに失敗する")
