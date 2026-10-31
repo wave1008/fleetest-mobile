@@ -746,7 +746,11 @@
 - 経緯: 発見: 10/31 の探索的テスト(所見は作業ログの findings-inapp.md / findings-mxa.md)
 
 - Flutter で `tap(欄A); tap(値の入った欄B); type("x")` が in-app で「focus is not on the tapped element」(7回中6回・xcuitest は緑)。
-  受け口が 1x1 で動かず(`movedSinceTap` false)、叩いた要素が入力欄と申告されないと `FocusLanding.landed` が外れる。F6 の救済が焦点の立った欄へ ref 付きで撃ち直す形の実害(inapp F9)
+  受け口が 1x1 で動かず(`movedSinceTap` false)、叩いた要素が入力欄と申告されないと `FocusLanding.landed` が外れる。F6 の救済が焦点の立った欄へ ref 付きで撃ち直す形の実害(inapp F9)。
+  **11/1 に Simulator iOS 27.0 の inapp-boost で再現(`tap("#field_first"); tap("#field_number"); type("3")` が 409。受け口 (16,249 1x1)・叩いた点 (201,276))**。
+  値の入った Flutter の欄は木で型が `other`(入力欄と申告されない)・欄の内側に入力欄の申告も無いため、`FocusLanding.landed` は `movedSinceTap`(同じ受け口が動かない)に頼って外れる。
+  動かなかったことだけを理由に通すと、入力欄を申告しない Flutter では「前の欄を含む容器を叩いて焦点が動かなかった形」と区別できず前の欄へ打つので、入れていない
+  (区別するには、叩く前から焦点がその欄にあったという事実が要る = 直前の tap が焦点を立てた記録をホストから渡す設計の決定が先)
 - CMP(iOS)の複数行へ別の欄を挟んで打ち足すと文字が先頭に入る・clearInput が 4 周で不発(XCUITest ランナーの `tapFieldEndIfHittable` が複数行の縦の中央を押す疑い。mxa F9)
 - Flutter(iOS)の上半分が見えている欄を「中心がキーボードの下」として type / clearInput が断る(中心1点の判定。焦点が既にその欄にあれば押さずに打てる。mxa F10。
   clearInput が容器を送らない側は inapp F8 として直した)
