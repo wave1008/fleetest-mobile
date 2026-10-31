@@ -452,6 +452,22 @@ test("行の並びは設定タブのマシン一覧の順に従い、並べ替�
   assert.deepEqual(rowsOf(document).map(labelOf), ["local", "alpha", "zeta"]);
 });
 
+test("再起動しても戻らないデバイスの案内は、どの台かを本文に出す(無ければ行を出さない)", (t) => {
+  const { window, document, send } = createWebview();
+  t.after(() => window.close());
+  const device = (name, spec) => ({ id: name, name, platform: "android", state: "connected", detail: "",
+    kind: "virtual", recording: false, registered: true, frozen: false, screenState: null, rebootAdvised: false, ...spec });
+  const advice = document.getElementById("reboot-advice");
+  send({ type: "devices", devices: [device("Pixel 9-05", { rebootAdvised: true }), device("Pixel 9-06", {}),
+    device("Pixel 9-07", { machine: "M1Max", rebootAdvised: true })] });
+  assert.ok(advice.classList.contains("visible"));
+  assert.match(advice.textContent, /2/);
+  assert.match(advice.textContent, /Pixel 9-05, Pixel 9-07 \(M1Max\)/);
+  assert.doesNotMatch(advice.textContent, /Pixel 9-06/);
+  send({ type: "devices", devices: [device("Pixel 9-05", {})] });
+  assert.ok(!advice.classList.contains("visible"));
+});
+
 test("Rendering 列: 0 の種類は出さず、全部 0 なら空欄。種類ごとに絵文字・数字・説明(リモートの行も同じ)", (t) => {
   const { window, document, send } = createWebview();
   t.after(() => window.close());

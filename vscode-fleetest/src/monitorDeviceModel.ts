@@ -752,7 +752,7 @@ export function disabledMachineSet(
 }
 
 /** モニター上部の「再起動しても戻らないデバイス」案内の中身。台が無ければ null(行を出さない)。
- * names は machine 付きの表示名(ホバー用)。手元は machine 無し。 */
+ * names は machine 付きの表示名(本文とホバーに出す = どの台かは本文で分かる)。手元は machine 無し。 */
 export function rebootAdviceSummary(
   devices: readonly Pick<MonitorDevice, "name" | "machine" | "rebootAdvised">[],
 ): { readonly count: number; readonly names: readonly string[] } | null {

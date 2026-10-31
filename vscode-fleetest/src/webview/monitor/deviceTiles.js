@@ -1677,7 +1677,7 @@ function renderRebootAdvice(devices) {
   const key = summary ? summary.count + '\n' + summary.names.join('\n') : '';
   if (key === rebootAdviceKey) { return; }
   rebootAdviceKey = key;
-  rebootAdvice.textContent = summary ? t('wvMonitor.rebootAdvice.text', { count: summary.count }) : '';
+  rebootAdvice.textContent = summary ? t('wvMonitor.rebootAdvice.text', { names: summary.names.join(', '), count: summary.count }) : '';
   rebootAdvice.classList.toggle('visible', summary !== null);
   setHoverTip(rebootAdvice, summary ? summary.names.join('\n') : '');
 }
