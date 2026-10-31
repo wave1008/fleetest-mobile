@@ -48,14 +48,7 @@ extension MCPServer {
                                         uiFramework: uiFrameworkHint)
             let outcome = await executor.execute(step)
             guard StepExecutor.isSuccess(outcome.status) else {
-                let reason: String
-                switch outcome.status {
-                case .failed(let message), .skipped(let message), .inconclusive(let message):
-                    reason = message
-                case .passed, .passedViaFallback, .healed:
-                    reason = "could not confirm the result"
-                }
-                throw MCPError(reason)
+                throw Self.executorFailure(outcome)
             }
             recordInteraction(action: "swipe", resolvedRef: nil, args: args,
                               direction: direction.rawValue)
@@ -86,16 +79,9 @@ extension MCPServer {
                                     uiFramework: uiFrameworkHint)
         let outcome = await executor.execute(step)
         guard StepExecutor.isSuccess(outcome.status) else {
-            let reason: String
-            switch outcome.status {
-            case .failed(let message), .skipped(let message), .inconclusive(let message):
-                reason = message
-            case .passed, .passedViaFallback, .healed:
-                reason = "could not confirm the result"
-            }
             // **容器なし/経路なしの文言は StepExecutor(FTCore)側の1本だけ**
             // (scrollFrameFailFastMessage)。MCP 側で二重に持たない
-            throw MCPError(scrollFrameLabelNote + reason)
+            throw Self.executorFailure(outcome, prefix: scrollFrameLabelNote)
         }
         let containerName = scrollFrameArg.original.map(RefGuard.describe)
             ?? scrollFrameArg.locator?.summary ?? "the scrollFrame"
@@ -238,6 +224,20 @@ extension MCPServer {
 
     /// ft_hide_keyboard と replace の引き直しが共有する閉じ方の実行器。iOS はキーボードの上の空きを叩く・Android は戻るキー。
     /// **Enter へは進まない**(消したばかりの欄・入力中の欄で確定させない)
+    /// StepExecutor へ委ねた手の失敗を投げる形へ。**投げられた `DriverError` は抱えたまま**(`MCPError` に畳むと配達の注記が出ない)
+    static func executorFailure(_ outcome: StepOutcome, prefix: String = "", suffix: String = "") -> Error {
+        let reason: String
+        switch outcome.status {
+        case .failed(let message), .skipped(let message), .inconclusive(let message): reason = message
+        case .passed, .passedViaFallback, .healed: reason = "could not confirm the result"
+        }
+        let message = prefix + reason + suffix
+        if let cause = outcome.thrownDriverError {
+            return MCPAnnotatedError(underlying: cause, suffix: "", fullMessage: message)
+        }
+        return MCPError(message)
+    }
+
     func hideKeyboardExecutor(_ driver: AppDriver, args: [String: Any]) async -> (executor: StepExecutor, isAndroid: Bool) {
         let (isAndroid, uiFramework) = await resolveExecutorHints(driver, args: args)
         let executor = StepExecutor(driver: driver, releasesScrollTouch: !isAndroid,
@@ -286,14 +286,9 @@ extension MCPServer {
         }
         let outcome = await executor.execute(FlowStep(action: "hideKeyboard"))
         guard StepExecutor.isSuccess(outcome.status) else {
-            let reason: String
-            switch outcome.status {
-            case .failed(let message), .skipped(let message), .inconclusive(let message): reason = message
-            case .passed, .passedViaFallback, .healed: reason = "could not confirm the result"
-            }
-            throw MCPError("hideKeyboard failed: \(reason)" + (isAndroid ? ""
+            throw Self.executorFailure(outcome, prefix: "hideKeyboard failed: ", suffix: isAndroid ? ""
                 : " — ft_type pressEnter: true may close it, but Return also fires the field's action"
-                    + " (submit, search or moving to the next field)"))
+                    + " (submit, search or moving to the next field)")
         }
         if executor.hideKeyboardFoundNoKeyboard { return await notShownReply() }
         recordInteraction(action: "hideKeyboard", resolvedRef: nil, args: args)

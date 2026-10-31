@@ -778,7 +778,7 @@ struct ApiLiveServe: AsyncParsableCommand {
                                                   bridgeStarting: await bridgeStartingFlag(starter)))
             } catch {
                 if let humanLabel { deviceLease?.recordHumanOperation(label: humanLabel, ok: false, at: operatedAt) }
-                let message = await annotated(error, starter: starter, triggering: true, port: port)
+                let message = await annotated(error, starter: starter, triggering: true, operated: true, port: port)
                 // **annotated の後で読む**: noteConnectionRefused() が idle→starting へ遷移させ得るため
                 let starting = await bridgeStartingFlag(starter)
                 emitLine(ApiLiveActionResultEvent(ok: false, error: message, app: follower?.sessionTarget,
@@ -818,8 +818,18 @@ struct ApiLiveServe: AsyncParsableCommand {
     /// 実地: 実機の起動待ち中に probe が transportFailed を返し、「起動中です(自然に直ります)」の
     /// 直後に「自然には直りません: bridge up してください」という矛盾した案内を出した。
     /// **失敗パスでだけ撃つ**(annotated は catch 節からしか呼ばれない = 成功パスへの往復は増えない)
+    /// `operated` = 操作を撃った失敗(観測の失敗は false)。届いたか分からない操作に「もう一度」と言わない = 人が二重に押す
     private func annotated(
-        _ error: Error, starter: LiveBridgeAutoStarter?, triggering: Bool, port: UInt16
+        _ error: Error, starter: LiveBridgeAutoStarter?, triggering: Bool, operated: Bool, port: UInt16
+    ) async -> String {
+        let deliveryUnknown = operated && (error as? DriverError)?.deliveryIsUnknown == true
+        let message = await guidance(error, starter: starter, triggering: triggering,
+                                     retrySafe: !deliveryUnknown, port: port)
+        return deliveryUnknown ? message + Self.deliveryUnknownHint : message
+    }
+
+    private func guidance(
+        _ error: Error, starter: LiveBridgeAutoStarter?, triggering: Bool, retrySafe: Bool, port: UInt16
     ) async -> String {
         var message = error.localizedDescription
         if let starter, case DriverError.bridgeConnectionRefused = error {
@@ -839,12 +849,12 @@ struct ApiLiveServe: AsyncParsableCommand {
                 probe: probe, hasStarter: starter != nil, starterIsIdle: starterIsIdle,
                 triggering: triggering) {
             case .useStarterSuffix:
-                message += await starter?.statusSuffix() ?? Self.bridgeUnreachableHint(probe: probe)
+                message += await starter?.statusSuffix() ?? Self.bridgeUnreachableHint(probe: probe, retrySafe: retrySafe)
             case .triggerStarter:
                 message += await starter?.noteConnectionRefused(
-                    trigger: "No answer and the bridge probe read \(probe)") ?? Self.bridgeUnreachableHint(probe: probe)
+                    trigger: "No answer and the bridge probe read \(probe)") ?? Self.bridgeUnreachableHint(probe: probe, retrySafe: retrySafe)
             case .probeHint:
-                message += Self.bridgeUnreachableHint(probe: probe)
+                message += Self.bridgeUnreachableHint(probe: probe, retrySafe: retrySafe)
             }
         }
         return message
@@ -892,10 +902,15 @@ struct ApiLiveServe: AsyncParsableCommand {
         + " problem with the app or this tool. The read was already retried for a few seconds."
         + " Wait a moment and try again; if it keeps happening, restart the simulator/device."
 
+    /// 届いたか分からない操作の失敗に足す文(判定は `DriverError.deliveryIsUnknown`)
+    static let deliveryUnknownHint =
+        " The action may already have taken effect — check the screen before doing it again."
+
     /// `BridgeDiscovery.probeStatus` の結果ごとの文言(純粋関数)。**固まり(transportFailed)と
     /// busy(timedOut)で対処が逆になる**のが要点 —— 固まりは起動し直しが要り、busy は待てば直る。
     /// この2つを混ぜて「待て」と言い続けたのが過去のバグ(MN-44.1)
-    static func bridgeUnreachableHint(probe: BridgeDiscovery.StatusProbe) -> String {
+    /// `retrySafe` が false(届いたか分からない操作の失敗)なら「もう一度」と勧めない。
+    static func bridgeUnreachableHint(probe: BridgeDiscovery.StatusProbe, retrySafe: Bool) -> String {
         switch probe {
         case .transportFailed:
             return " The device stopped responding, and the connection dropped almost immediately"
@@ -909,13 +924,13 @@ struct ApiLiveServe: AsyncParsableCommand {
             // 言えるのは「答えなかった」事実と、最も多い理由(忙しい)まで
             return " The device is still connected, but its bridge did not answer a status check in time —"
                 + " most likely it is busy (for example, waiting for the screen to settle can take tens of"
-                + " seconds). Wait a moment and try again; if the next try reports the connection as refused,"
-                + " the bridge has exited."
+                + " seconds). " + (retrySafe ? "Wait a moment and try again" : "Wait a moment")
+                + "; if the next try reports the connection as refused, the bridge has exited."
         case .notBound:
             return " Nothing is listening on this device's bridge port anymore. Run"
                 + " `fleetest bridge up` for this device, then try again."
         case .answered:
-            return " The bridge answered just now — the earlier failure looks transient. Try again."
+            return " The bridge answered just now — the earlier failure looks transient." + (retrySafe ? " Try again." : "")
         }
     }
 
@@ -1338,7 +1353,7 @@ struct ApiLiveServe: AsyncParsableCommand {
                 capturedAtMs: Int64(capturedAt.timeIntervalSince1970 * 1000)))
         } catch {
             ResidentProcessGuard.noteCommandProgress()
-            let message = await annotated(error, starter: starter, triggering: true, port: port)
+            let message = await annotated(error, starter: starter, triggering: true, operated: false, port: port)
             // **annotated の後で読む**(bridgeStartingFlag のコメント参照)
             emitLine(ApiLiveSnapshotEvent(
                 ok: false, error: message,
@@ -1370,7 +1385,7 @@ struct ApiLiveServe: AsyncParsableCommand {
                                        bridgeStarting: await bridgeStartingFlag(starter)))
         } catch {
             ResidentProcessGuard.noteCommandProgress()
-            let message = await annotated(error, starter: starter, triggering: false, port: port)
+            let message = await annotated(error, starter: starter, triggering: false, operated: false, port: port)
             // **annotated の後で読む**(bridgeStartingFlag のコメント参照)
             emitLine(ApiLiveFrameEvent(ok: false, error: message, image: nil,
                                        bridgeStarting: await bridgeStartingFlag(starter)))

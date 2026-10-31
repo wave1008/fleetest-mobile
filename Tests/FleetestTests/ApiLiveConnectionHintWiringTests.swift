@@ -56,6 +56,16 @@ final class ApiLiveConnectionHintWiringTests: XCTestCase {
         XCTAssertTrue(checkRange.upperBound < hintRange.lowerBound)
     }
 
+    /// 操作の失敗だけが配達の注記を受ける(観測の失敗に「効いたかも」と言わない)
+    func testOnlyTheOperationPathClaimsTheDeliveryIsUnknown() throws {
+        let code = try source()
+        XCTAssertEqual(code.components(separatedBy: "operated: true, port: port)").count - 1, 1)
+        XCTAssertEqual(code.components(separatedBy: "operated: false, port: port)").count - 1, 2)
+        let perform = try XCTUnwrap(code.range(of: "try await perform(command: command"))
+        let operated = try XCTUnwrap(code.range(of: "operated: true, port: port)"))
+        XCTAssertLessThan(perform.lowerBound, operated.lowerBound)
+    }
+
     /// LIVE-1: bridgeUnreachable のヒントは iOS xcuitest だけに絞り、probeStatus の結果を
     /// bridgeUnreachableHint へ渡すこと
     func testAnnotatedProbesOnlyForIOSXCUITestBridgeUnreachable() throws {
@@ -76,7 +86,7 @@ final class ApiLiveConnectionHintWiringTests: XCTestCase {
                 + " BridgeDiscovery.probeStatus を撃っていない")
         }
         guard let hintRange = code.range(
-            of: "Self.bridgeUnreachableHint(probe: probe)", range: probeRange.upperBound..<code.endIndex)
+            of: "Self.bridgeUnreachableHint(probe: probe, retrySafe: retrySafe)", range: probeRange.upperBound..<code.endIndex)
         else {
             return XCTFail("probeStatus の結果を文言選択(bridgeUnreachableHint)へ渡していない")
         }

@@ -349,14 +349,7 @@ extension MCPServer {
                     // 失敗の文言は「何も送っていない」だが、replace の消去は済んでいる(欄は空)
                     // 接続が応答の途中で切れた手(bridgeUnreachable)は打鍵が届いている/途中まで入っていることがある
                     // (実測: 「cleared before this failure」だけだと、欄に全文が入っていたのに空と読める)
-                    var maybeTyped = false
-                    if let driverError = error as? DriverError {
-                        switch driverError {
-                        case .bridgeUnreachable, .deliveryUnknown: maybeTyped = true
-                        case .bridgeConnectionRefused, .badResponse, .bridgeIdentityMismatch, .staleRef,
-                             .systemAlertBlocked, .notDelivered: break
-                        }
-                    }
+                    let maybeTyped = (error as? DriverError)?.deliveryIsUnknown == true
                     throw MCPAnnotatedError(underlying: error,
                                             suffix: maybeTyped
                                                 ? " — replace: the field had already been cleared before this failure, and the"

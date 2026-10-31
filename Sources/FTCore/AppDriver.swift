@@ -290,6 +290,18 @@ public protocol AppDriver {
     func backGestureEdgeWidths() async -> (left: Double, right: Double, bottom: Double)?
 }
 
+extension DriverError {
+    /// 操作が端末に届いたか分からない失敗か(撃ち直すと二重実行になりうる)。**`default` を置かない**(case を足したらここで決めさせる)。
+    /// 再キューの判定(`stepFailureKind`)とは別の問い = `bridgeUnreachable` は再キューの対象だが、届いたかは分からない
+    public var deliveryIsUnknown: Bool {
+        switch self {
+        case .bridgeUnreachable, .deliveryUnknown: return true
+        case .bridgeConnectionRefused, .badResponse, .bridgeIdentityMismatch, .staleRef, .systemAlertBlocked, .notDelivered:
+            return false
+        }
+    }
+}
+
 extension DriverError: StepFailureKindProviding {
     /// 到達できなかった(接続拒否・応答なし・アプリのプロセス死・別デバイスへの奪取)/
     /// 到達したがエラー応答、の2つ

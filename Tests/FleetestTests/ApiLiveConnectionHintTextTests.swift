@@ -13,7 +13,7 @@ final class ApiLiveConnectionHintTextTests: XCTestCase {
 
     /// 固まり(transportFailed): 起動し直しが要る。「busy」「待て」だけで済ませない
     func testTransportFailedPointsAtRebuildingNotWaiting() {
-        let hint = ApiLiveServe.bridgeUnreachableHint(probe: .transportFailed)
+        let hint = ApiLiveServe.bridgeUnreachableHint(probe: .transportFailed, retrySafe: true)
         XCTAssertTrue(hint.contains("gone"), hint)
         XCTAssertTrue(hint.contains("fleetest bridge up"), hint)
         XCTAssertFalse(hint.lowercased().contains("busy"),
@@ -22,7 +22,7 @@ final class ApiLiveConnectionHintTextTests: XCTestCase {
 
     /// busy(timedOut): 待てば直る。起動し直しを勧めない
     func testTimedOutPointsAtWaitingNotRebuilding() {
-        let hint = ApiLiveServe.bridgeUnreachableHint(probe: .timedOut)
+        let hint = ApiLiveServe.bridgeUnreachableHint(probe: .timedOut, retrySafe: true)
         XCTAssertTrue(hint.lowercased().contains("busy"), hint)
         XCTAssertFalse(hint.contains("fleetest bridge up"),
                        "busy なだけの接続を固まりと同じ『起動し直せ』にしない")
@@ -32,24 +32,33 @@ final class ApiLiveConnectionHintTextTests: XCTestCase {
 
     /// 誰も listen していない(probe 時点で消えていた): 固まりと同じく起動し直しを勧める
     func testNotBoundAlsoPointsAtRebuilding() {
-        let hint = ApiLiveServe.bridgeUnreachableHint(probe: .notBound)
+        let hint = ApiLiveServe.bridgeUnreachableHint(probe: .notBound, retrySafe: true)
         XCTAssertTrue(hint.contains("fleetest bridge up"), hint)
     }
 
     /// 追跡した瞬間には応答した(元の失敗は一過性だった可能性): 起動し直しも待機も強要しない
     func testAnsweredMarksTheOriginalFailureAsTransient() {
-        let hint = ApiLiveServe.bridgeUnreachableHint(probe: .answered)
+        let hint = ApiLiveServe.bridgeUnreachableHint(probe: .answered, retrySafe: true)
         XCTAssertTrue(hint.lowercased().contains("transient"), hint)
         XCTAssertFalse(hint.contains("fleetest bridge up"), hint)
+    }
+
+    /// 届いたか分からない操作の失敗には「もう一度」と言わない(人が効いた操作を二重に押す)
+    func testAnUnknownDeliveryIsNotToldToTryAgain() {
+        for probe in [BridgeDiscovery.StatusProbe.answered, .timedOut] {
+            XCTAssertTrue(ApiLiveServe.bridgeUnreachableHint(probe: probe, retrySafe: true).lowercased().contains("try again"), "\(probe)")
+            XCTAssertFalse(ApiLiveServe.bridgeUnreachableHint(probe: probe, retrySafe: false).lowercased().contains("try again"), "\(probe)")
+        }
+        XCTAssertTrue(ApiLiveServe.deliveryUnknownHint.contains("check the screen"))
     }
 
     /// 4状態それぞれ違う文言を返すこと(丸めて同じ文言に潰すと状態を見分けた意味が無い)
     func testAllFourProbeStatesProduceDistinctText() {
         let hints: Set<String> = [
-            ApiLiveServe.bridgeUnreachableHint(probe: .transportFailed),
-            ApiLiveServe.bridgeUnreachableHint(probe: .timedOut),
-            ApiLiveServe.bridgeUnreachableHint(probe: .notBound),
-            ApiLiveServe.bridgeUnreachableHint(probe: .answered),
+            ApiLiveServe.bridgeUnreachableHint(probe: .transportFailed, retrySafe: true),
+            ApiLiveServe.bridgeUnreachableHint(probe: .timedOut, retrySafe: true),
+            ApiLiveServe.bridgeUnreachableHint(probe: .notBound, retrySafe: true),
+            ApiLiveServe.bridgeUnreachableHint(probe: .answered, retrySafe: true),
         ]
         XCTAssertEqual(hints.count, 4)
     }

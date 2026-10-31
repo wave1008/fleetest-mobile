@@ -50,6 +50,40 @@ final class ConnectionLossDeliveryTests: XCTestCase {
         return await message(of: server, tool: "ft_tap", args: args)
     }
 
+    /// StepExecutor へ委ねた手も配達の案内を失わない(`MCPError` に畳むと案内が消える)
+    func testAHideKeyboardThatLostTheConnectionKeepsTheDeliveryNote() async {
+        let driver = FakeDriver()
+        driver.hideKeyboardError = DriverError.bridgeUnreachable(context: androidContext, detail: "connection lost")
+        let server = MCPServer(write: { _ in }, makeDriver: { _ in driver }, recordSnapshot: { _, _, _ in })
+        server.connectionFacts = facts()
+        let args: [String: Any] = ["platform": "android", "serial": "emulator-5554"]
+        let key = MCPServer.sessionKey(args)
+        server.connections[key] = "serial emulator-5554"
+        server.connectedAndroidSerials[key] = "emulator-5554"
+        let text = await message(of: server, tool: "ft_hide_keyboard", args: args)
+        XCTAssertTrue(text.contains("hideKeyboard failed: "), text)
+        XCTAssertTrue(text.contains(Self.unknownPhrase), text)
+    }
+
+    func testExecutorFailureKeepsTheThrownDriverError() throws {
+        let cause = DriverError.deliveryUnknown(context: androidContext, detail: "grpc")
+        let kept = MCPServer.executorFailure(StepOutcome(status: .failed("x"), thrownDriverError: cause), prefix: "p: ", suffix: " s")
+        let annotated = try XCTUnwrap(kept as? MCPAnnotatedError, "DriverError を畳んでいる")
+        XCTAssertEqual(annotated.errorDescription, "p: x s")
+        XCTAssertTrue(annotated.underlying is DriverError)
+        XCTAssertTrue(MCPServer.executorFailure(StepOutcome(status: .failed("x"))) is MCPError)
+    }
+
+    /// 全 case の表(`default` を置かない宣言と対で、配達の二値を等号で固定する)
+    func testDeliveryIsUnknownForEveryCase() {
+        let unknown: [DriverError] = [.bridgeUnreachable(context: androidContext, detail: ""), .deliveryUnknown(context: androidContext, detail: "")]
+        let known: [DriverError] = [.bridgeConnectionRefused(context: androidContext, detail: ""), .badResponse(status: 500, body: ""),
+                                    .bridgeIdentityMismatch(""), .staleRef(detail: ""), .systemAlertBlocked(detail: ""),
+                                    .notDelivered(context: androidContext, detail: "")]
+        XCTAssertTrue(unknown.allSatisfy(\.deliveryIsUnknown))
+        XCTAssertFalse(known.contains(where: \.deliveryIsUnknown))
+    }
+
     private func message(of server: MCPServer, tool: String, args: [String: Any]) async -> String {
         do {
             _ = try await server.call(tool: tool, args: args)

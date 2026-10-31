@@ -157,7 +157,7 @@ extension MCPServer {
         // refused と notDelivered は撃つ前に断られた確定(adb forward の失敗・端末が adb shell に答えない)
         let deliveryNote: String
         switch error {
-        case DriverError.bridgeUnreachable, DriverError.deliveryUnknown:
+        case let driverError as DriverError where driverError.deliveryIsUnknown:
             deliveryNote = Self.deliveryUnknownNote(mayHaveTakenEffect: mayHaveTakenEffect)
         case DriverError.bridgeConnectionRefused, DriverError.badResponse, DriverError.notDelivered:
             deliveryNote = ""

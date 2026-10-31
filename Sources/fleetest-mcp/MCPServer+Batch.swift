@@ -987,13 +987,14 @@ extension MCPServer {
     /// 拒否だったかは直前の失敗の文が言う(文言の一致では決めない)。ft_batch は撃ち直しを勧めない
     /// `thrown` が分かれば case で決める(撃つ前に断られた手には言わない・ブリッジ以外の理由で不明な手にも言う)
     static func batchDeliveryUnknownNote(failureKind: StepFailureKind?, thrown: DriverError?) -> String {
-        switch thrown {
-        case .notDelivered?, .bridgeConnectionRefused?: return ""
-        case .deliveryUnknown?, .bridgeUnreachable?:
+        if thrown?.deliveryIsUnknown == true {
             // 投げられた case が「届いたか不明」と決めている: 「拒否なら送っていない」の留保は付けない
             // (本文の「nothing is listening」と語が重なり、届いた手を未送信と読ませた)
             return "\n   (the connection to the driver failed during this step, and whether it was delivered is unknown —"
                 + " it may already have been performed. Check the screen before repeating it; do not simply run the step again)"
+        }
+        switch thrown {
+        case .notDelivered?, .bridgeConnectionRefused?: return ""
         default:
             guard failureKind == .driverUnreachable else { return "" }
         }
