@@ -19,16 +19,19 @@ extension MCPServer {
     /// 直接指定と profile とで判別条件を分けると、profile 経由はどちらの回復ハンドラにも
     /// 一度も入らず、死んだブリッジへ永久に再ダイヤルし続ける(実機の陽性対照で確認)
     func connectionLostHint(_ error: Error, args: [String: Any], tool: String) async -> String {
-        // 差し替えドライバ(テスト)では走査しない = 実ポートを叩かない
-        guard makeDriver == nil else { return "" }
+        // 差し替えドライバ(テスト)では走査しない = 実ポートを叩かない。`connectionFacts` を差し替えたテストだけは
+        // 偽の観測で分岐を通す(`makeDriver` の意味は変えない)
+        guard makeDriver == nil || connectionFacts != nil else { return "" }
+        let facts = connectionFacts ?? .live
         let key = Self.sessionKey(args)
         guard let connection = connections[key] else { return "" }
         if connectedPorts[key] != nil {
-            return await iosConnectionLostHint(error, key: key, connection: connection,
+            return await iosConnectionLostHint(error, key: key, connection: connection, facts: facts,
                                                mayHaveTakenEffect: Self.mayHaveTakenEffect(tool: tool))
         }
         if let serial = connectedAndroidSerials[key] {
             return await androidConnectionLostHint(error, key: key, connection: connection, serial: serial,
+                                                   facts: facts,
                                                    mayHaveTakenEffect: Self.mayHaveTakenEffect(tool: tool))
         }
         return ""
@@ -36,12 +39,12 @@ extension MCPServer {
 
     /// iOS(port 経由のブリッジ)の死活。Android には無い判定材料(BridgeDiscovery.isBound/scan)を
     /// 使うので、判定そのものを共有しない(androidConnectionLostHint 参照)
-    func iosConnectionLostHint(_ error: Error, key: String, connection: String,
+    func iosConnectionLostHint(_ error: Error, key: String, connection: String, facts: ConnectionFacts,
                                mayHaveTakenEffect: Bool) async -> String {
         switch error {
         case DriverError.bridgeConnectionRefused:
             // 接続拒否は「誰も待受していない」が確定しているので、走査は今の状況を添えるだけ
-            let running = await BridgeDiscovery.scan(excluding: 0, repoRoot: try? RepoRoot.find())
+            let running = await facts.scan(try? RepoRoot.find())
             return connectionLostAndForget(key: key, connection: connection, running: running)
         case DriverError.bridgeUnreachable:
             // **タイムアウトは死を意味しない**(実アプリ監査で踏んだ): 素の文言は
@@ -64,10 +67,10 @@ extension MCPServer {
             // 残る。pid ファイルの所有プロセス生死(bridgeOwnerAlive)で補強し、「bound を信じてよいか」
             // (trustBound)を verdict と scan 要否の両方で共有する(手書きの条件式を2箇所に置かない)。
             // 信じてよいときだけ走査を省ける(busy なブリッジは scan に載らず判定に使われない)
-            let bound = BridgeDiscovery.mayBeListening(port: port, repoRoot: repoRoot)
-            let ownerAlive = Self.bridgeOwnerAlive(port: port, repoRoot: repoRoot)
+            let bound = facts.mayBeListening(port, repoRoot)
+            let ownerAlive = facts.ownerAlive(port, repoRoot)
             let running = Self.trustBound(bound: bound, ownerAlive: ownerAlive)
-                ? [] : await BridgeDiscovery.scan(excluding: 0, repoRoot: repoRoot)
+                ? [] : await facts.scan(repoRoot)
             switch Self.bridgeUnreachableVerdict(
                 bound: bound, ownerAlive: ownerAlive,
                 vanished: Self.bridgeVanished(port: port, running: running)) {
@@ -78,7 +81,7 @@ extension MCPServer {
                 // (BridgeDiscovery.transportFailureFraction のコメント参照)。生きた xcodebuild の
                 // pid が残っていても wedged は起こる(実機実測。ownerAlive では捕まらない)
                 let bridge = Self.resolvedBridge(known: bridges[key], port: port, repoRoot: repoRoot)
-                let probe = await BridgeDiscovery.probeStatus(port: port, repoRoot: repoRoot)
+                let probe = await facts.probeStatus(port, repoRoot)
                 // **in-app ブリッジには wedged の文言を出さない** —— あちらは `bridge up` で
                 // 起動し直す物ではなく(注入は launch で起きる)、前面から外れただけのことが多い。
                 // その分岐は `bridgeBusyHint` が bridge で持っている
@@ -96,7 +99,11 @@ extension MCPServer {
                                                macEndStillListening: bound)
                     + Self.deliveryUnknownNote(mayHaveTakenEffect: mayHaveTakenEffect)
             }
+        case DriverError.deliveryUnknown:
+            // ブリッジ以外の理由(iOS では今は起きない)。ブリッジの生死は言わず、届いたか不明だけを言う
+            return Self.deliveryUnknownNote(mayHaveTakenEffect: mayHaveTakenEffect)
         default:
+            // notDelivered は送っていないと確定しているので何も足さない(「届いたか不明」と言うと文が矛盾する)
             return ""
         }
     }
@@ -145,13 +152,14 @@ extension MCPServer {
     /// (ここを経由しないと、死んだ serial への省略呼び出しがセッション中ずっと
     /// 同じ死んだ serial へ再ダイヤルされ続ける)
     func androidConnectionLostHint(_ error: Error, key: String, connection: String,
-                                   serial: String, mayHaveTakenEffect: Bool) async -> String {
-        // 届いたか分からないのは bridgeUnreachable(送った後に切れた・時限切れ)だけ。refused は撃つ前に断られた確定
+                                   serial: String, facts: ConnectionFacts, mayHaveTakenEffect: Bool) async -> String {
+        // 届いたか分からないのは bridgeUnreachable(送った後に切れた・時限切れ)と deliveryUnknown(ブリッジ以外の理由)だけ。
+        // refused と notDelivered は撃つ前に断られた確定(adb forward の失敗・端末が adb shell に答えない)
         let deliveryNote: String
         switch error {
-        case DriverError.bridgeUnreachable:
+        case DriverError.bridgeUnreachable, DriverError.deliveryUnknown:
             deliveryNote = Self.deliveryUnknownNote(mayHaveTakenEffect: mayHaveTakenEffect)
-        case DriverError.bridgeConnectionRefused, DriverError.badResponse:
+        case DriverError.bridgeConnectionRefused, DriverError.badResponse, DriverError.notDelivered:
             deliveryNote = ""
         default:
             return ""
@@ -162,8 +170,8 @@ extension MCPServer {
         // 「no longer connected」と言い切り、覚えている宛先まで捨てる)
         // **一覧の全行(offline / unauthorized も)で照らす** —— 消えたと言ってよいのは1行も無いときだけ
         // (state=device だけの connectedSerials だと、offline の端末を「does not list it」と言い宛先まで捨てる)
-        guard let listed = try? AndroidDeviceCatalog.listedSerialStates(),
-              Self.androidSerialVanished(serial, connected: Array(listed.keys))
+        guard let listed = facts.androidListed(),
+              Self.androidSerialVanished(serial, connected: listed)
         else { return deliveryNote }
         forgetConnection(key)
         return deliveryNote + "\nThe Android device behind \(connection) is no longer connected (adb devices"
@@ -391,4 +399,23 @@ extension MCPServer {
             : sameDevice != nil ? " (+\(remaining) more on other devices)" : " (+\(remaining) more)"
         return shown.map(\.label).joined(separator: ", ") + suffix
     }
+}
+
+/// 接続断の診断が読む外部の事実(ブリッジの走査・待受・所有プロセス・状態照会・`adb devices`)。
+/// 実運用は `.live`。テストは `MCPServer.connectionFacts` を差し替えて iOS / Android の分岐を `call()` 経由で通す
+/// (差し替えドライバでは診断全体が止まるので、分岐が単体で一度も通らなかった)
+struct ConnectionFacts: Sendable {
+    var scan: @Sendable (_ repoRoot: URL?) async -> [BridgeDiscovery.Found]
+    var mayBeListening: @Sendable (_ port: UInt16, _ repoRoot: URL?) -> Bool
+    var ownerAlive: @Sendable (_ port: UInt16, _ repoRoot: URL?) -> Bool?
+    var probeStatus: @Sendable (_ port: UInt16, _ repoRoot: URL?) async -> BridgeDiscovery.StatusProbe
+    /// `adb devices` の全行の serial(offline / unauthorized も含む)。読めなければ nil(「消えた」と言わない)
+    var androidListed: @Sendable () -> [String]?
+
+    static let live = ConnectionFacts(
+        scan: { await BridgeDiscovery.scan(excluding: 0, repoRoot: $0) },
+        mayBeListening: { BridgeDiscovery.mayBeListening(port: $0, repoRoot: $1) },
+        ownerAlive: { MCPServer.bridgeOwnerAlive(port: $0, repoRoot: $1) },
+        probeStatus: { await BridgeDiscovery.probeStatus(port: $0, repoRoot: $1) },
+        androidListed: { (try? AndroidDeviceCatalog.listedSerialStates()).map { Array($0.keys) } })
 }

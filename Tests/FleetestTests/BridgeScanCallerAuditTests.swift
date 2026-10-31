@@ -15,7 +15,7 @@ final class BridgeScanCallerAuditTests: XCTestCase {
     /// 呼び手の数 + 答えないポートの扱い。表の更新は「答えない = 居ない」と畳んでいないことを確かめてから
     static let scanCallers: [String: (count: Int, handling: String)] = [
         "fleetest-mcp/DeviceInventory.swift": (1, "表示だけ(判断に使わない)"),
-        "fleetest-mcp/MCPServer+ConnectionLoss.swift": (2, "診断の補助。待受の有無は mayBeListening で別に見る"),
+        "fleetest-mcp/MCPServer+ConnectionLoss.swift": (1, "診断の補助(ConnectionFacts.live の1箇所。呼ぶ側は facts.scan)。待受の有無は mayBeListening で別に見る"),
         "fleetest-mcp/MCPServer+Driver.swift": (1, "udid で濾すだけ。無いときは portForIOS が mayBeListening / 診断で補う"),
         "fleetest/BridgeCommand.swift": (2, "bridge down: 載らなかったポートは probeStatus と unresponsiveButBoundRefusal で別に門を掛ける"),
         "fleetest/ApiLiveCommand.swift": (2, "udid の一致を探して乗り換えるだけ。載らなければ busyRunnerPort(ps + 接続試行)と自動起動の門が見る"),

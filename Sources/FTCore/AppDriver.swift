@@ -292,8 +292,11 @@ extension DriverError: StepFailureKindProviding {
     /// 到達したがエラー応答、の2つ
     public var stepFailureKind: StepFailureKind? {
         switch self {
-        case .bridgeUnreachable, .bridgeConnectionRefused, .bridgeIdentityMismatch: return .driverUnreachable
-        case .badResponse, .staleRef: return .driverError
+        // notDelivered = 送る前に到達不能と確定(refused と同じ側 = 再キューしてよい)。
+        // deliveryUnknown = ブリッジ以外の理由で届いたか不明: ブリッジは健全かもしれないので driverUnreachable にせず、
+        // run のシナリオ再キュー・ブレーカの対象にしない(再キューは二重実行になりうる)
+        case .bridgeUnreachable, .bridgeConnectionRefused, .bridgeIdentityMismatch, .notDelivered: return .driverUnreachable
+        case .badResponse, .staleRef, .deliveryUnknown: return .driverError
         case .systemAlertBlocked: return .systemUICovered
         }
     }
@@ -409,6 +412,13 @@ public enum DriverError: Error, LocalizedError {
     /// (`ErrorResponse.reason == BridgeAPI.systemAlertBlockedReason`。今は XCUITest ランナーの `/tap` だけ)。
     /// 登録(iosAlertHandler)があれば閉じてから撃ち直してよい。detail はブリッジの文言(題名・ボタンを含む)
     case systemAlertBlocked(detail: String)
+    /// **何も送っていないと確定している**到達不能(送る前の門で断った: 端末が adb shell に答えない・`adb forward` が張れない等)。
+    /// `bridgeConnectionRefused` と違い URLSession 由来ではなく、ブリッジ以外(adb 等)の理由。
+    /// 撃ち直しの判定(`isDefiniteDeliveryFailure`)は URLError だけを見る別の層なので、この case は含めない
+    /// (自動リトライの根拠を増やさない)。MCP では「届いたか不明」の注記を付けない
+    case notDelivered(context: DriverErrorContext, detail: String)
+    /// **ブリッジ以外の理由で、届いたか分からない**(gRPC の途中の失敗等)。ブリッジの生死は言わない。撃ち直さない
+    case deliveryUnknown(context: DriverErrorContext, detail: String)
 
     public var errorDescription: String? {
         switch self {
@@ -428,6 +438,10 @@ public enum DriverError: Error, LocalizedError {
                 + " resolve the target again. \(detail)"
         case .systemAlertBlocked(let detail):
             return "The driver returned an error (422): \(detail)"
+        case .notDelivered(_, let detail):
+            return "The action was not sent: the device could not be reached, and nothing was sent to it. \(detail)"
+        case .deliveryUnknown(_, let detail):
+            return "Whether the action reached the device is unknown. \(detail)"
         }
     }
 

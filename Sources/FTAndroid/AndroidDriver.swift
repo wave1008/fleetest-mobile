@@ -180,7 +180,11 @@ public final class AndroidDriver: AppDriver {
         do {
             _ = try adbProbe(["shell", "true"], timeout: Self.deviceAnswerTimeoutSeconds)
         } catch ShellError.timedOut {
-            throw noAnswerError(consequence: "nothing was sent to it")
+            // 送る前の門で断った = 何も送っていないと確定(notDelivered)
+            throw DriverError.notDelivered(context: androidContext(),
+                detail: AndroidGuestReadiness.noAnswerMessage(
+                    serial: serial ?? "?", seconds: Self.deviceAnswerTimeoutSeconds,
+                    consequence: "nothing was sent to it"))
         }
     }
 
@@ -202,7 +206,8 @@ public final class AndroidDriver: AppDriver {
         case .performed: return true
         case .notSent: return false
         case .deliveryUnknown(let detail):
-            throw DriverError.bridgeUnreachable(context: context,
+            // ブリッジは経由していない(エミュレータの gRPC)ので、ブリッジの生死は言わない = deliveryUnknown
+            throw DriverError.deliveryUnknown(context: context,
                 detail: "\(verb) was cut off: the emulator gRPC call failed after sending may have started, so whether"
                     + " it was performed is unknown (\(detail))")
         }
@@ -929,7 +934,31 @@ public final class AndroidDriver: AppDriver {
             throw Self.typeNoFocusAdvice(after: error, hadRef: ref != nil, front: front, lastTreePackage: lastTree)
                 ?? Self.noFocusFrontAdvice(after: error, front: front, lastTreePackage: lastTree) ?? error
         }
-        try await pressEnter()
+        do {
+            try await pressEnter()
+        } catch let error as DriverError {
+            throw Self.enterAfterTypedBody(error)
+        }
+    }
+
+    /// 本文を打ち終えた後の Enter の失敗に「本文は打たれ済み」を足す(純関数)。これを言わないと、読み手は
+    /// 何も打たれていないと読んで type を撃ち直し、本文を二重に入れる。pressEnter 単体の文言(「tap the field」)は
+    /// 本文が届いた後の状況には合わないので、ここで前置きする
+    static func enterAfterTypedBody(_ error: DriverError) -> DriverError {
+        let note = "The text was already typed into the field; only the trailing Enter failed (do not type the text again)."
+        switch error {
+        case .badResponse(let status, let body):
+            return .badResponse(status: status, body: "\(note) \(body)")
+        case .bridgeUnreachable(let context, let detail):
+            return .bridgeUnreachable(context: context, detail: "\(note) \(detail)")
+        case .notDelivered(let context, let detail):
+            // Enter は未送でも本文は届いている
+            return .deliveryUnknown(context: context, detail: "\(note) The Enter key was not sent. \(detail)")
+        case .deliveryUnknown(let context, let detail):
+            return .deliveryUnknown(context: context, detail: "\(note) \(detail)")
+        case .bridgeConnectionRefused, .bridgeIdentityMismatch, .staleRef, .systemAlertBlocked:
+            return error
+        }
     }
 
     /// **ref 無しの type がフォーカス不在で落ちたとき**の書き換え(純関数 = 単体テストで固定)。

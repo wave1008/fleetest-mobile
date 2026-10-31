@@ -216,10 +216,14 @@ final class FakeDriver: AppDriver, @unchecked Sendable {
         }
     }
 
+    /// tap が投げるエラー(呼び出しは calls に積んでから投げる)。接続断・配達の注記の分岐を `call()` 経由で通すテスト用
+    var tapError: Error?
+
     func tap(ref: Int) async throws {
         lastActionNote = nil
         lastTapHitAreaMiss = nil
         try record("tap(ref:\(ref))", "tap")
+        if let tapError { throw tapError }
         onTap?()
         lastActionNote = scriptedActionNote
         lastTapHitAreaMiss = scriptedHitAreaMiss
@@ -227,6 +231,7 @@ final class FakeDriver: AppDriver, @unchecked Sendable {
 
     func tap(x: Double, y: Double) async throws {
         try record("tap(x:\(x),y:\(y))", "tap")
+        if let tapError { throw tapError }
         onTap?()
     }
 

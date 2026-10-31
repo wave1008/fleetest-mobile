@@ -112,6 +112,9 @@ final class MCPServer {
     var rpcTraceEnabled = false
     /// ドライバ生成の差し替え口。nil = 実デバイスを解決する(既定)
     let makeDriver: ((_ args: [String: Any]) async throws -> AppDriver)?
+    /// 接続断の診断が読む事実の差し替え口(テスト用)。nil = 実運用(`ConnectionFacts.live`)。
+    /// 非 nil のときだけ、`makeDriver` があっても `connectionLostHint` が働く(`makeDriver` の意味は変えない)
+    var connectionFacts: ConnectionFacts?
     /// スナップショットの `#id` を台帳へ落とす口。**テストは必ず差し替える**
     /// (既定は実プロジェクトの `.fleetest/` へ書くので、テストが利用者の資産を汚す)
     let recordSnapshot: (_ snapshot: SnapshotResponse, _ platform: String,
@@ -612,7 +615,10 @@ struct MCPAnnotatedError: Error, LocalizedError {
     let suffix: String
     /// 元の文の前に置く文(撮れなかった理由を、先に起きた失敗の報告の後ろへ続けるとき)
     var prefix: String = ""
-    var errorDescription: String? { prefix + underlying.localizedDescription + suffix }
+    /// 非 nil なら文面はこれだけ(`underlying` の文を含めない)。`underlying` は案内(接続断・配達の注記)を決めるためだけに抱える。
+    /// ft_scroll_to のように、呼び手がすでに失敗の文を組み終えている(元の文がその中に入っている)ときに使う
+    var fullMessage: String? = nil
+    var errorDescription: String? { fullMessage ?? (prefix + underlying.localizedDescription + suffix) }
 }
 
 /// **中身(文・画像)を持ったまま `isError: true` で返す失敗**。MCPError は文字列1本に畳まれるので、

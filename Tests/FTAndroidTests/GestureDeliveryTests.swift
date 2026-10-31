@@ -59,7 +59,7 @@ final class GestureDeliveryTests: XCTestCase {
     func testDeliveryUnknownThrowsTheCaseThatCarriesTheNote() {
         XCTAssertThrowsError(try AndroidDriver.gestureFinished(.deliveryUnknown(detail: "x"), verb: "drag",
                                                                context: context)) { error in
-            guard case DriverError.bridgeUnreachable(_, let detail) = error else { return XCTFail("\(error)") }
+            guard case DriverError.deliveryUnknown(_, let detail) = error else { return XCTFail("\(error)") }
             XCTAssertTrue(detail.contains("whether it was performed is unknown"), detail)
         }
     }

@@ -193,6 +193,10 @@ public struct StepOutcome: Sendable {
     /// 失敗したときの素性(`StepFailureKind`)。**言えない失敗では nil のまま**。
     /// notes と同じ累積器方式(`failureKindThisStep`)で内側から立て、`execute` の出口で載せる
     public let failureKind: StepFailureKind?
+    /// ステップの実行中に投げられた `DriverError` そのもの(文言に畳む前の型)。結果 JSON には載せない —— MCP の ft_scroll_to が
+    /// 失敗を `MCPError` に畳むと配達の情報(`notDelivered` / `deliveryUnknown` / `bridgeUnreachable` の別)が消えるので、
+    /// 呼び手が元の case を引けるように運ぶ。投げられなかった失敗・DriverError 以外では nil
+    public let thrownDriverError: DriverError?
     /// **画像の判定(分類器・existImage)で落ちたときだけ**、判定に使ったスクリーンショット(PNG そのまま)。
     /// 呼び手がレポートのステップ行に添える。切り出しではなく全体を持つ = 「判定した画面が
     /// 失敗時の画面と同じか」を後から見比べられる(切り出しは要素一覧の枠から再現できる)
@@ -217,6 +221,7 @@ public struct StepOutcome: Sendable {
                observedChecked: Bool? = nil, resolvedElement: ElementInfo? = nil,
                notVisibleSelection: ElementInfo? = nil,
                scrollSwipes: Int? = nil, slowDrags: Int? = nil, failureKind: StepFailureKind? = nil,
+               thrownDriverError: DriverError? = nil,
                evidenceImage: Data? = nil,
                imageMatches: [FindImage.Match]? = nil,
                ambiguousMatchCount: Int? = nil,
@@ -230,6 +235,7 @@ public struct StepOutcome: Sendable {
         self.imageMatches = imageMatches
         self.ambiguousMatchCount = ambiguousMatchCount
         self.failureKind = failureKind
+        self.thrownDriverError = thrownDriverError
         self.evidenceImage = evidenceImage
         self.guardEntered = guardEntered
         self.observedChecked = observedChecked
@@ -942,6 +948,7 @@ public final class StepExecutor {
                                // 分からない型は nil のまま = 推測しない
                                failureKind: Self.failureKind(thrown: error)
                                    ?? failureKindThisStep,
+                               thrownDriverError: error as? DriverError,
                                response: thrownResponse,
                                opensReadyObservation: thrownOpensReadyObservation)
         }

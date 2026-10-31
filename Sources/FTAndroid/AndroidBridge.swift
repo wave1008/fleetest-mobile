@@ -107,6 +107,9 @@ extension AndroidDriver {
             // 到達不能ではない(ブリッジは他のセッションの物で、触らないと決めただけ)。到達不能の
             // 決まり文句(「bridge up を試せ」= 同じ門で断られる)で包まない
             throw held
+        } catch DriverError.notDelivered(_, let detail) {
+            // adb forward の失敗: 操作は送っていない。bridgeUnreachable に包み直さない(「届いたか不明」と言ってしまう)
+            throw DriverError.notDelivered(context: androidContext(), detail: detail)
         } catch {
             throw Self.unreachableError(detail: Self.rawFailureDetail(error),
                                         physicalDevice: isPhysicalAndroidDevice)
@@ -127,6 +130,8 @@ extension AndroidDriver {
         switch driverError {
         case .bridgeUnreachable(_, let detail): return detail
         case .bridgeConnectionRefused(_, let detail): return detail
+        case .notDelivered(_, let detail): return detail
+        case .deliveryUnknown(_, let detail): return detail
         default: return driverError.errorDescription ?? "\(driverError)"
         }
     }
@@ -443,7 +448,8 @@ extension AndroidDriver {
         if let existing = findExistingForward() { return existing }
         let created = try adb(["forward", "tcp:0", "tcp:\(Self.bridgeDevicePort)"])
         guard let hostPort = UInt16(created.output.trimmingCharacters(in: .whitespacesAndNewlines)) else {
-            throw DriverError.bridgeUnreachable(context: androidContext(), detail: "adb forward failed: \(created.tail)")
+            // forward を張る段は操作を送る前 = 何も送っていない
+            throw DriverError.notDelivered(context: androidContext(), detail: "adb forward failed: \(created.tail)")
         }
         return hostPort
     }

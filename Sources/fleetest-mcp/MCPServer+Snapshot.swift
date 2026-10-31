@@ -1800,7 +1800,7 @@ extension MCPServer {
                     + " read the screen it should be on with ft_snapshot maxElements:"
                     + " \(BridgeAPI.maxSnapshotElementsCeiling) before concluding it is not there.\n"
                 : ""
-            throw MCPError(failedSwitched + scrollFrameLabelNote + sheetNote + containerGoneNote
+            let failureMessage: String = (failedSwitched + scrollFrameLabelNote + sheetNote + containerGoneNote
                 + truncatedDuringSearch
                 + Self.scrollTimingNote(totalMs: Int((timingClock.now - timingStart)
                                                      / .milliseconds(1)),
@@ -1813,6 +1813,12 @@ extension MCPServer {
                                           backDirection: Self.reversedDirection(direction))
                 + Self.similarLabelsHint(selectorText, in: after)
                 + Self.scrollAreaHint(Self.scrollFrameHintTree(args, before: beforeScroll, after: after), args: args, isAndroid: isAndroid))
+            // 投げられた DriverError があれば抱えたまま投げる(MCPError に畳むと notDelivered / deliveryUnknown / 接続断の案内が消える)。
+            // 文面は組み終えたものをそのまま使う(元の文は reason の「execution error: …」に入っている)
+            if let cause = outcome.thrownDriverError {
+                throw MCPAnnotatedError(underlying: cause, suffix: "", fullMessage: failureMessage)
+            }
+            throw MCPError(failureMessage)
         }
         // **成功と言う前に、返す木にそれが居ることを確かめる**(探索で外した)。
         // 探索のスワイプは**ボタンを発火させることがある**(SwiftUI の SUT で実測)。

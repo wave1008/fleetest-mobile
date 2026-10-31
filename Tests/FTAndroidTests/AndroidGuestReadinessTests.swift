@@ -73,7 +73,7 @@ extension AndroidGuestReadinessTests {
         XCTAssertFalse(driver.contains("the bridge was not started"), "ドライバの断りにブリッジ起動の文がある")
         XCTAssertTrue(bridge.contains(#"consequence: "the bridge was not started""#))
         let gate = try XCTUnwrap(driver.range(of: "func requireDeviceAnswers() throws {"))
-        XCTAssertTrue(driver[gate.upperBound...].prefix(300).contains(#"consequence: "nothing was sent to it""#),
+        XCTAssertTrue(driver[gate.upperBound...].prefix(700).contains(#"consequence: "nothing was sent to it""#),
                       "入口の門が「何も送っていない」と言っていない")
     }
 }

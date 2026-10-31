@@ -337,7 +337,8 @@ extension MCPServer {
                 // 「焦点が無い」としか言えず、原因がアラートだと気づけないまま撃ち直しがちになる)。
                 // target が無い形なので systemAlertGate(要素前提)ではなく frontSystemAlert を使う
                 if resolvedTypeRef == nil, let alert = await Self.frontSystemAlert(driver: typeDriver) {
-                    throw MCPError(error.localizedDescription + " — \(alert) is in front of the"
+                    // 元のエラーを抱えたまま投げる(MCPError に畳むと、届いたか分からない注記と接続断の案内が出ない)
+                    throw MCPAnnotatedError(underlying: error, suffix: " — \(alert) is in front of the"
                         + " app, which likely explains the missing focus. Handle it first with"
                         + " `ft_launch bundleId: com.apple.springboard`, tap its button by ref,"
                         + " then `ft_launch` your app again.")
@@ -347,7 +348,13 @@ extension MCPServer {
                     // 接続が応答の途中で切れた手(bridgeUnreachable)は打鍵が届いている/途中まで入っていることがある
                     // (実測: 「cleared before this failure」だけだと、欄に全文が入っていたのに空と読める)
                     var maybeTyped = false
-                    if let driverError = error as? DriverError, case .bridgeUnreachable = driverError { maybeTyped = true }
+                    if let driverError = error as? DriverError {
+                        switch driverError {
+                        case .bridgeUnreachable, .deliveryUnknown: maybeTyped = true
+                        case .bridgeConnectionRefused, .badResponse, .bridgeIdentityMismatch, .staleRef,
+                             .systemAlertBlocked, .notDelivered: break
+                        }
+                    }
                     throw MCPAnnotatedError(underlying: error,
                                             suffix: maybeTyped
                                                 ? " — replace: the field had already been cleared before this failure, and the"

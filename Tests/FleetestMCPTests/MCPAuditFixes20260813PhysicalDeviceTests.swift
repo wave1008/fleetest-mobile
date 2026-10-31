@@ -237,7 +237,7 @@ final class MCPAuditFixes20260813PhysicalDeviceTests: XCTestCase {
                                 "iosConnectionLostHint の終端(次の関数のコメント)が見つからない")
         let body = String(tail[..<end.lowerBound])
 
-        XCTAssertTrue(body.contains("Self.bridgeOwnerAlive(port: port, repoRoot: repoRoot)"),
+        XCTAssertTrue(body.contains("facts.ownerAlive(port, repoRoot)"),
                      "ownerAlive を計算していない —— bound だけでは実機の孤児 iproxy を"
                      + "生存中と誤判定する(欠陥④)")
         XCTAssertTrue(body.contains("ownerAlive: ownerAlive"),

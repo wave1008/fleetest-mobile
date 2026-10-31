@@ -656,7 +656,9 @@ extension MCPServer {
                 // 後の手順の時間まで起動に積まれる(実機 SE3: 起動 3.2 秒の batch が「launching the app 31.2s」)
                 _ = try await SlowCallWatchdog.marking("launch:") { try await ftLaunch(launchArgs) }
             } catch {
-                throw MCPError("launch \(launchBundle) failed — no step was run: \(error.localizedDescription)")
+                // 元のエラーを抱えたまま投げる(MCPError に畳むと、接続断の案内と配達の注記が出ない)
+                throw MCPAnnotatedError(underlying: error, suffix: "",
+                                        prefix: "launch \(launchBundle) failed — no step was run: ")
             }
             lines.append("0. launch \(launchBundle) — ok (\(Int((clock.now - start) / .milliseconds(1)))ms)")
         }

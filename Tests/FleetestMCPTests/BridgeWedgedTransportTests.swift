@@ -169,7 +169,7 @@ final class BridgeWedgedTransportTests: XCTestCase {
                                 "iosConnectionLostHint の終端(次の関数のコメント)が見つからない")
         let body = String(tail[..<end.lowerBound])
 
-        XCTAssertTrue(body.contains("BridgeDiscovery.probeStatus(port: port, repoRoot: repoRoot)"),
+        XCTAssertTrue(body.contains("facts.probeStatus(port, repoRoot)"),
                      "busy 分岐が probe で busy/wedged を分けていない")
         XCTAssertTrue(body.contains("Self.bridgeWedgedHint(connection: connection)"),
                      "wedged のときに bridgeWedgedHint を返していない")
