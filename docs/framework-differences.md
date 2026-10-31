@@ -211,6 +211,14 @@ Flutter・React Native)によって、**木の見え方と操作の効き方が�
 | UIKit / SwiftUI / RN | `insertText` | `textFieldShouldReturn:` + EditingDidEndOnExit を再現(SwiftUI の `onSubmit` もこの経路) | 置換後に EditingChanged と通知を補う |
 | Flutter | `insertText` | Flutter engine の私有 API(`flutterTextInputView:performAction:withClient:`)へ配送。欠けていれば 409 | **in-app では非対応** → XCUITest へ |
 
+- **Compose(iOS)の複数行は、別の欄を挟んで焦点を取り戻すとカーソルが先頭へ戻り、叩く位置を変えても動かない**(実測 2026-11-01 E2E-CMP・
+  XCUITest: `type(欄,"L3"); type(別の欄,"p"); type(欄,"x")` が `xL3`・右端を2回叩いても `yL3`。読み返しは文字の集合しか見ず通っていた。
+  clearInput は先頭への delete が空振りして4周で不発)。**XCUITest ランナーは、叩いて焦点を取り戻した値のある複数行の欄(型 `textView`)で、
+  焦点が立ってから Cmd+↓ を送ってカーソルを末尾へ送る**(`TypeReadback.needsCursorAtEndAfterRefocus`・v240。1行の欄は送らない)。
+  in-app の type / clear はこの形に手を入れていない(UIKit の受け口で別経路)
+- **Flutter(iOS in-app)の値入りの欄は、木で `other`・木の枠が欄の箱より小さくずれ、受け口は動かない 1x1**。`tap(A); tap(B); type("x")` の救済(ref 付き
+  /type)が「焦点は別の欄」と断られていた。**直前の ref の tap が受け口を動かし、いま叩き直す要素がその tap の対象の中にあるときだけ着地と読む**
+  (`FocusLanding.priorTapLanded`・v240)
 - **入力欄でない対象(ボタン等)への `type` / `clearInput` は、フレームワークを問わず撃つ前に失敗させる**(ドライバは打つ・
   消す前に対象をタップするので、撃つと押してしまう。`StepExecutor.nonTextInputPreflightRefusal`。入力欄をちょうど1つ包む容器と、
   役割の確定しない `clickable` は撃つ)。編集できる要素は全経路で入力型を名乗る(iOS in-app = テキスト入力の trait、XCUITest =

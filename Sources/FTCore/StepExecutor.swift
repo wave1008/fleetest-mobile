@@ -332,7 +332,13 @@ public final class StepExecutor {
     /// launch 系の直後に呼ぶ。システムアラートの確認に加え、**firstFrameGatePending もここで arm する**
     /// (CAE フェーズ先頭の armUnregisteredSystemAlertProbe には乗せない ——
     /// launch storyboard の猶予は launch 系コマンド直後だけに絞る)
-    public func noteAppLaunched() {
+    /// 直近に launchApp / restartApp で起こしたアプリ(DSL が `noteAppLaunched(bundleID:)` で運ぶ)。scrollToBottom/Top が
+    /// **始める前に前面を離れていた**形(始点の木がランチャー)を拾う基準: Android の木のセッションは前面と一緒に替わるので、
+    /// 始点の木からは対象のアプリが分からない。nil = 起こしていない・home / アプリ切替 / 終了の後(意図して別の面に居るかもしれない)
+    public var launchedBundleID: String?
+
+    public func noteAppLaunched(bundleID: String? = nil) {
+        if let bundleID { launchedBundleID = bundleID }
         armUnregisteredSystemAlertProbe()
         firstFrameGatePending = true
         pendingLaunchSettle = true

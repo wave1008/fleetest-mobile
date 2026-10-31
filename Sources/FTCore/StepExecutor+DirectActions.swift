@@ -322,10 +322,16 @@ extension StepExecutor {
         }
         // **前面を奪われていたなら、端に着いたとも ok とも言わない**(ランチャーの上を払って「端」と確定し、失敗が次の手まで出なかった)。
         // 木が変わらない = 端、は自アプリが前面に居る間だけ成り立つ。確かめるのは送り終えた後の1回だけ(scrollTo の打ち切りと同じ)
-        if sentSwipes > 0, let front = await frontAppIfSessionAppLeft(edgeBundleID, tree: lastEdgeTree, asksAppState: false) {
+        // **始点の木が起こしたアプリのものでないとき**(送る前から前面を離れていた = Android の木はランチャー)は、起こしたアプリを基準に引く
+        let leftBeforeStart = launchedBundleID.flatMap { launched in
+            edgeBundleID.map { $0 != launched ? ($0, launched) : nil } ?? nil
+        }
+        let expectedBundleID = leftBeforeStart?.1 ?? edgeBundleID
+        if sentSwipes > 0, let front = await frontAppIfSessionAppLeft(expectedBundleID, tree: lastEdgeTree, asksAppState: false) {
+            let before = leftBeforeStart.map { " (the tree was already \($0.0), not \($0.1), when the swipes started)" } ?? ""
             return StepOutcome(status: failed(.notFound,
                 "\(step.action ?? "scrollToEdge") stopped after \(sentSwipes) swipe(s): the app was not in the foreground"
-                + " (\(front) was in front), so the swipes did not reach its list and the end of the list is not known"
+                + " (\(front) was in front)\(before), so the swipes did not reach its list and the end of the list is not known"
                 + " — \(Self.bringBackAdvice(front: front))"))
         }
         // 上限で抜けたら**端に着いたとは限らない**。黙って成功にすると

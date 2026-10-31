@@ -74,6 +74,7 @@ extension BridgeRouter {
             let point = try resolvePoint(ref: ref, x: nil, y: nil)
             Self.tapBeforeTyping(coordinate(app, point))
             tapped = point
+            moveCursorToEndAfterRefocus(app, ref: ref)
         }
         // 末尾の改行1つは本文と分けて送る(改行は Return キー相当で、値には残らない=検証対象外)。
         // 本文を入れ切ってから発火するので「空のまま送信された」も同時に塞げる
@@ -431,6 +432,7 @@ extension BridgeRouter {
                 let focusBefore = Self.focusMark(app)
                 Self.tapBeforeTyping(coordinate(app, point))
                 fieldTappedAt = Date()
+                moveCursorToEndAfterRefocus(app, ref: ref)
                 let refIsTextInput = refElements[ref].map(TypeReadback.isTextInput) ?? false
                 let focusWasOnRefField = focusIsRefField(focusBefore, ref: ref)
                 focused = try Self.awaitClearFocusTarget(app, tapped: point, focusBefore: focusBefore,
@@ -573,6 +575,16 @@ extension BridgeRouter {
     /// 叩くと手前の部品を押す(実機 iPhone SE3 の CMP: キーボード表示中にパスワード欄が下のタブバーの裏へ回り、
     /// 枠の右端は「情報」タブの上だった)。叩かなくても削除キーは焦点の欄(最前のレスポンダ)へ届き、
     /// カーソルが末尾でなければ消し残りは読み返しのループが拾う(消せなければ 422)。isHittable は要素ごとに往復する(数十 ms)
+    /// 叩いて焦点を取り戻した複数行の欄で、カーソルを文書の末尾へ送る(`TypeReadback.needsCursorAtEndAfterRefocus`・Cmd+↓)。
+    /// 焦点が無いまま送ると XCTest が失敗しランナーごと落ちるので、**焦点が立つまで待ち(`requireKeyboardFocus`。Flutter 等は遅れて立つ)、
+    /// 立たなければ送らない**(失敗の報告は後続の判定が行う。対象は値のある複数行だけなので、待ちの費用はこの形だけが払う)
+    private func moveCursorToEndAfterRefocus(_ app: XCUIApplication, ref: Int) {
+        guard let element = refElements[ref], TypeReadback.needsCursorAtEndAfterRefocus(element),
+              (try? Self.requireKeyboardFocus(app)) != nil else { return }
+        ResponseMeasurement.noteInjection()
+        app.typeKey(.downArrow, modifierFlags: .command)
+    }
+
     private func tapFieldEndIfHittable(_ app: XCUIApplication, _ field: XCUIElement) {
         guard field.isHittable else { return }
         let frame = field.frame

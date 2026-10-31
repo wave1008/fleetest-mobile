@@ -398,7 +398,8 @@ extension StepExecutor {
         // **いま焦点を持つ欄へ打つのに、キーボードの下かどうかは関係ない**: ドライバは焦点の欄にはタップせずに打つ
         // (XCUITest = alreadyFocusedInput・in-app = 座標を使わない)。人も焦点の欄にはそのまま打てる。
         // 複数行の欄はキーボードを閉じる副作用の無い手段が無く(hideKeyboard は改行を入れる)、ここで断ると打てる場面を失敗にする
-        if action == "type", element.focused == true, KeyboardWait.isShown(snapshot) { return nil }
+        // clearInput も同じ(XCUITest ランナーの clear も `alreadyFocusedInput` で焦点の欄を叩かない。mxa F10)
+        if action == "type" || action == "clearInput", element.focused == true, KeyboardWait.isShown(snapshot) { return nil }
         let nothing = "nothing was " + (action == "type" ? "typed" : action == "clearInput" ? "cleared" : "tapped")
         let note: String
         switch try await closeKeyboardWithoutSideEffects(step: step, phase: &phase) {

@@ -219,4 +219,34 @@ class テキスト入力が正しくechoされること {
             }
         }
     }
+
+
+    // 複数行の欄は、別の欄を挟んで焦点を取り戻すとカーソルが先頭へ戻る(CMP iOS。叩く位置を変えても動かない)。
+    // 打ち足しは末尾へ入り、clearInput は消し切れる(先頭のままだと打ち足しは `xL3`・clearInput は先頭への delete が空振りして4周で不発)
+    @Test("別の欄を挟んだ複数行の欄へ打ち足し・消す")
+    func S0060() {
+        scenario {
+            scene(1, "打ち足し") {
+                condition {
+                    launchApp()
+                    tap("#nav_input")
+                    type("#field_multiline", "L3")
+                    type("#field_password", "p")
+                }.action {
+                    type("#field_multiline", "x")
+                }.expectation {
+                    select("#field_multiline").valueIs("L3x")
+                }
+            }
+            scene(2, "消す") {
+                condition {
+                    type("#field_password", "q")
+                }.action {
+                    clearInput("#field_multiline")
+                }.expectation {
+                    exist("#field_multiline")
+                }
+            }
+        }
+    }
 }

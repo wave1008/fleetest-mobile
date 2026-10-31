@@ -737,23 +737,16 @@
 - 確認: コミット未記録(2026-10-31)
 - 経緯: 発見: 10/31 の探索(a F2・p F14・p F3・p F4・mxa F4・mxa F5。所見は作業ログの findings-*.md)
 
-- **scrollToBottom / scrollToTop は、始める前に前面を離れていた形を拾わない**: Android の木のセッションは前面と一緒に替わるので、始点の木がランチャーなら
-  「対象のアプリ」が分からない(拾えるのは送りの途中で離れた形だけ)。`StepExecutor` はシナリオが起動したアプリの bundle ID を持っていない
-  (`noteAppLaunched` は引数なし)ので、事実で答えるには起動の経路から bundle ID を運ぶ設計が先(10/31 の調査で確認。実装していない)
 ### OI-91 in-app の背面の要素・焦点の受け口(10/31 探索 inapp・mxa)
 - 状態: 推測
 - 確認: コミット未記録(2026-10-31)
 - 経緯: 発見: 10/31 の探索的テスト(所見は作業ログの findings-inapp.md / findings-mxa.md)
 
-- Flutter で `tap(欄A); tap(値の入った欄B); type("x")` が in-app で「focus is not on the tapped element」(7回中6回・xcuitest は緑)。
-  受け口が 1x1 で動かず(`movedSinceTap` false)、叩いた要素が入力欄と申告されないと `FocusLanding.landed` が外れる。F6 の救済が焦点の立った欄へ ref 付きで撃ち直す形の実害(inapp F9)。
-  **11/1 に Simulator iOS 27.0 の inapp-boost で再現(`tap("#field_first"); tap("#field_number"); type("3")` が 409。受け口 (16,249 1x1)・叩いた点 (201,276))**。
-  値の入った Flutter の欄は木で型が `other`(入力欄と申告されない)・欄の内側に入力欄の申告も無いため、`FocusLanding.landed` は `movedSinceTap`(同じ受け口が動かない)に頼って外れる。
-  動かなかったことだけを理由に通すと、入力欄を申告しない Flutter では「前の欄を含む容器を叩いて焦点が動かなかった形」と区別できず前の欄へ打つので、入れていない
-  (区別するには、叩く前から焦点がその欄にあったという事実が要る = 直前の tap が焦点を立てた記録をホストから渡す設計の決定が先)
-- CMP(iOS)の複数行へ別の欄を挟んで打ち足すと文字が先頭に入る・clearInput が 4 周で不発(XCUITest ランナーの `tapFieldEndIfHittable` が複数行の縦の中央を押す疑い。mxa F9)
-- Flutter(iOS)の上半分が見えている欄を「中心がキーボードの下」として type / clearInput が断る(中心1点の判定。焦点が既にその欄にあれば押さずに打てる。mxa F10。
-  clearInput が容器を送らない側は inapp F8 として直した)
+- Flutter(iOS)の上半分が見えている欄を「中心がキーボードの下」として type / clearInput が断る(mxa F10)。**11/1 に Simulator で再現できなかった**
+  (E2E-Flutter のテキスト入力画面では、パスワード → 複数行の後のキーボード上端が 546 で、複数行の中心 538 は覆われない。探索の 538 とは別の
+  キーボードの形)。測れたのは **Flutter の木も XCUITest では焦点の印(`focused: true`)を出す**こと(複数行の欄で確認)。
+  clearInput だけ「焦点のある欄は閉じずに消す」免除が無かった(type にはある)ので、DSL(`reachPastKeyboard`)と MCP(`keyboardRefusal`)の両方に足した
+  (単体テストのみ・デバイスでの陽性は取れていない)。type も断られたという所見の原因は未特定
 
 ### OI-85 軽い残り(負荷テスト)
 - 状態: 経路確定

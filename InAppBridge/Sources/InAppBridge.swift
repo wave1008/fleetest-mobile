@@ -512,11 +512,37 @@ final class FTInAppBridge {
                               truncatedTiers: truncatedTiers, bulkExempt: base.bulkExempt)
     }
 
+    /// 直近の ref の tap(叩いた要素の id・叩く直前の受け口)。ref 付きの type / clear が叩き直したとき、
+    /// 受け口が動かない理由が「直前の tap で既に焦点が立った」ことかを `FocusLanding.priorTapLanded` で判定する材料。
+    /// ref の tap 以外(座標 tap)は捨てる。リクエストは1本ずつ処理されるので錠は要らない
+    private var lastRefTap: (targetID: String?, before: ReceiverMark?)?
+
+    /// main で呼ぶ。直近の ref の tap が `ref` の要素へ焦点を立てていたか(根拠と条件は `FocusLanding.priorTapLanded`)。
+    /// 判定したら記録は捨てる(type / clear を挟んだ後の叩き直しに使い回さない)
+    private func priorTapLanded(ref: Int) -> Bool {
+        defer { lastRefTap = nil }
+        guard let recorded = lastRefTap, let id = recorded.targetID, !id.isEmpty, let current = frames[ref] else { return false }
+        let same = frames.keys.filter { key in
+            (nodes.object(forKey: NSNumber(value: key)) as? NSObject).flatMap { FTAccessibilityIdentifier($0) } == id
+        }
+        guard same.count == 1, let recordedNow = frames[same[0]] else { return false }
+        let now = Self.receiverMark()
+        let moved = recorded.before.map { before in now.map { before.id != $0.id || before.rect != $0.rect } ?? true }
+            ?? (now != nil)
+        return FocusLanding.priorTapLanded(receiverMovedSinceThatTap: moved, recordedTargetNow: recordedNow, current: current)
+    }
+
     private func handleTap(_ body: Data) throws -> InAppHTTPServer.Response {
         let req = try decode(TapRequest.self, body)
+        lastRefTap = nil
         if let ref = req.ref {
             try requireExpectedRef(ref, expect: req.expect)
+            let targetID = mainSync {
+                (self.nodes.object(forKey: NSNumber(value: ref)) as? NSObject).flatMap { FTAccessibilityIdentifier($0) }
+            }
+            let before = mainSync { Self.receiverMark() }
             let (note, hitAreaMiss) = try tapByRef(ref, req: req)
+            lastRefTap = (targetID, before)
             return ok(note, hitAreaMiss: hitAreaMiss)
         }
         let clippedNote = NoteBox()
@@ -916,7 +942,7 @@ final class FTInAppBridge {
     /// 最初にキーボードが出たとき SwiftUI は欄を避けて中身をずらす(実測: 欄が y=237 → 103)ので、
     /// 叩いた時点の座標のままでは正しい受け口を「別の欄」と断る
     private func requireFocusMoved(ref: Int, tapped point: CGPoint, before: ReceiverMark?,
-                                   action: String) throws {
+                                   landedByPriorTap: Bool = false, action: String) throws {
         let deadline = Date().addingTimeInterval(FocusWait.waitSeconds)
         enum Poll { case focused, pending, refused(String) }
         while true {
@@ -938,7 +964,8 @@ final class FTInAppBridge {
                 guard let reason = Self.focusRefusal(toward: centre, within: target,
                                                      targetIsInput: self.textInputRefs.contains(ref),
                                                      soleInnerInput: inner.count == 1 ? inner[0] : nil,
-                                                     before: before, action: action)
+                                                     before: before, landedByPriorTap: landedByPriorTap,
+                                                     action: action)
                 else { return .focused }
                 guard Date() >= deadline else { return .pending }
                 return .refused(reason + " Diagnostics: \(FTFirstResponderDiagnostics())")
@@ -964,13 +991,16 @@ final class FTInAppBridge {
     }
 
     private static func focusRefusal(toward point: CGPoint, within target: CGRect?, targetIsInput: Bool,
-                                     soleInnerInput: CGRect?, before: ReceiverMark?, action: String) -> String? {
+                                     soleInnerInput: CGRect?, before: ReceiverMark?, landedByPriorTap: Bool,
+                                     action: String) -> String? {
         guard let receiver = FTCurrentTextReceiver() else {
             return "no focused input field after tapping the target — the ref is"
                 + " probably not a text input (tapping it does not move keyboard focus)."
                 + " \(action) needs a focused field: pass the ref of the input element itself."
         }
         guard let view = receiver as? UIView else { return nil }
+        // 直前の tap が焦点を立てた欄への叩き直し(`FocusLanding.priorTapLanded`)。木の枠が欄の箱とずれる Flutter でも通す
+        if landedByPriorTap { return nil }
         let rect = view.convert(view.bounds, to: nil)
         let moved = before.map { $0.id != ObjectIdentifier(view) || $0.rect != rect } ?? true
         guard FocusLanding.landed(receiver: rect, tapped: point, target: target, targetIsInput: targetIsInput,
@@ -1006,12 +1036,15 @@ final class FTInAppBridge {
             try requireExpectedRef(ref, expect: req.expect)
             var point = CGPoint.zero
             var before: ReceiverMark?
+            var landedByPriorTap = false
             try performWithSettle(operation: "the tap before typing") { window in
                 point = try self.pointFollowingMove(ref: ref)
                 before = Self.receiverMark()
+                landedByPriorTap = self.priorTapLanded(ref: ref)
                 FTSynthTap(window, point)
             }
-            try requireFocusMoved(ref: ref, tapped: point, before: before, action: "type")
+            try requireFocusMoved(ref: ref, tapped: point, before: before, landedByPriorTap: landedByPriorTap,
+                                  action: "type")
             replacesSecureText = mainSync { Self.refocusedSecureFieldHasText(before: before) }
         }
         // 末尾の改行1つは本文と分けて **pressEnter と同じ経路**へ流す(「type の末尾改行 = pressEnter」が
@@ -1065,12 +1098,15 @@ final class FTInAppBridge {
             try requireExpectedRef(ref, expect: req.expect)
             var point = CGPoint.zero
             var before: ReceiverMark?
+            var landedByPriorTap = false
             try performWithSettle { window in
                 point = try self.pointFollowingMove(ref: ref)
                 before = Self.receiverMark()
+                landedByPriorTap = self.priorTapLanded(ref: ref)
                 FTSynthTap(window, point)
             }
-            try requireFocusMoved(ref: ref, tapped: point, before: before, action: "clear")
+            try requireFocusMoved(ref: ref, tapped: point, before: before, landedByPriorTap: landedByPriorTap,
+                                  action: "clear")
         }
         var cleared = false
         try performWithSettle { _ in cleared = FTClearTextInFirstResponder() }

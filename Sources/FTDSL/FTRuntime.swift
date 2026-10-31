@@ -1377,7 +1377,7 @@ public final class FTDriveCore {
     /// paced は**それ自体が操作でない**ステップだけ false(wait = 眠るだけ / doUntilTrue・procedure =
     /// 入れ物で、中の操作が各自で待つ。true だと入れ物の前と中の最初の操作の前で二重に待つ)
     @discardableResult
-    func performCustom(description: String, command: String? = nil,
+    func performCustom(description: String, command: String? = nil, launchedBundleID: String? = nil,
                        file: StaticString, line: UInt,
                        launchTiming: (() -> LaunchTiming?)? = nil,
                        isAssertion: Bool = false,
@@ -1416,7 +1416,11 @@ public final class FTDriveCore {
         // launch 系の直後は OS のアラート(通知・ATT・権限)が出やすい。登録の無い run でも
         // **次の触る操作で1回だけ**前面を確かめる(StepExecutor.systemAlertProbePending)
         if let command, ["launchApp", "restartApp", "clearAppData", "installApp"].contains(command) {
-            executor.noteAppLaunched()
+            executor.noteAppLaunched(bundleID: launchedBundleID)
+        }
+        // home / アプリの切り替え・終了の後は、意図して別の面に居るかもしれない(scrollToEdge の「始める前に前面を離れていた」の基準を捨てる)
+        if let command, ["home", "appSwitcher", "tapAppIcon", "terminateApp", "removeApp"].contains(command) {
+            executor.launchedBundleID = nil
         }
         // 上の一覧のうち、アプリを前面へ出すものだけ(起動の前の絵を控える対象)
         let launches = command == "launchApp" || command == "restartApp"

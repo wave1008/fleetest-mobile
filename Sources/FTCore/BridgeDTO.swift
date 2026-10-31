@@ -44,7 +44,7 @@ public enum BridgeAPI {
     /// - ソースの分割・コメントだけの変更は指紋の貼り替えだけでよい(版は据え置き)
     /// - **撤去した版の番号は再利用しない**(37・48 は欠番): その版が稼働中の環境を確実に入れ替えるため
     /// 各版で何を変えたかは `git log -L '/bridgeProtocolVersion =/,+1:Sources/FTCore/BridgeDTO.swift'` で引く
-    public static let bridgeProtocolVersion = 239
+    public static let bridgeProtocolVersion = 240
 
     /// `ErrorResponse.reason` の値: ref が指していた要素が、撃つ時点でもう同じ場所に居ない(古い ref)。
     /// **何も撃たずに断った**ことを保証する(422)。ホストは新しい木から引き直して撃ち直してよい。
@@ -436,6 +436,29 @@ public enum FocusLanding {
         let centre = CGPoint(x: receiver.midX, y: receiver.midY)
         guard target.map({ $0.contains(centre) }) ?? false else { return false }
         return targetIsInput || movedSinceTap || (soleInnerInput?.contains(centre) ?? false)
+    }
+}
+
+extension FocusLanding {
+    /// 同じ要素と見なす枠の差(pt)。in-app の取り直しが id 無しの要素を同定する許容(frame ±2pt)と同じ
+    static let sameElementFrameTolerance: CGFloat = 2
+
+    /// **直前の ref の tap が、いま叩き直している欄へ焦点を立てていたか**(`landed` を通さずに焦点の着地とする)。
+    /// 叩き直しは焦点のある欄を叩くので受け口が動かない。Flutter の値入りの欄は木で `other`(入力欄と申告されない)・
+    /// 木の枠は欄の実際の箱より小さく下にずれ(実測 2026-11-01 E2EX-Flutter: 木 (16,271 370x10)・受け口は箱の左上 (16,249))、
+    /// 受け口は動かない 1x1 なので、枠への包含でも「動いたか」でも着地と読めず、`tap(A); tap(B); type("x")` の救済が
+    /// 409 になった(inapp F9)。「動かなかった」だけで通すと、前の欄を内側に含む容器を叩いて焦点が動かなかった形
+    /// (前の欄へ打つ)と区別できないので、次の2つが揃うときだけ true(呼び手は、その tap の後に type / clear / 別の tap を
+    /// 挟んだ記録を捨てる):
+    /// ①その tap の前から今までに受け口が動いた / ②いま叩き直す要素が、その tap の対象の中にある
+    /// (同じ id の要素の今の枠。中身の入力欄は包みの枠に収まる)。
+    /// **受け口を tap の直後に採って「それ以降動かない」とは見ない**: Flutter の焦点は tap から遅れて移る(直後に採ると
+    /// まだ前の欄で、実測 6 回中 2 回が外れた)
+    public static func priorTapLanded(receiverMovedSinceThatTap: Bool, recordedTargetNow: CGRect?,
+                                      current: CGRect?) -> Bool {
+        guard receiverMovedSinceThatTap, let target = recordedTargetNow, let current else { return false }
+        let t = sameElementFrameTolerance
+        return target.insetBy(dx: -t, dy: -t).contains(current)
     }
 }
 

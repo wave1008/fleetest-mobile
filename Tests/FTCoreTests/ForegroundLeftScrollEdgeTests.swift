@@ -62,6 +62,38 @@ final class ForegroundLeftScrollEdgeTests: XCTestCase {
         XCTAssertTrue(StepExecutor.isSuccess(outcome.status), "\(outcome.status)")
     }
 
+    /// 送り始める前に前面を離れていた形(始点の木がランチャー。Android の木は前面と一緒に替わる)。起こしたアプリを基準に拾う
+    func testScrollToEdgeFailsWhenTheAppAlreadyLeftBeforeTheSwipes() async {
+        let driver = ForegroundScriptedDriver()
+        driver.treeSession = "com.google.android.apps.nexuslauncher"
+        driver.front = "com.google.android.apps.nexuslauncher"
+        let exec = executor(driver)
+        exec.noteAppLaunched(bundleID: "com.example.app")
+        let outcome = await exec.execute(FlowStep(action: "scrollToEdge", direction: "up", maxSwipes: 6))
+        guard case .failed(let message) = outcome.status else { return XCTFail("前面を離れていたのに ok: \(outcome.status)") }
+        XCTAssertTrue(message.contains("not in the foreground"), message)
+        XCTAssertTrue(message.contains("already com.google.android.apps.nexuslauncher, not com.example.app"), message)
+    }
+
+    /// 起こしたアプリの記録が無い(home / アプリ切替の後・起こしていない)ときは従来どおり(始点の木を基準にする)
+    func testScrollToEdgeWithoutALaunchRecordKeepsTheTreeAsTheBaseline() async {
+        let driver = ForegroundScriptedDriver()
+        driver.treeSession = "com.google.android.apps.nexuslauncher"
+        driver.front = "com.google.android.apps.nexuslauncher"
+        let outcome = await executor(driver).execute(FlowStep(action: "scrollToEdge", direction: "up", maxSwipes: 6))
+        XCTAssertTrue(StepExecutor.isSuccess(outcome.status), "\(outcome.status)")
+    }
+
+    /// 起こしたアプリが始点の木と同じなら、何も足さない
+    func testScrollToEdgeWithTheLaunchedAppInFrontStaysGreen() async {
+        let driver = ForegroundScriptedDriver()
+        driver.front = "com.example.app"
+        let exec = executor(driver)
+        exec.noteAppLaunched(bundleID: "com.example.app")
+        let outcome = await exec.execute(FlowStep(action: "scrollToEdge", direction: "up", maxSwipes: 6))
+        XCTAssertTrue(StepExecutor.isSuccess(outcome.status), "\(outcome.status)")
+    }
+
     func testShadeTreeIsNamedAsTheShadeNotAsAnEdge() async throws {
         let driver = ForegroundScriptedDriver()
         driver.front = "com.example.app"   // シェードの下では前面のアプリ名が下のアプリのまま

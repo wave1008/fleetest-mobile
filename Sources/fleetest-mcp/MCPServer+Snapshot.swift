@@ -1012,8 +1012,8 @@ extension MCPServer {
     /// `keyboardCoordinateWarning`)。DSL の tap は据え置き(注記のみ)
     static func keyboardRefusal(_ target: ElementInfo, keyboardOcclusion: KeyboardOcclusion) -> String? {
         guard let advisory = keyboardOcclusion.advisory(for: target) else { return nil }
-        // いま焦点を持つ欄への ft_type は、ドライバがタップせずに打つので断らない(DSL の reachPastKeyboard と同じ)
-        if Self.currentTool == "ft_type", target.focused == true { return nil }
+        // いま焦点を持つ欄への ft_type / ft_clear_input は、ドライバがタップせずに打つので断らない(DSL の reachPastKeyboard と同じ)
+        if Self.currentTool == "ft_type" || Self.currentTool == "ft_clear_input", target.focused == true { return nil }
         return "refusing to act on \(RefGuard.describe(target)): \(advisory). On XCUITest the finger"
             + " would press a key and type into the focused field; the in-app bridge rejects it (422)."
             + " Close the keyboard with ft_hide_keyboard (it sends no Enter; ft_navigate back on Android), or"

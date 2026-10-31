@@ -97,4 +97,26 @@ class 入力の種類ごとに入力できること {
             }
         }
     }
+
+
+    // 直前の tap が焦点にした値入りの欄へ、ロケータ無しの type が打てる(inapp F9)。欄は木で `other`(入力欄と申告されない)・
+    // 受け口は動かない 1x1 なので、焦点の着地を「受け口が動いたか」だけで見ると、既に焦点のある欄を叩き直した救済が断られた
+    @Test("別の欄を挟んで値入りの欄を叩き直し、ロケータ無しで打ち足す")
+    func S0050() {
+        scenario {
+            scene(1, "値入りの欄へ打ち足す") {
+                condition {
+                    launchApp()
+                    tap("#nav_inputs", scroll: .down)
+                    type("#field_number", "12")
+                }.action {
+                    tap("#field_first")
+                    tap("#field_number")
+                    type("3")
+                }.expectation {
+                    select("#txt_number_echo").textIs("number=123")
+                }
+            }
+        }
+    }
 }

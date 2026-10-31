@@ -49,7 +49,7 @@ public func launchApp(_ appID: String? = nil, url: String? = nil,
     let driver = core.driver
     let description = url.map { "launch \(bundle) and open \($0)" } ?? "launch \(bundle)"
     var deliveredBeforeUI = false
-    core.performCustom(description: description, command: "launchApp", file: file, line: line,
+    core.performCustom(description: description, command: "launchApp", launchedBundleID: bundle, file: file, line: line,
                        launchTiming: { driver.lastLaunchTiming },
                        note: {
                            if deliveredBeforeUI { return .launchURLBeforeInteractiveUI }
@@ -83,7 +83,7 @@ public func restartApp(_ appID: String? = nil,
     let core = FTRuntime.requireCore(command: "restartApp")
     let bundle = appID ?? core.appBundleID
     let driver = core.driver
-    core.performCustom(description: "restart \(bundle)", command: "restartApp", file: file, line: line,
+    core.performCustom(description: "restart \(bundle)", command: "restartApp", launchedBundleID: bundle, file: file, line: line,
                        launchTiming: { driver.lastLaunchTiming },
                        note: {
                            driver.lastLaunchTiming?.activatedBeforeForeground == true

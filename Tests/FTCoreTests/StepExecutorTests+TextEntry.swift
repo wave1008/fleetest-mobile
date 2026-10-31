@@ -1319,6 +1319,21 @@ extension StepExecutorTests {
         XCTAssertTrue(primary.coordinateTaps.isEmpty, "閉じるために叩いた")
     }
 
+    /// clearInput も同じ(mxa F10): 焦点を持つ欄は、中心がキーボードの下でも閉じずに消す
+    /// (XCUITest ランナーは `alreadyFocusedInput` で焦点の欄を叩かずに消す。閉じる手段が無い複数行の欄を失敗にしない)
+    func testClearInputOnTheFocusedFieldUnderTheKeyboardClearsWithoutClosingIt() async throws {
+        var focusedField = Self.phoneUnderKeyboard
+        focusedField.focused = true
+        let log = CallLog()
+        let primary = FakeAppDriver(name: "primary", log: log, snapshotElements: [[focusedField]])
+        primary.keyboardFrame = FTRect(x: 0, y: 538, width: 402, height: 336)
+        let executor = StepExecutor(driver: primary, isAndroid: false, tunables: RunTunables(defaultTimeout: 0.2),
+                                    uiFramework: .compose)
+        let outcome = await executor.execute(FlowStep(action: "clearInput", locator: FlowLocator(id: "field_phone")))
+        XCTAssertTrue(log.entries.contains { $0.hasPrefix("primary.clearInput(") }, "焦点の欄を消していない: \(log.entries) \(outcome.status)")
+        XCTAssertFalse(log.entries.contains { $0.contains("hideKeyboard") }, "閉じようとした: \(log.entries)")
+    }
+
     /// キーボードの上に見えている欄へは従来どおり打つ(門は覆われた欄だけ)
     func testTypeIntoAFieldAboveTheKeyboardStillTypes() async throws {
         let log = CallLog()
