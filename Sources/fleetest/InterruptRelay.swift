@@ -8,7 +8,7 @@
 // (実測。残った子は exit 途中で刺さり、次のディスパッチが数十分ぶん詰まった)。
 //
 // 中断を握りつぶすのではなく、**子を落としてから通常の巻き戻しを続ける**のが要点:
-// そうすることで呼び出し側の defer(dispatch.lock の解放・終了スクリプト)が動く。
+// そうすることで呼び出し側の出口(`RunExitGuard` = 終了スクリプト・dispatch.lock の解放)が動く。
 //
 // **1プロセスに1組のシグナルソース**: ホスト別の子を並行に持つ親
 // (DeviceMachineRunner / FleetRunner / ApiRunMachineFanout)は relay を同時に複数抱える。
@@ -289,7 +289,7 @@ final class RunInterruptState: @unchecked Sendable {
 
 /// run-setup.sh・供給(ブリッジ起動等)・ビルドのいずれか(= まだ `RunRecorder` が無いか、
 /// シナリオが1本も始まっていない段階)で中断が来たときに投げる。**既存の早期失敗と同じ出口**
-/// (ビルド失敗等と同じく、NDJSON は1行も出さず defer で後始末して stderr + 非0 exit で終わる)。
+/// (ビルド失敗等と同じく、NDJSON は1行も出さず `RunExitGuard` で後始末して stderr + 非0 exit で終わる)。
 /// 利用者向け文言は英語のみ
 struct RunInterruptedBeforeStartError: Error, LocalizedError {
     let phase: String

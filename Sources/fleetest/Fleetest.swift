@@ -511,15 +511,7 @@ struct RunScenarios: AsyncParsableCommand {
             try await asSingleTarget(only).run()
             return
         }
-        // どの経路(失敗・中断・対象なし)で抜けても、供給・片付け・ロックの解放をこの順で通す(RunExitGuard の宣言)
-        let runExit = RunExitGuard()
-        do {
-            try await runBody(runExit: runExit)
-        } catch {
-            await runExit.finish()
-            throw error
-        }
-        await runExit.finish()
+        try await RunExitGuard.run(log: { ConsoleOut.out($0) }) { try await runBody(runExit: $0) }
     }
 
     private func runBody(runExit: RunExitGuard) async throws {
@@ -650,7 +642,7 @@ struct RunScenarios: AsyncParsableCommand {
             entryProgress.attach()
             writeProgress(phase: "preparing")
         }
-        defer {
+        runExit.removeProgress = {
             if common.profile != nil, !dryRun, !progressHandedToProfileRunner {
                 entryProgress.close()
                 RunProgressLedger.remove(pid: progressPid, directory: RunProgressLedger.directory())
@@ -681,20 +673,21 @@ struct RunScenarios: AsyncParsableCommand {
         // `--failed` は対象が無ければ何もせず終わるので、開始スクリプトとサービスを空撃ちしないよう外す
         var earlySupply: ProfileRunner.PreparedSupply?
         if let profile = common.profile, !dryRun, !common.skipBuild, !failed, ScenarioHost.buildNeeded(project: testProject) {
-            let full = try ProfileRunner.resolveFullProfile(
-                project: testProject, profileName: profile, setOverrides: profileOverrides,
-                workspaceOverride: common.workspace, deviceFilter: effectiveDeviceFilter,
-                deviceMachine: effectiveDeviceHost, broadcast: broadcast)
-            // 一覧の前なので OS が分からない = 明示 ID の本数を両 OS に数える(0 = 本数も分からない → 絞らない)
-            let exactCount = ApiRun.exactScenarioCount(scenarios)
-            let estimate: Int? = exactCount > 0 ? exactCount : nil
-            ConsoleOut.out("→ Preparing the devices while the scenarios build")
             do {
+                let full = try ProfileRunner.resolveFullProfile(
+                    project: testProject, profileName: profile, setOverrides: profileOverrides,
+                    workspaceOverride: common.workspace, deviceFilter: effectiveDeviceFilter,
+                    deviceMachine: effectiveDeviceHost, broadcast: broadcast)
+                // 一覧の前なので OS が分からない = 明示 ID の本数を両 OS に数える(0 = 本数も分からない → 絞らない)
+                let exactCount = ApiRun.exactScenarioCount(scenarios)
+                let estimate: Int? = exactCount > 0 ? exactCount : nil
+                ConsoleOut.out("→ Preparing the devices while the scenarios build")
                 let supply = try await ProfileRunner.prepareSupply(
                     full: full, profileName: profile, iosScenarios: estimate, androidScenarios: estimate,
                     scenarioCount: estimate, broadcast: broadcast,
                     reportDirOverride: reportDir, failureLogDir: nil,
-                    supplyProgress: supplyProgress, interruptState: interruptState)
+                    supplyProgress: supplyProgress, interruptState: interruptState,
+                    supplyAbandon: runExit.supplyAbandon)
                 earlySupply = supply
                 runExit.settle = { await supply.settle() }
                 runExit.close = { supply.close() }

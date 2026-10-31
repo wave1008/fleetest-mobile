@@ -38,7 +38,7 @@ final class LocalDispatchLock {
     /// 進行ログに出すこの機械の呼び名(`DispatchWaitStatus.target`)。ssh 宛先の代わり
     private static let targetLabel = "this Mac"
 
-    /// 握ったロック1本。**解放は defer から**(成功・失敗・中断のいずれでも)。二重解放は無害
+    /// 握ったロック1本。**解放は `RunExitGuard` から**(成功・失敗・中断のいずれでも・片付けの後)。二重解放は無害
     final class Holder {
         private let releaseAction: () -> Void
         private var released = false
@@ -128,7 +128,7 @@ final class LocalDispatchLock {
     /// 自分の `InterruptRelay.observing` を1つ登録済みのときの規律 —— 1プロセス1組。
     /// ここで2つ目を立てない)。**省略時**(他の呼び出し元)は自前で1つ立てて
     /// 待機を抜けたら `stop()` する。**握ったあとは自前で立てた分だけ外す**(`interruptCheck` が
-    /// 渡されていれば、それを提供した relay は呼び出し側が defer で管理するのでここでは
+    /// 渡されていれば、それを提供した relay は呼び出し側が管理するのでここでは
     /// 何もしない)。**待機中だけで横取りをやめてよい理由**: 握っているロックは死んだ pid として
     /// 次の run が自分で回収する(`decideLocalSweep`)ので握りっぱなしで残らない
     func acquire(interruptCheck: (() -> Bool)? = nil) throws -> Holder? {

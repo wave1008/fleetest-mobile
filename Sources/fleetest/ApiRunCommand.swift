@@ -227,15 +227,7 @@ struct ApiRunCommand: AsyncParsableCommand {
         // 子プロセスを1本も起こす前に(供給の adb なども stdin を受け継ぐ)
         if common.workQueue { _ = WorkQueueStdin.claim() }
         try common.rejectWorkQueueMeasurement(setOverrides: setOverrides)
-        // どの経路で抜けても、供給・片付け・ロックの解放をこの順で通す(RunExitGuard の宣言)
-        let runExit = RunExitGuard()
-        do {
-            try await runBody(runExit: runExit)
-        } catch {
-            await runExit.finish()
-            throw error
-        }
-        await runExit.finish()
+        try await RunExitGuard.run(log: { logStderr($0) }) { try await runBody(runExit: $0) }
     }
 
     private func runBody(runExit: RunExitGuard) async throws {
@@ -447,7 +439,7 @@ struct ApiRunCommand: AsyncParsableCommand {
             entryProgress.attach()
             writeProgress(phase: "preparing")
         }
-        defer {
+        runExit.removeProgress = {
             if resolvedProfile != nil, !dryRun, debugOptions == nil,
                !progressHandedToRunWithProfileParallel {
                 entryProgress.close()
@@ -456,7 +448,7 @@ struct ApiRunCommand: AsyncParsableCommand {
         }
 
         // 開始/終了スクリプト(RR-17。ProfileRunner.run と同じ規律 ——
-        // デバイスに触る前に撃ち、終了スクリプトは defer で必ず撃つ)。**resolvedAll ではなく
+        // デバイスに触る前に撃ち、終了スクリプトは RunExitGuard の片付けで必ず撃つ)。**resolvedAll ではなく
         // 絞り込み後の resolved を渡す**(スクリプトが受け取るデバイス一覧は、この run が実際に
         // 使うデバイスと一致していないと `adb reverse` の宛先がずれる)。
         // **dry-run では撃たない**(`fleetest run` の dry-run 分岐と同じ)—— dry-run は dispatch.lock を取らないので、
@@ -471,7 +463,7 @@ struct ApiRunCommand: AsyncParsableCommand {
         defer { responseTrace?.cleanup() }
         if let resolved = resolvedProfile, !dryRun {
             let hookStateDir = (try? RepoRoot.find())?.appendingPathComponent(".fleetest")
-            // レスポンス計測中はモニターを止める(ProfileRunner.run と同じ。解除は defer = 中断・エラーでも通る)
+            // レスポンス計測中はモニターを止める(ProfileRunner.run と同じ。解除は片付け = 中断・エラーでも通る)
             if resolved.responseMeasurement, let hookStateDir {
                 cleanup.responseMonitorHold = ResponseMeasurementMonitorHold.acquire(stateDir: hookStateDir) { logStderr($0) }
             }
@@ -530,6 +522,7 @@ struct ApiRunCommand: AsyncParsableCommand {
         var iosWorkersTask: Task<[RunWorker], Never>?
         if let resolvedProfile, !dryRun, debugOptions == nil {
             let resolved = resolvedProfile
+            let supplyAbandon = runExit.supplyAbandon
             androidWorkersTask = Task {
                 let deviceList = resolved.devices
                     .map { "\($0.name)(\($0.platform))" }.joined(separator: ", ")
@@ -539,7 +532,7 @@ struct ApiRunCommand: AsyncParsableCommand {
                 // 除外されたら投げる = run を止める(ユーザー決定: 全滅は異常)
                 let workers = try await ProfileSupplyLanes.android(
                     resolved: resolved, supplyLease: supplyLease, supplyStage: supplyProgress.reporter,
-                    triage: triageBox, isStopped: { interruptState.isStopped },
+                    triage: triageBox, isStopped: { interruptState.isStopped || supplyAbandon.isAbandoned },
                     wipeStatus: { self.emitLine(ApiWipeStatusEvent(device: $0, phase: $1)) }) { logSupply($0) }
                 // "🚀 Starting with…" は iOS の合流有無が分かってから1回だけ出す(下の
                 // RunStartLine.text 呼び出し。ここで固定文言を出すと iOS 0 台のプロファイルでも
@@ -552,22 +545,20 @@ struct ApiRunCommand: AsyncParsableCommand {
                     // 遅延参加(1台も合流しなければ配布を止める)か、performanceMode の LaneGate が決める
                     await ProfileSupplyLanes.ios(
                         resolved: resolved, supplyLease: supplyLease, supplyStage: supplyProgress.reporter,
-                        triage: triageBox, isStopped: { interruptState.isStopped }) { logSupply($0) }
+                        triage: triageBox, isStopped: { interruptState.isStopped || supplyAbandon.isAbandoned }) { logSupply($0) }
                 }
             }
         } else {
             androidWorkersTask = nil
         }
-        let supplyTasks = (android: androidWorkersTask, ios: iosWorkersTask)
-        runExit.settle = {
-            _ = try? await supplyTasks.android?.value
-            _ = await supplyTasks.ios?.value
+        if androidWorkersTask != nil {
+            let supplyTasks = (android: androidWorkersTask, ios: iosWorkersTask)
+            runExit.settle = { await ProfileRunner.settleSupplyTasks(android: supplyTasks.android, ios: supplyTasks.ios) }
         }
 
-        // **ビルドの前にも中断を見る**(供給タスクが既に走っている可能性があるのでキャンセルする)
+        // **ビルドの前にも中断を見る**(走っている供給は isStopped で段の境目に止まる。Task.cancel は撃たない =
+        // レーンは cancel を見ず、`try? await Task.sleep` の待ちだけが消えて空回りする)
         if interruptState.isStopped {
-            androidWorkersTask?.cancel()
-            iosWorkersTask?.cancel()
             throw RunInterruptedBeforeStartError(phase: "before the scenario build")
         }
         // ビルドはホスト側で 1 回だけ(サブプロセスは自らビルドしない)
@@ -585,8 +576,6 @@ struct ApiRunCommand: AsyncParsableCommand {
         // `interruptState` に登録もしないので、ビルド中に届いた中断はここで初めて拾える ——
         // その間 swift build 自体は最後まで走ってしまう。この限界は直せていない)
         if interruptState.isStopped {
-            androidWorkersTask?.cancel()
-            iosWorkersTask?.cancel()
             throw RunInterruptedBeforeStartError(phase: "after the scenario build")
         }
 

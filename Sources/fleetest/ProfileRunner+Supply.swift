@@ -76,9 +76,13 @@ extension ProfileRunner {
         /// 供給のタスクが終わるまで待つ(結果は捨てる)。**失敗で抜ける経路は、これを待ってから `close()` する** ——
         /// 待たないと、走っている iOS の準備の横で終了スクリプト・サービスの停止・準備中の印の解除が走る
         func settle() async {
-            _ = try? await androidTask.value
-            _ = await iosTask?.value
+            await ProfileRunner.settleSupplyTasks(android: androidTask, ios: iosTask)
         }
+    }
+
+    static func settleSupplyTasks(android: Task<[RunWorker], Error>?, ios: Task<[RunWorker], Never>?) async {
+        _ = try? await android?.value
+        _ = await ios?.value
     }
 
     /// プロファイルを解決し、ワークスペースを用意して `--device` / `--device-machine` で絞る(0台なら止める)
@@ -128,7 +132,7 @@ extension ProfileRunner {
     static func prepareSupply(
         full: ResolvedProfile, profileName: String, iosScenarios: Int?, androidScenarios: Int?,
         scenarioCount: Int?, broadcast: Bool, reportDirOverride: String?, failureLogDir: URL?,
-        supplyProgress: RunSupplyProgress, interruptState: RunInterruptState
+        supplyProgress: RunSupplyProgress, interruptState: RunInterruptState, supplyAbandon: SupplyAbandon
     ) async throws -> PreparedSupply {
         // **回す本数を超える台数を用意しない**(ResolvedProfile.limitingDevices の宣言参照)。
         // ブリッジ供給・アプリ版チェック・blank triage が丸ごと縮む。
@@ -208,12 +212,12 @@ extension ProfileRunner {
         let androidTask = Task {
             try await ProfileSupplyLanes.android(
                 resolved: resolved, supplyLease: supplyLease, supplyStage: progress,
-                triage: triageBox, isStopped: { interruptState.isStopped }) { ConsoleOut.out($0) }
+                triage: triageBox, isStopped: { interruptState.isStopped || supplyAbandon.isAbandoned }) { ConsoleOut.out($0) }
         }
         let iosTask: Task<[RunWorker], Never>? = resolved.iosDevices.isEmpty ? nil : Task {
             await ProfileSupplyLanes.ios(
                 resolved: resolved, supplyLease: supplyLease, supplyStage: progress,
-                triage: triageBox, isStopped: { interruptState.isStopped }) { ConsoleOut.out($0) }
+                triage: triageBox, isStopped: { interruptState.isStopped || supplyAbandon.isAbandoned }) { ConsoleOut.out($0) }
         }
         handedOver = true
         return PreparedSupply(

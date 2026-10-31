@@ -165,7 +165,7 @@ enum ProfileSupplyLanes {
             ws = screen.workers
             // 中断後は録画の解消も home も撃たない(run は始まらない)
             if isStopped() {
-                log("⏹ interrupted — skipping the rest of the device supply")
+                log("⏹ stopping — skipping the rest of the device supply")
                 return ws
             }
             // 録画ありの run では、端末側に録画セッションが残ったデバイスを再起動して解く(HostRecordingProbe)

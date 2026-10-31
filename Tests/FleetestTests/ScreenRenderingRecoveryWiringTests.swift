@@ -53,8 +53,9 @@ final class ScreenRenderingRecoveryWiringTests: XCTestCase {
         XCTAssertEqual(lanes.components(separatedBy: "isStopped: isStopped").count - 1, 2)
         let api = try Self.code("Sources/fleetest/ApiRunCommand.swift")
         let supply = try Self.code("Sources/fleetest/ProfileRunner+Supply.swift")
-        let calls = api.components(separatedBy: "isStopped: { interruptState.isStopped }").count - 1
-            + supply.components(separatedBy: "isStopped: { interruptState.isStopped }").count - 1
+        // 閉じ括弧を見ない(早期の供給は放棄の印も足す)
+        let calls = api.components(separatedBy: "isStopped: { interruptState.isStopped").count - 1
+            + supply.components(separatedBy: "isStopped: { interruptState.isStopped").count - 1
         XCTAssertEqual(calls, 6)
     }
 

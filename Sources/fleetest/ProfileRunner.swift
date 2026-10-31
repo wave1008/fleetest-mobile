@@ -369,7 +369,8 @@ enum ProfileRunner {
                 full: full, profileName: profileName,
                 iosScenarios: counts.ios, androidScenarios: counts.android,
                 scenarioCount: items.count, broadcast: broadcast, reportDirOverride: reportDirOverride,
-                failureLogDir: recorder?.runDir, supplyProgress: supplyProgress, interruptState: interruptState)
+                failureLogDir: recorder?.runDir, supplyProgress: supplyProgress, interruptState: interruptState,
+                supplyAbandon: SupplyAbandon())
         }
         defer { if early == nil { prepared.close() } }
         let resolved = prepared.resolved

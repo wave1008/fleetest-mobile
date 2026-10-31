@@ -32,10 +32,9 @@ final class RunEarlySupplyWiringTests: XCTestCase {
     func testBothEntryPointsFinishTheExitGuardOnEveryExit() throws {
         for path in ["Sources/fleetest/Fleetest.swift", "Sources/fleetest/ApiRunCommand.swift"] {
             let lines = try code(path)
-            let body = try XCTUnwrap(lines.firstIndex { $0.hasPrefix("private func runBody(runExit:") }, path)
-            let wrapper = try XCTUnwrap(lines[..<body].lastIndex { $0 == "func run() async throws {" }, path)
-            XCTAssertEqual(lines[wrapper..<body].filter { $0 == "await runExit.finish()" }.count, 2,
-                           "\(path): 本体の外側で、成功と失敗の両方の出口で片付けていない")
+            XCTAssertEqual(lines.filter { $0.hasPrefix("try await RunExitGuard.run(log:") && $0.contains("runBody(runExit:") }.count, 1,
+                           "\(path): 本体を RunExitGuard の中で走らせていない")
+            XCTAssertTrue(lines.contains { $0.hasPrefix("runExit.removeProgress = ") }, "\(path): 進捗の控えを出口へ渡していない(ロックより先に消える)")
             XCTAssertFalse(lines.contains { $0.contains("defer") && $0.contains("runExit.") }, "\(path): defer で片付けている(待てない)")
             XCTAssertTrue(lines.contains { $0.hasPrefix("runExit.stopInterruptRelay = ") }, "\(path): 中断の登録を出口へ渡していない")
         }
@@ -45,6 +44,9 @@ final class RunEarlySupplyWiringTests: XCTestCase {
     func testApiRunCleansUpThroughTheSupplyCleanup() throws {
         let lines = try code("Sources/fleetest/ApiRunCommand.swift")
         XCTAssertEqual(lines.filter { $0.hasPrefix("runExit.settle = ") }.count, 1, "供給のタスクを出口へ渡していない")
+        XCTAssertFalse(lines.contains { $0.contains("WorkersTask?.cancel()") }, "レーンは cancel を見ず、sleep の待ちだけが消える")
+        XCTAssertEqual(lines.filter { $0.contains("isStopped: { interruptState.isStopped || supplyAbandon.isAbandoned }") }.count, 2,
+                       "供給のレーンへ放棄の印を渡していない")
         XCTAssertEqual(lines.filter { $0.hasPrefix("runExit.close = ") }.count, 1, "片付けを出口へ渡していない")
         let body = try XCTUnwrap(lines.firstIndex { $0.hasPrefix("private func runBody(runExit:") })
         let end = try XCTUnwrap(lines[body...].firstIndex { $0.hasPrefix("private func dispatchToRemoteHost") })
@@ -57,6 +59,17 @@ final class RunEarlySupplyWiringTests: XCTestCase {
     /// 供給の準備で落ちた回も JUnit を書く(ビルド・一覧の失敗と同じ。書かないと CI が「レポートが無い」で止まる)
     func testSupplyFailureBeforeTheBuildWritesJUnit() throws {
         let lines = try code("Sources/fleetest/Fleetest.swift")
-        XCTAssertTrue(lines.contains { $0.hasPrefix("writeJUnitForEarlyFailure(") && $0.contains("\"device supply\"") })
+        let write = try XCTUnwrap(lines.firstIndex { $0.hasPrefix("writeJUnitForEarlyFailure(") && $0.contains("\"device supply\"") })
+        let resolve = try XCTUnwrap(lines.firstIndex { $0.hasPrefix("let full = try ProfileRunner.resolveFullProfile(") })
+        let opener = try XCTUnwrap(lines[..<resolve].lastIndex { !$0.isEmpty })
+        XCTAssertEqual(lines[opener], "do {", "プロファイルの解決(appPath の原本のステージング)の失敗を JUnit へ載せていない")
+        XCTAssertLessThan(resolve, write)
+    }
+
+    /// 終了スクリプトへ中断の状態を渡さない(中断済みの run の片付けを起動の直後に SIGTERM で止め、控えも消える)
+    func testTheTeardownScriptIsNotStoppedByTheInterruptedRun() throws {
+        let lines = try code("Sources/fleetest/RunHookRunner.swift")
+        XCTAssertFalse(lines.contains { $0.contains("session.interrupt") })
+        XCTAssertEqual(lines.filter { $0.hasPrefix("lease: session.lease, interrupt: nil, log: log)") }.count, 1)
     }
 }
