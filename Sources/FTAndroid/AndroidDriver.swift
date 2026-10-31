@@ -469,6 +469,12 @@ public final class AndroidDriver: AppDriver {
         return front == bundleID
     }
 
+    /// キーガードが出ているか。読めない・行が無いときは nil(失敗は投げず「分からない」)
+    public func keyguardShowing() async throws -> Bool? {
+        guard let result = try? adbAnswering(["shell", "dumpsys", "window", "displays"]), result.status == 0 else { return nil }
+        return AndroidForegroundWindows.keyguardShowing(displaysDumpsys: result.output)
+    }
+
     public func foregroundAppID() async throws -> String? {
         let result = try adbAnswering(["shell", "dumpsys", "window", "windows"])
         guard result.status == 0 else {

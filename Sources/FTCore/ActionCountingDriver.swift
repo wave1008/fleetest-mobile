@@ -144,6 +144,7 @@ public final class ActionCountingDriver: AppDriver {
     public func isAppForeground(bundleID: String) async throws -> Bool { try await base.isAppForeground(bundleID: bundleID) }
     public func systemAlert() async throws -> SystemAlertProbeResponse? { try await base.systemAlert() }
     public func systemUICovering() async throws -> SystemUICoveringResponse? { try await base.systemUICovering() }
+    public func keyguardShowing() async throws -> Bool? { try await base.keyguardShowing() }
     public func foregroundAppID() async throws -> String? { try await base.foregroundAppID() }
     public var lastActionNote: String? { base.lastActionNote }
     public var lastLaunchTiming: LaunchTiming? { base.lastLaunchTiming }

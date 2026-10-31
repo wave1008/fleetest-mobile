@@ -1370,7 +1370,10 @@ extension MCPServer {
     func coordinateFrontAppWarning(_ driver: AppDriver, args: [String: Any]) async -> String {
         guard let launched = launchedBundleIDs[Self.sessionKey(args)] else { return "" }
         var facts = ForegroundFacts(launched: launched, sessionBundleID: launched)
-        if let android = driver as? AndroidDriver { facts.shadeHoldsInputFocus = await Self.shadeProbe(android) }
+        if let android = driver as? AndroidDriver {
+            facts.shadeHoldsInputFocus = await Self.shadeProbe(android)
+            if facts.shadeHoldsInputFocus.value == true { facts.keyguardShowing = await ForegroundState.keyguardProbe(android) }
+        }
         else { facts.covering = await ForegroundState.coveringProbe(driver) }   // iOS: SpringBoard の覆い(通知センター・スイッチャー等)
         facts.front = await ForegroundState.frontProbe(driver)
         switch ForegroundState.judge(facts) {
@@ -1380,6 +1383,10 @@ extension MCPServer {
                 // ロック画面の窓も入力フォーカスを持つので、シェードと分けられない(解除が先)
                 + " (if back changes nothing, this is the lock screen: unlock the device first),"
                 + " or ft_snapshot to see what is on screen)"
+        case .locked:
+            return " (warning: the lock screen is up over \(launched) (the app this session launched)"
+                + " — this acted on the lock screen, not the app. The tool cannot enter a PIN, pattern or password:"
+                + " unlock the device by hand, then ft_launch \(launched) with resume: true)"
         case .covered(let surface):
             return " (warning: \(Self.coveringSurfaceName(surface)) is drawn over \(launched) (the app this session launched)"
                 + " — this acted on that surface, not the app. Dismiss it first (swipe up from the bottom edge, or"
@@ -1397,7 +1404,10 @@ extension MCPServer {
     func leftAppAfterGestureNote(_ driver: AppDriver, args: [String: Any], alreadyWarned: Bool) async -> String {
         guard !alreadyWarned, let launched = launchedBundleIDs[Self.sessionKey(args)] else { return "" }
         var facts = ForegroundFacts(launched: launched, sessionBundleID: launched)
-        if let android = driver as? AndroidDriver { facts.shadeHoldsInputFocus = await Self.shadeProbe(android) }
+        if let android = driver as? AndroidDriver {
+            facts.shadeHoldsInputFocus = await Self.shadeProbe(android)
+            if facts.shadeHoldsInputFocus.value == true { facts.keyguardShowing = await ForegroundState.keyguardProbe(android) }
+        }
         else { facts.covering = await ForegroundState.coveringProbe(driver) }   // iOS
         facts.front = await ForegroundState.frontProbe(driver)
         switch ForegroundState.judge(facts) {
@@ -1405,6 +1415,9 @@ extension MCPServer {
             return " (warning: after the gesture the notification shade or quick settings was open over \(launched)"
                 + " — a touch that starts at the top edge can be taken as the shade gesture. Start the gesture clear of the"
                 + " screen edge; ft_navigate back closes the shade)"
+        case .locked:
+            return " (warning: after the gesture the lock screen was up over \(launched) — the screen is locked"
+                + " (the tool cannot enter a PIN, pattern or password): unlock the device by hand, then ft_launch \(launched) with resume: true)"
         case .covered(let surface):
             return " (warning: after the gesture \(Self.coveringSurfaceName(surface)) was drawn over \(launched)"
                 + " — a touch that starts at a screen edge can be taken as a system gesture (the notification centre from the top,"

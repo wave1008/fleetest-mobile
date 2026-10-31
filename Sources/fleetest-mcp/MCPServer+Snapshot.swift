@@ -434,7 +434,8 @@ extension MCPServer {
             launched: switchedLaunched, snapshot: snapshot,
             processEvidence: androidProcessEvidenceForSwitch(
                 launched: switchedLaunched, snapshot: snapshot, driver: driver, args: args),
-            stoppedByTool: toolStoppedBundleIDs[Self.sessionKey(args)])
+            stoppedByTool: toolStoppedBundleIDs[Self.sessionKey(args)],
+            keyguardShowing: await Self.keyguardFact(for: snapshot, driver: driver))
             // セッションが SpringBoard のまま、木がほぼ空(ステータスバーだけ)= ホーム画面から開いたアプリを見ていない
             + (snapshot.sessionBundleID == Self.springboardBundleID
                 && Self.unrepresentedScreenFraction(snapshot) >= Self.unrepresentedScreenCaveatThreshold
@@ -1823,7 +1824,8 @@ extension MCPServer {
                 launched: failedLaunched, snapshot: after,
                 processEvidence: androidProcessEvidenceForSwitch(
                     launched: failedLaunched, snapshot: after, driver: scrollDriver, args: args),
-                stoppedByTool: toolStoppedBundleIDs[Self.sessionKey(args)])
+                stoppedByTool: toolStoppedBundleIDs[Self.sessionKey(args)],
+                keyguardShowing: await Self.keyguardFact(for: after, driver: scrollDriver))
             // **fail-fast(scrollFrame 未解決)は別の文で伝える**: 通常の「did not reach the
             // element」はスワイプを何本か送った前提の文言で、fail-fast は1本も送っていないので
             // そのままでは誤解を招く(StepNote.scrollFrameMissing = DSL と共有した判定)
@@ -1958,7 +1960,8 @@ extension MCPServer {
             launched: scrollToLaunched, snapshot: after,
             processEvidence: androidProcessEvidenceForSwitch(
                 launched: scrollToLaunched, snapshot: after, driver: scrollDriver, args: args),
-            stoppedByTool: toolStoppedBundleIDs[Self.sessionKey(args)])
+            stoppedByTool: toolStoppedBundleIDs[Self.sessionKey(args)],
+            keyguardShowing: await Self.keyguardFact(for: after, driver: scrollDriver))
         // scrollFrame を渡すべき当人なので、複数領域の注記もここに出す(欠陥⑪)
         let scrollAreaNote = args["scrollFrame"] == nil ? (ScrollFrameCandidates.note(after) ?? "")
             : Self.lineNote(Self.scrollAreaHint(Self.scrollFrameHintTree(args, before: beforeScroll, after: after),

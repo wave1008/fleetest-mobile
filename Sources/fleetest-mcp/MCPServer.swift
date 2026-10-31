@@ -440,6 +440,10 @@ final class MCPServer {
     var lastExplicitIOSTarget: (port: UInt16, udid: String?)?
     /// Android 版の同じ記憶。同じ規律(androidExplicitWithMemory/androidMemoryAfterResolve)
     var lastExplicitAndroidSerial: String?
+    /// 一瞬の切断(`adb reconnect` 等)で `forgetConnection` が捨てた起動の記録を、**同じ serial が戻ったときだけ**返すための1枠
+    /// (捨てると ft_terminate が「nothing was launched here」と事実と違う帰属を言った)。物理端末だけが入る —— Emulator の serial は
+    /// 別の AVD に再利用されうる(`launchRecordSurvivingDisconnect` の doc)。復元は `restoredLaunchRecord`
+    var launchRecordAcrossAndroidDisconnect: (serial: String, bundleID: String)?
     /// このセッションで明示解決された iOS 宛先(port)の**延べ集合**。
     /// **lastExplicitIOSTarget との違い**: あちらは「省略呼び出しが実際にどこへ行くか」に使う
     /// 直近1件、こちらは「省略呼び出しが曖昧かどうか」の判定材料(2件以上あれば

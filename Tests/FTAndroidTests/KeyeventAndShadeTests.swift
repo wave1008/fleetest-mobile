@@ -130,6 +130,13 @@ final class KeyeventAndShadeTests: XCTestCase {
             dumpsys: "  Window #1 Window{a u0 NotificationShade}:\n    isVisible=true"))
     }
 
+    /// `isKeyguardShowing` は `dumpsys window displays` の行(Android 15 Emulator で実測: PIN ロック中 true・解除後 false)。行が無ければ nil
+    func testKeyguardShowingReadsTheDisplaysLine() {
+        XCTAssertEqual(AndroidForegroundWindows.keyguardShowing(displaysDumpsys: "    mAwake=true\n    isKeyguardShowing=true\n"), true)
+        XCTAssertEqual(AndroidForegroundWindows.keyguardShowing(displaysDumpsys: "    isKeyguardShowing=false"), false)
+        XCTAssertNil(AndroidForegroundWindows.keyguardShowing(displaysDumpsys: "  mCurrentFocus=Window{a u0 NotificationShade}"))
+    }
+
     /// ft_launch resume: シェード・ロック画面が入力フォーカスを持つなら「Activated」と言わず断る(探索 p F1/F10)
     func testActivateIsRefusedWhileTheShadeHoldsTheFocus() {
         let blocked = AndroidDriver.activateBlockedByShade(

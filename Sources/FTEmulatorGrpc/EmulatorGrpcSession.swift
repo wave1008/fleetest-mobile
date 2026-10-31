@@ -93,7 +93,7 @@ public enum EmulatorGrpcSession {
                 _ = try await client.sendTouch(touchEvent(x: x, y: y, pressure: pressure),
                                                metadata: metadata, options: options)
             }
-            try await requireController(client, metadata: metadata, options: options)
+            try await requireController(client, metadata: metadata, options: options, clearingStrayFingerAt: (fromX, fromY))
             var last = (x: fromX, y: fromY)
             do {
                 let steps = max(2, durationMs / 16)
@@ -119,7 +119,7 @@ public enum EmulatorGrpcSession {
                                  durationMs: Int) async throws {
         try await withController(endpoint: endpoint,
                                  timeout: .milliseconds(durationMs + 10_000)) { client, metadata, options in
-            try await requireController(client, metadata: metadata, options: options)
+            try await requireController(client, metadata: metadata, options: options, clearingStrayFingerAt: (x, y))
             do {
                 _ = try await client.sendTouch(touchEvent(x: x, y: y, pressure: 1), metadata: metadata, options: options)
                 try await Task.sleep(for: .milliseconds(durationMs))
@@ -144,13 +144,18 @@ public enum EmulatorGrpcSession {
 
     private static func requireController(
         _ client: Android_Emulation_Control_EmulatorController.Client<HTTP2ClientTransport.Posix>,
-        metadata: Metadata, options: CallOptions
+        metadata: Metadata, options: CallOptions, clearingStrayFingerAt point: (x: Int32, y: Int32)
     ) async throws {
         do {
             _ = try await client.getStatus(.init(), metadata: metadata, options: options)
         } catch {
             throw GestureNotStarted(cause: error)
         }
+        // 前のプロセスが指を下ろしたまま死ぬと、ゲスト側に identifier 0 の指が残り、次のジェスチャの down はその指の MOVE として
+        // 消費されて丸ごと不発になる(実測: 残った指のまま ft_drag が「sent」で drag=0)。**pressure 0 の up を先に1本**送って上げる。
+        // 指が無いときの up は何も起こさない(実測: Android 15 Emulator で getevent に何も出ず・TouchStates 空・ボタンの上でも押下にならない)。
+        // 失敗は握る(本物の送りが同じ失敗で落ち、そちらが正しい失敗として返る)
+        _ = try? await client.sendTouch(touchEvent(x: point.x, y: point.y, pressure: 0), metadata: metadata, options: options)
     }
 
     /// 途中で失敗したジェスチャの指を上げる(up を送らないと identifier が残り、次の入力に重なる)。**別の接続・別のタスクで送る** ——

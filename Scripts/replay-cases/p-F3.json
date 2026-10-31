@@ -1,0 +1,57 @@
+{
+  "id": "p-F3",
+  "finding": "Android のロック画面が木・窓から通知シェードと分けられず、ft_status は dialog の総称文・ft_snapshot / 座標の警告は「シェードが開いている」と言う(p F3/F4。isKeyguardShowing の事実で .locked へ)",
+  "platform": "android",
+  "redConfirmed": true,
+  "redNote": "PIN ロック(locksettings set-pin 1234)の Emulator が前提。赤は main のビルドの fleetest-mcp で 3 形とも確認(ft_status は dialog の総称文・ft_snapshot / 座標 ft_tap はシェードの文言)",
+  "setup": [
+    ["ft_launch", {"bundleId": "com.ftester.e2e.android"}]
+  ],
+  "reset": [
+    ["$adb", {"args": ["shell", "input", "keyevent", "KEYCODE_WAKEUP"], "seconds": 1}],
+    ["$adb", {"args": ["shell", "wm", "dismiss-keyguard"], "seconds": 1.5}],
+    ["$adb", {"args": ["shell", "input", "text", "1234"], "seconds": 0.5}],
+    ["$adb", {"args": ["shell", "input", "keyevent", "KEYCODE_ENTER"], "seconds": 2}],
+    ["ft_launch", {"bundleId": "com.ftester.e2e.android"}]
+  ],
+  "resetSeconds": 1,
+  "rounds": 10,
+  "forms": [
+    {
+      "name": "ロック画面の ft_status",
+      "steps": [
+        ["$adb", {"args": ["shell", "input", "keyevent", "KEYCODE_SLEEP"], "seconds": 1}],
+        ["$adb", {"args": ["shell", "input", "keyevent", "KEYCODE_WAKEUP"], "seconds": 2}],
+        ["ft_status", {}]
+      ],
+      "allowErrors": true,
+      "replyOnly": true,
+      "replyExpect": ["the lock screen or always-on display is up"],
+      "replyReject": ["a permission dialog"]
+    },
+    {
+      "name": "ロック画面の ft_snapshot",
+      "steps": [
+        ["$adb", {"args": ["shell", "input", "keyevent", "KEYCODE_SLEEP"], "seconds": 1}],
+        ["$adb", {"args": ["shell", "input", "keyevent", "KEYCODE_WAKEUP"], "seconds": 2}],
+        ["ft_snapshot", {}]
+      ],
+      "allowErrors": true,
+      "replyOnly": true,
+      "replyExpect": ["This tree is the lock screen"],
+      "replyReject": ["is drawn over", "If back changes nothing"]
+    },
+    {
+      "name": "ロック画面への座標 ft_tap",
+      "steps": [
+        ["$adb", {"args": ["shell", "input", "keyevent", "KEYCODE_SLEEP"], "seconds": 1}],
+        ["$adb", {"args": ["shell", "input", "keyevent", "KEYCODE_WAKEUP"], "seconds": 2}],
+        ["ft_tap", {"x": 540, "y": 1200}]
+      ],
+      "allowErrors": true,
+      "replyOnly": true,
+      "replyExpect": ["the lock screen is up over"],
+      "replyReject": ["notification shade or quick settings is open"]
+    }
+  ]
+}

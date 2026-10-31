@@ -27,3 +27,5 @@
 | `suite` | `baseline` = 回をまたいで比べる固定の課題(`--suite baseline --record <ndjson>`)。**中身を変えない**(変えると前の回と比べられない) |
 
 手順の `$wait`(`seconds`)は画面の動きが終わるのを待つ。`$killApp`(`bundleId`・`seconds`)は故障の注入で、宛先の1台のアプリだけを OS の側から止める。
+`$adb`(`args`・`seconds`)は宛先の1台へ adb を直接撃つ故障の注入(Android だけ。ロック・消灯・シェード)、`$adbLater`(`after`・`args`)は
+`after` 秒後に adb を撃つが待たずに次の手へ進む(探索の最中に前面を奪う形)。`$` の手は `reset` にも書ける。

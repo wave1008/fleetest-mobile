@@ -879,7 +879,8 @@ extension MCPServer {
                 launched: launched, snapshot: tree,
                 processEvidence: androidProcessEvidenceForSwitch(
                     launched: launched, snapshot: tree, driver: batchDriver, args: args),
-                stoppedByTool: toolStoppedBundleIDs[Self.sessionKey(args)]).isEmpty { return true }
+                stoppedByTool: toolStoppedBundleIDs[Self.sessionKey(args)],
+                keyguardShowing: await Self.keyguardFact(for: tree, driver: batchDriver)).isEmpty { return true }
             return !(await Self.backgroundedSessionNote(tree, driver: batchDriver)).isEmpty
         }
         // 全手を撃った後の読みが失敗した(落ちた・前面を離れた)。手の一覧は捨てない —— 捨てると撃ち直しを誘う(届いた手の二重実行)

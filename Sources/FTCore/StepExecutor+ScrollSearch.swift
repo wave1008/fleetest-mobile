@@ -374,6 +374,7 @@ extension StepExecutor {
            ForegroundState.systemDialogPackages.contains(treeSession) {
             facts.sessionBundleID = treeSession
             facts.tree = SystemUITreeKind.classify(sessionBundleID: treeSession, identifiers: tree.elements.map(\.identifier))
+            facts.keyguardShowing = await ForegroundState.keyguardProbe(driver)
         }
         facts.front = await ForegroundState.frontProbe(driver)
         if asksAppState, facts.front.value == nil {

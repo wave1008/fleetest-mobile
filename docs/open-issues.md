@@ -742,13 +742,9 @@
   `cc-volume-slider` が Simulator の CC に無い(木は「コントロールを追加」「電源」等)・SE3 は `probeSystemUICovering` が OR 述語の
   firstMatch 1件だけ見るため、常に hittable な `SBSwitcherWindow:Main` が先に当たり cc-* に届かない疑い(推測)。
   **直すにはランナー(BridgeRouter)の変更 = ブリッジの版上げが要る**ので、この回は触らない。CC の下の ft_tap(ref) は `done`(実際は CC が閉じるだけ)
-- **Android のロック画面と通知シェードを木から分けられない**(p F3・F4): `SystemUITreeKind.isLockScreenOrAlwaysOn` は bouncer 本体が無い回に
-  `quick_settings` でシェード側へ倒れる。ft_status は木を読まないので `.locked` の文言に届かない。`isKeyguardShowing`(dumpsys window)を
-  `AndroidDriver` に足して `ForegroundFacts` に渡せば直る(読みを足す設計の決定が先)。それまで座標の警告・ft_snapshot の文言は「back が効かなければロック画面」の留保で出す
-- **Android の探索の途中の前面の奪われ方(mxa F4・F5)は、探索の最中に adb でキーを入れる形でしか再現できない**。シェード・権限ダイアログへの対処文は
-  直したが、再生ケースにできていない。シェードは「打ち切りの時点で木が systemui のもの」のときだけ拾う(木が下のアプリのままの実装では拾えない)
 - **scrollToBottom / scrollToTop は、始める前に前面を離れていた形を拾わない**: Android の木のセッションは前面と一緒に替わるので、始点の木がランチャーなら
-  「対象のアプリ」が分からない(拾えるのは送りの途中で離れた形だけ)
+  「対象のアプリ」が分からない(拾えるのは送りの途中で離れた形だけ)。`StepExecutor` はシナリオが起動したアプリの bundle ID を持っていない
+  (`noteAppLaunched` は引数なし)ので、事実で答えるには起動の経路から bundle ID を運ぶ設計が先(10/31 の調査で確認。実装していない)
 ### OI-91 in-app の背面の要素・焦点の受け口(10/31 探索 inapp・mxa)
 - 状態: 推測
 - 確認: コミット未記録(2026-10-31)
@@ -777,9 +773,7 @@
 - 確認: コミット未記録(2026-10-31)
 - 経緯: 発見: 10/31 の探索的テスト(所見は作業ログの findings-b.md / findings-p.md)
 
-- 着信のヘッズアップの下の要素への tap が通知のボタンへ入る(6/6 で着信を拒否した。木に出ず警告も無い。b F3)。ヘッズアップは NotificationShade が可視(`isVisible=true`)で入力フォーカスはアプリのまま = 順6 が見るフォーカスでは検知できない。可視だけを見ると閉じかけ・開き途中の窓で誤検知する(`shadeCovering` の doc)うえ、カードの矩形が `dumpsys` から読めず「狙った座標が重なるか」を言えない。検知を足すなら可視の窓 + 通知の到着(`dumpsys notification`)を既存資産の全数に当てて誤検知 0 を確かめてから、まず警告で
-- 別プロセスの最初の gRPC ジェスチャが、前のプロセスが残した指に吸われる(b F1 の後半)。残った指を次のジェスチャの前に上げる案(`getStatus` の後に pressure 0 を1本)は、指が無いときの up がゲストで何をするかが未測定なので入れていない。今は残った可能性を応答に言うところまで
-- 端末の一瞬の切断の後、`ft_terminate` が「nothing was launched here」と言う(p F6)。切断の案内が `forgetConnection` で起動の記録まで捨てる。記録を残すと、別の端末へ付け替わった後に古い記録で撃つ型(`forgetDeviceState` の doc)と衝突するので、serial が同じ端末へ戻った場合だけ残す設計が要る
+- 着信のヘッズアップの下の要素への tap が通知のボタンへ入る(6/6 で着信を拒否した。木に出ず警告も無い。b F3)。ヘッズアップは NotificationShade が可視(`isVisible=true`)で入力フォーカスはアプリのまま = 順6 が見るフォーカスでは検知できない。可視だけを見ると閉じかけ・開き途中の窓で誤検知する(`shadeCovering` の doc)うえ、カードの矩形が `dumpsys` から読めず「狙った座標が重なるか」を言えない。検知を足すなら可視の窓 + 通知の到着(`dumpsys notification`)を既存資産の全数に当てて誤検知 0 を確かめてから、まず警告で。(11/1: Pixel 9 / Android 15 の AVD 2台ではヘッズアップを出せなかった — console に `gsm` が無く着信を作れず、`cmd notification post` は NotificationShade が可視にならない。実測の入力が無いので未着手)
 - adb が端末を見失った間(撃つ前)の `ft_navigate` が「届いたか分からない」と言う(p F5)。終了コード 1 だけでは撃つ前の失敗と送った後の切断を分けられず、文言の一致で確定しない規律なので不明のまま。注記の文言だけ「切れた」と断定しない形にした
 
 ## 設計判断で据え置いているもの(直さないと決めた。症状が出たら見直す)

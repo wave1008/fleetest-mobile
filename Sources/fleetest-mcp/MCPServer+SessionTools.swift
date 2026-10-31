@@ -59,10 +59,15 @@ extension MCPServer {
         } ?? false
         var facts = ForegroundFacts(launched: launched, sessionBundleID: status.sessionBundleID,
                                     stoppedByTool: toolStoppedBundleIDs[statusKey])
+        // セッションがシステム UI のとき(ロック画面・シェード・ダイアログ)は木を読まないので、キーガードの事実で分ける
+        if let session = status.sessionBundleID, session == SystemUITreeKind.systemUIPackage {
+            facts.keyguardShowing = await ForegroundState.keyguardProbe(foregroundDriver)
+        }
         if askFront, let session = status.sessionBundleID {
             facts.covering = await ForegroundState.coveringProbe(foregroundDriver)
             if let android = foregroundDriver as? AndroidDriver {
                 facts.shadeHoldsInputFocus = await Self.shadeProbe(android)
+                if facts.shadeHoldsInputFocus.value == true { facts.keyguardShowing = await ForegroundState.keyguardProbe(android) }
             }
             facts.front = await ForegroundState.frontProbe(foregroundDriver)
             // iOS は前面のアプリ名を答えない = 真偽だけ聞く(Android は名前で足りる)

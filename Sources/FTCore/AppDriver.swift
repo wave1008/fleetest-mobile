@@ -235,6 +235,9 @@ public protocol AppDriver {
     /// nil = 答えられない(in-app / Android / 旧ブリッジ)。**プロトコル要件として宣言すること**
     /// (存在型越しの呼び出しは要件でなければ既定実装へ静的ディスパッチされる)
     func systemUICovering() async throws -> SystemUICoveringResponse?
+    /// **キーガード(ロック画面・解除画面)が出ているか**(Android の `dumpsys window displays` の `isKeyguardShowing`)。
+    /// nil = 答えられない(iOS・読めなかった)。**プロトコル要件として宣言すること**(存在型越しの呼び出しが既定実装へ静的ディスパッチされない)
+    func keyguardShowing() async throws -> Bool?
     /// 現在フォアグラウンドのアプリの bundleID/package(分かるプラットフォームだけ実値。
     /// 分からなければ nil。DSL の appIs の失敗メッセージが actual として使う)。
     /// **プロトコル要件として宣言すること**(install(packagePath:) と同じ理由)
@@ -515,6 +518,7 @@ public extension AppDriver {
     func systemAlert() async throws -> SystemAlertProbeResponse? { nil }
     /// 既定は「答えられない」。答えられるのは XCUITest ブリッジを話す BridgeClient だけ
     func systemUICovering() async throws -> SystemUICoveringResponse? { nil }
+    func keyguardShowing() async throws -> Bool? { nil }
 
     var lastActionNote: String? { nil }
     /// 既定は「分からない」。答えられるのは**位置を直接動かせる**ドライバ(AndroidDriver の

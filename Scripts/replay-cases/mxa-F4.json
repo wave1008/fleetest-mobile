@@ -1,0 +1,42 @@
+{
+  "id": "mxa-F4",
+  "finding": "Android の探索(ft_scroll_to)の最中に前面が奪われる: 権限画面へ移ると launch を勧める文と勧めない文が同居する(F4)・通知シェードが降りると「端に着いた・maxSwipes を上げても無駄」と言い切る(F5)",
+  "platform": "android",
+  "redConfirmed": true,
+  "redNote": "赤は frontAppIfSessionAppLeft の .covered / .dialog の枝を nil 返しに変異させた版で確かめた(2形とも 3/3 赤・直した版は 0/3)。直す前のコミットのビルドではない",
+  "setup": [
+    ["ft_launch", {"bundleId": "com.ftester.e2e.android"}]
+  ],
+  "reset": [
+    ["$adb", {"args": ["shell", "cmd", "statusbar", "collapse"], "seconds": 0.5}],
+    ["$adb", {"args": ["shell", "input", "keyevent", "KEYCODE_HOME"], "seconds": 0.5}],
+    ["ft_launch", {"bundleId": "com.ftester.e2e.android"}],
+    ["ft_batch", {"steps": "tap '#nav_scroll'"}]
+  ],
+  "resetSeconds": 1,
+  "rounds": 5,
+  "forms": [
+    {
+      "name": "探索の最中に通知シェードが降りる",
+      "steps": [
+        ["$adbLater", {"after": 0.4, "args": ["shell", "cmd", "statusbar", "expand-notifications"]}],
+        ["ft_scroll_to", {"selector": "#no_such_item", "direction": "up"}]
+      ],
+      "allowErrors": true,
+      "replyOnly": true,
+      "replyExpect": ["notification shade"],
+      "replyReject": ["reached its end", "raising maxSwipes will not help"]
+    },
+    {
+      "name": "探索の最中に権限画面へ前面が移る",
+      "steps": [
+        ["$adbLater", {"after": 0.4, "args": ["shell", "am", "start", "-a", "android.intent.action.MANAGE_APP_PERMISSIONS", "--es", "android.intent.extra.PACKAGE_NAME", "com.ftester.e2e.android"]}],
+        ["ft_scroll_to", {"selector": "#no_such_item", "direction": "up"}]
+      ],
+      "allowErrors": true,
+      "replyOnly": true,
+      "replyExpect": ["was not in the foreground", "permissioncontroller"],
+      "replyReject": ["bring the app back with launch", "reached its end"]
+    }
+  ]
+}

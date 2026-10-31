@@ -334,6 +334,12 @@ extension MCPServer {
             bridges[key] = "android"
             connections[key] = "serial \(serial)"
             connectedAndroidSerials[key] = serial
+            // 一瞬の切断の後に同じ(物理)端末が戻った: 切断で捨てた起動の記録を返す(別の serial なら保留を捨てる)
+            if launchedBundleIDs[key] == nil,
+               let restored = Self.restoredLaunchRecord(saved: launchRecordAcrossAndroidDisconnect, serial: serial) {
+                launchedBundleIDs[key] = restored
+            }
+            launchRecordAcrossAndroidDisconnect = nil
             rememberResolvedTarget(platform: "android", args: args,
                                    iosPort: nil, iosUDID: nil, androidSerial: serial)
         default:
@@ -1877,6 +1883,12 @@ extension MCPServer {
             + " Bring it back with ft_launch before trusting these refs\n"
     }
 
+    /// 木がシステム UI のものなのでキーガードを聞く(ロック画面とシェードは木から分けられない)。それ以外・iOS は聞かない
+    static func keyguardFact(for snapshot: SnapshotResponse, driver: AppDriver) async -> Probe<Bool> {
+        guard snapshot.sessionBundleID == SystemUITreeKind.systemUIPackage else { return .notAnswerable }
+        return await ForegroundState.keyguardProbe(driver)
+    }
+
     /// 「前面ではない」と分かるが理由を言えないときの原因の並べ方(ft_status と共有)。iOS の `/appstate` は
     /// 別アプリ・ホーム・プロセスの終了を区別しない(分けるにはブリッジの版上げが要る = OI-81)ので、断定せず並べる
     static let notInFrontCauses = "another app, the home screen or a system screen is in front, or the app's process has ended"
@@ -1949,7 +1961,8 @@ extension MCPServer {
     /// 「クラッシュしたかも」ではなく「この操作で止めた」と言う
     static func switchedAppNote(launched: String?, snapshot: SnapshotResponse,
                                 processEvidence: AndroidAppProcessEvidence? = nil,
-                                stoppedByTool: String? = nil) -> String {
+                                stoppedByTool: String? = nil,
+                                keyguardShowing: Probe<Bool> = .notAnswerable) -> String {
         guard let launched, let session = snapshot.sessionBundleID, session != launched else {
             return ""
         }
@@ -1957,6 +1970,7 @@ extension MCPServer {
         let verdict = ForegroundState.judge(ForegroundFacts(
             launched: launched, sessionBundleID: session,
             tree: SystemUITreeKind.classify(sessionBundleID: session, identifiers: snapshot.elements.map(\.identifier)),
+            keyguardShowing: keyguardShowing,
             processRunning: processEvidence.map { .value($0.running) } ?? .notAnswerable,
             stoppedByTool: stoppedByTool))
         switch verdict {

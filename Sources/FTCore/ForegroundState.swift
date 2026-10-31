@@ -75,7 +75,7 @@ public enum SystemUITreeKind: Equatable, Sendable {
     /// システム UI の木だが、シェードともロック画面とも分けられない
     case systemUIOther
 
-    static let systemUIPackage = "com.android.systemui"
+    public static let systemUIPackage = "com.android.systemui"
 
     /// 解除画面(PIN・パスワード・パターン・SIM)の本体の要素 ID(AOSP の KeyguardPINView 等)
     public static let keyguardBouncerIDMarkers = ["keyguard_pin_view", "keyguard_password_view", "keyguard_pattern_view",
@@ -142,6 +142,8 @@ public enum ForegroundState {
         if let session = f.sessionBundleID {
             if session == springboard { return .home }
             if systemDialogPackages.contains(session) {
+                // キーガードの事実が木の ID 推定より先(bouncer の無いロック画面の木は quick_settings でシェードに見える)
+                if f.keyguardShowing.value == true { return .locked }
                 switch f.tree {
                 case .lockScreen: return .locked
                 case .notificationShade: return .covered(.shade)
@@ -156,7 +158,7 @@ public enum ForegroundState {
         }
         guard let reference = f.launched ?? f.sessionBundleID else { return .unknown(.notAnswerable) }
         if case .value(let surface?) = f.covering { return .covered(surface) }
-        if f.shadeHoldsInputFocus.value == true { return .covered(.shade) }
+        if f.shadeHoldsInputFocus.value == true { return f.keyguardShowing.value == true ? .locked : .covered(.shade) }
         if let front = f.front.value {
             if front == reference { return .inFront }
             if systemDialogPackages.contains(front) { return .dialog(package: front) }
@@ -192,6 +194,13 @@ extension ForegroundState {
     }
 }
 
+extension ForegroundState {
+    /// キーガードの事実(Android だけが答える)。`.notAnswerable` = 答える口が無い
+    public static func keyguardProbe(_ driver: AppDriver) async -> Probe<Bool> {
+        await Probe.of { try await driver.keyguardShowing() }
+    }
+}
+
 extension Probe {
     var isFailed: Bool { if case .failed = self { return true } else { return false } }
 }
@@ -212,6 +221,9 @@ public struct ForegroundFacts: Sendable {
     public var covering: Probe<CoveringSurface?>
     /// 入力フォーカスを通知シェードが持っているか(Android の dumpsys)
     public var shadeHoldsInputFocus: Probe<Bool>
+    /// キーガード(ロック画面・解除画面)が出ているか(Android の dumpsys)。`.value(false)` = 聞いて出ていなかった。
+    /// 通知シェードと同じ窓(NotificationShade)が焦点を持つので、窓や木からは分けられない
+    public var keyguardShowing: Probe<Bool>
     /// 起動したアプリのプロセスが居るか(Android のみ答えられる)
     public var processRunning: Probe<Bool>
     /// このツール自身がアプリを止めた操作の名前
@@ -221,6 +233,7 @@ public struct ForegroundFacts: Sendable {
                 front: Probe<String> = .notAnswerable, sessionInForeground: Probe<Bool> = .notAnswerable,
                 covering: Probe<CoveringSurface?> = .notAnswerable,
                 shadeHoldsInputFocus: Probe<Bool> = .notAnswerable,
+                keyguardShowing: Probe<Bool> = .notAnswerable,
                 processRunning: Probe<Bool> = .notAnswerable, stoppedByTool: String? = nil) {
         self.launched = launched
         self.sessionBundleID = sessionBundleID
@@ -229,6 +242,7 @@ public struct ForegroundFacts: Sendable {
         self.sessionInForeground = sessionInForeground
         self.covering = covering
         self.shadeHoldsInputFocus = shadeHoldsInputFocus
+        self.keyguardShowing = keyguardShowing
         self.processRunning = processRunning
         self.stoppedByTool = stoppedByTool
     }

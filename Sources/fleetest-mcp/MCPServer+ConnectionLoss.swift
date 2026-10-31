@@ -173,6 +173,7 @@ extension MCPServer {
         guard let listed = facts.androidListed(),
               Self.androidSerialVanished(serial, connected: listed)
         else { return deliveryNote }
+        launchRecordAcrossAndroidDisconnect = Self.launchRecordSurvivingDisconnect(serial: serial, bundleID: launchedBundleIDs[key])
         forgetConnection(key)
         return deliveryNote + "\nThe Android device behind \(connection) is no longer connected (adb devices"
             + " does not list it — unplugged, or the emulator was shut down). Reconnect it, then"
@@ -312,6 +313,20 @@ extension MCPServer {
             seenExplicitAndroidSerials.remove(serial)
         }
         forgetDeviceState(key)
+    }
+
+    /// 切断で捨てる起動の記録のうち、**同じ serial が戻ったら残してよいもの**。物理端末の serial は端末固有なので同じ端末が戻っただけ。
+    /// **Emulator(`emulator-<port>`)は残さない**: serial は port の番号で、落ちた後に別の AVD が同じ port で上がる
+    /// (古い記録で別の AVD のアプリへ撃つ型 = `forgetDeviceState` の doc)。記録が無ければ nil
+    static func launchRecordSurvivingDisconnect(serial: String, bundleID: String?) -> (serial: String, bundleID: String)? {
+        guard let bundleID, !serial.hasPrefix("emulator-") else { return nil }
+        return (serial, bundleID)
+    }
+
+    /// ドライバを作り直した serial が、切断で保留した記録の serial と同じなら起動したアプリ(違えば nil)
+    static func restoredLaunchRecord(saved: (serial: String, bundleID: String)?, serial: String) -> String? {
+        guard let saved, saved.serial == serial else { return nil }
+        return saved.bundleID
     }
 
     /// sessionKey に紐づく状態を**全部**捨てる。

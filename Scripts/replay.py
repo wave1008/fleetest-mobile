@@ -115,17 +115,40 @@ def kill_app(target, bundle_id):
         raise CannotRun(f"故障の注入が失敗: {done.stderr.strip()[-200:]}")
 
 
+def run_directive(target, name, arguments):
+    """`$` で始まる手(故障の注入・待ち)を撃つ。撃ったら True(ツールの手ではない)"""
+    if name == "$wait":   # 画面の動き(通知センターの出現等)が終わるのを待つ。短いと面が出る前に判定して別の理由で赤になる
+        time.sleep(arguments["seconds"])
+        return True
+    if name == "$killApp":
+        kill_app(target, arguments["bundleId"])
+        time.sleep(arguments.get("seconds", 1))
+        return True
+    if name == "$adb":   # 宛先の1台へ adb を直接撃つ故障の注入(ロック・ヘッズアップ等。Android だけ)
+        if "serial" not in target:
+            raise CannotRun("$adb は Android のケースだけ")
+        done = subprocess.run(["adb", "-s", target["serial"], *arguments["args"]], capture_output=True, text=True,
+                              timeout=60, stdin=subprocess.DEVNULL)
+        if done.returncode != 0:
+            raise CannotRun(f"故障の注入 adb {' '.join(arguments['args'])} が失敗: {done.stderr.strip()[-200:]}")
+        time.sleep(arguments.get("seconds", 1))
+        return True
+    if name == "$adbLater":   # 次の手の最中に差す故障の注入: after 秒後に adb を撃つ(待たずに次の手へ進む。探索の途中で前面を奪う形)
+        if "serial" not in target:
+            raise CannotRun("$adbLater は Android のケースだけ")
+        command = "sleep {}; adb -s {} {}".format(arguments["after"], target["serial"], " ".join(arguments["args"]))
+        subprocess.Popen(["bash", "-c", command], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                         stderr=subprocess.DEVNULL, start_new_session=True)
+        return True
+    return False
+
+
 def round_problems(mcp, target, form):
     """1周撃って、答え合わせの食い違いを返す(空 = 通った)"""
     problems, tree, reply = [], "", ""
     for step in form["steps"]:
         name, arguments = step
-        if name == "$wait":   # 画面の動き(通知センターの出現等)が終わるのを待つ。短いと面が出る前に判定して別の理由で赤になる
-            time.sleep(arguments["seconds"])
-            continue
-        if name == "$killApp":
-            kill_app(target, arguments["bundleId"])
-            time.sleep(arguments.get("seconds", 1))
+        if run_directive(target, name, arguments):
             continue
         try:
             arguments = resolve_refs(arguments, tree)
@@ -161,6 +184,8 @@ def run_case(mcp, target, case, rounds_override, record=None):
         failures = []
         for i in range(rounds):
             for name, arguments in case.get("reset", []):
+                if run_directive(target, name, arguments):
+                    continue
                 text, is_error = mcp.tool(name, {**arguments, **target})
                 if is_error:
                     raise CannotRun(f"{case['id']} の戻し {name} が失敗: {text[:240]}")

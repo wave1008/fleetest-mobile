@@ -59,6 +59,18 @@ public enum AndroidForegroundWindows {
         return name == "NotificationShade"
     }
 
+    /// `dumpsys window displays` の `isKeyguardShowing=` 行。ロック画面・解除画面が出ている間 true
+    /// (Android 15 Emulator で実測: PIN ロックの消灯→点灯 = true・解除後 = false・解除済みでシェードを開いても false)。
+    /// 行が無ければ nil(読めない = 「出ていない」にしない)
+    public static func keyguardShowing(displaysDumpsys: String) -> Bool? {
+        for raw in displaysDumpsys.split(separator: "\n", omittingEmptySubsequences: false) {
+            let line = raw.trimmingCharacters(in: .whitespaces)
+            if line == "isKeyguardShowing=true" { return true }
+            if line == "isKeyguardShowing=false" { return false }
+        }
+        return nil
+    }
+
     /// `Window #N Window{... 名前}:` ブロックを (名前, isVisible) の並び(z 順)に分解する。
     /// overlaying / keyboardVisible の共通パーサ(可視性判定はここ1箇所)
     private static func windowBlocks(_ dumpsys: String) -> [(name: String, visible: Bool)] {
