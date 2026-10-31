@@ -514,14 +514,6 @@
 - 引き直し(StepExecutor の relocateAfterClear / MCP の ftType)は、見つからずキーボードが出ていれば hideKeyboardIfShown で閉じて1回だけ引き直す。XCUITest ブリッジは `/hidekeyboard` を 501 で断るので、iOS では何も送らずに「消した・打っていない」で失敗する
 - 手がかり: DSL の hideKeyboard と同じ「キーボードの上の空きを叩く」を引き直しにも使うか(Enter は送らない = 消した欄で確定させない)
 
-### OI-61 通知センター(カバーシート)がアプリを覆っている間、ft_snapshot / ft_status / snapshotAfter が「アプリが前面」と言う
-- 状態: 経路確定
-- 確認: コミット未記録(2026-10-30)
-- 経緯: 発見: 10-30 午後の探索的テスト(SE3 実機 = se3 F11)
-
-- `systemUICoveringWarning`(MCPServer+Snapshot.swift)は撃った後の警告にしか使われていない。撃つ前の読みでも `/systemui/covering` を引くか、verifiedRef の門で覆いを見る
-- ランナー側で /snapshot ごとに SpringBoard を引くと約 185ms 増える(G1 の見積もり)ので、引くのは MCP の読みだけにする案
-
 ### OI-62 横向きの ft_screenshot で maxWidth が高さの上限として効き、fullSize の PNG の画素が縦のまま(向きは eXIf だけ)
 - 状態: 経路確定
 - 確認: コミット未記録(2026-10-30)
@@ -672,14 +664,7 @@
 - 確認: コミット未記録(2026-10-30)
 - 経緯: 発見: 10-30 夜の負荷テスト(答え合わせ・故障の注入)
 
-- `/appstate` の `AppStateResponse` が前面の真偽しか返さず、死んだと別アプリの前面を区別できない。実行状態を足すにはブリッジの版上げが要る(c F8・b F8)
-
-### OI-82 ft_batch の途中でアプリが落ちると、続く tap が「the target was covered」と言う・長押しの途中で落ちても done
-- 状態: 再現済み
-- 確認: コミット未記録(2026-10-30)
-- 経緯: 発見: 10-30 夜の負荷テスト(答え合わせ・故障の注入)
-
-- `liftCoveredTarget` は覆いを持ち上げる前に前面を確かめない(e F4。24/41)。`ftLongPress` に「前面を離れた」の注記が無い(mxa F3)
+- `/appstate` の `AppStateResponse` が前面の真偽しか返さず、死んだと別アプリの前面を区別できない。実行状態を足すにはブリッジの版上げが要る(c F8・b F8)。ft_status と snapshot の文言は `ForegroundState.judge` で揃え、死んだと別アプリを分けずに原因を並べて言う
 
 ### OI-83 固まったアプリで XCUITest ランナーごと落ち、bridge up まで戻らない・起動し直しのポートが run の in-app ブリッジと衝突
 - 状態: 再現済み

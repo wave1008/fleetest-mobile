@@ -798,7 +798,8 @@ extension StepExecutor {
                 element, in: snapshot, step: step, verb: "touching",
                 snapshotSource: switchedToFallbackDriver ? .driver(actingDriver) : .primary, phase: &phase) {
                 guard let liftedElement = lifted.element else {
-                    return StepOutcome(status: failed(.notFound, Self.coverLiftLostMessage(step, verb: "touching")))
+                    return StepOutcome(status: failed(.notFound, Self.coverLiftLostMessage(step, verb: "touching")
+                        + (await leftForegroundSuffix(snapshot.sessionBundleID))))
                 }
                 element = liftedElement
                 snapshot = lifted.snapshot
@@ -1027,7 +1028,8 @@ extension StepExecutor {
                 element, in: snapshot, step: step, verb: "typing",
                 snapshotSource: switchedToFallbackDriver ? .driver(actingDriver) : .primary, phase: &phase) {
                 guard let liftedElement = lifted.element else {
-                    return StepOutcome(status: failed(.notFound, Self.coverLiftLostMessage(step, verb: "typing")))
+                    return StepOutcome(status: failed(.notFound, Self.coverLiftLostMessage(step, verb: "typing")
+                        + (await leftForegroundSuffix(snapshot.sessionBundleID))))
                 }
                 element = liftedElement
                 snapshot = lifted.snapshot

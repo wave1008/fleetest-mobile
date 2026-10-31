@@ -664,22 +664,8 @@ extension MCPServer {
         try await gestureDriver.gesture(validatedGesture)
         // 画面の端から始めた指は OS のジェスチャ(戻る・ホーム・シェード)として取られ、アプリを離れることがある
         // (DSL の swipePointToPoint は始点を帯の外へ寄せる)。撃った後に前面が替わっていたら事実として言う
-        let gestureLeftAppNote: String
-        // シェードは窓の並びの上だけで、`foregroundAppID` は下のアプリを返すので別に見る
-        if gestureFrontWarning.isEmpty, let launched = launchedBundleIDs[Self.sessionKey(args)],
-           (gestureDriver as? AndroidDriver)?.shadeHoldsInputFocus() == true {
-            gestureLeftAppNote = " (warning: after the gesture the notification shade or quick settings was open over \(launched)"
-                + " — a touch that starts at the top edge can be taken as the shade gesture. Start the gesture clear of the"
-                + " screen edge; ft_navigate back closes the shade)"
-        } else if gestureFrontWarning.isEmpty, let launched = launchedBundleIDs[Self.sessionKey(args)],
-           let front = (try? await gestureDriver.foregroundAppID()) ?? nil, front != launched,
-           !Self.systemDialogPackages.contains(front) {
-            gestureLeftAppNote = " (warning: after the gesture \(front) was in front, not \(launched) — a touch that starts"
-                + " at a screen edge can be taken as a system gesture (back / home / the shade). Start the gesture"
-                + " clear of the screen edge, or ft_launch \(launched) to come back)"
-        } else {
-            gestureLeftAppNote = ""
-        }
+        let gestureLeftAppNote = await leftAppAfterGestureNote(
+            gestureDriver, args: args, alreadyWarned: !gestureFrontWarning.isEmpty)
         // **座標(絶対)→ 比率へ割り戻して記録する**(DSL の gesture は FTFinger の比率で書く。
         // FlowStep.gesture がその置き場)。対象は常に画面全体(ft_gesture にセレクタは無い)ので
         // locator は付けない
@@ -715,7 +701,10 @@ extension MCPServer {
             recordInteraction(action: "press", resolvedRef: pressTarget.ref, args: args,
                               duration: pressDuration,
                               maxGestureSeconds: pressCap)
+            // 長押しも ft_gesture と同じく、操作の後に前面を確かめる(画面の端での長押しがシェード・ホームに取られうる)
+            let pressLeftAppNote = await leftAppAfterGestureNote(pressDriver, args: args, alreadyWarned: false)
             return text("press [\(ref)] done.\(pressTarget.note)" + (bandPoint != nil ? Self.bottomBandTouchNote : "")
+                + pressLeftAppNote
                 + reproductionNote(resolvedRef: pressTarget.ref, args: args)
                 + changedHintOnce(args)
                 + waitForWithoutSnapshotAfterNote(args) + (await snapshotAfterBody(args, outsideTheAppTree: false)))
@@ -732,8 +721,10 @@ extension MCPServer {
             recordInteraction(action: "press", resolvedRef: nil, args: args, coordinate: (x, y),
                               duration: pressDuration,
                               maxGestureSeconds: pressCap)
+            let pressLeftAppNote = await leftAppAfterGestureNote(
+                pressDriver, args: args, alreadyWarned: !frontWarning.isEmpty)
             return text("press (\(x), \(y)) done." + keyboardCoordinateWarning(x: x, y: y, args: args)
-                + frontWarning
+                + frontWarning + pressLeftAppNote
                 + once("coordinateHoldReproductionNote",
                 full: Self.coordinateHoldReproductionNote(
                     holdSeconds: pressDuration, maxGestureSeconds: pressCap),

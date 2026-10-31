@@ -1858,14 +1858,22 @@ extension MCPServer {
     /// iOS の springboard では再現しない(実測: 誤警告なし)ので触っていない
     static func backgroundedSessionNote(_ snapshot: SnapshotResponse,
                                         driver: AppDriver) async -> String {
-        guard let bundleID = snapshot.sessionBundleID,
-              !systemDialogPackages.contains(bundleID),
-              let foreground = try? await driver.isAppForeground(bundleID: bundleID),
-              !foreground else { return "" }
+        guard let bundleID = snapshot.sessionBundleID else { return "" }
+        // 判定は ForegroundState.judge。システム UI・SpringBoard のセッションは judge が inFront 以外を返すので黙る
+        let verdict = ForegroundState.judge(ForegroundFacts(
+            sessionBundleID: bundleID,
+            tree: SystemUITreeKind.classify(sessionBundleID: bundleID, identifiers: snapshot.elements.map(\.identifier)),
+            sessionInForeground: bundleID == ForegroundState.springboard || systemDialogPackages.contains(bundleID)
+                ? .notAnswerable : await ForegroundState.inForegroundProbe(driver, bundleID: bundleID)))
+        guard case .otherApp(name: .none) = verdict else { return "" }
         return "\(bundleID) is NOT in the foreground: this tree is its last state, not what is on"
-            + " screen now (another app or a system screen is in front)."
+            + " screen now (\(notInFrontCauses))."
             + " Bring it back with ft_launch before trusting these refs\n"
     }
+
+    /// 「前面ではない」と分かるが理由を言えないときの原因の並べ方(ft_status と共有)。iOS の `/appstate` は
+    /// 別アプリ・ホーム・プロセスの終了を区別しない(分けるにはブリッジの版上げが要る = OI-81)ので、断定せず並べる
+    static let notInFrontCauses = "another app, the home screen or a system screen is in front, or the app's process has ended"
 
     /// **このセッションが home / appSwitcher を送ったあと、まだ ft_launch で戻していない**
     /// ときの注記。`/appstate` の照会と違い**プラットフォームに聞かない**ので、答えが
@@ -1916,11 +1924,7 @@ extension MCPServer {
     /// ではなく「対象アプリの上にシステム UI が出ている」なので、案内を変える(欠陥⑧)。
     /// 実測: 位置情報の許可ダイアログ(permissioncontroller)で通常の案内(ft_launch し直す)に
     /// 従うと、ダイアログを放置したままアプリを再起動してループした
-    static let systemDialogPackages: Set<String> = [
-        "com.google.android.permissioncontroller", "com.android.permissioncontroller",
-        "com.android.packageinstaller", "com.google.android.packageinstaller",
-        "com.android.systemui",
-    ]
+    static let systemDialogPackages: Set<String> = ForegroundState.systemDialogPackages
 
     /// **この木は ft_launch したアプリのものか**。違えば名指しで止める。
     ///
@@ -1943,50 +1947,53 @@ extension MCPServer {
         guard let launched, let session = snapshot.sessionBundleID, session != launched else {
             return ""
         }
-        // springboard は ft_launch bundleId: com.apple.springboard がホーム画面へ attach する
-        // 正規の使い方(ツール説明に明記)なので、その用途を否定しない文言にする
-        if session == "com.apple.springboard" {
+        // 判定は FTCore.ForegroundState.judge の1箇所(順序もそこ)。ここは文言だけ
+        let verdict = ForegroundState.judge(ForegroundFacts(
+            launched: launched, sessionBundleID: session,
+            tree: SystemUITreeKind.classify(sessionBundleID: session, identifiers: snapshot.elements.map(\.identifier)),
+            processRunning: processEvidence.map { .value($0.running) } ?? .notAnswerable,
+            stoppedByTool: stoppedByTool))
+        switch verdict {
+        case .home:
+            // springboard は ft_launch bundleId: com.apple.springboard がホーム画面へ attach する
+            // 正規の使い方(ツール説明に明記)なので、その用途を否定しない文言にする
             return "⚠️ This tree is the home screen (springboard), not \(launched)."
                 + " Reading it is fine — ft_launch bundleId: com.apple.springboard is the supported"
                 + " way to attach there — but ft_launch \(launched) first if you meant to keep"
                 + " testing the app.\n"
-        }
-        if isLockScreenOrAlwaysOnTree(snapshot) {
+        case .locked:
             return "⚠️ This tree is the lock screen / always-on display (\(session)), not \(launched):"
                 + " the device screen went dark or is locked, so it is not a dialog to operate. The"
                 + " next tool call wakes the screen — read the screen again before acting.\n"
-        }
-        if isNotificationShadeTree(snapshot) {
+        case .covered:
             // 通知シェード・クイック設定の要素がある systemui の木。権限ダイアログではなく、アプリは下で生きている
             return "⚠️ \(session) (the notification shade or quick settings) is drawn over \(launched), not a dialog of the app."
                 + " \(launched) is still running underneath: ft_navigate back closes the shade and keeps the app's state"
                 + " (ft_launch also closes it but restarts the app, so typed values are lost)."
                 // ロック画面の木も同じ要素 ID を持ち、解除画面の本体が無い回は木から分けられない
                 + " If back changes nothing, this is the lock screen: unlock the device first.\n"
-        }
-        if systemDialogPackages.contains(session) {
+        case .dialog:
             return "⚠️ \(session) is a system dialog drawn over \(launched)"
                 + " (e.g. a permission prompt), not the app itself. Operate the dialog"
                 + " (tap its buttons, or back) to get back to \(launched) — ft_launch restarts"
                 + " the app and leaves the dialog on screen, so you would loop without progress.\n"
-        }
-        if let stoppedByTool {
+        case .toolStopped(let by):
             return "⚠️ This tree belongs to \(session), NOT the app you launched (\(launched))"
-                + " — \(launched) is not running because \(stoppedByTool) stopped it just now"
+                + " — \(launched) is not running because \(by) stopped it just now"
                 + " (not a crash). ft_launch \(launched) to start it again.\n"
-        }
-        if let processEvidence, !processEvidence.running {
+        case .processGone:
             var note = "⚠️ This tree belongs to \(session), NOT the app you launched (\(launched))"
                 + " — and \(launched) has no process any more: it may have crashed."
-            if !processEvidence.crashSummary.isEmpty {
+            if let processEvidence, !processEvidence.crashSummary.isEmpty {
                 note += " Last crash in logcat -b crash: "
                     + processEvidence.crashSummary.joined(separator: " / ") + "."
                     // **`crashOnly` は ft_logs の引数名ではない**: 実際のスキーマは
-                    // `all`(既定 false = crash バッファのみ)なので、無指定の ft_logs が
-                    // そのまま全文を出す
+                    // `all`(既定 false = crash バッファのみ)なので、無指定の ft_logs がそのまま全文を出す
                     + " ft_logs shows the full trace."
             }
             return note + " ft_launch \(launched) to start it again.\n"
+        case .inFront, .otherApp, .unknown:
+            break
         }
         return "⚠️ This tree belongs to \(session), NOT the app you launched (\(launched))."
             + " Leaving the app (back from its first screen, home, an app switch) hands the"
@@ -1994,38 +2001,15 @@ extension MCPServer {
             + " ft_launch \(launched) before trusting these refs\n"
     }
 
-    /// 通知シェード・クイック設定の木か(systemui の要素 ID で見る。ID が読めない systemui の木は従来どおり「システムダイアログ」)
+    /// 木の判定は FTCore.SystemUITreeKind(Android の systemui の木)に1つ。ここは転送
     static func isNotificationShadeTree(_ snapshot: SnapshotResponse) -> Bool {
-        guard snapshot.sessionBundleID == "com.android.systemui" else { return false }
-        return snapshot.elements.contains { element in
-            let id = (element.identifier ?? "").lowercased()
-            return id.contains("notification_panel") || id.contains("notification_stack") || id.contains("expanded_qs")
-                || id.contains("quick_settings") || id.contains("qs_panel")
-        }
+        SystemUITreeKind.isNotificationShade(sessionBundleID: snapshot.sessionBundleID,
+                                             identifiers: snapshot.elements.map(\.identifier))
     }
 
-    /// 解除画面の本体の要素 ID(`keyguard_pin_view` 等。AOSP の KeyguardPINView / PasswordView / PatternView / SimPin / SimPuk)
-    static let keyguardBouncerIDMarkers = ["keyguard_pin_view", "keyguard_password_view", "keyguard_pattern_view",
-                                           "keyguard_sim_pin_view", "keyguard_sim_puk_view"]
-
-    /// 消灯中の常時表示(AOD)・ロック画面の木か。`com.android.systemui` は通知シェードも同じ ID で名乗るので、
-    /// **キーガード/時計の要素 ID が木にあるとき**だけ言う(`keyguard_*` / `animatable_clock_view` /
-    /// `lockscreen*`)。無ければ従来どおり「システムダイアログ」
     static func isLockScreenOrAlwaysOnTree(_ snapshot: SnapshotResponse) -> Bool {
-        guard snapshot.sessionBundleID == "com.android.systemui" else { return false }
-        let ids = snapshot.elements.map { ($0.identifier ?? "").lowercased() }
-        // **解除画面(PIN・パスワード・パターン・SIM)の本体があれば、クイック設定の要素が同じ木に居てもロック画面**:
-        // 実機のロック画面の木は quick_settings_container・expanded_qs_scroll_view を常に持つ(下の除外だけだと
-        // 解除画面を「通知シェード」と呼び、従えない対処 = back で閉じる、を勧めた)。横向きのシェードはこの本体を持たない
-        if ids.contains(where: { id in Self.keyguardBouncerIDMarkers.contains { id.contains($0) } }) { return true }
-        // 横向きの通知シェード(split shade)は keyguard_message_area_container を持つ。クイック設定のパネルがあれば
-        // 点灯中のシェードで、ロック画面ではない(ロック画面にクイック設定は無い)
-        if ids.contains(where: { $0.contains("expanded_qs") || $0.contains("quick_settings") || $0.contains("qs_panel") }) {
-            return false
-        }
-        return ids.contains { id in
-            id.contains("keyguard") || id.contains("animatable_clock_view") || id.contains("lockscreen")
-        }
+        SystemUITreeKind.isLockScreenOrAlwaysOn(sessionBundleID: snapshot.sessionBundleID,
+                                                identifiers: snapshot.elements.map(\.identifier))
     }
 
     /// `switchedAppNote` の `processEvidence` 引数を埋める(Android のみ・adb 2〜3往復)。

@@ -73,7 +73,8 @@ extension MCPServer {
         recordSnapshot(snapshot, snapshotDriver is AndroidDriver ? "android" : "ios", args)
         return text(withPendingWarnings(
             await snapshotBody(snapshot, driver: snapshotDriver, args: args,
-                               extraNote: inheritedNote + waitNote, foldsSelectorTables: false),
+                               extraNote: inheritedNote + waitNote, foldsSelectorTables: false,
+                               probesCovering: true),
             args: args))
     }
 

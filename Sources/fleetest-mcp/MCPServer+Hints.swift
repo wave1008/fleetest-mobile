@@ -278,22 +278,72 @@ extension MCPServer {
         return "note: search took \(Self.elapsedText(milliseconds: Double(totalMs)))\(detail).\n"
     }
 
-    /// 「session のアプリが今も前面か」。判定できないドライバでは黙る(嘘を足さない)
-    static func foregroundNote(_ sessionBundleID: String?, driver: AppDriver) async -> String {
-        guard let bundleID = sessionBundleID else { return "" }
-        // SpringBoard は常に動いているので appstate は「前面」と答える —— アプリを開いた後でも。iOS は別アプリの前面を知る手段が無い
-        // (`BridgeClient.foregroundAppID`)ので yes と断定せず、アプリを開いたなら向け直しが要ると言う
-        if bundleID == "com.apple.springboard" {
+    /// Android の通知シェード等が入力フォーカスを持つか。**読めなければ `.notAnswerable`**(`shadeHoldsInputFocus` は
+    /// 読めないとき false を返すので、false を「持たない」とは言えない)。dumpsys は同期の子プロセスなので
+    /// 協調スレッドプールを塞がないよう別キューで撃つ
+    static func shadeProbe(_ android: AndroidDriver) async -> Probe<Bool> {
+        await withCheckedContinuation { continuation in
+            DispatchQueue.global().async {
+                continuation.resume(returning: android.shadeHoldsInputFocus() ? .value(true) : .notAnswerable)
+            }
+        }
+    }
+
+    /// ft_status の " / foreground: …" の文言(判定は `ForegroundState.judge`)。判定できない(unknown)は空 =
+    /// 嘘を足さない。セッションが起動したアプリと違うとき(`session != launched`)は、付け替わった事実を言う
+    static func statusForegroundText(_ verdict: ForegroundVerdict, launched: String?, session: String?) -> String {
+        let reattached = launched != nil && session != nil && launched != session
+        switch verdict {
+        case .inFront:
+            return " / foreground: yes"
+        case .home:
+            if reattached, let launched {
+                return " / foreground: no (the session now points at SpringBoard, not \(launched), the app this session"
+                    + " launched — ft_launch \(launched) to come back)"
+            }
+            // SpringBoard は常に動いているので appstate は「前面」と答える —— アプリを開いた後でも。iOS は別アプリの前面を知る手段が無い
+            // ので yes と断定せず、アプリを開いたなら向け直しが要ると言う
             return " / foreground: unknown (the session is SpringBoard — if you opened an app from the home screen,"
                 + " ft_launch its bundleId with resume: true to drive it)"
+        case .locked:
+            return " / foreground: no (the lock screen or always-on display is up\(launched.map { " over \($0)" } ?? "") —"
+                + " unlock the device, then ft_launch the bundleId with resume: true if the app is not back)"
+        case .covered(let surface):
+            switch surface {
+            case .shade:
+                return " / foreground: no (the notification shade or quick settings is drawn over\(launched.map { " \($0)" } ?? " the app") —"
+                    + " the app is usually still running underneath, not crashed; ft_navigate back closes the shade and keeps the app's state)"
+            case .coverSheet:
+                // iOS(XCUITest ブリッジだけが答える): ロック中・通知センターが降りている間は、アプリは前面のまま木に答えるか、
+                // `/appstate` が false を返す。どちらも「別のアプリかホーム画面」とは言えない
+                return " / foreground: no (the lock screen or the notification centre is drawn over the app —"
+                    + " unlock the device or dismiss it, then ft_launch the bundleId with resume: true if the app is not back)"
+            default:
+                return " / foreground: no (\(coveringSurfaceName(surface)) is drawn over the app —"
+                    + " dismiss it, then ft_launch the bundleId with resume: true if the app is not back)"
+            }
+        case .dialog(let package):
+            let over = launched.map { " over \($0)" } ?? ""
+            return " / foreground: no (\(package) — system UI (a permission dialog, the notification shade, quick settings"
+                + " or the lock screen) is drawn\(over); the app is usually still running underneath, not crashed;"
+                + " ft_snapshot says which one it is, ft_navigate back closes a shade and keeps the app's state)"
+        case .otherApp(let name?):
+            if reattached, let launched {
+                return " / foreground: no (the session now points at \(name), not \(launched), the app this session"
+                    + " launched — \(launched) may have crashed or been left; ft_snapshot says which, ft_launch \(launched) to come back)"
+            }
+            return " / foreground: no (\(name) is in front — ft_launch to come back)"
+        case .otherApp(nil):
+            return " / foreground: no (\(notInFrontCauses) — ft_launch to come back)"
+        case .processGone:
+            return " / foreground: no (\(launched ?? "the app") has no process any more: it may have crashed;"
+                + " ft_launch to start it again)"
+        case .toolStopped(let by):
+            return " / foreground: no (\(launched ?? "the app") is not running because \(by) stopped it (not a crash);"
+                + " ft_launch to start it again)"
+        case .unknown:
+            return ""
         }
-        if let front = (try? await driver.foregroundAppID()) ?? nil {
-            return front == bundleID ? " / foreground: yes"
-                : " / foreground: no (\(front) is in front — ft_launch to come back)"
-        }
-        guard let inFront = try? await driver.isAppForeground(bundleID: bundleID) else { return "" }
-        return inFront ? " / foreground: yes"
-            : " / foreground: no (another app or the home screen is in front — ft_launch to come back)"
     }
 
     /// FM が死んでいるなら status に出す。**生きているときは黙る** —— 毎回「FM: alive」と
@@ -1314,9 +1364,45 @@ extension MCPServer {
             + " what is on screen)"
     }
 
+    /// 判定は `ForegroundState.judge`(シェードは入力フォーカスを持つ窓の事実で、前面のアプリ名より先に見る =
+    /// シェードの下でも `foregroundAppID` は下のアプリを返す)。読めなければ黙る
     func coordinateFrontAppWarning(_ driver: AppDriver, args: [String: Any]) async -> String {
         guard let launched = launchedBundleIDs[Self.sessionKey(args)] else { return "" }
-        return Self.frontAppWarning(launched: launched, front: (try? await driver.foregroundAppID()) ?? nil)
+        var facts = ForegroundFacts(launched: launched, sessionBundleID: launched)
+        if let android = driver as? AndroidDriver { facts.shadeHoldsInputFocus = await Self.shadeProbe(android) }
+        facts.front = await ForegroundState.frontProbe(driver)
+        switch ForegroundState.judge(facts) {
+        case .covered(.shade):
+            return " (warning: the notification shade or quick settings is open over \(launched) (the app this session launched)"
+                + " — this acted on the shade, not the app. ft_navigate back closes it and keeps the app's state,"
+                + " or ft_snapshot to see what is on screen)"
+        case .otherApp(let name?):
+            return Self.frontAppWarning(launched: launched, front: name)
+        default:
+            return ""
+        }
+    }
+
+    /// 操作の後で、前面がアプリを離れていたら事実として言う(ft_gesture と ft_long_press が共有。
+    /// 画面の端から始めた指は OS のジェスチャ(戻る・ホーム・シェード)として取られうる)。
+    /// 撃つ前の警告(`coordinateFrontAppWarning`)が既に言っているときは重ねない(`alreadyWarned`)
+    func leftAppAfterGestureNote(_ driver: AppDriver, args: [String: Any], alreadyWarned: Bool) async -> String {
+        guard !alreadyWarned, let launched = launchedBundleIDs[Self.sessionKey(args)] else { return "" }
+        var facts = ForegroundFacts(launched: launched, sessionBundleID: launched)
+        if let android = driver as? AndroidDriver { facts.shadeHoldsInputFocus = await Self.shadeProbe(android) }
+        facts.front = await ForegroundState.frontProbe(driver)
+        switch ForegroundState.judge(facts) {
+        case .covered(.shade):
+            return " (warning: after the gesture the notification shade or quick settings was open over \(launched)"
+                + " — a touch that starts at the top edge can be taken as the shade gesture. Start the gesture clear of the"
+                + " screen edge; ft_navigate back closes the shade)"
+        case .otherApp(let front?):
+            return " (warning: after the gesture \(front) was in front, not \(launched) — a touch that starts"
+                + " at a screen edge can be taken as a system gesture (back / home / the shade). Start the gesture"
+                + " clear of the screen edge, or ft_launch \(launched) to come back)"
+        default:
+            return ""
+        }
     }
 
     /// 座標の操作が画面の範囲を知るための screen。直近の木があればそれ(追加の読みは払わない)、

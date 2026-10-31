@@ -62,8 +62,8 @@ final class RefGuardHintsBatchCTests: XCTestCase {
 
     /// SpringBoard のセッションは常に前面に見える(appstate)ので yes と言わない
     func testSpringBoardSessionIsNotReportedAsForeground() async {
-        let driver = FakeDriver()
-        let note = await MCPServer.foregroundNote("com.apple.springboard", driver: driver)
+        let verdict = ForegroundState.judge(ForegroundFacts(sessionBundleID: "com.apple.springboard"))
+        let note = MCPServer.statusForegroundText(verdict, launched: nil, session: "com.apple.springboard")
         XCTAssertFalse(note.contains("foreground: yes"), note)
         XCTAssertTrue(note.contains("foreground: unknown"), note)
     }

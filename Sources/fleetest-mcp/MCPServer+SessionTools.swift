@@ -47,26 +47,31 @@ extension MCPServer {
         // session はブリッジが掴んでいるアプリで、ft_navigate home の後も変わらない。
         // 前面の照会は 1 往復で済むので、シナリオ冒頭の appIs 相当をここで賄えるようにする
         // **session がこのセッションの起動したアプリと違うなら、前面が「yes」でも別のアプリ**(Android はアプリが死ぬと
-        // ブリッジの session が下から出たアプリへ付け替わり、`foregroundNote` は付け替え後の session を前面と照合して yes と答えていた。
+        // ブリッジの session が下から出たアプリへ付け替わり、前面の判定は付け替え後の session を前面と照合して yes と答えていた。
         // ft_snapshot の「NOT the app you launched」と同じ事実を言う)
-        let foreground: String
-        if let launched = launchedBundleIDs[statusKey], let current = status.sessionBundleID, current != launched,
-           current == "com.android.systemui" {
-            foreground = " / foreground: no (the session points at \(current), system UI (the notification shade, quick settings, the lock screen"
-                + " or a system dialog) drawn over \(launched) — the app is usually still running underneath, not crashed;"
-                + " ft_snapshot says which one it is, ft_navigate back closes a shade and keeps the app's state)"
-        } else if let launched = launchedBundleIDs[statusKey], let current = status.sessionBundleID, current != launched {
-            foreground = " / foreground: no (the session now points at \(current), not \(launched), the app this session"
-                + " launched — \(launched) may have crashed or been left; ft_snapshot says which, ft_launch \(launched) to come back)"
-        } else if let covering = try? await driver(args).systemUICovering(), covering.covering,
-                  covering.marker == "SBCoverSheetWindow" {
-            // iOS(XCUITest ブリッジだけが答える): 端末がロックされている・通知センターが降りている間は、アプリは
-            // 前面のまま木に答えるか、`/appstate` が false を返す。どちらも「別のアプリかホーム画面」とは言えない
-            foreground = " / foreground: no (the lock screen or the notification centre is drawn over the app —"
-                + " unlock the device or dismiss it, then ft_launch the bundleId with resume: true if the app is not back)"
-        } else {
-            foreground = await Self.foregroundNote(status.sessionBundleID, driver: try await driver(args))
+        // 判定は ForegroundState.judge の1箇所(snapshot の注記・batch の中断と共有)。ここは事実を集めて文言にするだけ。
+        // セッションが別の面へ付け替わっている(launched != session)ときは、前面の照会を撃たない(judge が先に答える)
+        let foregroundDriver = try await driver(args)
+        let launched = launchedBundleIDs[statusKey]
+        let askFront = status.sessionBundleID.map { session in
+            session != ForegroundState.springboard && !Self.systemDialogPackages.contains(session)
+                && (launched == nil || launched == session)
+        } ?? false
+        var facts = ForegroundFacts(launched: launched, sessionBundleID: status.sessionBundleID,
+                                    stoppedByTool: toolStoppedBundleIDs[statusKey])
+        if askFront, let session = status.sessionBundleID {
+            facts.covering = await ForegroundState.coveringProbe(foregroundDriver)
+            if let android = foregroundDriver as? AndroidDriver {
+                facts.shadeHoldsInputFocus = await Self.shadeProbe(android)
+            }
+            facts.front = await ForegroundState.frontProbe(foregroundDriver)
+            // iOS は前面のアプリ名を答えない = 真偽だけ聞く(Android は名前で足りる)
+            if facts.front.value == nil {
+                facts.sessionInForeground = await ForegroundState.inForegroundProbe(foregroundDriver, bundleID: session)
+            }
         }
+        let foreground = Self.statusForegroundText(ForegroundState.judge(facts), launched: launched,
+                                                   session: status.sessionBundleID)
         return text(withPendingWarnings(
             "ready: \(status.ready) / \(status.device) (\(status.osVersion))\(endpoint)"
             + " / session: \(session)\(foreground)\(await Self.fmLivenessNote())", args: args))

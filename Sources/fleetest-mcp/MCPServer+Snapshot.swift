@@ -395,7 +395,8 @@ extension MCPServer {
     func snapshotBody(_ snapshot: SnapshotResponse, driver: AppDriver,
                               args: [String: Any], extraNote: String = "",
                               foldsSelectorTables: Bool,
-                              cache: SnapshotAnnotationCache? = nil) async -> String {
+                              cache: SnapshotAnnotationCache? = nil,
+                              probesCovering: Bool = false) async -> String {
         let cache = cache ?? SnapshotAnnotationCache()
         // **背面のアプリのツリーを「今の画面」として返さない**: XCUITest の snapshot は
         // セッションのアプリに閉じているので、**別のアプリが前面に来ても同じ木を返し続ける**。
@@ -412,6 +413,8 @@ extension MCPServer {
             if decision.appIsBack { backgroundedByNavigate.remove(Self.sessionKey(args)) }
             backgroundNote = decision.note
         }
+        // 覆い(iOS のカバーシート・コントロールセンター等)は照会の費用があるので、呼び手が許したときだけ聞く(coveringNote の doc)
+        if probesCovering { backgroundNote = await Self.coveringNote(driver: driver) + backgroundNote }
         // **すり替わりを先頭に置く**: これが起きているとき、以下の一覧は丸ごと別アプリのもので、
         // ghost 注記も scrollFrame 候補も読む意味が無い
         let switchedLaunched = launchedBundleIDs[Self.sessionKey(args)]
@@ -695,6 +698,8 @@ extension MCPServer {
             snapshot = try await consumePendingTypeKeyboardCheck(snapshot, driver: snapshotDriver, args: args)
             var settleNote = ""
             var waitNote = ""
+            // 撮り直しても操作の前と変わらなかった = 覆いの下の形(coveringNote の doc)。このときだけ覆いを聞く
+            var stillUnchanged = false
             // **waitFor は settle-lite の代わり**(併用しない): 待つ理由が同じ(木がまだ
             // 追いついていない)なので、両方は二重に待つだけ。パターンは ft_snapshot の
             // waitFor 分岐と同じ(refetched の扱いも含め)
@@ -747,6 +752,7 @@ extension MCPServer {
                 try await Task.sleep(nanoseconds: UInt64(max(0, settleWaitSeconds) * 1_000_000_000))
                 let reread = try await freshSnapshot(snapshotDriver, args: args)
                 if Self.looksUnchanged(snapshot, reread) {
+                    stillUnchanged = true
                     settleNote = "note: the tree still looked unchanged after a short re-read"
                         + " wait — the action may not have changed the screen."
                         + Self.unrepresentedScreenCaveat(reread)
@@ -796,7 +802,7 @@ extension MCPServer {
             SlowCallWatchdog.mark("composing the tree and notes")
             let body = "\n\n" + inheritedNote + waitNote + settleNote + readNote
                 + (await snapshotBody(snapshot, driver: snapshotDriver, args: effectiveArgs,
-                                      foldsSelectorTables: true))
+                                      foldsSelectorTables: true, probesCovering: stillUnchanged))
             return (body, true)
         } catch {
             let body = "\n\n(snapshotAfter could not read the screen:"
@@ -1083,12 +1089,33 @@ extension MCPServer {
     static func systemUICoveringWarning(_ found: ElementInfo, driver: AppDriver) async -> String {
         guard let covering = try? await driver.systemUICovering(), covering.covering
         else { return "" }
-        let surface = covering.marker == "SBCoverSheetWindow"
-            ? "the notification centre (or the lock screen)" : "Control Center"
+        let surface = Self.coveringSurfaceName(CoveringSurface.from(marker: covering.marker))
         return " (warning: \(surface) is drawn over the app right now, so \(RefGuard.describe(found))"
             + " is not actually reachable — the element list still shows what is underneath,"
             + " because the covering surface belongs to another process and never appears in it."
             + " This tap landed on that surface. Dismiss it first, then read the screen again)"
+    }
+
+    /// 面の呼び名(ft_status・snapshot の注記・タップ後の警告で共有)
+    static func coveringSurfaceName(_ surface: CoveringSurface) -> String {
+        switch surface {
+        case .coverSheet: return "the notification centre (or the lock screen)"
+        case .controlCenter: return "Control Center"
+        case .appSwitcher: return "the app switcher"
+        case .shade: return "the notification shade or quick settings"
+        case .other(let marker): return "a system surface (\(marker))"
+        }
+    }
+
+    /// 読みの応答に添える「覆われている」注記。iOS XCUITest だけが答える(他は `.notAnswerable` で黙る)。
+    /// 費用は `/systemui/covering` の1往復。**呼ぶのは ft_snapshot(1手ずつ読む口)と、操作の直後に木が変わらなかった
+    /// snapshotAfter だけ** —— 覆いの下では木が操作の前と1バイト同じままなので「変わらなかった」形が唯一の手がかり。
+    /// 毎手の照会は OI-46 で取り消した(約 0.6 秒)ので足さない
+    static func coveringNote(driver: AppDriver) async -> String {
+        guard case .value(let surface?) = await ForegroundState.coveringProbe(driver) else { return "" }
+        return "⚠️ \(coveringSurfaceName(surface)) is drawn over the app right now: the tree below is the app's own tree"
+            + " (the covering surface belongs to another process and never appears in it), NOT what is on screen —"
+            + " a tap by ref here lands on that surface. Dismiss it first, then read the screen again.\n"
     }
 
     /// **木が画面を代表していないことを、木の外から知る唯一の答え**(iOS xcuitest だけ)。

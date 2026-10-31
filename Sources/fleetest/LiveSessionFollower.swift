@@ -129,6 +129,8 @@ final class LiveSessionFollower {
         // preferred の前面判定だけでなく**前面アプリの探索も必ず誤る**ので、駆動対象が前面か
         // どうかに関わらず先に聞く(実害: 駆動対象でない Safari を見ている状態で
         // スイッチャーを開くと、探索が Safari を「前面」と拾って木が Safari のままだった)。
+        // ForegroundState.judge に寄せない: ここの問いは「次にどのアプリへ向けるか」で、覆いを見つけたら向け直さない・
+        // 前面アプリの探索まで含む。「いま前面か」を答える judge とは目的が別
         let covered = ((try? await driver.systemUICovering()) ?? nil)?.covering == true
         if covered {
             foreground = false

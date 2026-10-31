@@ -364,11 +364,25 @@ extension StepExecutor {
     /// 前面を名指しできないドライバ(iOS)は `isAppForeground` だけで判断し、名前は "another app"
     func frontAppIfSessionAppLeft(_ sessionBundleID: String?) async -> String? {
         guard let bundleID = sessionBundleID, !bundleID.isEmpty else { return nil }
-        if let front = (try? await driver.foregroundAppID()) ?? nil, !front.isEmpty {
-            return front == bundleID ? nil : front
+        // 判定は ForegroundState.judge。覆い・シェードの照会は撃たない(探索の打ち切りの1回に費用を足さない)
+        var facts = ForegroundFacts(launched: nil, sessionBundleID: bundleID)
+        facts.front = await ForegroundState.frontProbe(driver)
+        if facts.front.value == nil {
+            facts.sessionInForeground = await ForegroundState.inForegroundProbe(driver, bundleID: bundleID)
         }
-        guard let inFront = try? await driver.isAppForeground(bundleID: bundleID), !inFront else { return nil }
-        return "another app"
+        switch ForegroundState.judge(facts) {
+        case .otherApp(let name): return name ?? "another app"
+        case .dialog(let package): return package == bundleID ? nil : package
+        default: return nil
+        }
+    }
+
+    /// 失敗経路で「覆われた」と言う前に、アプリが前面を離れていた事実があれば添える。
+    /// 緑の経路では呼ばない(読みを足さない)。前面を読めない・アプリのままなら空
+    func leftForegroundSuffix(_ sessionBundleID: String?) async -> String {
+        guard let front = await frontAppIfSessionAppLeft(sessionBundleID) else { return "" }
+        return " (the app was not in the foreground when this failed — \(front) was in front, so the target was not"
+            + " covered by the app's own UI: bring the app back with launch)"
     }
 
     /// `notExist(scroll:)` の裏返し: スクロール探索中に見つかってしまったら不在検証は失敗
