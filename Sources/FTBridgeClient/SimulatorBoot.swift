@@ -9,7 +9,8 @@ import Foundation
 import FTCore
 
 public enum SimulatorBoot {
-    public enum Error: Swift.Error, CustomStringConvertible {
+    public enum Error: Swift.Error, CustomStringConvertible, LocalizedError {
+        public var errorDescription: String? { description }
         case failed(udid: String, detail: String)
         public var description: String {
             switch self {
@@ -22,14 +23,21 @@ public enum SimulatorBoot {
     /// 永久に返らない(枠も run も止まる)。根拠: 枠なしの8台同時でも3分強 → 枠は2台なのでその3倍あれば正常な起動は切らない
     static let bootTimeoutSeconds: Double = 600
 
-    /// 期限切れは起動が途中で止まった形。Shutdown へ戻してから失敗にする(残すと次の bootstatus も同じ所で止まる)
-    static func bootWithinLimit(udid: String, run: (Double) throws -> Shell.Result,
-                                shutdown: () -> Void) throws -> Shell.Result {
+    /// 期限切れは起動が途中で止まった形。Shutdown へ戻して1回だけ撃ち直す(M1mini の実測: 51 分止まった台が Shutdown の後は 3/3 で 6〜13 秒)。
+    /// 2回目も止まったら失敗にする(同じ操作を繰り返さない)
+    static func bootWithinLimit(udid: String, run: (Double) throws -> Shell.Result, shutdown: () -> Void,
+                                log: (String) -> Void) throws -> Shell.Result {
         do {
             return try run(bootTimeoutSeconds)
         } catch ShellError.timedOut {
             shutdown()
-            throw Error.failed(udid: udid, detail: "did not finish booting within \(Int(bootTimeoutSeconds))s;"
+            log("the simulator \(udid) did not finish booting within \(Int(bootTimeoutSeconds))s; shut it down and booting once more")
+        }
+        do {
+            return try run(bootTimeoutSeconds)
+        } catch ShellError.timedOut {
+            shutdown()
+            throw Error.failed(udid: udid, detail: "did not finish booting within \(Int(bootTimeoutSeconds))s, twice;"
                 + " the simulator was shut down")
         }
     }
@@ -51,7 +59,8 @@ public enum SimulatorBoot {
                 try bootWithinLimit(
                     udid: udid,
                     run: { try Shell.run(["xcrun", "simctl", "bootstatus", udid, "-b"], timeout: $0) },
-                    shutdown: { _ = try? Shell.run(["xcrun", "simctl", "shutdown", udid], timeout: 30) })
+                    shutdown: { _ = try? Shell.run(["xcrun", "simctl", "shutdown", udid], timeout: 30) },
+                    log: log)
             })
     }
 

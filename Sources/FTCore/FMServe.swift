@@ -172,7 +172,9 @@ public enum FMServeWire {
     }
 }
 
-public enum FMServeError: Error, CustomStringConvertible {
+public enum FMServeError: Error, CustomStringConvertible, LocalizedError {
+
+    public var errorDescription: String? { description }
     /// 常駐プロセスに届かない(起こしていない・死んだ・答えない)。**FM の失敗ではない**
     case unavailable(String)
 

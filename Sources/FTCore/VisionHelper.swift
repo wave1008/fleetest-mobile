@@ -66,7 +66,9 @@ public enum VisionHelperWire {
     }
 }
 
-public enum VisionHelperError: Error, CustomStringConvertible {
+public enum VisionHelperError: Error, CustomStringConvertible, LocalizedError {
+
+    public var errorDescription: String? { description }
     /// 繋がらない・答えない・期限切れ(`detail` に事実)
     case unavailable(String)
     /// 補助プロセス自身の Vision が健全でない(暖機中を含む)

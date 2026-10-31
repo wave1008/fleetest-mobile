@@ -365,7 +365,9 @@ public enum FMServeServer {
     }
 }
 
-enum FMServeProbeError: Error, CustomStringConvertible {
+enum FMServeProbeError: Error, CustomStringConvertible, LocalizedError {
+
+    var errorDescription: String? { description }
     case visionUnsupported
     var description: String { FMVisionSupport.requirement }
 }

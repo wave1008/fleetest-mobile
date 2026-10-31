@@ -977,10 +977,12 @@ struct RunScenarios: AsyncParsableCommand {
             // --broadcast は (シナリオ × デバイス) を数える。単位を言わないと「3本のはずが
             // 24 passed」に見える
             let unit = broadcast ? "scenario run(s) (one per scenario per device)" : "scenario(s)"
-            ConsoleOut.out(failedCount == 0
+            ConsoleOut.out(RunTotalsLine.noScenarioRan(ranCount: ranCount, workQueue: common.workQueue,
+                                                       abortReason: runSummary.abortReason)
+                ?? (failedCount == 0
                   ? "✅ All \(ranCount - runSummary.skipped) \(unit) passed\(skippedSuffix)"
                   : "❌ \(failedCount) of \(ranCount) \(unit) failed\(skippedSuffix)"
-                    + (runSummary.interrupted ? Self.interruptedCountNote : ""))
+                    + (runSummary.interrupted ? Self.interruptedCountNote : "")))
             // 自己修復で通ったシナリオ(合否は変えない。✅ の行と同じ顔なので、ここで言わないと選択子の腐りが見えない)
             let records = RunResultsStore.records(runDir: recorder.runDir)
             if let healed = HealedScenarios.summaryLine(records: records) {

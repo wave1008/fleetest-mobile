@@ -256,7 +256,9 @@ public enum FramedUnixSocket {
     }
 }
 
-public enum FramedUnixSocketError: Error, CustomStringConvertible {
+public enum FramedUnixSocketError: Error, CustomStringConvertible, LocalizedError {
+
+    public var errorDescription: String? { description }
     /// 繋がらない・答えない・期限切れ(`detail` に事実)
     case unavailable(String)
     case frameTooLarge

@@ -129,7 +129,9 @@ public enum BridgeSourceSet: String, CaseIterable, Sendable {
     }
 }
 
-public enum BridgeSourceSetError: Error, CustomStringConvertible {
+public enum BridgeSourceSetError: Error, CustomStringConvertible, LocalizedError {
+
+    public var errorDescription: String? { description }
     case directoryUnreadable(String, String)
     case fileUnreadable(String)
 

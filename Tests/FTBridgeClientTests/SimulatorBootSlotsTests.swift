@@ -109,30 +109,47 @@ final class SimulatorBootSlotsTests: XCTestCase {
         XCTAssertEqual(SimulatorBoot.bootTimeoutSeconds, 600)
     }
 
-    func testStalledBootShutsDownAndFails() {
-        var limit: Double?
+    func testStalledBootIsRetriedOnceAfterShutdown() throws {
+        var attempts = 0
+        var shutdowns = 0
+        var notes: [String] = []
+        let result = try SimulatorBoot.bootWithinLimit(
+            udid: "U",
+            run: { seconds in
+                attempts += 1
+                if attempts == 1 { throw ShellError.timedOut(args: ["xcrun"], seconds: seconds) }
+                return Shell.Result(status: 0, output: "")
+            },
+            shutdown: { shutdowns += 1 },
+            log: { notes.append($0) })
+        XCTAssertEqual(result.status, 0)
+        XCTAssertEqual(attempts, 2)
+        XCTAssertEqual(shutdowns, 1)
+        XCTAssertEqual(notes.count, 1)
+    }
+
+    func testBootStalledTwiceFailsWithTheFact() {
+        var attempts = 0
         var shutdowns = 0
         XCTAssertThrowsError(try SimulatorBoot.bootWithinLimit(
             udid: "U",
             run: { seconds in
-                limit = seconds
+                attempts += 1
                 throw ShellError.timedOut(args: ["xcrun"], seconds: seconds)
             },
-            shutdown: { shutdowns += 1 })) { error in
-            guard case SimulatorBoot.Error.failed(let udid, let detail) = error else {
-                return XCTFail("unexpected \(error)")
-            }
-            XCTAssertEqual(udid, "U")
-            XCTAssertTrue(detail.contains("did not finish booting within 600s"), detail)
+            shutdown: { shutdowns += 1 },
+            log: { _ in })) { error in
+            XCTAssertTrue(error.localizedDescription.contains("did not finish booting within 600s, twice"),
+                          error.localizedDescription)
         }
-        XCTAssertEqual(limit, SimulatorBoot.bootTimeoutSeconds)
-        XCTAssertEqual(shutdowns, 1)
+        XCTAssertEqual(attempts, 2)
+        XCTAssertEqual(shutdowns, 2)
     }
 
     func testNormalBootDoesNotShutDown() throws {
         var shutdowns = 0
         let result = try SimulatorBoot.bootWithinLimit(
-            udid: "U", run: { _ in Shell.Result(status: 0, output: "") }, shutdown: { shutdowns += 1 })
+            udid: "U", run: { _ in Shell.Result(status: 0, output: "") }, shutdown: { shutdowns += 1 }, log: { _ in })
         XCTAssertEqual(result.status, 0)
         XCTAssertEqual(shutdowns, 0)
     }
