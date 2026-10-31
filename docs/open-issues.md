@@ -506,13 +506,12 @@
 - replace なしの古い ref は照合し直して打てる。replace の経路(消去の前の ref の検査)で、キーボードで動いた欄の枠がアラートの枠の外と読まれている疑い
 - 手がかり: 断る直前の木で、欄とアラートの枠を突き合わせる
 
-### OI-60 iOS の CMP で replace の消去の後に欄が木から消えると、キーボードを閉じて引き直す手が無い
-- 状態: 経路確定
-- 確認: コミット未記録(2026-10-30)
+### OI-60 iOS の CMP で replace の消去の後に欄が木から消える形の再確認
+- 状態: 推測
+- 確認: コミット未記録(2026-11-01)
 - 経緯: 発見: 10-30 午後の探索的テスト(SE3 実機・E2E-CMP のパスワード欄 = se3 F8 の CMP の形)
 
-- 引き直し(StepExecutor の relocateAfterClear / MCP の ftType)は、見つからずキーボードが出ていれば hideKeyboardIfShown で閉じて1回だけ引き直す。XCUITest ブリッジは `/hidekeyboard` を 501 で断るので、iOS では何も送らずに「消した・打っていない」で失敗する
-- 手がかり: DSL の hideKeyboard と同じ「キーボードの上の空きを叩く」を引き直しにも使うか(Enter は送らない = 消した欄で確定させない)
+- 当時の経路(`hideKeyboardIfShown` が XCUITest で 501)は通らなくなった。引き直しは DSL も MCP も `closeKeyboardWithoutEnter`(iOS はキーボードの外を叩く)。SE3 実機で同じ形を確かめたら閉じる
 
 ### OI-62 横向きの ft_screenshot で maxWidth が高さの上限として効き、fullSize の PNG の画素が縦のまま(向きは eXIf だけ)
 - 状態: 経路確定
@@ -611,13 +610,6 @@
 - emu F13 は `type "#field_first" "Taro\n"; type "Jiro"` の形は直った(改行入りの type の後に叩いた欄の控えを捨てる)。典型の `tap; type; pressEnter; type` は 2/2 で 1つ目の欄へ入り All passed
 - 手がかり: IME の「次へ」の後に、ブリッジが焦点として掴むノードの id と、画面の焦点(echo の focus=)を並べて記録する
 
-### OI-74 MCP の ft_tap(ref)の後の ft_type が、救済で別の欄へ打つ(Flutter)
-- 状態: 再現済み
-- 確認: コミット未記録(2026-10-30)
-- 経緯: 発見: 10-30 午後の探索的テスト(Emulator・E2EX-Flutter = emu F14 の MCP の形)
-
-- DSL の形は直った(`InputFocusRescue.currentFrame` で、撮り直した木の枠で突き合わせる)。MCP の ft_tap ref → ft_type は 2/2 で「名」へ入る。MCP 側の救済の材料(lastTapTargets は叩く前の木)が古い枠のまま
-
 ### OI-75 Android の横向きで、座標の ft_drag / ft_long_press(x,y) と DSL の座標ジェスチャが縦の座標系で撃たれる
 - 状態: 再現済み
 - 確認: コミット未記録(2026-10-30)
@@ -644,13 +636,6 @@
 - replace の引き直しで閉じた後、`.closed` が持つ撮り直しの木を使わずに撃つ側のドライバでもう1回読む(同じドライバのときは1往復の無駄)
 - ft_batch の終わりの前面の照会は、Android では木の bundle が前面のパッケージなので常に前面 = 1往復の無駄。意図して別アプリへ移る batch も「前面を離れたかも」と言う
 - Android の launch で systemui が居座ったときの失敗文が、シェードを閉じた事実を書かない・PowerManager が読めないと時点の注記が落ちる
-
-### OI-79 Android の通知シェードの上の座標操作が無警告で done になる
-- 状態: 再現済み
-- 確認: コミット未記録(2026-10-30)
-- 経緯: 発見: 10-30 夜の負荷テスト(答え合わせ・故障の注入)
-
-- `frontAppWarning` は `systemDialogPackages` の `com.android.systemui` を黙らせる(権限ダイアログは座標で押すのが正規)。シェード(mCurrentFocus=NotificationShade)と見分ける材料がドライバに要る(d F7。タップ 12/12)
 
 ### OI-80 PIN ロック中の Android 実機は全呼び出しが 22 秒空回りし、原因が応答に出ない
 - 状態: 再現済み
