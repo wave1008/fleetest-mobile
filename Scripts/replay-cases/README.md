@@ -21,3 +21,8 @@
 | `forms[].steps` | `[ツール, 引数]` の列。引数の値 `$ref:<id>` は直近の `ft_snapshot` の木の ref に置き換わる |
 | `forms[].settleSeconds` | 答え合わせまでの間(秒。既定 1) |
 | `forms[].allowErrors` | true = 手の失敗を食い違いに数えない(断るのが正しい手) |
+| `forms[].replyReject` | 最後の手の応答に在ってはいけない文字列 |
+| `forms[].replyOnly` | true = 応答だけで判定し、最後の `ft_snapshot` を撃たない(アプリを落とした後の形) |
+| `suite` | `baseline` = 回をまたいで比べる固定の課題(`--suite baseline --record <ndjson>`)。**中身を変えない**(変えると前の回と比べられない) |
+
+手順の `$killApp`(`bundleId`・`seconds`)は故障の注入で、宛先の1台のアプリだけを OS の側から止める。

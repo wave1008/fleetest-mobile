@@ -1,0 +1,139 @@
+{
+  "id": "baseline-input-android",
+  "finding": "入力の固定の課題(E2E の入力画面の echo で答え合わせ)",
+  "platform": "android",
+  "suite": "baseline",
+  "redNote": "固定の課題は回をまたぐ比較用。赤の確認は対象外",
+  "rounds": 5,
+  "setup": [
+    [
+      "ft_launch",
+      {
+        "bundleId": "com.ftester.e2e.android"
+      }
+    ],
+    [
+      "ft_batch",
+      {
+        "steps": "tap '#nav_input'"
+      }
+    ]
+  ],
+  "reset": [
+    [
+      "ft_batch",
+      {
+        "steps": "tap '#btn_input_clear'"
+      }
+    ]
+  ],
+  "forms": [
+    {
+      "name": "type 前の空白",
+      "steps": [
+        [
+          "ft_batch",
+          {
+            "steps": "type '#field_single' ' lead'"
+          }
+        ]
+      ],
+      "expect": [
+        "single= lead"
+      ]
+    },
+    {
+      "name": "type 語の間の空白",
+      "steps": [
+        [
+          "ft_batch",
+          {
+            "steps": "type '#field_single' 'a b'"
+          }
+        ]
+      ],
+      "expect": [
+        "single=a b"
+      ]
+    },
+    {
+      "name": "type 和文",
+      "steps": [
+        [
+          "ft_batch",
+          {
+            "steps": "type '#field_single' '日本語'"
+          }
+        ]
+      ],
+      "expect": [
+        "single=日本語"
+      ]
+    },
+    {
+      "name": "type 絵文字と空白",
+      "steps": [
+        [
+          "ft_batch",
+          {
+            "steps": "type '#field_single' '🙂 ok'"
+          }
+        ]
+      ],
+      "expect": [
+        "single=🙂 ok"
+      ]
+    },
+    {
+      "name": "欄を移って打つ(間に木の読み)",
+      "steps": [
+        [
+          "ft_batch",
+          {
+            "steps": "type '#field_single' 'aa'"
+          }
+        ],
+        [
+          "ft_snapshot",
+          {}
+        ],
+        [
+          "ft_batch",
+          {
+            "steps": "type '#field_password' 'bb'"
+          }
+        ]
+      ],
+      "expect": [
+        "single=aa",
+        "password=bb"
+      ]
+    },
+    {
+      "name": "置き換え",
+      "steps": [
+        [
+          "ft_batch",
+          {
+            "steps": "type '#field_single' 'old'"
+          }
+        ],
+        [
+          "ft_snapshot",
+          {}
+        ],
+        [
+          "ft_type",
+          {
+            "ref": "$ref:field_single",
+            "text": "new",
+            "replace": true
+          }
+        ]
+      ],
+      "expect": [
+        "single=new"
+      ]
+    }
+  ]
+}

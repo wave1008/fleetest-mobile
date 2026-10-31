@@ -2,32 +2,87 @@
   "id": "la-F6",
   "finding": "SwiftUI の iOS で type → ft_snapshot → すぐ別の欄へ type の形が、古い木で「入力クリア」を押して最初の欄を消す / 別の欄へ入る",
   "platform": "ios",
-  "redNote": "load 20〜30 では iOS のキーボードの出現待ちを外しても 0/10(10-31)。所見の 12/15 は load 約 70 の run ループの中。高負荷で赤を確かめるまで未確認",
+  "redConfirmed": true,
+  "redNote": "直しを外した版は load 74〜166 で 8/20 が赤(10-31)・load 約 30 では 0/20。**再現に load 70 以上が要る**。低い負荷の緑は直った証拠にならない。現行版の高負荷での確認は未実施",
   "setup": [
-    ["ft_launch", {"bundleId": "com.ftester.e2e.ios"}],
-    ["ft_batch", {"steps": "tap '#nav_input'"}]
+    [
+      "ft_launch",
+      {
+        "bundleId": "com.ftester.e2e.ios"
+      }
+    ],
+    [
+      "ft_batch",
+      {
+        "steps": "tap '#nav_input'"
+      }
+    ]
   ],
-  "reset": [["ft_batch", {"steps": "tap '#btn_input_clear'"}]],
+  "reset": [
+    [
+      "ft_batch",
+      {
+        "steps": "tap '#btn_input_clear'"
+      }
+    ]
+  ],
   "rounds": 10,
   "forms": [
     {
       "name": "DSL の type の間に ft_snapshot",
       "steps": [
-        ["ft_batch", {"steps": "type '#field_single' 'aa'"}],
-        ["ft_snapshot", {}],
-        ["ft_batch", {"steps": "type '#field_password' 'bb'"}]
+        [
+          "ft_batch",
+          {
+            "steps": "type '#field_single' 'aa'"
+          }
+        ],
+        [
+          "ft_snapshot",
+          {}
+        ],
+        [
+          "ft_batch",
+          {
+            "steps": "type '#field_password' 'bb'"
+          }
+        ]
       ],
-      "expect": ["single=aa", "password=bb"]
+      "expect": [
+        "single=aa",
+        "password=bb"
+      ]
     },
     {
       "name": "ft_type(ref)の間に ft_snapshot",
       "steps": [
-        ["ft_snapshot", {}],
-        ["ft_type", {"ref": "$ref:field_single", "text": "aa"}],
-        ["ft_snapshot", {}],
-        ["ft_type", {"ref": "$ref:field_password", "text": "bb"}]
+        [
+          "ft_snapshot",
+          {}
+        ],
+        [
+          "ft_type",
+          {
+            "ref": "$ref:field_single",
+            "text": "aa"
+          }
+        ],
+        [
+          "ft_snapshot",
+          {}
+        ],
+        [
+          "ft_type",
+          {
+            "ref": "$ref:field_password",
+            "text": "bb"
+          }
+        ]
       ],
-      "expect": ["single=aa", "password=bb"]
+      "expect": [
+        "single=aa",
+        "password=bb"
+      ]
     }
   ]
 }

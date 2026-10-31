@@ -2,6 +2,8 @@
 # 修正の関門: 所見の再現手順(Scripts/replay-cases/*.json)を fleetest-mcp へ撃ち、SUT の表示で答え合わせする。
 # 手順と規律は docs/verification/testing.md「修正の関門」。ケースの形は Scripts/replay-cases/README.md。
 #   Scripts/replay.py --udid <iOS の udid> | --serial <Android の serial> [--case <id>] [--rounds N] [--mcp <path>]
+#                     [--suite baseline] [--record <ndjson>]
+# --suite baseline は回をまたいで比べる固定の課題(既定は再生ケース)。--record は形ごとの結果を1行ずつ足す(比較の元データ)。
 # 終了コード: 0 = 全部通った / 1 = 通らない形がある / 2 = 回せなかった(宛先・ケース・MCP の問題)
 # 宛先は明示の1台だけ(他の run の端末へ向かわせない)。MCP はこのプロセスの子で、終わるときに必ず止める(使用中の印を残さない)。
 import argparse, glob, json, os, re, select, subprocess, sys, time
@@ -102,20 +104,39 @@ def upper_bound(rounds):
     return 1 - 0.05 ** (1 / rounds)
 
 
+def kill_app(target, bundle_id):
+    """故障の注入: 宛先の1台のアプリだけを止める(ツールの ft_terminate を通すと印が残って別の経路になる)"""
+    if "udid" in target:
+        cmd = ["xcrun", "simctl", "terminate", target["udid"], bundle_id]
+    else:
+        cmd = ["adb", "-s", target["serial"], "shell", "am", "force-stop", bundle_id]
+    done = subprocess.run(cmd, capture_output=True, text=True, timeout=30, stdin=subprocess.DEVNULL)
+    if done.returncode != 0:
+        raise CannotRun(f"故障の注入が失敗: {done.stderr.strip()[-200:]}")
+
+
 def round_problems(mcp, target, form):
     """1周撃って、答え合わせの食い違いを返す(空 = 通った)"""
-    problems, tree = [], ""
+    problems, tree, reply = [], "", ""
     for step in form["steps"]:
         name, arguments = step
+        if name == "$killApp":
+            kill_app(target, arguments["bundleId"])
+            time.sleep(arguments.get("seconds", 1))
+            continue
         try:
             arguments = resolve_refs(arguments, tree)
         except ValueError as error:
             return [str(error)]
         text, is_error = mcp.tool(name, {**arguments, **target})
+        reply = text
         if name == "ft_snapshot":
             tree = text
         if is_error and not form.get("allowErrors"):
             return [f"{name} が失敗: {text[:240]}"]
+    problems += [f"応答にあってはいけない: {s}" for s in form.get("replyReject", []) if s in reply]
+    if form.get("replyOnly"):
+        return problems
     time.sleep(form.get("settleSeconds", 1))
     final, is_error = mcp.tool("ft_snapshot", target)
     if is_error:
@@ -125,7 +146,7 @@ def round_problems(mcp, target, form):
     return problems
 
 
-def run_case(mcp, target, case, rounds_override):
+def run_case(mcp, target, case, rounds_override, record=None):
     failed_forms = 0
     for name, arguments in case.get("setup", []):
         text, is_error = mcp.tool(name, {**arguments, **target})
@@ -144,6 +165,8 @@ def run_case(mcp, target, case, rounds_override):
             if problems:
                 failures.append((i + 1, problems))
         label = f"{case['id']} / {form['name']}"
+        if record:
+            record({"case": case["id"], "form": form["name"], "rounds": rounds, "failures": len(failures)})
         if failures:
             failed_forms += 1
             print(f"❌ {label}: {len(failures)}/{rounds} 周で食い違い")
@@ -156,14 +179,27 @@ def run_case(mcp, target, case, rounds_override):
     return failed_forms
 
 
-def load_cases(selected, platform):
+def recorder(path):
+    """--record の先へ足す関数。行にコミットとマシンの状態を添える(同じ条件の回だけを比べるため)"""
+    head = subprocess.run(["git", "rev-parse", "--short", "HEAD"], cwd=ROOT, capture_output=True, text=True).stdout.strip()
+    state = subprocess.run([sys.executable, os.path.join(ROOT, "Scripts", "machine-state.py")],
+                           capture_output=True, text=True).stdout.strip()
+
+    def write(row):
+        with open(path, "a") as f:
+            f.write(json.dumps({**row, "commit": head, "machine": json.loads(state) if state else None},
+                               ensure_ascii=False) + "\n")
+    return write
+
+
+def load_cases(selected, platform, suite=None):
     cases = []
     for path in sorted(glob.glob(os.path.join(CASES, "*.json"))):
         with open(path) as f:
             case = json.load(f)
         if selected and case["id"] not in selected:
             continue
-        if case["platform"] == platform:
+        if case["platform"] == platform and case.get("suite") == suite:
             cases.append(case)
     missing = set(selected or []) - {c["id"] for c in cases}
     if missing:
@@ -179,12 +215,14 @@ def main():
     parser.add_argument("--case", action="append", help="ケースの id(繰り返し可。省くとその OS の全ケース)")
     parser.add_argument("--rounds", type=int, help="形ごとの周回(省くとケースの rounds)")
     parser.add_argument("--mcp", default=DEFAULT_MCP)
+    parser.add_argument("--suite", choices=["baseline"], help="baseline = 回をまたいで比べる固定の課題")
+    parser.add_argument("--record", help="形ごとの結果を足す ndjson")
     options = parser.parse_args()
     platform = "ios" if options.udid else "android"
     target = {"platform": platform, **({"udid": options.udid} if options.udid else {"serial": options.serial})}
     mcp = None
     try:
-        cases = load_cases(options.case, platform)
+        cases = load_cases(options.case, platform, options.suite)
         if not cases:
             raise CannotRun(f"{platform} のケースがありません")
         mcp = MCP(options.mcp)
@@ -192,7 +230,8 @@ def main():
         status, is_error = mcp.tool("ft_status", target)
         if is_error:
             raise CannotRun(f"宛先に届きません: {status[:240]}")
-        failed = sum(run_case(mcp, target, case, options.rounds) for case in cases)
+        record = recorder(options.record) if options.record else None
+        failed = sum(run_case(mcp, target, case, options.rounds, record) for case in cases)
     except (CannotRun, OSError, ValueError) as error:   # 子の死(BrokenPipe)・壊れた応答も「回せなかった」= 赤と区別する
         print(f"⚠️ 回せませんでした: {error}")
         return 2

@@ -1,0 +1,66 @@
+{
+  "id": "baseline-fault-ios",
+  "finding": "故障の固定の課題(アプリを落とした直後の応答)",
+  "platform": "ios",
+  "suite": "baseline",
+  "redNote": "固定の課題は回をまたぐ比較用。赤の確認は対象外",
+  "rounds": 5,
+  "reset": [
+    [
+      "ft_launch",
+      {
+        "bundleId": "com.ftester.e2e.ios"
+      }
+    ],
+    [
+      "ft_batch",
+      {
+        "steps": "tap '#nav_input'"
+      }
+    ]
+  ],
+  "resetSeconds": 1,
+  "forms": [
+    {
+      "name": "アプリを落とした後の ft_status",
+      "steps": [
+        [
+          "$killApp",
+          {
+            "bundleId": "com.ftester.e2e.ios"
+          }
+        ],
+        [
+          "ft_status",
+          {}
+        ]
+      ],
+      "replyReject": [
+        "foreground: yes"
+      ],
+      "replyOnly": true
+    },
+    {
+      "name": "アプリを落とした後の DSL の tap",
+      "steps": [
+        [
+          "$killApp",
+          {
+            "bundleId": "com.ftester.e2e.ios"
+          }
+        ],
+        [
+          "ft_batch",
+          {
+            "steps": "tap '#btn_input_clear'"
+          }
+        ]
+      ],
+      "allowErrors": true,
+      "replyReject": [
+        "All 1 step(s) passed"
+      ],
+      "replyOnly": true
+    }
+  ]
+}
