@@ -2,6 +2,7 @@
   "id": "a-F9",
   "finding": "スイッチャーの下の scrollTo の失敗文が覆いに触れない",
   "platform": "ios",
+  "redConfirmed": true,
   "setup": [
     [
       "ft_launch",

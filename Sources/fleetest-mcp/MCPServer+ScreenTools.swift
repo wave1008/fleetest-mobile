@@ -121,6 +121,7 @@ extension MCPServer {
                               noEffectWarning: treeBeforeTap?.first { $0.ref == target.ref }?.enabled == false
                                   ? "the target was disabled" : nil)
             lastTapTargets[Self.sessionKey(args)] = treeBeforeTap?.first { $0.ref == target.ref }
+            treesBeforeLastTap[Self.sessionKey(args)] = treeBeforeTap
             focusedBeforeLastTaps[Self.sessionKey(args)] = treeBeforeTap?.first { $0.focused == true }
             return text("tap [\(ref)] done.\(target.note)" + (bandPoint != nil ? Self.bottomBandTouchNote : "")
                 // ブリッジの /tap が返す note(例:
@@ -294,7 +295,7 @@ extension MCPServer {
                InputFocusRescue.focusIsElsewhere(from: tapped, in: fresh.elements) {
                 let focused = fresh.elements.first { $0.focused == true }
                 let focusedName = focused.map(RefGuard.describe)
-                if let field = InputFocusRescue.fieldToType(after: tapped, in: fresh.elements) {
+                if let field = InputFocusRescue.fieldToType(after: tapped, in: fresh.elements, before: treesBeforeLastTap[Self.sessionKey(args)]) {
                     rescuedNativeRef = field.ref
                     note += " (tapping \(RefGuard.describe(tapped)) left input focus"
                         + (focusedName.map { " on \($0)" } ?? " nowhere")

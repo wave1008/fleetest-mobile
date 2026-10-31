@@ -2,6 +2,7 @@
   "id": "a-F1",
   "finding": "通知センターが降りている間、ft_snapshot / ft_tap が「another app is」と言い切り ft_status と食い違う",
   "platform": "ios",
+  "redConfirmed": true,
   "setup": [
     [
       "ft_launch",

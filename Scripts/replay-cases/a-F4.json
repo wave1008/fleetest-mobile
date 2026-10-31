@@ -2,6 +2,7 @@
   "id": "a-F4",
   "finding": "iOS で端から撃ったジェスチャ・覆いの下の座標操作が無警告 done(p-F8 の座標形を含む)",
   "platform": "ios",
+  "redConfirmed": true,
   "setup": [
     [
       "ft_launch",

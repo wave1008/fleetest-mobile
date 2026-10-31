@@ -44,6 +44,7 @@ final class MCPServer {
     let resultsMemo = RunRecordMemo()
     var lastTapTargets: SessionMap<ElementInfo> { SessionMap(server: self, path: \.lastTapTarget) }
     var focusedBeforeLastTaps: SessionMap<ElementInfo> { SessionMap(server: self, path: \.focusedBeforeLastTap) }
+    var treesBeforeLastTap: SessionMap<[ElementInfo]> { SessionMap(server: self, path: \.treeBeforeLastTap) }
     var knownScreens: SessionMap<FTRect> { SessionMap(server: self, path: \.knownScreen) }
     var uiFrameworkHints: SessionMap<UIFrameworkHint> { SessionMap(server: self, path: \.uiFrameworkHint) }
     /// `bundleID` のアプリについて覚えている判定(別のアプリの判定は返さない)

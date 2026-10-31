@@ -74,7 +74,10 @@ extension StepExecutor {
         }
         // 焦点救済の「直前」は tap → type の並びだけ(select は掴むだけで焦点を動かさない)。
         // **ロケータを持つ type も捨てる**(欄を名指しした後のロケータなし type は、その欄の続き = MCP の recordInteraction と同じ)
-        if !grabsOnly, action != "type" || step.locator != nil { lastTapTarget = nil }
+        if !grabsOnly, action != "type" || step.locator != nil {
+            lastTapTarget = nil
+            tapTreeForRescue = nil
+        }
         pendingScrollFrameNote = nil
         spanScale = 1
         // **OS のシステム UI が被さっている間は、どのアクションも撃たない**(SystemUIGate)。
@@ -1859,7 +1862,7 @@ extension StepExecutor {
         // (閉じずに入れ先を選ぶと、覆いの下の欄を名指しして ref で撃つことになる)
         try await dismissInterruption(in: &snapshot, phase: &phase)
         guard InputFocusRescue.focusIsElsewhere(from: tapped, in: snapshot.elements) else { return nil }
-        guard let field = InputFocusRescue.fieldToType(after: tapped, in: snapshot.elements) else { return nil }
+        guard let field = InputFocusRescue.fieldToType(after: tapped, in: snapshot.elements, before: tapTreeForRescue) else { return nil }
         // 呼び出し元(type のキーボード押し上げ検知)へ「打つ前」の状態を渡す橋渡し
         // (retypeRescueKeyboardFrame の doc。戻り値の型は変えない)
         retypeRescueKeyboardFrame = snapshot.keyboardFrame

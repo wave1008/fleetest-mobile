@@ -1303,6 +1303,8 @@ public final class StepExecutor {
     /// `lastInteraction` は次のアクションの入口で捨てられるので流用できない。
     /// tap 以外のアクションが走ったら捨てる = 「直前」の意味を保つ(`executeAction` の入口)
     var lastTapTarget: ElementInfo?
+    /// `lastTapTarget` を叩く直前の木(`InputFocusRescue.fieldToType` の `before`)。`lastTapTarget` と同じ寿命
+    var tapTreeForRescue: [ElementInfo]?
 
     /// `type` の直前(実際に打つ直前)に撮ってあった木の `keyboardFrame`。
     /// **`pendingTypeKeyboardCheck` が立っている間だけ意味を持つ**(消費側が「打つ前」として読む)
@@ -1463,6 +1465,7 @@ public final class StepExecutor {
                 unchangedEarlierTaps = Array(unchangedEarlierTaps.suffix(Self.unchangedEarlierTapsLimit))
             }
         }
+        tapTreeForRescue = snapshot.elements
         lastInteraction = LastInteraction(
             description: "tap \(step.locatorSummary)",
             before: snapshot.elements,

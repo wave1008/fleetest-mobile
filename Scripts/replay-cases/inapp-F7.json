@@ -2,6 +2,7 @@
   "id": "inapp-F7",
   "finding": "遷移した tap の直後のロケータ無し type が、遷移前の行の枠に重なった無関係な欄へ打って緑",
   "platform": "ios",
+  "redConfirmed": true,
   "setup": [
     [
       "ft_launch",

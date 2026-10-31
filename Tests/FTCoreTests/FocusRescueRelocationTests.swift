@@ -24,7 +24,7 @@ final class FocusRescueRelocationTests: XCTestCase {
 
         XCTAssertFalse(InputFocusRescue.focusIsElsewhere(from: tapped, in: tree),
                        "焦点は叩いた容器(新しい枠)の中にある")
-        XCTAssertEqual(InputFocusRescue.fieldToType(after: tapped, in: tree)?.ref, 13,
+        XCTAssertEqual(InputFocusRescue.fieldToType(after: tapped, in: tree, before: nil)?.ref, 13,
                        "新しい枠の中の欄を選ぶ(古い枠に入った隣の欄 14 ではない)")
     }
 
@@ -41,7 +41,7 @@ final class FocusRescueRelocationTests: XCTestCase {
         let tapped = element(ref: 2, type: "button", id: "nav_inputs", y: 300)
         let unrelatedField = element(ref: 7, type: "textField", id: "field_auto", y: 300)
         XCTAssertNil(InputFocusRescue.currentFrame(of: tapped, in: [unrelatedField]))
-        XCTAssertNil(InputFocusRescue.fieldToType(after: tapped, in: [unrelatedField]),
+        XCTAssertNil(InputFocusRescue.fieldToType(after: tapped, in: [unrelatedField], before: nil),
                      "叩いた要素が木に無い = 画面が変わった。旧い枠で入れ先を推測しない")
     }
 
@@ -53,10 +53,25 @@ final class FocusRescueRelocationTests: XCTestCase {
     }
 
     /// id の無い叩いた要素は従来どおり叩いた時点の枠で救済する(緑の普通の入力を赤にしない)
+    /// 遷移の途中の木: 叩いた行と新しい画面の欄が同居する(inapp F7)。叩く前に無かった欄へは入れない
+    func testFieldThatAppearedAfterTheTapIsNotRescued() {
+        let tapped = element(ref: 1, type: "button", id: "nav_inputs", y: 100)
+        let appeared = element(ref: 2, type: "textField", id: "field_second", y: 100)
+        XCTAssertNil(InputFocusRescue.fieldToType(after: tapped, in: [tapped, appeared], before: [tapped]))
+    }
+
+    /// 容器の救済はそのまま: 欄は叩く前から中にあった(ref は木ごとに変わるので id で見る)
+    func testFieldThatWasAlreadyInsideIsRescued() {
+        let tapped = element(ref: 1, type: "other", id: "container", y: 100)
+        let before = element(ref: 2, type: "textField", id: "field", y: 100)
+        let after = element(ref: 9, type: "textField", id: "field", y: 100)
+        XCTAssertEqual(InputFocusRescue.fieldToType(after: tapped, in: [tapped, after], before: [tapped, before])?.ref, 9)
+    }
+
     func testTappedElementWithoutIdKeepsItsFrame() {
         let tapped = element(ref: 2, type: "other", id: nil, y: 300)
         let field = element(ref: 7, type: "textField", id: nil, y: 300)
-        XCTAssertEqual(InputFocusRescue.fieldToType(after: tapped, in: [field])?.ref, 7)
+        XCTAssertEqual(InputFocusRescue.fieldToType(after: tapped, in: [field], before: nil)?.ref, 7)
     }
 
     func testSideBandMovesStartInsideAndLeavesOthers() {

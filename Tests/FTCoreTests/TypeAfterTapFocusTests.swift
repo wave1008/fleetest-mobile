@@ -191,21 +191,21 @@ final class TypeAfterTapFocusTests: XCTestCase {
 
     func testPicksTheOnlyFieldInsideTheTappedContainer() {
         let tapped = container(ref: 8, id: "txtMailAddress")
-        let picked = InputFocusRescue.fieldToType(after: tapped, in: [tapped, field(ref: 9)])
+        let picked = InputFocusRescue.fieldToType(after: tapped, in: [tapped, field(ref: 9)], before: nil)
         XCTAssertEqual(picked?.ref, 9)
     }
 
     /// 叩いたのが入力欄そのものなら、それ自身(フォーカスだけが立たなかった形)
     func testPicksTheTappedFieldItself() {
         let tapped = field(ref: 9)
-        XCTAssertEqual(InputFocusRescue.fieldToType(after: tapped, in: [tapped])?.ref, 9)
+        XCTAssertEqual(InputFocusRescue.fieldToType(after: tapped, in: [tapped], before: nil)?.ref, 9)
     }
 
     /// 無効な欄は選ばない(入らないので、入れたことにしない)
     func testSkipsDisabledFields() {
         let tapped = container(ref: 8, id: "txtMailAddress")
         XCTAssertNil(InputFocusRescue.fieldToType(
-            after: tapped, in: [tapped, field(ref: 9, enabled: false)]))
+            after: tapped, in: [tapped, field(ref: 9, enabled: false)], before: nil))
     }
 
     /// 申告が無ければ救済すべき(true)

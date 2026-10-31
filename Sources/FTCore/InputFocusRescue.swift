@@ -62,15 +62,28 @@ public enum InputFocusRescue {
     /// 突き合わせは**新しく撮り直した木**に対して行う(ref は木ごとに振り直されるので、
     /// 前の木の ref をそのまま使ってはいけない)。位置は**中心が容器の矩形に入るか**で見る ——
     /// 容器と中身は数 px ずれることがあり、厳密な包含だと落ちる
-    public static func fieldToType(after tapped: ElementInfo,
-                                   in elements: [ElementInfo]) -> ElementInfo? {
+    /// `before` = 叩く直前の木。**入れ先は叩く前からそこにあった欄だけ** —— 遷移の途中の木には叩いた行と新しい画面の欄が
+    /// 同居するので、枠の包含だけでは遷移先の無関係な欄を選んで緑で打つ(inapp F7)。無ければ(読めなかった)枠だけで見る
+    public static func fieldToType(after tapped: ElementInfo, in elements: [ElementInfo],
+                                   before: [ElementInfo]?) -> ElementInfo? {
         guard let frame = currentFrame(of: tapped, in: elements) else { return nil }
-        let candidates = elements.filter {
-            SnapshotRenderer.textInputTypes.contains($0.type) && $0.enabled
-                && contains(frame, centreOf: $0.frame)
+        let candidates = elements.filter { element in
+            SnapshotRenderer.textInputTypes.contains(element.type) && element.enabled
+                && contains(frame, centreOf: element.frame)
+                && (before.map { existed(element, in: $0, tapped: tapped) } ?? true)
         }
         guard candidates.count == 1 else { return nil }
         return candidates.first
+    }
+
+    private static func existed(_ field: ElementInfo, in before: [ElementInfo], tapped: ElementInfo) -> Bool {
+        if let id = field.identifier, !id.isEmpty {
+            return before.contains { $0.identifier == id && $0.type == field.type }
+        }
+        return before.contains {
+            $0.type == field.type && SnapshotRenderer.textInputTypes.contains($0.type)
+                && contains(tapped.frame, centreOf: $0.frame)
+        }
     }
 
     /// **焦点は叩く前からそこにあったか**(= 叩いても動かなかった残りか)。偽なら焦点は叩いた操作が動かした先
