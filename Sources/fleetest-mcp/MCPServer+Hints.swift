@@ -1255,6 +1255,33 @@ extension MCPServer {
             + " and pass an in-bounds coordinate, or use a ref instead.")
     }
 
+    /// ft_batch の座標の手(tap / doubleTap / swipePointToPoint の始点と終点)が画面の外なら断る文。判定は `offscreenCoordinateError` の1箇所
+    static func hasCoordinateTarget(_ step: FlowStep) -> Bool {
+        switch step.action ?? "" {
+        case "tap", "doubleTap": return step.locator == nil && step.x != nil && step.y != nil
+        case "swipePointToPoint": return step.x != nil || step.toX != nil
+        default: return false
+        }
+    }
+
+    static func offscreenBatchCoordinateError(_ step: FlowStep, screen: FTRect?, bridge: String?) -> MCPError? {
+        var points: [(Double, Double)] = []
+        switch step.action ?? "" {
+        case "tap", "doubleTap":
+            guard step.locator == nil, let x = step.x, let y = step.y else { return nil }
+            points = [(x, y)]
+        case "swipePointToPoint":
+            if let x = step.x, let y = step.y { points.append((x, y)) }
+            if let toX = step.toX, let toY = step.toY { points.append((toX, toY)) }
+        default:
+            return nil
+        }
+        for (x, y) in points {
+            if let error = offscreenCoordinateError(x: x, y: y, screen: screen, bridge: bridge) { return error }
+        }
+        return nil
+    }
+
     /// **座標がソフトキーボードの中にある**ときの警告(ft_tap / ft_double_tap / ft_long_press の座標形)。
     /// ref 形は RefGuard.keyboardWarning が言うのに、座標形は無警告で done と返し、実機 Pixel 3a では
     /// 欄にスペースが入った。**拒否はしない**(キーそのものを押す意図があり得る)。

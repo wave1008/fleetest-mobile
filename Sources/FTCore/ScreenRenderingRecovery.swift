@@ -17,11 +17,16 @@ public struct RenderingLaneBook: Sendable, Equatable {
     }
 
     private var lanes: [String: String] = [:]
+    /// laneKey(udid / serial)→ 利用者に見せる名前(ワーカーの label)。文言が他のレーンを鍵のまま言わないため。離脱後も残す(報告は離脱後も効く)
+    private var labels: [String: String] = [:]
     private var reports: [String: [String: DeviceScreenState]] = [:]
 
     public init() {}
 
-    public mutating func join(laneKey: String, platform: String) { lanes[laneKey] = platform }
+    public mutating func join(laneKey: String, platform: String, label: String? = nil) {
+        lanes[laneKey] = platform
+        if let label { labels[laneKey] = label }
+    }
     public mutating func leave(laneKey: String) { lanes[laneKey] = nil }
 
     /// 順序: ①他のレーンの同じ報告(同じシナリオ・同じ状態)→ ②他に生きているレーン。
@@ -31,7 +36,7 @@ public struct RenderingLaneBook: Sendable, Equatable {
         let reportKey = "\(platform)|\(scenarioID)"  // 同じ ID でも OS が違えば別のアプリ
         let other = reports[reportKey]?.filter { $0.key != laneKey && $0.value == state }.keys.sorted().first
         reports[reportKey, default: [:]][laneKey] = state
-        if let other { return .keepReportedByOtherLane(lane: other) }
+        if let other { return .keepReportedByOtherLane(lane: labels[other] ?? other) }
         guard lanes.contains(where: { $0.key != laneKey && $0.value == platform }) else { return .keepNoOtherLane }
         lanes[laneKey] = nil
         return .detach
@@ -48,6 +53,8 @@ public enum RenderingRecoveryOutcome: Sendable, Equatable {
     case advised
     /// 実機・鍵なし = 撃たない
     case notAttempted
+    /// 撃っている間にデバイスが adb から消えた(再起動は完了していない)。案内は公表しない(マシンの再起動で戻る事象と言えない)
+    case deviceGone
 }
 
 public enum MachineBoot {
@@ -141,10 +148,25 @@ public enum UnrecoveredDeviceStore {
     }
 
     /// run の最後のログに出す1行。台が無ければ nil。測った事実だけ(原因は書かない)
-    public static func closingNotice(names: [String]) -> String? {
-        guard !names.isEmpty else { return nil }
-        return "⚠️ Restarting the device did not bring the screen back on \(names.joined(separator: ", ")) —"
-            + " restarting this machine is recommended (fleetest does not restart it)"
+    /// `notUsedByThisRun` = 公表はあるがこの run のレーンに居らず、run の前の点検でも除外していない台(前の run から残っている分)
+    public static func closingNotice(_ entries: [Entry], used: Set<String>, excludedBeforeRun: Set<String>) -> String? {
+        let ours = used.union(excludedBeforeRun)
+        return closingNotice(names: entries.filter { ours.contains($0.key) }.map(\.name),
+                             notUsedByThisRun: entries.filter { !ours.contains($0.key) }.map(\.name))
+    }
+
+    public static func closingNotice(names: [String], notUsedByThisRun: [String]) -> String? {
+        guard !names.isEmpty || !notUsedByThisRun.isEmpty else { return nil }
+        var text = ""
+        if !names.isEmpty {
+            text = "⚠️ Restarting the device did not bring the screen back on \(names.joined(separator: ", ")) —"
+                + " restarting this machine is recommended (fleetest does not restart it)"
+        }
+        if !notUsedByThisRun.isEmpty {
+            text += (text.isEmpty ? "ℹ️ " : "; ")
+                + "also still published from an earlier run (not used by this run): \(notUsedByThisRun.joined(separator: ", "))"
+        }
+        return text
     }
 }
 
@@ -186,6 +208,15 @@ public enum ScreenRenderingRecovery {
         return .notRecovered(kind)
     }
 
+    /// 回復の完了ログの「何の後か」。撃った段を事実どおりに言う(sleep/wake で済んだのに「再起動」と言わない)
+    static func recoveredPhrase(_ kind: WorkerRecoveryKind) -> String {
+        switch kind {
+        case .displaySleepWake: return "sleep/wake"
+        case .displayServerRestart: return "restarting the display server"
+        default: return "the restart"
+        }
+    }
+
     public static func run(key: String?, name: String, stateDir: URL, bootTime: Date? = MachineBoot.time(),
                            repair: () async -> WorkerRecoveryKind?, drawn: () async -> Bool,
                            log: @Sendable (String) -> Void) async -> RenderingRecoveryOutcome {
@@ -206,7 +237,7 @@ public enum ScreenRenderingRecovery {
         let isDrawn = kind == nil ? false : await drawn()
         let outcome = conclude(key: key, name: name, stateDir: stateDir, kind: kind, drawn: isDrawn)
         switch outcome {
-        case .recovered: log("✅ \(name): the screen is drawing again after the restart")
+        case .recovered(let kind): log("✅ \(name): the screen is drawing again after \(recoveredPhrase(kind))")
         case .notRecovered: log("⚠️ \(name): restarting the device did not bring the screen back — restarting the machine is recommended")
         default: break
         }

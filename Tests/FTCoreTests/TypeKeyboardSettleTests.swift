@@ -133,6 +133,7 @@ final class TypeKeyboardSettleTests: XCTestCase {
         ])
         driver.verifiesTypedText = false
         let executor = StepExecutor(driver: driver, isAndroid: false, tunables: RunTunables())
+        executor.keyboardKnownAbsent = true  // キーボードが現れない端末 = 出現待ちの対象外
 
         _ = await executor.execute(
             FlowStep(action: "type", locator: FlowLocator(id: "wv_input"), text: "hello"))
@@ -228,24 +229,50 @@ final class TypeKeyboardSettleTests: XCTestCase {
 
     func testShouldAwaitAppearanceFlipsOnEachOfTheFourConditions() {
         func awaits(android: Bool = true, before: FTRect? = nil, after: FTRect? = nil,
-                   newline: Bool = false) -> Bool {
+                   newline: Bool = false, absent: Bool = false) -> Bool {
             KeyboardWait.shouldAwaitAppearance(isAndroid: android, before: before, after: after,
-                                               screen: screen, typedNewline: newline)
+                                               screen: screen, typedNewline: newline,
+                                               keyboardKnownAbsent: absent)
         }
         XCTAssertTrue(awaits())
-        XCTAssertFalse(awaits(android: false), "iOS で申告が無い(nil)= そもそも出ない形は待たない")
+        XCTAssertTrue(awaits(android: false), "iOS で申告が無い(nil)= 上がる途中の最初の読みはキーボードを載せない = 待つ")
+        XCTAssertFalse(awaits(android: false, absent: true), "出なかったと観測済みの端末(ハードウェアキーボード等)は待たない")
         XCTAssertTrue(awaits(android: false, after: hidden),
                       "iOS でも画面の外の矩形で申告されたら出る直前 = 待つ(XCUITest の /type は出る前に返る)")
         XCTAssertFalse(awaits(android: false, after: shown), "iOS で既に出ていれば待たない")
-        XCTAssertFalse(awaits(before: shown), "打つ前から出ているなら出現待ちではない")
+        XCTAssertFalse(awaits(before: shown), "Android は打つ前から出ているなら出現待ちではない")
+        XCTAssertTrue(awaits(android: false, before: shown), "iOS は打った直後の木から枠が一瞬消える = 戻るのを待つ")
+        XCTAssertTrue(awaits(android: false, before: shown, after: hidden), "枠が画面の外へ出た読みも戻るのを待つ(実測の形)")
+        XCTAssertFalse(awaits(android: false, before: shown, absent: true), "出ないと観測済みなら待たない")
+        XCTAssertFalse(awaits(android: false, before: shown, after: shown), "戻っていれば待たない")
         XCTAssertFalse(awaits(after: shown), "次の木に既に出ている")
         XCTAssertFalse(awaits(newline: true), "Enter で閉じうる")
         XCTAssertTrue(awaits(before: hidden, after: hidden), "画面外の矩形は「無い」扱い")
     }
 
+    func testKnownAbsentIsClearedByAnyObservedKeyboardAndOnlySetByAKeyboardThatNeverWasThere() {
+        func next(current: Bool = false, before: FTRect? = nil, after: FTRect? = nil, exhausted: Bool = false) -> Bool {
+            KeyboardWait.knownAbsent(current: current, before: before, after: after, screen: screen, waitExhausted: exhausted)
+        }
+        XCTAssertTrue(next(exhausted: true), "打つ前も後も無く、待っても出なかった = 不在")
+        XCTAssertFalse(next(before: shown, exhausted: true), "打つ前に出ていた = アプリが閉じた。不在の証拠にならない")
+        XCTAssertFalse(next(current: true, after: shown), "すぐ出た回(待ちの枝に入らない)でも戻す")
+        XCTAssertFalse(next(current: true, before: shown), "打つ前に出ていれば戻す")
+        XCTAssertTrue(next(current: true), "何も観測していなければ保つ")
+        XCTAssertFalse(next(), "何も観測していなければ立てない")
+        XCTAssertTrue(next(after: hidden, exhausted: true), "画面の外の矩形は「出た」ではない")
+    }
+
+    /// 不在の記憶があっても、キーボードがすぐ出た type で戻り、次の type の上がる途中の読みを待つ
+    func testAKeyboardThatAppearsAtOnceClearsTheAbsentMemory() async throws {
+        let result = try await androidScript(isAndroid: false, keyboardFrames: [shown], knownAbsent: true,
+                                                buttonYs: [300, 300, 300, 300, 300])
+        XCTAssertFalse(result.executor.keyboardKnownAbsent, "待ちの枝に入らない回で戻していない")
+    }
+
     /// `buttonYs` は撮影ごとの送信ボタンの y(既定 = キーボードが上がってボタンが押し上がる形)
     private func androidScript(isAndroid: Bool, keyboardFrames: [FTRect?],
-                               typeText: String = "hello",
+                               typeText: String = "hello", knownAbsent: Bool = false,
                                buttonYs: [Double] = [700, 700, 700, 520, 480]) async throws
         -> (count: Int, notes: Set<StepNote>, driver: FakeAppDriver, executor: StepExecutor) {
         let driver = FakeAppDriver(name: "primary", log: CallLog(),
@@ -253,6 +280,7 @@ final class TypeKeyboardSettleTests: XCTestCase {
         driver.keyboardFrames = keyboardFrames
         driver.verifiesTypedText = true
         let executor = StepExecutor(driver: driver, isAndroid: isAndroid, tunables: RunTunables())
+        executor.keyboardKnownAbsent = knownAbsent
         _ = await executor.execute(
             FlowStep(action: "type", locator: FlowLocator(id: "wv_input"), text: typeText))
         let outcome = await executor.execute(
@@ -275,11 +303,22 @@ final class TypeKeyboardSettleTests: XCTestCase {
     /// ①' iOS: 打った直後は画面の外(出る直前)と申告され、後から上がる → 待って整定してから押す
     /// (E2EY-Flutter の反転チャット: 待たずに下端の古い座標を押し、上がってきたキーボードに当たって送信が飲まれた)
     func testIOSTapAfterTypeWaitsWhileTheKeyboardIsReportedBelowTheScreen() async throws {
-        let baseline = try await androidScript(isAndroid: false, keyboardFrames: [nil])
+        let baseline = try await androidScript(isAndroid: false, keyboardFrames: [nil], knownAbsent: true)
         let result = try await androidScript(isAndroid: false, keyboardFrames: [nil, hidden, hidden, shown])
         XCTAssertFalse(result.notes.contains(.keyboardNotShownAfterType), "上がったので尽きていない")
         XCTAssertGreaterThan(result.count, baseline.count,
                              "画面の外の申告の間は撮り直して待つ(申告が無い iOS = 待たない基準より多く撮る)")
+    }
+
+    /// ①'' iOS: 打った直後の木がキーボードを申告しない(上がる途中の最初の読み)→ 出るまで待ってから押す。
+    /// 待たないと上がる前の座標を撃ち、上がってきたキーボードの上の別のボタンに当たる(SwiftUI で実測)
+    func testIOSTapAfterTypeWaitsWhileNothingIsReportedAndRemembersWhenItNeverComes() async throws {
+        let rising = try await androidScript(isAndroid: false, keyboardFrames: [nil, nil, nil, shown])
+        XCTAssertFalse(rising.notes.contains(.keyboardNotShownAfterType), "上がったので尽きていない")
+        XCTAssertFalse(rising.executor.keyboardKnownAbsent, "現れたら不在の記憶は立たない")
+        let never = try await androidScript(isAndroid: false, keyboardFrames: [nil])
+        XCTAssertTrue(never.notes.contains(.keyboardNotShownAfterType), "上限まで待って現れなかった")
+        XCTAssertTrue(never.executor.keyboardKnownAbsent, "現れなかった端末は以後待たない")
     }
 
     /// ② 出ないまま → 上限で止まり注記。所要は壁時計(下限だけ厳しく、上限は負荷で落ちない緩さ)
@@ -297,7 +336,7 @@ final class TypeKeyboardSettleTests: XCTestCase {
     /// ③ 待たない形(iOS / 打つ前から有り / 改行で終わる)は Android でも余分に撮らない
     func testNoExtraSnapshotsWhenTheWaitDoesNotApply() async throws {
         // iOS: キーボードは出ないまま。基準の撮影回数
-        let ios = try await androidScript(isAndroid: false, keyboardFrames: [nil])
+        let ios = try await androidScript(isAndroid: false, keyboardFrames: [nil], knownAbsent: true)
         XCTAssertFalse(ios.notes.contains(.keyboardNotShownAfterType))
 
         let newline = try await androidScript(isAndroid: true, keyboardFrames: [nil], typeText: "a\n")
@@ -310,7 +349,8 @@ final class TypeKeyboardSettleTests: XCTestCase {
                                              buttonYs: above)
         XCTAssertFalse(before.notes.contains(.keyboardNotShownAfterType), "打つ前から出ていれば出現待ちはしない")
         let iosBefore = try await androidScript(isAndroid: false,
-                                                keyboardFrames: [shown, shown, shown, shown, shown], buttonYs: above)
+                                                keyboardFrames: [shown, shown, shown, shown, shown], knownAbsent: true,
+                                                buttonYs: above)
         XCTAssertEqual(before.count, iosBefore.count)
     }
 

@@ -33,7 +33,8 @@ extension MCPServer {
                 // 自前描画(Compose・Flutter)の iOS は、swipe が慣性の途中で返り、続く tap は慣性を止めるだけで押下にならない
                 // (負荷テストの実測: 慣性の途中の ref の tap は CMP 7/8・Flutter 5/5 で `done` のまま未選択)。
                 // 待つ・空打ちで吸うのは DSL の tap の仕事(StepExecutor の swipeInertiaPending)で、ここは言うだけ
-                let coastingNote = await selfRenderedCoastingNote(swipeDriver, args: args)
+                let coastingNote = await selfRenderedCoastingNote(swipeDriver, args: args,
+                                                                 step: FlowStep(action: "swipe", direction: direction.rawValue))
                 // **「動いた」と断言しない**(back と同じ理由)。スワイプは端に着いて
                 // いれば1px も動かないし、スクロールできない画面では何も起きない
                 return text("swipe \(direction.rawValue) sent." + frontWarning + coastingNote
@@ -117,21 +118,43 @@ extension MCPServer {
                     + " [no stable DSL reproduction]"), args: args)
         }
         let fallbackNote = outcome.driverFallback.map { " (\($0))" } ?? ""
+        // 容器指定の払いも慣性を残す(CMP の横カルーセル: 3.6 秒待った後でも続く ref の tap が 6/8 で押せていない)
+        let coastingNote = await selfRenderedCoastingNote(swipeDriver, args: args, step: step)
         return text(scrollFrameLabelNote + "swipe \(direction.rawValue) sent inside \(containerName)."
-            + fallbackNote
+            + fallbackNote + coastingNote
             + Self.changedHint(args, otherwise: " If anything moved, the old refs are stale"
                 + " — take a fresh ft_snapshot before using any ref")
             + waitForWithoutSnapshotAfterNote(args) + (await snapshotAfterBody(args, outsideTheAppTree: false)))
     }
 
-    /// 自前描画の iOS で swipe の直後に付ける注記(上の doc)。Android・UIKit 系・不明なアプリでは空
-    func selfRenderedCoastingNote(_ driver: AppDriver, args: [String: Any]) async -> String {
+    /// 自前描画(Compose・Flutter)の iOS は swipe が慣性の途中で返り、続く tap は慣性を止めるだけで押下にならない
+    /// (`done` のまま未選択)。**払った容器の中の内容が2回続けて同じになるまで読み直して待つ**(容器の外の動き続ける表示は見ない =
+    /// `StepExecutor.searchContentRegion`。木全体で比べると、止まっている一覧に永久に「まだ動いている」と言った)(DSL の tap が次の操作の前に吸う
+    /// のと違い、MCP は呼び出しごとに実行器を作り捨てるので、持ち越せない分をここで払う)。ref ・セレクタ・scrollFrame
+    /// のどの形の次の操作にも効く。収まらなかったときだけ注記を返す(収まったなら黙る)。
+    /// 上限 `coastSettleMaxReads` 回: 実測で Flutter/CMP の慣性は 3 秒待てば収まる(間隔 `settleWaitSeconds` 0.4 秒 + 読みの
+    /// 所要 ≒ 10 回で約 6〜10 秒)。尽きたら「まだ動いているかもしれない」と言う。
+    /// **読みは adopt しない**(呼び手へ渡さない木 = `freshSnapshot` の doc の「捨てる木」。通すと snapshotAfter の操作前の木が
+    /// 払った後の木にすり替わり、waitForChange が変化を見つけられず、世代も進んで手持ちの ref を押し出す)
+    func selfRenderedCoastingNote(_ driver: AppDriver, args: [String: Any], step: FlowStep) async -> String {
         let hints = await resolveExecutorHints(driver, args: args)
         guard !hints.isAndroid, hints.uiFrameworkHint?.isSelfRendered == true else { return "" }
-        return " The list may still be coasting: a tap now can land on a moving row and only stop it"
-            + " (the call returns `done` without pressing anything). Take a fresh ft_snapshot until the frames stop"
-            + " changing, then tap."
+        var previous: SnapshotResponse?
+        for _ in 0..<Self.coastSettleMaxReads {
+            guard let tree = try? await driver.snapshot(bypassingCache: driver.supportsCacheBypass) else {
+                return " Whether the list stopped coasting is unknown (reading the tree failed): a tap now can land on"
+                    + " a moving row and only stop it. Take a fresh ft_snapshot until the frames stop changing, then tap."
+            }
+            if let previous, StepExecutor.sameContentInSearchRegion(step, previous, tree) { return "" }
+            previous = tree
+            try? await Task.sleep(nanoseconds: UInt64(max(0, settleWaitSeconds) * 1_000_000_000))
+        }
+        return " The list may still be coasting (the tree kept changing for \(Self.coastSettleMaxReads) reads): a tap now can land on"
+            + " a moving row and only stop it (the call returns `done` without pressing anything)."
+            + " Take a fresh ft_snapshot until the frames stop changing, then tap."
     }
+
+    static let coastSettleMaxReads = 10
 
     func ftRotate(_ args: [String: Any]) async throws -> [[String: Any]] {
         guard let raw = args["orientation"] as? String,
@@ -639,6 +662,24 @@ extension MCPServer {
         let gestureFrontWarning = gestureKeyboardWarning
             + (await coordinateFrontAppWarning(gestureDriver, args: args))
         try await gestureDriver.gesture(validatedGesture)
+        // 画面の端から始めた指は OS のジェスチャ(戻る・ホーム・シェード)として取られ、アプリを離れることがある
+        // (DSL の swipePointToPoint は始点を帯の外へ寄せる)。撃った後に前面が替わっていたら事実として言う
+        let gestureLeftAppNote: String
+        // シェードは窓の並びの上だけで、`foregroundAppID` は下のアプリを返すので別に見る
+        if gestureFrontWarning.isEmpty, let launched = launchedBundleIDs[Self.sessionKey(args)],
+           (gestureDriver as? AndroidDriver)?.shadeHoldsInputFocus() == true {
+            gestureLeftAppNote = " (warning: after the gesture the notification shade or quick settings was open over \(launched)"
+                + " — a touch that starts at the top edge can be taken as the shade gesture. Start the gesture clear of the"
+                + " screen edge; ft_navigate back closes the shade)"
+        } else if gestureFrontWarning.isEmpty, let launched = launchedBundleIDs[Self.sessionKey(args)],
+           let front = (try? await gestureDriver.foregroundAppID()) ?? nil, front != launched,
+           !Self.systemDialogPackages.contains(front) {
+            gestureLeftAppNote = " (warning: after the gesture \(front) was in front, not \(launched) — a touch that starts"
+                + " at a screen edge can be taken as a system gesture (back / home / the shade). Start the gesture"
+                + " clear of the screen edge, or ft_launch \(launched) to come back)"
+        } else {
+            gestureLeftAppNote = ""
+        }
         // **座標(絶対)→ 比率へ割り戻して記録する**(DSL の gesture は FTFinger の比率で書く。
         // FlowStep.gesture がその置き場)。対象は常に画面全体(ft_gesture にセレクタは無い)ので
         // locator は付けない
@@ -652,7 +693,7 @@ extension MCPServer {
         return text("gesture sent (\(validatedGesture.fingers.count) \(fingerWord),"
             + " \(FTSeconds.format((validatedGesture.totalSeconds * 100).rounded() / 100))s)."
             + " Nothing about the result is checked — if it should have moved something,"
-            + " confirm with ft_snapshot/ft_screenshot." + gestureFrontWarning
+            + " confirm with ft_snapshot/ft_screenshot." + gestureFrontWarning + gestureLeftAppNote
             + waitForWithoutSnapshotAfterNote(args) + (await snapshotAfterBody(args, outsideTheAppTree: false)))
     }
 

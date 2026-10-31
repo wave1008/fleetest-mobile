@@ -47,6 +47,18 @@ public enum AndroidForegroundWindows {
         windowBlocks(dumpsys).contains { $0.visible && $0.name == "NotificationShade" }
     }
 
+    /// 入力フォーカスを持つ窓が通知シェード・クイック設定・ロック画面(解除画面)の窓か(`mCurrentFocus=Window{… NotificationShade}`)。
+    /// **渡すのは `dumpsys window displays` の出力**(`windows` には行が無い。Android 12・13・15 で実測)。行が無ければ false。
+    /// 通知の到着(ヘッズアップ)でもシェードの窓は可視になりうるが入力フォーカスは持たない(実測: 通知の到着ではアプリのまま・
+    /// シェードとクイック設定を開くと NotificationShade)ので、可視かどうかではなくフォーカスで見る
+    public static func inputFocusHeldByShade(dumpsys: String) -> Bool {
+        guard let line = dumpsys.split(separator: "\n", omittingEmptySubsequences: false)
+            .map({ $0.trimmingCharacters(in: .whitespaces) })
+            .first(where: { $0.hasPrefix("mCurrentFocus=") }),
+              let name = windowName(line) else { return false }
+        return name == "NotificationShade"
+    }
+
     /// `Window #N Window{... 名前}:` ブロックを (名前, isVisible) の並び(z 順)に分解する。
     /// overlaying / keyboardVisible の共通パーサ(可視性判定はここ1箇所)
     private static func windowBlocks(_ dumpsys: String) -> [(name: String, visible: Bool)] {

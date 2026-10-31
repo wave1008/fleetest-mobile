@@ -15,18 +15,47 @@ public enum ScreenRenderingRecoverer {
                                log: @escaping @Sendable (String) -> Void) async -> RenderingRecoveryOutcome {
         guard let key = DisplayFreezeWatch.key(of: worker) else { return .notAttempted }
         log("🔧 \(worker.label): the screen was reported as \(state.rawValue) — restarting the device while it is idle")
-        return await ScreenRenderingRecovery.run(
+        let outcome = await ScreenRenderingRecovery.run(
             key: key, name: displayName(worker), stateDir: repoRoot.appendingPathComponent(".fleetest"),
             repair: {
                 // run の中では複数のレーンが同時に離脱する。一斉の起動は描画の凍結の引き金なので Emulator も同時2台まで(Simulator は SimulatorBootSlots)
                 await restartSlots.acquire()
-                let kind = await DisplayFreezeWatch.productionRepair(worker, stillFrozen: stillBad(worker, state: state),
-                                                                     repoRoot: repoRoot, locale: locale, log: log)
+                let kind = await DisplayFreezeWatch.productionRepair(
+                    worker, stillFrozen: stillBad(worker), sleepWakeMeasurable: sleepWakeMeasurable(state),
+                    repoRoot: repoRoot, locale: locale, log: log)
                 await restartSlots.release()
                 return kind
             },
             drawn: { await isDrawing(worker) }, log: log)
+        // 撃てなかった理由がデバイスの消失なら事実として返す(呼び手が「再起動した」と記録しない)
+        if outcome == .notAttempted, isGone(worker) {
+            log("⚠️ \(worker.label): the device disappeared while it was being restarted")
+            // 止めて戻せなかった台: 撃った事実を台帳に戻す(次の機会にまた撃たない)
+            ScreenRecoveryLedger.markFired(stateDir: repoRoot.appendingPathComponent(".fleetest"), key: key)
+            return .deviceGone
+        }
+        return outcome
     }
+
+    public static func isGone(_ worker: RunWorker) -> Bool {
+        if worker.platform == "ios" {
+            return worker.connection.udid.map { simulatorIsDown(simctlList(udid: $0), udid: $0) } == true
+        }
+        return worker.platform == "android" && worker.connection.serial.map { DisplayFreezeWatch.deviceIsGone(serial: $0) } == true
+    }
+
+    private static func simctlList(udid: String) -> String? {
+        (try? Shell.run(["xcrun", "simctl", "list", "devices"]))?.outputIfSucceeded
+    }
+
+    /// 起動していないと読めたときだけ true。読めない(nil)は消えたと言わない
+    static func simulatorIsDown(_ list: String?, udid: String) -> Bool {
+        guard let line = list?.split(separator: "\n").first(where: { $0.contains(udid) }) else { return false }
+        return !line.contains("(Booted)")
+    }
+
+    /// この実行の run の前の点検で除外した台。供給の後で作る RunOrchestrator の最後の案内が引く(1プロセス = 1 run)
+    public static let excludedBeforeRun = LockedValue<Set<String>>([])
 
     static let restartSlots = RestartSlots(limit: SimulatorBootSlots.concurrency)
 
@@ -57,10 +86,13 @@ public enum ScreenRenderingRecoverer {
 
     static func displayName(_ worker: RunWorker) -> String { worker.connection.deviceName ?? worker.logicalName ?? worker.label }
 
-    /// sleep/wake の後に「まだ直っていない」か。文字消えは絵が一様でないので絵では見分けられない = 常に直っていないと読んでゲストの再起動へ進む
-    static func stillBad(_ worker: RunWorker, state: DeviceScreenState) -> @Sendable () async -> Bool {
-        { state == .textless ? true : !(await isDrawing(worker)) }
+    /// sleep/wake の後に「まだ直っていない」か(OS 側の絵が一様なまま)
+    static func stillBad(_ worker: RunWorker) -> @Sendable () async -> Bool {
+        { !(await isDrawing(worker)) }
     }
+
+    /// 文字消えは絵が一様にならないので sleep/wake の効きを絵で測れない = 撃たずゲストの再起動へ進む
+    static func sleepWakeMeasurable(_ state: DeviceScreenState) -> Bool { state != .textless }
 
     /// OS 側の絵が全面一様でない(描かれている)か。撮れないときは描かれているとは言わない
     public static func isDrawing(_ worker: RunWorker) async -> Bool {
@@ -91,12 +123,15 @@ public enum ScreenRenderingRecoverer {
     public static func prepareBeforeRun(
         _ workers: [RunWorker], stateDir: URL, locale: String, repoRoot: URL,
         recoverIOS: @Sendable ([String], [RunWorker], _ onDisplayServerRestored: @escaping @Sendable (String) -> Void) async -> [RunWorker]?,
+        isStopped: @Sendable () -> Bool,
         bootTime: Date? = MachineBoot.time(),
         drawing: @Sendable (RunWorker) async -> Bool = isDrawing,
+        deviceGone: @Sendable (RunWorker) -> Bool = isGone,
         repairAndroid injectedRepair: (@Sendable (RunWorker, DeviceScreenState) async -> WorkerRecoveryKind?)? = nil,
         log: @escaping @Sendable (String) -> Void) async -> PreRun {
         let repairAndroid = injectedRepair ?? { worker, state in
-            await DisplayFreezeWatch.productionRepair(worker, stillFrozen: stillBad(worker, state: state),
+            await DisplayFreezeWatch.productionRepair(worker, stillFrozen: stillBad(worker),
+                                                      sleepWakeMeasurable: sleepWakeMeasurable(state),
                                                       repoRoot: repoRoot, locale: locale, log: log)
         }
         var result = PreRun(workers: workers)
@@ -108,16 +143,21 @@ public enum ScreenRenderingRecoverer {
         }
         guard !published.isEmpty else { return result }
         var unrecovered: [(worker: RunWorker, state: DeviceScreenState)] = []
+        var gone: [RunWorker] = []
         var fired: [(worker: RunWorker, key: String, state: DeviceScreenState)] = []
         for entry in published {
+            // 中断後は台帳にも触らない(begin は撃つ前に記録する = 撃たない台に残すと、以降マシンの再起動まで回復されない)
+            if isStopped() { break }
             let name = displayName(entry.worker)
             // **撃った後の台は、残った印だけで除外しない**: 除外すると緑の確かめが来ないので案内がマシンの再起動まで消えない。
-            // 今の絵で描けていれば印を消して使う(文字消えは絵で測れないので使う = 再発すれば run の中の検出が案内する)
+            // 今の絵で描けていれば印だけ消して使う(文字消えは絵で測れないので使う = 再発すれば run の中の検出が案内する)。
+            // **案内(UnrecoveredDeviceStore)は消さない** —— 消すのは緑の確かめ(FTRuntime の screenStatePublisher)かマシンの再起動だけ。
+            // 絵が一様でないことは「文字が描けている」の根拠にならない
             if ScreenRecoveryLedger.action(stateDir: stateDir, key: entry.key, bootTime: bootTime) == .advise,
                await drawing(entry.worker) {
                 DeviceScreenStateStore.clear(stateDir: stateDir, key: entry.key)
-                UnrecoveredDeviceStore.clear(stateDir: stateDir, key: entry.key)
-                log("→ \(entry.worker.label): the published \(entry.state.rawValue) state was cleared — the screen is drawing")
+                log("→ \(entry.worker.label): the published \(entry.state.rawValue) state was cleared — the screen is drawing"
+                    + " (the reboot advice stays until a scenario passes on this device)")
                 continue
             }
             if ScreenRenderingRecovery.begin(key: entry.key, name: name, stateDir: stateDir, bootTime: bootTime) == .fire {
@@ -132,7 +172,16 @@ public enum ScreenRenderingRecoverer {
         // (同時の起動は描画の凍結の引き金になる = 凍結の回復と同じ)
         let iosFired = fired.filter { $0.worker.platform == "ios" }
         var current = workers
-        if !iosFired.isEmpty {
+        // 中断後に撃たない。begin で記録した台帳は戻す(撃っていない台を「撃った」にしない)
+        func restoreLedger(_ entries: [(worker: RunWorker, key: String, state: DeviceScreenState)]) {
+            for entry in entries {
+                _ = ScreenRenderingRecovery.conclude(key: entry.key, name: displayName(entry.worker), stateDir: stateDir,
+                                                     kind: nil, drawn: false)
+            }
+        }
+        if !iosFired.isEmpty && isStopped() {
+            restoreLedger(iosFired)
+        } else if !iosFired.isEmpty {
             log("🔧 restarting \(iosFired.count) simulator(s) that still show a published screen state (\(iosFired.map(\.worker.label).joined(separator: ", ")))")
             let restored = LockedValue<Set<String>>([])
             let rebuilt = await recoverIOS(iosFired.map(\.worker.label), workers) { udid in
@@ -148,30 +197,54 @@ public enum ScreenRenderingRecoverer {
                     : restored.withLock { $0.contains(entry.key) } ? .displayServerRestart : .deviceRestart
                 let outcome = ScreenRenderingRecovery.conclude(
                     key: entry.key, name: displayName(after), stateDir: stateDir, kind: kind, drawn: drawn)
-                record(outcome, entry: (after, entry.state), into: &result, unrecovered: &unrecovered)
+                record(outcome, entry: (after, entry.state), into: &result, unrecovered: &unrecovered, gone: &gone)
             }
         }
         for entry in fired where entry.worker.platform == "android" {
-            let outcome = await ScreenRenderingRecovery.fire(
+            if isStopped() {
+                restoreLedger([entry])
+                continue
+            }
+            var outcome = await ScreenRenderingRecovery.fire(
                 key: entry.key, name: displayName(entry.worker), stateDir: stateDir,
                 repair: { await repairAndroid(entry.worker, entry.state) },
                 drawn: { await drawing(entry.worker) }, log: log)
-            record(outcome, entry: (entry.worker, entry.state), into: &result, unrecovered: &unrecovered)
+            if outcome == .notAttempted, deviceGone(entry.worker) {
+                log("⚠️ \(entry.worker.label): the device disappeared while it was being restarted")
+                outcome = .deviceGone
+            }
+            record(outcome, entry: (entry.worker, entry.state), into: &result, unrecovered: &unrecovered, gone: &gone)
         }
         result.workers = current
-        let bad = Set(unrecovered.map { DisplayFreezeWatch.key(of: $0.worker) })
+        let goneKeys = Set(gone.map { DisplayFreezeWatch.key(of: $0) })
+        let bad = Set(unrecovered.map { DisplayFreezeWatch.key(of: $0.worker) }).union(goneKeys)
         for entry in unrecovered { result.anomalies.append(WorkerAnomalyRecord.rebootAdvice(entry.worker, state: entry.state)) }
         let candidates = current.filter { !bad.contains(DisplayFreezeWatch.key(of: $0)) }
         // 全部が戻らなかったなら使う(全滅を作らない)。除外は「他に使える台がある」ときだけ
         if !candidates.isEmpty && candidates.count < current.count {
             result.excludedWorkers = current.filter { bad.contains(DisplayFreezeWatch.key(of: $0)) }
             result.workers = candidates
+            excludedBeforeRun.withLock { $0.formUnion(bad.compactMap { $0 }) }
+            func isGoneWorker(_ worker: RunWorker) -> Bool { goneKeys.contains(DisplayFreezeWatch.key(of: worker)) }
+            func why(_ worker: RunWorker) -> String {
+                isGoneWorker(worker) ? "the device disappeared while it was being restarted"
+                    : "restarting the device did not bring the screen back"
+            }
             result.anomalies += WorkerAnomalyRecord.preRunTriage(
                 excluded: result.excludedWorkers, repaired: [],
                 excludedReasons: Dictionary(uniqueKeysWithValues: result.excludedWorkers.map {
-                    ($0.label, "excluded before the run started: restarting the device did not bring the screen back") }))
+                    ($0.label, "excluded before the run started: \(why($0))") }),
+                excludedCauses: Dictionary(uniqueKeysWithValues: result.excludedWorkers.filter(isGoneWorker).map {
+                    ($0.label, WorkerAnomalyCause.deviceGone) }))
             for worker in result.excludedWorkers {
-                log("⚠️ \(worker.label): excluded from this run — restarting the device did not bring the screen back")
+                log("⚠️ \(worker.label): excluded from this run — \(why(worker))")
+            }
+        } else {
+            // 使うしかない(全台が戻らなかった)ときも、消えた事実は記録に残す
+            for worker in gone {
+                result.anomalies.append(WorkerAnomalyRecord(
+                    kind: "degraded", worker: RunOrchestrator.workerID(worker), label: worker.label,
+                    reason: "the device disappeared while it was being restarted", cause: .deviceGone))
             }
         }
         return result
@@ -179,13 +252,17 @@ public enum ScreenRenderingRecoverer {
 
     private static func record(_ outcome: RenderingRecoveryOutcome, entry: (worker: RunWorker, state: DeviceScreenState),
                                into result: inout PreRun,
-                               unrecovered: inout [(worker: RunWorker, state: DeviceScreenState)]) {
+                               unrecovered: inout [(worker: RunWorker, state: DeviceScreenState)],
+                               gone: inout [RunWorker]) {
         switch outcome {
-        case .recovered:
+        case .recovered(let kind):
             result.repairedWorkers.append(entry.worker)
-            result.anomalies += WorkerAnomalyRecord.preRunTriage(excluded: [], repaired: [entry.worker])
+            result.anomalies += WorkerAnomalyRecord.preRunTriage(
+                excluded: [], repaired: [entry.worker], repairedRecovery: [entry.worker.label: kind])
         case .notRecovered, .advised:
             unrecovered.append(entry)
+        case .deviceGone:
+            gone.append(entry.worker)
         case .notAttempted:
             break
         }

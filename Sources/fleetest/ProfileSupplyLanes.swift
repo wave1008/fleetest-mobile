@@ -20,7 +20,8 @@ enum ProfileSupplyLanes {
     /// - wipeStatus: Wipe Data の進行を NDJSON へ出す口(api run だけが渡す)
     static func android(
         resolved: ResolvedProfile, supplyLease: SupplyLeaseHolder?, supplyStage: SupplyStageReporter?,
-        triage: BlankTriageBox, wipeStatus: (@Sendable (String, String) -> Void)? = nil,
+        triage: BlankTriageBox, isStopped: @escaping @Sendable () -> Bool,
+        wipeStatus: (@Sendable (String, String) -> Void)? = nil,
         log: @escaping @Sendable (String) -> Void
     ) async throws -> [RunWorker] {
         let stateDir = (try? RepoRoot.find())?.appendingPathComponent(".fleetest")
@@ -65,11 +66,13 @@ enum ProfileSupplyLanes {
         if let stateDir {
             let screen = await ScreenRenderingRecoverer.prepareBeforeRun(
                 workers, stateDir: stateDir, locale: resolved.locale, repoRoot: stateDir.deletingLastPathComponent(),
-                recoverIOS: { _, _, _ in nil }, log: log)
+                recoverIOS: { _, _, _ in nil }, isStopped: isStopped, log: log)
             triage.add(repaired: screen.repairedWorkers.map(\.label), excluded: screen.excludedWorkers.map(\.label),
                        anomalies: screen.anomalies)
             workers = screen.workers
         }
+        // 中断後はインストールも home も撃たない(中断の応答を遅らせず、まだ何も決めていない端末を動かさない)
+        if isStopped() { throw RunInterruptedBeforeStartError(phase: "device supply") }
         // **実機は上の triage の対象外**(閾値がエミュレータ較正で、誤判定すると健全な実機へ `adb reboot` を撃つ)。
         // 観測と無害な修復(画面の sleep/wake)だけを通す
         await BlankWorkerTriage.observePhysicalScreens(
@@ -105,7 +108,7 @@ enum ProfileSupplyLanes {
     /// Android の開始をそれで待たせない)
     static func ios(
         resolved: ResolvedProfile, supplyLease: SupplyLeaseHolder?, supplyStage: SupplyStageReporter?,
-        triage: BlankTriageBox, log: @escaping @Sendable (String) -> Void
+        triage: BlankTriageBox, isStopped: @escaping @Sendable () -> Bool, log: @escaping @Sendable (String) -> Void
     ) async -> [RunWorker] {
         do {
             PhaseLog.mark("ios-workers-start")
@@ -156,10 +159,15 @@ enum ProfileSupplyLanes {
                     await ProfileWorkerFactory.recoverFrozenIOSWorkers(
                         labels: labels, workers: current, resolved: resolved, repoRoot: repoRoot,
                         apps: resolved.apps, triesDisplayServer: true, onDisplayServerRestored: restored, log: log)
-                }, log: log)
+                }, isStopped: isStopped, log: log)
             triage.add(repaired: screen.repairedWorkers.map(\.label), excluded: screen.excludedWorkers.map(\.label),
                        anomalies: screen.anomalies)
             ws = screen.workers
+            // 中断後は録画の解消も home も撃たない(run は始まらない)
+            if isStopped() {
+                log("⏹ interrupted — skipping the rest of the device supply")
+                return ws
+            }
             // 録画ありの run では、端末側に録画セッションが残ったデバイスを再起動して解く(HostRecordingProbe)
             ws = await ProfileWorkerFactory.recoverStaleRecordingIOSWorkers(
                 workers: ws, resolved: resolved, repoRoot: repoRoot, apps: resolved.apps, log: log)

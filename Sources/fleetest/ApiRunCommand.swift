@@ -537,7 +537,7 @@ struct ApiRunCommand: AsyncParsableCommand {
                 // 除外されたら投げる = run を止める(ユーザー決定: 全滅は異常)
                 let workers = try await ProfileSupplyLanes.android(
                     resolved: resolved, supplyLease: supplyLease, supplyStage: supplyProgress.reporter,
-                    triage: triageBox,
+                    triage: triageBox, isStopped: { interruptState.isStopped },
                     wipeStatus: { self.emitLine(ApiWipeStatusEvent(device: $0, phase: $1)) }) { logSupply($0) }
                 // "🚀 Starting with…" は iOS の合流有無が分かってから1回だけ出す(下の
                 // RunStartLine.text 呼び出し。ここで固定文言を出すと iOS 0 台のプロファイルでも
@@ -550,7 +550,7 @@ struct ApiRunCommand: AsyncParsableCommand {
                     // 遅延参加(1台も合流しなければ配布を止める)か、performanceMode の LaneGate が決める
                     await ProfileSupplyLanes.ios(
                         resolved: resolved, supplyLease: supplyLease, supplyStage: supplyProgress.reporter,
-                        triage: triageBox) { logSupply($0) }
+                        triage: triageBox, isStopped: { interruptState.isStopped }) { logSupply($0) }
                 }
             }
         } else {
@@ -1069,10 +1069,12 @@ struct ApiRunCommand: AsyncParsableCommand {
             // 遅延参加が無いので iOS も開始前に待つ)。台帳へは記帳しないので supplyStage は渡さない
             workers = try await ProfileSupplyLanes.android(
                 resolved: resolved, supplyLease: supplyLease, supplyStage: nil, triage: triageBox,
+                isStopped: { interruptState.isStopped },
                 wipeStatus: { self.emitLine(ApiWipeStatusEvent(device: $0, phase: $1)) }) { logSupply($0) }
             if !resolved.iosDevices.isEmpty {
                 let ios = await ProfileSupplyLanes.ios(
-                    resolved: resolved, supplyLease: supplyLease, supplyStage: nil, triage: triageBox) { logSupply($0) }
+                    resolved: resolved, supplyLease: supplyLease, supplyStage: nil, triage: triageBox,
+                    isStopped: { interruptState.isStopped }) { logSupply($0) }
                 // 全滅は異常として止める(並列経路の遅延参加と同じ文)
                 if ios.isEmpty {
                     throw ProfileWorkerFactory.InstallError(message: RunOrchestrator.lateJoinAbortReason(platforms: ["ios"]))

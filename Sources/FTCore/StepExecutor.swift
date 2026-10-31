@@ -1228,6 +1228,8 @@ public final class StepExecutor {
     private var lastDismissedInterrupt: String?
     /// 閉じたのに消えない相手を諦めたか(注記に残す)
     private var interruptStuck = false
+    /// 検出は当たったのに dismiss が解決できず閉じられなかった宣言の detect(失敗したときだけ注記に出す)
+    private var interruptDismissUnresolved: String?
 
     /// 直前の「画面を変えるはずの操作」の記録。**失敗の診断にだけ使い、判定は変えない**。
     ///
@@ -1344,6 +1346,18 @@ public final class StepExecutor {
     /// 以降のロケータ操作の解決の木でキーボードが出ていたら注記を立てて消す。次の type の消費時にも消す。
     /// シナリオ(StepExecutor)をまたいで持たない
     var keyboardWaitExhausted = false
+    /// 打った後に上限まで待ってもキーボードが現れなかった(ハードウェアキーボード等)と観測済みか。
+    /// `KeyboardWait.shouldAwaitAppearance` の iOS・申告なしの待ちを止める。現れたら戻す。MCP は ft_batch のたびに executor を
+    /// 作り直すので、前後で受け渡す(`carryPendingTypeKeyboardCheck`)
+    public var keyboardKnownAbsent = false
+
+    /// MCP の ft_type が立てた「出現待ち」の印を、新しく作った executor の最初のロケータ操作の解決へ引き継ぐ
+    /// (印を持たない executor が打った直後の上がる途中の木で欄を解決し、上がってきたキーボードの上のボタンを押した)
+    public func carryPendingTypeKeyboardCheck(keyboardBefore: FTRect?, typedNewline: Bool) {
+        keyboardFrameBeforeType = keyboardBefore
+        pendingTypeEndedWithNewline = typedNewline
+        pendingTypeKeyboardCheck = true
+    }
 
     /// 打つ前に出ていたキーボードが、打った後の最初の木で画面外に居るか(純粋関数)。
     /// **secure 欄では iOS がキーボードを一度隠して出し直す**(実測: 打っている間と、type が
@@ -1588,6 +1602,10 @@ public final class StepExecutor {
         // 撃ち直しはしない —— 既に届いていた場合に二重実行になる(報告者の指摘どおり)
         // **抑止したまま忘れた**ときに気付けるようにする。出ていたのに閉じなかったのは
         // 宣言どおりの動作なので、**落ちたときにだけ**言う(成功していれば意図どおり)
+        if failed, let interruptDismissUnresolved {
+            parts.append("the declared interruption \(interruptDismissUnresolved) is on screen but its dismiss"
+                + " selector matched nothing, so it was not closed")
+        }
         if failed, suppressedInterruptionSeenThisStep {
             // **どちらの止め方かは書かない**(suppressHandler / disableHandler の両方があり、
             // 実行器はどちらで止まっているかを区別しても読み手の役に立たない)
@@ -1633,8 +1651,11 @@ public final class StepExecutor {
         for handler in interruptHandlers {
             let key = handler.key
             guard (interruptDismissals[key] ?? 0) < handler.maxDismissals else { continue }
-            guard handler.matchDetect(in: snapshot) != nil,
-                  let target = handler.matchDismiss(in: snapshot) else { continue }
+            guard handler.matchDetect(in: snapshot) != nil else { continue }
+            guard let target = handler.matchDismiss(in: snapshot) else {
+                interruptDismissUnresolved = key
+                continue
+            }
             let start = clock.now
             try await driver.tap(ref: target.ref)
             phase.actionMs += Self.ms(clock.now - start)
@@ -1670,6 +1691,7 @@ public final class StepExecutor {
         interruptDismissalTotal = 0
         lastDismissedInterrupt = nil
         interruptStuck = false
+        interruptDismissUnresolved = nil
     }
 
     /// `perform` を通らない条件判定(`ifCanSelect` / `repeatWhileCanSelect`)が

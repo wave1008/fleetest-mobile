@@ -968,7 +968,11 @@ public final class RunOrchestrator: Sendable {
     /// FTAndroid.ScreenRenderingRecoverer。1台1回の台帳と効いたかの測定はあちらの責務)。nil = 撃たない(離脱と振り直しは行う)
     private let recoverRendering: RenderingRecovery?
     /// run の最後のログに出す「再起動では戻らなかった台」の名前(マシンごとの公表 `UnrecoveredDeviceStore`。run の前の分も含む)
-    private let unrecoveredDeviceNames: (@Sendable () -> [String])?
+    private let unrecoveredDevices: (@Sendable () -> [UnrecoveredDeviceStore.Entry])?
+    /// この run の前の点検で除外した台(`DisplayFreezeWatch.key`)。レーンに入らないが、前の run の残りではない
+    private let excludedBeforeRun: (@Sendable () -> Set<String>)?
+    /// この run のレーンに入ったデバイスの鍵(run の最後の案内を、この run で使った台とそれ以外に分ける)
+    private let usedDeviceKeys = LockedValue<Set<String>>([])
     /// 切り離しの判定帳(`RenderingLaneBook`)。判定と記録を1回のロックで行う
     private let renderingBook = LockedValue<RenderingLaneBook>(RenderingLaneBook())
     /// 描画の状態で離脱し、回復待ちのレーン(レーン key → 状態)。superviseWorker が離脱後に1回だけ引く
@@ -1130,7 +1134,8 @@ public final class RunOrchestrator: Sendable {
                 reviveWorker: (@Sendable (RunWorker) async -> RunWorker?)? = nil,
                 checkLaneDisplay: LaneDisplayCheck? = nil,
                 recoverRendering: RenderingRecovery? = nil,
-                unrecoveredDeviceNames: (@Sendable () -> [String])? = nil,
+                unrecoveredDevices: (@Sendable () -> [UnrecoveredDeviceStore.Entry])? = nil,
+                excludedBeforeRun: (@Sendable () -> Set<String>)? = nil,
                 recheckRunner: RunnerRecheck? = nil,
                 lateWorkers: (platforms: Set<String>, provider: @Sendable () async -> [RunWorker])? = nil,
                 installHandler: (@Sendable (RunWorker, String?) async
@@ -1170,7 +1175,8 @@ public final class RunOrchestrator: Sendable {
         self.reviveWorker = reviveWorker
         self.checkLaneDisplay = checkLaneDisplay
         self.recoverRendering = recoverRendering
-        self.unrecoveredDeviceNames = unrecoveredDeviceNames
+        self.unrecoveredDevices = unrecoveredDevices
+        self.excludedBeforeRun = excludedBeforeRun
         self.clearResidualSystemAlert = clearResidualSystemAlert
         self.recheckRunner = recheckRunner
         self.lateWorkers = lateWorkers
@@ -1584,7 +1590,10 @@ public final class RunOrchestrator: Sendable {
         }
 
         await progressState?.finish()
-        if let notice = UnrecoveredDeviceStore.closingNotice(names: unrecoveredDeviceNames?() ?? []) {
+        let unrecovered = unrecoveredDevices?() ?? []
+        let used = usedDeviceKeys.withLock { $0 }
+        if let notice = UnrecoveredDeviceStore.closingNotice(
+            unrecovered, used: used, excludedBeforeRun: excludedBeforeRun?() ?? []) {
             continuation.yield(.workerLog(worker: "run", message: notice))
         }
 
@@ -1676,8 +1685,11 @@ public final class RunOrchestrator: Sendable {
                 await cleanupRetiredWorker?(retired)
                 // 描画の状態で離脱したデバイスは、revive の前に回復を1回撃つ(テスト中ではない)。revive できない離脱
                 // (キューが空・復帰未注入・上限)では撃たない = 起動し直しの数十秒を払うだけで、次の run の前の点検が同じ台帳で拾う
+                // **中断中は撃たない・復帰させない**(キューは中断後も残るので `hasItems` だけでは門にならない。
+                // 回復の待ち(Emulator の起動待ち最大120秒)と revive の作り直しで、中断の応答が数十秒遅れた)
                 if let state = renderingPending.withLock({ $0.removeValue(forKey: Self.leaseKey(retired) ?? retired.label) }),
-                   let recoverRendering, revives < MAX_WORKER_REVIVES, reviveWorker != nil, await queue.hasItems() {
+                   let recoverRendering, revives < MAX_WORKER_REVIVES, reviveWorker != nil, await queue.hasItems(),
+                   await !stoppedByUser() {
                     let log: @Sendable (String) -> Void = { [continuation, label = retired.label] message in
                         continuation.yield(.workerLog(worker: label, message: message))
                     }
@@ -1694,12 +1706,19 @@ public final class RunOrchestrator: Sendable {
                         await anomalies.add(WorkerAnomalyRecord.rebootAdvice(retired, state: state))
                     case .advised:
                         await anomalies.add(WorkerAnomalyRecord.rebootAdvice(retired, state: state))
+                    case .deviceGone:
+                        // 再起動は完了していない・マシンの再起動で戻る事象とも言えない = 回復も案内も記録せず、消えた事実だけを置く
+                        await anomalies.add(WorkerAnomalyRecord(
+                            kind: "degraded", worker: Self.workerID(retired), label: retired.label,
+                            reason: "the device disappeared while it was being restarted after a \(state.rawValue) screen",
+                            cause: .deviceGone))
                     case .notAttempted:
                         break
                     }
                 }
                 // queue が空/復帰未注入/復帰回数上限 のいずれかならこれ以上粘っても無駄なので諦める
-                guard revives < MAX_WORKER_REVIVES, await queue.hasItems(), let revive = reviveWorker else {
+                guard revives < MAX_WORKER_REVIVES, await queue.hasItems(), await !stoppedByUser(),
+                      let revive = reviveWorker else {
                     if let retiredKey { await runLeases.release(retiredKey) }
                     await closeTestingSlot()
                     return totalFailed
@@ -1812,7 +1831,8 @@ public final class RunOrchestrator: Sendable {
         // (--port 等 udid/serial の無い経路。この orchestrator では progressState 自体が
         // 未注入なので実質関係ない)でも記帳自体は続けられるよう label へ縮退する
         let progressLaneKey = leaseKey ?? worker.label
-        renderingBook.withLock { $0.join(laneKey: progressLaneKey, platform: worker.platform) }
+        renderingBook.withLock { $0.join(laneKey: progressLaneKey, platform: worker.platform, label: worker.label) }
+        if let leaseKey { usedDeviceKeys.withLock { _ = $0.insert(leaseKey) } }
         // compile-ocr の待ちがあるなら、レーンを見せる最初の記帳から段階を "compiling" にする(running を一瞬挟まない)
         let waitsForOCRCompile = ScenarioHost.isOCRModelCompileWaitPending
         if waitsForOCRCompile {

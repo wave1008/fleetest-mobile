@@ -39,12 +39,28 @@ public enum KeyboardWait {
     /// **iOS は「画面の外の矩形」で申告されたときだけ** —— XCUITest の /type はキーボードが出る前に返り、
     /// 0.6〜0.9 秒は画面の下(y=891・画面 874)に申告したまま、その後に上がって入力バーを動かす(実測 E2EY-Flutter の
     /// 反転チャット: 打った直後の木の下端の送信ボタンを押し、上がってきたキーボードに当たって送信が飲まれた)。
-    /// 申告が無い(nil)= ハードウェアキーボード等でそもそも出ない形は待たない(毎回上限まで待つことになる)。
-    /// 打つ前に出ていた(= 出現待ちでなく隠れ待ちの領分)・既に次の木に出ている・改行で終わる
-    /// (Enter で閉じうる)ときは待たない
+    /// 申告が無い(nil)iOS は、**この端末で打った後にキーボードが出なかったと既に観測していなければ**待つ(`keyboardKnownAbsent`)。
+    /// XCUITest は上がる途中の最初の読みに `.keyboard` を載せず、欄も上がる前の位置のまま返す(SwiftUI で実測: 打った直後の
+    /// 木で別の欄を解決し、上がってきたキーボードの上の「入力クリア」を押した)。ハードウェアキーボード等でそもそも出ない端末は
+    /// 上限まで待った1回で `keyboardKnownAbsent` を立てて以後は待たない(毎回上限まで待たない)。
+    /// **打つ前に出ていても iOS は画面の外の読みを待つ**: XCUITest は打った直後の木でキーボードの枠が画面の外(y=918・画面 874)になり、
+    /// 欄も閉じた位置で返す(SwiftUI で実測 4/4・1 秒後に戻る。その木の ref で打って別の欄へ入った)。Android は打つ前に出ていれば待たない(隠れ待ちの領分)。
+    /// 既に次の木に出ている・改行で終わる(Enter で閉じうる)ときは待たない
     public static func shouldAwaitAppearance(isAndroid: Bool, before: FTRect?, after: FTRect?,
-                                      screen: FTRect, typedNewline: Bool) -> Bool {
-        guard !typedNewline, !onScreen(before, screen: screen), !onScreen(after, screen: screen) else { return false }
-        return isAndroid || after != nil
+                                      screen: FTRect, typedNewline: Bool,
+                                      keyboardKnownAbsent: Bool) -> Bool {
+        guard !typedNewline, !onScreen(after, screen: screen) else { return false }
+        if onScreen(before, screen: screen) { return !isAndroid && !keyboardKnownAbsent }
+        return isAndroid || after != nil || !keyboardKnownAbsent
+    }
+
+    /// `keyboardKnownAbsent` の次の値(純粋関数)。**待ちの枝の外でも更新する**: 待ちの枝に入らない回(すぐ出た)で戻さないと、
+    /// 一度立てた不在が残り続け、上がる途中の読みを待たなくなる。
+    /// **打つ前に出ていたキーボードは不在の証拠にならない**(アプリが入力の完了で閉じた = コード欄。この端末に出ないのではない)。
+    /// `waitExhausted` = 上限まで待っても出なかった
+    public static func knownAbsent(current: Bool, before: FTRect?, after: FTRect?, screen: FTRect,
+                                   waitExhausted: Bool) -> Bool {
+        if onScreen(before, screen: screen) || onScreen(after, screen: screen) { return false }
+        return current || waitExhausted
     }
 }

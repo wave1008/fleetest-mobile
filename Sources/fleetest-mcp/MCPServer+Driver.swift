@@ -134,7 +134,7 @@ extension MCPServer {
             let created: AppDriver
             var probePort: UInt16?
             switch target {
-            case .ios(let provisioned, let iosApp):
+            case .ios(let provisioned, _):
                 (created, probePort) = try await Self.iosDriver(provisioned: provisioned)
             case .android(let serial, _):
                 created = try AndroidDriver(serial: serial)
@@ -633,6 +633,9 @@ extension MCPServer {
         /// ブリッジの可能性)。**本人確認できなかった分だけを残す**(確認できた分は `portForIOS` が採用し、
         /// 別の udid を名乗った分は捨てる)。非空なら「居ない」とは言わない
         var answeredPorts: [UInt16] = []
+        /// 無応答で待受しているが、持ち主が背面の in-app ブリッジ(ランナーではない)と台帳から分かるポート。
+        /// `listeningButUnresponsive` へは入れない(XCUITest のランナーは居ない = 起動し直してよい側)
+        var backgroundedInAppPorts: [UInt16] = []
 
         /// 診断を呼ばなかった(必要が無かった)ときの既定。**`timedOut` は `false`** ——
         /// `reconcilePort` の default 引数・省略呼び出しのテストがこの値を「診断していない」
@@ -738,11 +741,26 @@ extension MCPServer {
             for await (port, probe) in group { result[port] = probe }
             return result
         }
+        // 無応答の待受のうち、in-app ブリッジの台帳だけが残るポートは**背面へ回ったアプリ**(前の run の残り等)で、
+        // XCUITest のランナーではない。busy と読むと、ランナーが居ないのに「待て・bridge up は打つな」を言い続け、
+        // 自動の起動し直しも門で止まる
+        let silent = candidates.ports.filter { probes[$0] == .timedOut }
+        let backgrounded = silent.filter { Self.isBackgroundedInAppBridgeOnly(port: $0, repoRoot: repoRoot) }
         return UDIDBridgeDiagnosis(
-            listeningButUnresponsive: candidates.ports.filter { probes[$0] == .timedOut },
+            listeningButUnresponsive: silent.filter { !backgrounded.contains($0) },
             heldByRunPID: candidates.heldByRunPID, lookup: candidates.lookup,
             wedgedPorts: candidates.ports.filter { probes[$0] == .transportFailed },
-            answeredPorts: candidates.ports.filter { probes[$0] == .answered })
+            answeredPorts: candidates.ports.filter { probes[$0] == .answered },
+            backgroundedInAppPorts: backgrounded)
+    }
+
+    /// このポートの持ち主が in-app ブリッジだけか(`.inapp` の台帳があり、xcodebuild の `.pid` が生きていない)。
+    /// 生きた `.pid` があればランナーが居る(busy でありうる)ので false
+    static func isBackgroundedInAppBridgeOnly(port: UInt16, repoRoot: URL?) -> Bool {
+        guard let repoRoot else { return false }
+        let inapp = InAppBridgeState.url(stateDir: repoRoot.appendingPathComponent(".fleetest"), port: port)
+        guard FileManager.default.fileExists(atPath: inapp.path) else { return false }
+        return bridgeOwnerAlive(port: port, repoRoot: repoRoot) != true
     }
 
     /// `probedUDIDBridgeDiagnosis` が専用 Thread で集める材料(候補ポート・run 保持者・実体判定)
@@ -881,7 +899,11 @@ extension MCPServer {
         guard diagnosis.listeningButUnresponsive.isEmpty else {
             return Self.bridgeBusyOnUDIDMessage(udid: udid, diagnosis: diagnosis)
         }
-        return "no running bridge is on udid \(udid).\(BridgeRecoveryFailureLedger.note(key: udid))"
+        let background = diagnosis.backgroundedInAppPorts.isEmpty ? "" : " (port"
+            + (diagnosis.backgroundedInAppPorts.count == 1 ? " " : "s ")
+            + diagnosis.backgroundedInAppPorts.map(String.init).joined(separator: ", ")
+            + " is held by an app's in-app bridge that is not answering — not an XCUITest runner)"
+        return "no running bridge is on udid \(udid).\(background)\(BridgeRecoveryFailureLedger.note(key: udid))"
             + " ft_list_devices shows which devices have one;"
             + " \(Self.bridgeUpSuggestion(udid: udid, lookup: diagnosis.lookup))"
             + " (a device without a bridge cannot be driven from MCP)"
@@ -952,6 +974,12 @@ extension MCPServer {
         }
         message += " Retry in a moment; `fleetest bridge up` is for a device with no bridge at all"
             + " and would start a second one on this device."
+        if diagnosis.lookup == .physical {
+            // 固まったトンネルは接続が通るのに応答が無く、busy と見分けられない(所要時間では決められない)
+            message += " If it does not clear after a minute, the USB tunnel itself may be stuck:"
+                + " `fleetest bridge down --port \(diagnosis.listeningButUnresponsive[0]) --force` stops it, and"
+                + " `fleetest bridge up --device \"\(udid)\" --physical` starts a fresh one."
+        }
         return message
     }
 
@@ -1448,7 +1476,9 @@ extension MCPServer {
             physicalUDID: provisioned.physical ? provisioned.udid : nil)
         // **launch はシナリオ実行と同じく FastLaunchDriver**(素の XCUIApplication.launch() は実測 6.6s)
         let driver = SessionRecoveryDriver(
-            base: FastLaunchDriver.wrapping(client, simulatorUDID: provisioned.physical ? nil : provisioned.udid))
+            base: FastLaunchDriver.wrapping(client, simulatorUDID: provisioned.physical ? nil : provisioned.udid),
+            appIsRunning: SimulatorAppProcess.recoveryProbe(simulatorUDID: provisioned.physical ? nil : provisioned.udid,
+                                                            physicalUDID: provisioned.physical ? provisioned.udid : nil))
         return (driver, probePort(physical: provisioned.physical, endpoint: resolution.endpoint))
     }
 
@@ -1926,6 +1956,14 @@ extension MCPServer {
                 + " the device screen went dark or is locked, so it is not a dialog to operate. The"
                 + " next tool call wakes the screen — read the screen again before acting.\n"
         }
+        if isNotificationShadeTree(snapshot) {
+            // 通知シェード・クイック設定の要素がある systemui の木。権限ダイアログではなく、アプリは下で生きている
+            return "⚠️ \(session) (the notification shade or quick settings) is drawn over \(launched), not a dialog of the app."
+                + " \(launched) is still running underneath: ft_navigate back closes the shade and keeps the app's state"
+                + " (ft_launch also closes it but restarts the app, so typed values are lost)."
+                // ロック画面の木も同じ要素 ID を持ち、解除画面の本体が無い回は木から分けられない
+                + " If back changes nothing, this is the lock screen: unlock the device first.\n"
+        }
         if systemDialogPackages.contains(session) {
             return "⚠️ \(session) is a system dialog drawn over \(launched)"
                 + " (e.g. a permission prompt), not the app itself. Operate the dialog"
@@ -1956,12 +1994,30 @@ extension MCPServer {
             + " ft_launch \(launched) before trusting these refs\n"
     }
 
+    /// 通知シェード・クイック設定の木か(systemui の要素 ID で見る。ID が読めない systemui の木は従来どおり「システムダイアログ」)
+    static func isNotificationShadeTree(_ snapshot: SnapshotResponse) -> Bool {
+        guard snapshot.sessionBundleID == "com.android.systemui" else { return false }
+        return snapshot.elements.contains { element in
+            let id = (element.identifier ?? "").lowercased()
+            return id.contains("notification_panel") || id.contains("notification_stack") || id.contains("expanded_qs")
+                || id.contains("quick_settings") || id.contains("qs_panel")
+        }
+    }
+
+    /// 解除画面の本体の要素 ID(`keyguard_pin_view` 等。AOSP の KeyguardPINView / PasswordView / PatternView / SimPin / SimPuk)
+    static let keyguardBouncerIDMarkers = ["keyguard_pin_view", "keyguard_password_view", "keyguard_pattern_view",
+                                           "keyguard_sim_pin_view", "keyguard_sim_puk_view"]
+
     /// 消灯中の常時表示(AOD)・ロック画面の木か。`com.android.systemui` は通知シェードも同じ ID で名乗るので、
     /// **キーガード/時計の要素 ID が木にあるとき**だけ言う(`keyguard_*` / `animatable_clock_view` /
     /// `lockscreen*`)。無ければ従来どおり「システムダイアログ」
     static func isLockScreenOrAlwaysOnTree(_ snapshot: SnapshotResponse) -> Bool {
         guard snapshot.sessionBundleID == "com.android.systemui" else { return false }
         let ids = snapshot.elements.map { ($0.identifier ?? "").lowercased() }
+        // **解除画面(PIN・パスワード・パターン・SIM)の本体があれば、クイック設定の要素が同じ木に居てもロック画面**:
+        // 実機のロック画面の木は quick_settings_container・expanded_qs_scroll_view を常に持つ(下の除外だけだと
+        // 解除画面を「通知シェード」と呼び、従えない対処 = back で閉じる、を勧めた)。横向きのシェードはこの本体を持たない
+        if ids.contains(where: { id in Self.keyguardBouncerIDMarkers.contains { id.contains($0) } }) { return true }
         // 横向きの通知シェード(split shade)は keyguard_message_area_container を持つ。クイック設定のパネルがあれば
         // 点灯中のシェードで、ロック画面ではない(ロック画面にクイック設定は無い)
         if ids.contains(where: { $0.contains("expanded_qs") || $0.contains("quick_settings") || $0.contains("qs_panel") }) {

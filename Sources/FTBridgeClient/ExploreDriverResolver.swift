@@ -88,7 +88,9 @@ public enum ExploreDriverResolver {
             // launch はシナリオ実行と同じく FastLaunchDriver(シミュレータと分かったときだけ。判定は wrapping の1箇所)
             let client = BridgeClient(port: endpoint.port, host: endpoint.host, physicalUDID: physicalUDID)
             return Resolved(driver: SessionRecoveryDriver(
-                base: FastLaunchDriver.wrapping(client, simulatorUDID: physicalUDID == nil ? udid : nil)),
+                base: FastLaunchDriver.wrapping(client, simulatorUDID: physicalUDID == nil ? udid : nil),
+                appIsRunning: SimulatorAppProcess.recoveryProbe(simulatorUDID: physicalUDID == nil ? udid : nil,
+                                                                physicalUDID: physicalUDID)),
                             bridge: status?.bridge ?? "xcuitest", udid: udid ?? physicalUDID, port: endpoint.port)
         }
         // in-app だった(または背面で止まった in-app)= 同じデバイスの XCUITest ブリッジへ振り替える(無ければ起動する)
@@ -108,7 +110,8 @@ public enum ExploreDriverResolver {
                 + " XCUITest bridge of the same device (port \(port))")
             // endpoint をそのまま渡す(host だけ渡すと usb トンネルの token を落とす)
             return Resolved(driver: SessionRecoveryDriver(
-                base: FastLaunchDriver.wrapping(BridgeClient(endpoint: resolution.endpoint), simulatorUDID: udid)),
+                base: FastLaunchDriver.wrapping(BridgeClient(endpoint: resolution.endpoint), simulatorUDID: udid),
+                appIsRunning: SimulatorAppProcess.recoveryProbe(simulatorUDID: udid)),
                             bridge: "xcuitest", udid: udid, port: port)
         case .noXCUITest, .direct:   // bridge: "inapp" を渡しているので .direct は来ない
             throw ExploreDriverResolverError.noXCUITestBridge(inAppPort: preferred)

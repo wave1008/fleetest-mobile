@@ -73,7 +73,7 @@ public struct WorkerAnomalyRecord: Codable, Sendable {
     /// degraded/requeued/retryLimit/circuitHeld の理由の分類(WorkerAnomalyCause.rawValue)。
     /// 写像できない reason は nil。他の kind では常に nil
     public var cause: String?
-    /// kind == "recovered" のときだけの回復の種類(WorkerRecoveryKind.rawValue)
+    /// kind == "recovered" / "preRunRepaired" のときだけの回復の種類(WorkerRecoveryKind.rawValue)。preRunRepaired は撃った段が分かる回復(描画の状態)だけ
     public var recovery: String?
 
     public init(kind: String, worker: String?, label: String,
@@ -102,13 +102,18 @@ public struct WorkerAnomalyRecord: Codable, Sendable {
     /// 変わり label も変わるので、triage 前の一覧で引くと修復したデバイスが黙って数から落ちる
     /// `excludedReasons`: label → 除外の理由(無い label は凍結の理由。Android の run 前の点検は
     /// ネットワークの無い Emulator も除外する = `ProfileWorkerFactory.BlankScreenTriage.excludedReasons`)
+    /// `repairedRecovery` / `excludedCauses`: label → 撃った段 / 除外の型付きの原因(無い label は欄を省く)
     public static func preRunTriage(excluded: [RunWorker], repaired: [RunWorker],
-                                    excludedReasons: [String: String] = [:]) -> [WorkerAnomalyRecord] {
+                                    excludedReasons: [String: String] = [:],
+                                    repairedRecovery: [String: WorkerRecoveryKind] = [:],
+                                    excludedCauses: [String: WorkerAnomalyCause] = [:]) -> [WorkerAnomalyRecord] {
         func make(_ workers: [RunWorker], kind: String, reason: (RunWorker) -> String) -> [WorkerAnomalyRecord] {
             workers.map { worker in
                 WorkerAnomalyRecord(
                     kind: kind, worker: worker.logicalName.map { "\(worker.platform):\($0)" },
-                    label: worker.label, reason: reason(worker))
+                    label: worker.label, reason: reason(worker),
+                    cause: kind == "preRunExcluded" ? excludedCauses[worker.label] : nil,
+                    recovery: kind == "preRunRepaired" ? repairedRecovery[worker.label] : nil)
             }
         }
         return make(excluded, kind: "preRunExcluded", reason: {

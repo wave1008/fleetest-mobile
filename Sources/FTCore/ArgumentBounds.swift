@@ -38,6 +38,12 @@ public enum ArgumentBounds {
     /// 境界ちょうどは浮動小数の丸めで Int.max を跨ぎうるので1桁下げる。実用の待ちを縛る値ではない(約 3,170 万年)
     public static let waitSecondsCeiling: Double = 1e15
 
+    /// 払いの回数(`maxSwipes` / `ft_batch` の `repeat`)の上限。1回の払いは整定込みで実測約 1.1 秒なので、
+    /// 上限ぴったりでも約 2 分で必ず終わる。上限が無いと呼び手が切れた後も MCP が払い続け、別セッションの操作と
+    /// 取り合う(100 万を受けていた)。DSL の既定 8 本の十数倍で、実用の長い一覧(数百行)の端送りは端の検知で先に終わる。
+    /// 尽きたときは値と上限を並べて断る(`violation`)
+    public static let swipeCountCeiling: Double = 100
+
     /// 引数名 → 値域。**値域を持たない引数も `.unbounded` で必ず載せる** ——
     /// スキーマの数値プロパティ全部がここに載っていることを `ArgumentBoundsTests` が
     /// 走査で確かめる(載せ忘れは「値域が無いから」ではなく「まだ検討していないから」を
@@ -51,7 +57,7 @@ public enum ArgumentBounds {
         "lines": Bound(min: 1),
         "sinceSeconds": Bound(min: 1),
         "maxElements": Bound(min: 1, max: Double(BridgeAPI.maxSnapshotElementsCeiling)),
-        "maxSwipes": Bound(min: 0),
+        "maxSwipes": Bound(min: 0, max: swipeCountCeiling),
         "lastN": Bound(min: 1),
         "maxWidth": Bound(min: 1),
         "quality": Bound(min: 0, minExclusive: true, max: 1),
@@ -71,7 +77,7 @@ public enum ArgumentBounds {
         "pid": Bound(min: 1, max: Double(Int32.max)),
         // ft_start_run の待機列で待つ上限(秒)。`fleetest run --wait-lock` へそのまま渡す
         "waitLockSeconds": Bound(min: 1),
-        "repeat": Bound(min: 1),
+        "repeat": Bound(min: 1, max: swipeCountCeiling),
         // ft_fold のヒンジ角(度)。範囲は FoldControl が定義元
         "degrees": Bound(min: FoldControl.degreesRange.lowerBound, max: FoldControl.degreesRange.upperBound),
         // ft_results の行数・最小標本数

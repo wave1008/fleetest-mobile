@@ -90,6 +90,44 @@ final class SessionRecoveryDriverTests: XCTestCase {
         XCTAssertEqual(fake.snapshotCallCount, 2)
     }
 
+    /// アプリのプロセスが居ないと確かめられたら activate(= 冷間起動)を撃たない。撃つと画面が最初に戻り、
+    /// 呼び手は元の画面のつもりで次の操作を撃つ(誤った成功)
+    func testDeadAppIsNotColdLaunchedByRecovery() async throws {
+        let fake = FakeAppDriver()
+        fake.snapshotShouldFail = [true, false]
+        fake.tapRefShouldFail = [true]
+        let driver = SessionRecoveryDriver(base: fake, appIsRunning: { _ in false })
+        try await driver.launch(bundleID: "com.example.app")
+        do {
+            _ = try await driver.snapshot()
+            XCTFail("アプリが居ないのに回復して成功してはいけない")
+        } catch {
+            guard case DriverError.badResponse(409, let body) = error else { return XCTFail("\(error)") }
+            XCTAssertTrue(body.contains("is not running"), body)
+        }
+        do {
+            try await driver.tap(ref: 1)
+            XCTFail()
+        } catch {
+            guard case DriverError.badResponse(409, let body) = error else { return XCTFail("\(error)") }
+            XCTAssertTrue(body.contains("is not running"), body)
+        }
+        XCTAssertEqual(fake.activateCalls, [], "死んだアプリへ activate を撃たない")
+        XCTAssertEqual(fake.snapshotCallCount, 1, "撃ち直さない")
+    }
+
+    /// 居る(true)・判定できない(nil)は従来どおり回復する(判定できないことで正当な回復を赤にしない)
+    func testLiveOrUnknownAppStillRecovers() async throws {
+        for answer in [true as Bool?, nil] {
+            let fake = FakeAppDriver()
+            fake.snapshotShouldFail = [true, false]
+            let driver = SessionRecoveryDriver(base: fake, appIsRunning: { _ in answer })
+            try await driver.launch(bundleID: "com.example.app")
+            _ = try await driver.snapshot()
+            XCTAssertEqual(fake.activateCalls, ["com.example.app"], "\(String(describing: answer))")
+        }
+    }
+
     /// **包む相手が in-app 自身のときは 409 を回復しない**(in-app の 409 は一時的な競合 = キーウィンドウ無し・
     /// フォーカス無し)。読み違えると activate を撃ち、本文を「ランナーのセッションが失われた」に差し替える
     func testConflictIsPassedThroughWhenTheBaseIsAnInAppBridge() async throws {

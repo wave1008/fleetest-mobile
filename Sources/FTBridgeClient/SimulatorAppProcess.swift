@@ -26,6 +26,32 @@ public enum SimulatorAppProcess {
         return processIsRunning(inLaunchctlListOutput: result.output, bundleID: bundleID)
     }
 
+    /// 生死の問いを撃たない対象。SpringBoard はアプリではなく(launchctl に `UIKitApplication:` の行が無い = 常に「居ない」と読める)、
+    /// 居ない扱いにするとホーム画面に居る正常なセッションを「落ちた」と断る
+    static let systemShellBundleID = "com.apple.springboard"
+
+    static func asksAboutProcess(bundleID: String) -> Bool { bundleID != systemShellBundleID }
+
+    /// SessionRecoveryDriver の `appIsRunning` に渡す口。Simulator は launchctl・実機は devicectl(`IOSPhysicalRunningApps.isRunning`。
+    /// 照会は 409 を受けた回復の経路でしか撃たれず、実測 0.6 秒前後 × 2 本)で聞く。どちらでもなければ nil = 判定しない。
+    /// 協調スレッドプールを塞がないよう Task.detached で包む
+    public static func recoveryProbe(simulatorUDID: String?, physicalUDID: String? = nil)
+        -> (@Sendable (String) async -> Bool?)? {
+        if let simulatorUDID {
+            return { bundleID in
+                guard asksAboutProcess(bundleID: bundleID) else { return nil }
+                return await Task.detached { isRunning(udid: simulatorUDID, bundleID: bundleID) }.value
+            }
+        }
+        if let physicalUDID {
+            return { bundleID in
+                guard asksAboutProcess(bundleID: bundleID) else { return nil }
+                return await Task.detached { IOSPhysicalRunningApps.isRunning(udid: physicalUDID, bundleID: bundleID) }.value
+            }
+        }
+        return nil
+    }
+
     /// `launchctl list` の1行は "PID\tステータス\tラベル"。対象アプリのラベルは
     /// "UIKitApplication:<bundleID>[" を含み、未起動なら PID 列が "-"。純粋関数でテストする
     static func processIsRunning(inLaunchctlListOutput output: String, bundleID: String) -> Bool {

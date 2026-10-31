@@ -610,7 +610,9 @@ struct MCPError: Error, LocalizedError {
 struct MCPAnnotatedError: Error, LocalizedError {
     let underlying: Error
     let suffix: String
-    var errorDescription: String? { underlying.localizedDescription + suffix }
+    /// 元の文の前に置く文(撮れなかった理由を、先に起きた失敗の報告の後ろへ続けるとき)
+    var prefix: String = ""
+    var errorDescription: String? { prefix + underlying.localizedDescription + suffix }
 }
 
 /// **中身(文・画像)を持ったまま `isError: true` で返す失敗**。MCPError は文字列1本に畳まれるので、

@@ -1369,9 +1369,13 @@ extension StepExecutor {
         }
         // type はキーボードの表示を待たずに返る(Android・iOS は画面の外の申告のとき): 出るまで撮り直す(KeyboardWait の doc)。
         // 出れば下の keyboardShifted(nil → 矩形)が true になり整定へつながる
+        keyboardKnownAbsent = KeyboardWait.knownAbsent(
+            current: keyboardKnownAbsent, before: keyboardFrameBeforeType, after: snapshot.keyboardFrame,
+            screen: snapshot.screen, waitExhausted: false)
         if KeyboardWait.shouldAwaitAppearance(
             isAndroid: isAndroid, before: keyboardFrameBeforeType, after: snapshot.keyboardFrame,
-            screen: snapshot.screen, typedNewline: pendingTypeEndedWithNewline) {
+            screen: snapshot.screen, typedNewline: pendingTypeEndedWithNewline,
+            keyboardKnownAbsent: keyboardKnownAbsent) {
             let deadline = clock.now + .milliseconds(Int(KeyboardWait.appearSeconds * 1000))
             while clock.now < deadline,
                   !Self.keyboardOnScreen(snapshot.keyboardFrame, screen: snapshot.screen) {
@@ -1386,6 +1390,9 @@ extension StepExecutor {
                 noteCodesThisStep.insert(.keyboardNotShownAfterType)
                 keyboardWaitExhausted = true
             }
+            keyboardKnownAbsent = KeyboardWait.knownAbsent(
+                current: keyboardKnownAbsent, before: keyboardFrameBeforeType, after: snapshot.keyboardFrame,
+                screen: snapshot.screen, waitExhausted: true)
         }
         if waitedForKeyboard
             || Self.keyboardShifted(before: keyboardFrameBeforeType, after: snapshot.keyboardFrame) {

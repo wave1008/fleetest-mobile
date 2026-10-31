@@ -685,6 +685,16 @@ extension MCPServer {
             refResolutionNote = resolved.note
         }
 
+        // **直前の ft_type / ft_batch の type が立てた出現待ちの印を、この executor の最初の解決へ渡す**
+        // (executor は呼び出しごとに作るので印を持たない。上がる途中の木で解決した欄を撃つと、上がってきたキーボードの上の別のボタンに当たる。
+        // 1手目が ref なら verifiedRef が上で消費済みで、ここには残らない)
+        if let pending = pendingTypeKeyboardChecks[Self.sessionKey(args)] {
+            executor.carryPendingTypeKeyboardCheck(keyboardBefore: pending.before?.keyboardFrame,
+                                                   typedNewline: pending.typedNewline)
+            pendingTypeKeyboardChecks[Self.sessionKey(args)] = nil
+        }
+        executor.keyboardKnownAbsent = sessions[Self.sessionKey(args)]?.keyboardKnownAbsent ?? false
+
         // **ok でも何も起きていないかもしれない手**(行番号)。結論を「passed」と言わない材料
         // (実測: オプションのシートが出てくる途中の tap が飲まれ、disabled の「完了」も ok で "All 4 step(s) passed")
         var suspectSteps: [Int] = []
@@ -728,7 +738,23 @@ extension MCPServer {
             }
             let start = clock.now
             let treeBeforeStep = lastSnapshots[Self.sessionKey(args)]
+            // 画面の外の座標は撃たずに断る(ft_tap / ft_double_tap の座標形と同じ判定 `offscreenCoordinateError`)。
+            // 画面外の座標が木に残る別画面の要素に当たると、緑のまま別の物を押す
+            // swipePointToPoint は始点と終点の両方(ft_drag と同じ。終点が外のドラッグも前面のアプリを追い出す)
+            if Self.hasCoordinateTarget(plan.step),
+               let offscreen = Self.offscreenBatchCoordinateError(
+                   plan.step, screen: await coordinateScreen(batchDriver, args: args),
+                   bridge: bridges[Self.sessionKey(args)]) {
+                lines.append("\(index + 1). \(plan.summary) — FAILED: \(offscreen.message)")
+                throw MCPError(lines.joined(separator: "\n")
+                    + "\n\nStopped at step \(index + 1) of \(plans.count) — later steps were not run.")
+            }
+            if let mistake = Self.typeTextLooksLikeSelector(plan.step, tree: treeBeforeStep?.elements) {
+                throw MCPError(lines.joined(separator: "\n") + (lines.isEmpty ? "" : "\n")
+                    + "\(index + 1). \(plan.summary) — REFUSED, nothing was sent: \(mistake)")
+            }
             let outcome = await executor.execute(plan.step)
+            sessions[Self.sessionKey(args), default: DeviceSession()].keyboardKnownAbsent = executor.keyboardKnownAbsent
             let ms = Int((clock.now - start) / .milliseconds(1))
             // **実行した手はそのまま記録する**(利用者が書いた式のまま — 解決後の要素ではない。
             // scrollTo の記録と同じ理由)。ただし ref だった1手目は上で既にセレクタへ差し替え済み
@@ -738,7 +764,13 @@ extension MCPServer {
             // **キーボードが出ておらず何も送らなかった hideKeyboard は記録しない**(ft_hide_keyboard と同じ答え・同じ下書き)
             let sentNothing = plan.step.action == "hideKeyboard" && executor.hideKeyboardFoundNoKeyboard
             if !sentNothing {
-                recordAction(InteractionLog.Entry(step: plan.step, unresolved: nil,
+                // 座標の手は ft_tap の座標形と同じ注意書きを下書きへ残す
+                var recorded = plan.step
+                if ["tap", "doubleTap"].contains(recorded.action ?? ""), recorded.locator == nil,
+                   recorded.x != nil, recorded.y != nil, recorded.note == nil {
+                    recorded.note = DraftNotes.coordinates
+                }
+                recordAction(InteractionLog.Entry(step: recorded, unresolved: nil,
                                                   summary: plan.summary), args: args)
             }
             let refNote = index == 0 ? (refResolutionNote ?? "") : ""
@@ -750,7 +782,8 @@ extension MCPServer {
                 case .passed, .passedViaFallback, .healed:
                     reason = "could not confirm the result"
                 }
-                lines.append("\(index + 1). \(plan.summary) — FAILED (\(ms)ms): \(Self.batchWritableAdvice(reason))" + refNote
+                lines.append("\(index + 1). \(plan.summary) — FAILED (\(ms)ms): \(Self.batchWritableAdvice(reason))"
+                    + (outcome.driverFallback.map { " (\($0))" } ?? "") + refNote
                     + Self.batchDeliveryUnknownNote(failureKind: outcome.failureKind))
                 // **止まった位置と、そこで見えている画面を一緒に返す**(scrollTo の failure と
                 // 同じ形: throw で isError にする — 呼び手が要求した手が最後まで実行されなかった
@@ -897,6 +930,17 @@ extension MCPServer {
                                                                    appLeftFront: leftFront)
             + Self.batchAlertAppearedNote(beforeBatch: beforeBatch, final: final, beforeLastStep: treeBeforeLastTap)
             + (leftFront ? "" : unchangedNote) + inheritedNote + (await snapshotBody(final, driver: batchDriver, args: treeArgs, foldsSelectorTables: true)))
+    }
+
+    /// セレクタを書かず本文だけの `type` の本文が、直近の木にある id そのもの(`#field_x`)のとき、本文の書き忘れの疑いを返す。
+    /// 木に無い `#語` は本物の本文(ハッシュタグ)かもしれないので撃つ。木が古ければ見逃すだけ(誤って断らない側)
+    static func typeTextLooksLikeSelector(_ step: FlowStep, tree: [ElementInfo]?) -> String? {
+        guard step.action == "type", step.locator == nil, let text = step.text, text.hasPrefix("#"),
+              !text.contains(where: \.isWhitespace), let tree,
+              tree.contains(where: { $0.identifier == String(text.dropFirst()) }) else { return nil }
+        return "the only argument \"\(text)\" is an element id on the current screen — was the text left out?"
+            + " type(\"\(text)\", \"…\") takes the selector first. To type this exact text into the focused field,"
+            + " use ft_type with text instead."
     }
 
     /// ok の手の後で画面(木の内容)が1つも変わっていなかった tap の行に添える。iOS の木はアプリの外(システムのアラート)を

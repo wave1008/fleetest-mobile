@@ -38,11 +38,14 @@ public enum DeviceScreenStateStore {
         try? FileManager.default.removeItem(at: entryURL(stateDir: stateDir, key: key))
     }
 
-    /// 公表されている状態。書いた時刻が `stalenessSeconds` より古ければ無いものとして扱う。読めなければ nil
-    public static func current(stateDir: URL, key: String, now: Date = Date()) -> DeviceScreenState? {
+    /// 公表されている状態。書いた時刻が `stalenessSeconds` より古い、またはマシンの起動より前なら無いものとして扱う
+    /// (印は描画のプロセスの状態なので、マシンの再起動で意味を失う。30 分以内に再起動すると残っていた)。読めなければ nil
+    public static func current(stateDir: URL, key: String, now: Date = Date(),
+                               bootTime: Date? = MachineBoot.time()) -> DeviceScreenState? {
         guard let data = try? Data(contentsOf: entryURL(stateDir: stateDir, key: key)),
               let entry = try? JSONDecoder().decode(Entry.self, from: data),
-              now.timeIntervalSince1970 - entry.at <= stalenessSeconds else { return nil }
+              now.timeIntervalSince1970 - entry.at <= stalenessSeconds,
+              bootTime.map({ entry.at >= $0.timeIntervalSince1970 }) ?? true else { return nil }
         return entry.state
     }
 }

@@ -153,6 +153,10 @@ public enum StepNote: String, Sendable, Codable, CaseIterable {
     /// `typeRetyped` と対で立つ。**これが立つ欄は打鍵の落ちではない** —— `textIs` で値を別途確かめる
     case typeRetypeAbandoned = "type-retype-abandoned"
 
+    /// 欄が返した前後の空白が**打った空白と違った**(半角空白が全角空白 U+3000 に化けた等。RN の iOS で実測)ので、
+    /// 検証できないまま受理した。**これが立つ欄は入った値が打った文字と違う** —— `textIs` で別途確かめる
+    case typeWhitespaceAltered = "type-whitespace-altered"
+
     /// 読み返しの値が**入力の前から1文字も動かなかった**が、打った文字は欄の領域に描かれていた(OCR)ので、
     /// 欄の値が入力を映さないものとして追送せずに受理した(M3 SearchBar の iOS は value に説明文を出す。
     /// 追送すると入力が重複する)。**値そのものは読み返していない** —— 必要なら後段で確かめる
@@ -490,6 +494,9 @@ public enum StepNote: String, Sendable, Codable, CaseIterable {
         case .typeRetypeAbandoned:
             return "the field still lost the same characters after retyping, so the value was accepted"
                 + " as input the app transforms"
+        case .typeWhitespaceAltered:
+            return "the field holds different whitespace than the typed text (e.g. a space"
+                + " became a full-width space); accepted — check the value with textIs"
         case .swipeByRatioCapped:
             return "dxRatio/dyRatio beyond ±0.9 were capped to 0.9 (the ratio is relative to the target's"
                 + " size); to move farther than the target, use swipeElementToElement or swipePointToPoint"

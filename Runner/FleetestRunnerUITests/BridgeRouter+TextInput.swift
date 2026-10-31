@@ -149,6 +149,7 @@ extension BridgeRouter {
         var beforeRetype: String?
         var retypeAbandoned = false
         var consumedByApp = false
+        var whitespaceAltered = false
         // 直前の追送を撃った時点の値。追送の後も同じ値なら、それ以上撃っても重複するだけ(ホストの verifyTypedText と同じ規律)
         var valueAtLastResend: String?
         // 打つ前の木(ホストは /type の直前に snapshot を撮っている)。全文が欠けたときの判定にだけ使う
@@ -185,6 +186,9 @@ extension BridgeRouter {
                         + " (\(actual.count) character(s) against the expected \(expected.count)); not retyped again")
                 }
             case .done, .unverifiable:
+                break loop
+            case .whitespaceAltered:
+                whitespaceAltered = true
                 break loop
             case .resend where valueAtLastResend == actual:
                 // **追送しても値が動かなければ2回目は撃たない**(撃つたびにアプリへ同じ入力が届きうる)
@@ -234,6 +238,10 @@ extension BridgeRouter {
         if consumedByApp {
             return "the field was back to its previous value after typing, but the screen outside it changed —"
                 + " taken as the app consuming the input (e.g. submitting a complete code); not re-sent"
+        }
+        if whitespaceAltered {
+            return "the field holds different whitespace than the typed text"
+                + " (e.g. a space became a full-width space); accepted — check the value with textIs"
         }
         if retypeAbandoned {
             return "retyped the whole text once, but the field still lost the same characters;"

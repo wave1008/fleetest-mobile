@@ -184,6 +184,29 @@ public final class AndroidDriver: AppDriver {
         }
     }
 
+    /// `adb shell input swipe` が **adb 自身の失敗(終了コード 255 = 送った後に接続が切れた)** で終わったときの「届いたか分からない」。
+    /// 端末側の `input` は adb が切れた後も走り続けるので、長押し・ドラッグは完走して届いていることがある
+    /// (「failed」と断定して撃ち直すと二重に効く)。終了コードで決める(文言の一致では決めない)。
+    /// 255 以外(端末側のコマンドの失敗・撃つ前の `device not found` = 1)は従来どおり失敗
+    static func shellInputCutOff(_ result: Shell.Result, verb: String, context: DriverErrorContext) -> DriverError? {
+        guard result.status == 255 else { return nil }
+        return .bridgeUnreachable(context: context,
+            detail: "\(verb) was cut off: adb lost the connection after the command was sent (exit 255), so whether it"
+                + " was performed is unknown\(result.tail.isEmpty ? "" : " (\(result.tail))")")
+    }
+
+    /// `adb shell input keyevent` の送出。**終了コードが 0 以外は「届いたか分からない」**: 接続が切れた後も端末側の `input` は
+    /// キーを撃ち終えることがあり、`error: closed` は終了コード 1 でも届いていた回がある(実測: back 2/2 が届いていた)。
+    /// 255 だけを見る長押し・ドラッグ(`shellInputCutOff`)と違い、終了コードだけでは送る前の失敗(1)と送った後の切断(1 か 255)を
+    /// 分けられないので、文言の一致で仕分けず、すべて撃ち直さない側へ倒す。失敗は `bridgeUnreachable`(= 配達不明)で投げる
+    func sendKeyevent(_ key: String, what: String) throws {
+        let result = try adbAnswering(["shell", "input", "keyevent", key])
+        guard result.status != 0 else { return }
+        throw DriverError.bridgeUnreachable(context: androidContext(),
+            detail: "\(what) failed (adb exit \(result.status)): whether the key reached the device is unknown"
+                + " — look at the screen before sending it again\(result.tail.isEmpty ? "" : " (\(result.tail))")")
+    }
+
     func noAnswerError(consequence: String) -> DriverError {
         .bridgeUnreachable(context: androidContext(),
                            detail: AndroidGuestReadiness.noAnswerMessage(
@@ -202,6 +225,8 @@ public final class AndroidDriver: AppDriver {
 
     public func status() async throws -> StatusResponse {
         // ブリッジの /status に一本化(ready判定にブリッジ疎通を伴わせ、接続不能なら早期に失敗させる)
+        // **ここで撃ち直さない**: 2回目は withBridge がブリッジを起動し直す = run の死活プローブが実行中の操作を巻き込む。
+        // 状態確認の道具の撃ち直しは呼び手の ftStatus が持つ
         try await withBridge { try await $0.status() }
     }
 
@@ -526,11 +551,7 @@ public final class AndroidDriver: AppDriver {
     /// タスク一覧(最近使ったアプリ)を開く。**gRPC の名前付きキーは使わない**(理由は home())。
     /// adb keyevent 直行。
     public func openAppSwitcher() async throws {
-        let result = try adbAnswering(["shell", "input", "keyevent", "KEYCODE_APP_SWITCH"])
-        guard result.status == 0 else {
-            throw DriverError.badResponse(status: Int(result.status),
-                body: "failed to open the app switcher: \(result.tail)")
-        }
+        try sendKeyevent("KEYCODE_APP_SWITCH", what: "opening the app switcher")
         // keyevent は遷移完了を待たないため、直後の snapshot 用の整定待ち(activate と同様)
         await settleViaBridge()
     }
@@ -542,11 +563,7 @@ public final class AndroidDriver: AppDriver {
     /// gpio-keys に載る KEY_POWER/KEY_SLEEP = sleepWake だけは届く。DS-16.3)。
     /// adb keyevent 直行。
     public func home() async throws {
-        let result = try adbAnswering(["shell", "input", "keyevent", "KEYCODE_HOME"])
-        guard result.status == 0 else {
-            throw DriverError.badResponse(status: Int(result.status),
-                body: "failed to go to the home screen: \(result.tail)")
-        }
+        try sendKeyevent("KEYCODE_HOME", what: "going to the home screen")
         // keyevent は遷移完了を待たないため、直後の snapshot 用の整定待ち(openAppSwitcher と同様)
         await settleViaBridge()
     }
@@ -554,11 +571,7 @@ public final class AndroidDriver: AppDriver {
     /// 前の画面へ戻る。**gRPC "GoBack" は使わない** — 成功を返すのにキーが届かない
     /// (実機で確認。KEY_WAKEUP 不発と同型の無音 no-op。機序は home())。adb keyevent 直行。
     public func back() async throws {
-        let result = try adbAnswering(["shell", "input", "keyevent", "KEYCODE_BACK"])
-        guard result.status == 0 else {
-            throw DriverError.badResponse(status: Int(result.status),
-                body: "failed to go back: \(result.tail)")
-        }
+        try sendKeyevent("KEYCODE_BACK", what: "going back")
         // keyevent は遷移完了を待たないため、直後の snapshot 用の整定待ち(home() と同様)
         await settleViaBridge()
     }
@@ -770,21 +783,37 @@ public final class AndroidDriver: AppDriver {
         restoreStateIfNeeded()
         try refuseIfStepExpectationContradicts(ref)
         let target = bridgeRef(ref)
+        // ref 無し = 焦点の欄を消す。解除画面(PIN)が焦点を持つと、その欄(空の PIN)を「消した」と読み返して成功を返し、
+        // アプリの欄は残っていた。覆いが焦点を持つなら撃たない(ft_type と同じ理由・同じ文言)
+        if ref == nil, shadeHoldsInputFocus() { throw Self.coveredFieldError() }
         do {
             try await withoutStepExpectation { try await withBridge { try await $0.clearInput(ref: target) } }
         } catch let error as DriverError {
             throw Self.noFocusFrontAdvice(after: error, front: noInputFocusFront(after: error),
-                                          lastTreePackage: lastTreeForegroundPackage ?? currentPackage) ?? error
+                                          lastTreePackage: currentPackage ?? lastTreeForegroundPackage) ?? error
         }
     }
 
     /// 入力フォーカス不在で落ちた直後の前面。**シェードはアプリ窓を覆うだけで最前面のアプリは下のまま**なので
     /// 窓の並びから覆いを見る(`topmostAppPackage` だけではシェードの下のアプリが返る)。照会は「フォーカス不在」の回だけ・不明は nil
     private func noInputFocusFront(after error: DriverError) -> String? {
-        guard case .badResponse(_, let body) = error, body.contains(Self.noInputFocusMarker),
+        guard case .badResponse = error,
               let result = try? adbAnswering(["shell", "dumpsys", "window", "windows"]), result.status == 0 else { return nil }
-        return AndroidForegroundWindows.shadeCovering(dumpsys: result.output)
+        return shadeHoldsInputFocus(windows: result.output)
             ? "com.android.systemui" : AndroidForegroundWindows.topmostAppPackage(dumpsys: result.output)
+    }
+
+    /// 通知シェード・クイック設定・解除画面が入力フォーカスを持つか。読めないときは false(覆いの案内も、追加の BACK も撃たない側)
+    public func shadeHoldsInputFocus() -> Bool {
+        guard let windows = try? adbAnswering(["shell", "dumpsys", "window", "windows"]), windows.status == 0 else { return false }
+        return shadeHoldsInputFocus(windows: windows.output)
+    }
+
+    /// `windows` = 読み済みの `dumpsys window windows`。窓が可視の回だけ焦点を読む(正常系に adb を足さない)
+    private func shadeHoldsInputFocus(windows: String) -> Bool {
+        guard AndroidForegroundWindows.shadeCovering(dumpsys: windows),
+              let focus = try? adbAnswering(["shell", "dumpsys", "window", "displays"]), focus.status == 0 else { return false }
+        return AndroidForegroundWindows.inputFocusHeldByShade(dumpsys: focus.output)
     }
 
     /// ホストの ref をブリッジが知っている ref へ写す(DOM 由来だけ差し替わる。domBridgeRefs 参照)。
@@ -813,14 +842,27 @@ public final class AndroidDriver: AppDriver {
                 body: "could not read whether the keyboard is showing (dumpsys window): \(dumpsys.tail)")
         }
         guard AndroidForegroundWindows.keyboardVisible(dumpsys: dumpsys.output) else { return false }
-        let result = try adbAnswering(["shell", "input", "keyevent", "KEYCODE_BACK"])
-        guard result.status == 0 else {
-            throw DriverError.badResponse(status: Int(result.status),
-                body: "failed to hide the keyboard: \(result.tail)")
+        // **通知シェード・クイック設定が前面だと BACK はそれを畳むだけでキーボードは残る**。クイック設定は
+        // 「クイック設定 → 通知シェード → 閉じる」の2回の BACK で畳まれ、キーボード用の BACK はその後の1回(合わせて最大 3 回)。
+        // 覆いが残っている間だけ BACK を重ね、覆いが無くなってからの1回は従来の1回と同じ(読み直さずに成功とする)。
+        // 上限まで撃ってもキーボードが残るなら、閉じたと言わず断る
+        // 覆いは焦点で見る: 通知の到着でも窓は可視になりうるが BACK はキーボードに届く。閉じ途中を見て重ねると、2回目がアプリの画面を戻す
+        var covered = shadeHoldsInputFocus(windows: dumpsys.output)
+        for _ in 0..<Self.hideKeyboardMaxBacks {
+            try sendKeyevent("KEYCODE_BACK", what: "hiding the keyboard")
+            await settleViaBridge()
+            guard covered else { return true }
+            let again = try adbAnswering(["shell", "dumpsys", "window", "windows"])
+            guard again.status == 0, AndroidForegroundWindows.keyboardVisible(dumpsys: again.output) else { return true }
+            covered = shadeHoldsInputFocus(windows: again.output)
         }
-        await settleViaBridge()
-        return true
+        throw DriverError.badResponse(status: 422, body: "the keyboard is still showing after \(Self.hideKeyboardMaxBacks) BACK presses:"
+            + " the notification shade or quick settings is in front and took them. Close it first (ft_navigate back),"
+            + " then hide the keyboard")
     }
+
+    /// クイック設定(畳み 2 回)+ キーボード(1 回)
+    static let hideKeyboardMaxBacks = 3
 
     /// ブリッジ snapshot の結果をホスト側 ref テーブルにも写す(CLI プロセス跨ぎの手動駆動を保つ)。internal = テストが表を置く口
     func syncLocalState(from snapshot: SnapshotResponse) {
@@ -861,9 +903,11 @@ public final class AndroidDriver: AppDriver {
         } catch let error as DriverError {
             // 前面が systemui(通知シェード・クイック設定・ロック画面・アシスタント)ならそれが入力フォーカスを持っている。
             // 照会は「フォーカス不在」で落ちた回だけ(正常系には掛からない)
-            let front = ref == nil ? noInputFocusFront(after: error) : nil
-            throw Self.typeNoFocusAdvice(after: error, hadRef: ref != nil, front: front,
-                                         lastTreePackage: lastTreeForegroundPackage ?? currentPackage) ?? error
+            // 失敗の種類に依らず覆い・アプリ不在を言う(ロック画面の下の SET_TEXT 拒否・アプリが落ちた後の読み返しの失敗)
+            let front = noInputFocusFront(after: error)
+            let lastTree = currentPackage ?? lastTreeForegroundPackage
+            throw Self.typeNoFocusAdvice(after: error, hadRef: ref != nil, front: front, lastTreePackage: lastTree)
+                ?? Self.noFocusFrontAdvice(after: error, front: front, lastTreePackage: lastTree) ?? error
         }
         try await pressEnter()
     }
@@ -892,9 +936,16 @@ public final class AndroidDriver: AppDriver {
             + " focuses it (e.g. type(\".textField[1]\", \"…\"))")
     }
 
+    /// 覆い(シェード・クイック設定・ロック画面)が入力フォーカスを持つとき、ref 無しの clearInput を断る文
+    static func coveredFieldError() -> DriverError {
+        .badResponse(status: 422, body: "nothing was cleared: com.android.systemui (the notification shade, quick settings or the lock"
+            + " screen) is in front and holds the input focus, so the app's field is not the one that would be cleared."
+            + " Close it first (ft_navigate back, or unlock the device), then retry.")
+    }
+
     /// 欄ではなく前面が原因のフォーカス不在(type / clearInput 共通)。前面からは言えないとき nil
     static func noFocusFrontAdvice(after error: DriverError, front: String?, lastTreePackage: String?) -> DriverError? {
-        guard case .badResponse(let status, let body) = error, body.contains(noInputFocusMarker) else { return nil }
+        guard case .badResponse(let status, let body) = error else { return nil }
         if front == "com.android.systemui" {
             return DriverError.badResponse(status: status, body: body
                 + " — com.android.systemui (the notification shade, quick settings, the lock screen or an assistant) is"
@@ -956,11 +1007,7 @@ public final class AndroidDriver: AppDriver {
         // gRPC の名前付きキーは使わない(理由は home())。"Enter" は GoHome/AppSwitch と同じ
         // sendKey なので同型の無音 no-op になる — ここは成功が返ると adb へ落ちない救済経路で、
         // 失敗の型が沈黙(誤った成功)なので単独では再現していないが塞ぐ
-        let result = try adbAnswering(["shell", "input", "keyevent", "66"])
-        guard result.status == 0 else {
-            throw DriverError.badResponse(status: Int(result.status),
-                body: "failed to send the Enter key: \(result.tail)")
-        }
+        try sendKeyevent("66", what: "sending the Enter key")
         // keyevent は遷移完了を待たないため、直後の snapshot 用の整定待ち(home() と同様)。
         // ブリッジ経路はサーバ側 settle() 込みで応答するため不要
         await settleViaBridge()
@@ -1331,6 +1378,7 @@ public final class AndroidDriver: AppDriver {
                               String(toXi), String(toYi),
                               String(durationMs)])
         guard result.status == 0 else {
+            if let cut = Self.shellInputCutOff(result, verb: "drag", context: androidContext()) { throw cut }
             throw DriverError.badResponse(status: Int(result.status),
                 body: "drag failed: \(result.tail)")
         }
@@ -1375,6 +1423,7 @@ public final class AndroidDriver: AppDriver {
         let py = String(yi)
         let result = try adb(["shell", "input", "swipe", px, py, px, py, String(durationMs)])
         guard result.status == 0 else {
+            if let cut = Self.shellInputCutOff(result, verb: "long-press", context: androidContext()) { throw cut }
             throw DriverError.badResponse(status: Int(result.status),
                 body: "long-press failed: \(result.tail)")
         }

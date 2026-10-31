@@ -27,12 +27,15 @@ public enum TypeReadback {
         /// どちらでもない = 入力が加工されている(自動修正・書式付け・マスク欄の伏せ字)。
         /// 追送でも delete でも直せないので検証を諦めて受理する
         case unverifiable
+        /// 前後の空白を除くと一致するが、**欄が返した前後の空白が打った空白と違う**、または語の間の空白の種類だけが違う(半角空白が全角空白 U+3000 に化けた等 =
+        /// 欄が空白を読み返せている証拠)。追送でも delete でも直せないので受理するが、**打った文字と違う値が入った事実は注記で言う**
+        case whitespaceAltered
 
         /// 前方一致で説明できる(追送・削除・完了)。部分列の説明(`.retype`)より確度が高い
         public var explainsByPrefix: Bool {
             switch self {
             case .done, .resend, .deleteExcess: return true
-            case .retype, .unverifiable: return false
+            case .retype, .unverifiable, .whitespaceAltered: return false
             }
         }
     }
@@ -50,8 +53,15 @@ public enum TypeReadback {
         // (実測: 4周で12個の空白が入った)
         if expected.trimmingCharacters(in: .whitespacesAndNewlines)
             == actual.trimmingCharacters(in: .whitespacesAndNewlines) {
+            // 読めない空白は「返ってこない」ので、欄が前後に空白を返しているのにそれが打った空白と違うなら加工
+            if outerWhitespace(actual) != emptyOuterWhitespace, outerWhitespace(actual) != outerWhitespace(expected) {
+                return .whitespaceAltered
+            }
             return .unverifiable
         }
+        // **語の間の空白が別の空白に化けた**(RN の iOS で `🙂 ok` → `🙂　ok`)= 空白の位置と数は同じで文字だけ違う。
+        // 追送も delete も直せないので受理するが、欄が打った文字と違う値を持つ事実は言う
+        if whitespaceFolded(expected) == whitespaceFolded(actual) { return .whitespaceAltered }
         if expected.hasPrefix(actual) { return .resend(String(expected.dropFirst(actual.count))) }
         if actual.hasPrefix(expected) { return .deleteExcess(actual.count - expected.count) }
         // **前方一致の後にしか置けない**: `hel` は `hello123` の部分列でもあり、先に見ると
@@ -61,6 +71,20 @@ public enum TypeReadback {
             return .retype
         }
         return .unverifiable
+    }
+
+    /// 空白・改行を1文字ずつ半角空白に畳んだ文字列(数と位置は保つ)。畳んで一致するが元は違う = 空白の種類だけが化けた
+    static func whitespaceFolded(_ text: String) -> String {
+        String(text.map { $0.isWhitespace || $0.isNewline ? " " : $0 })
+    }
+
+    /// 前後の空白(先頭の連なり + 末尾の連なり)。全部空白の文字列は先頭側に数える
+    static let emptyOuterWhitespace = "\u{1F}"
+
+    static func outerWhitespace(_ text: String) -> String {
+        let leading = String(text.prefix { $0.isWhitespace || $0.isNewline })
+        let trailing = leading.count == text.count ? "" : String(text.reversed().prefix { $0.isWhitespace || $0.isNewline }.reversed())
+        return leading + "\u{1F}" + trailing
     }
 
     /// 1回の type で全文を打ち直す上限(ランナー・ホストの両消費者が共有)。
@@ -114,7 +138,28 @@ public enum TypeReadback {
         }
         if case .retype = byExpected { return expected }
         if case .retype = byTypedOnly { return typedOnly }
+        if let replaced = selectionReplacedTarget(expected: expected, typedOnly: typedOnly, actual: actual) { return replaced }
         return expected
+    }
+
+    /// 欄の語を選択して打った(選択範囲が置き換わる)が、**撃った文字の後ろが欠けた**形(`hello world` の `hello` を選んで
+    /// `ABCD` → `AB world`)の目標 `ABCD world`。`actual` = 撃った文字の先頭の一部 + 撃つ前の値の後ろ側(空でない)のとき、
+    /// 撃った文字 + その後ろ側を返す(`.retype` で全文を打ち直せる)。当たらなければ nil。
+    /// 先頭の一部は空でなく、撃った文字より短いこと(全部あれば `typedOnlyExcessIsPriorValue` の領分)
+    static func selectionReplacedTarget(expected: String, typedOnly: String, actual: String) -> String? {
+        guard !typedOnly.isEmpty, expected.hasSuffix(typedOnly) else { return nil }
+        let prior = String(expected.dropLast(typedOnly.count))
+        guard !prior.isEmpty else { return nil }
+        var tail = prior.count
+        while tail > 0 {
+            let suffix = String(prior.suffix(tail))
+            if actual.hasSuffix(suffix) {
+                let head = String(actual.dropLast(suffix.count))
+                if !head.isEmpty, head.count < typedOnly.count, typedOnly.hasPrefix(head) { return typedOnly + suffix }
+            }
+            tail -= 1
+        }
+        return nil
     }
 
     /// `actual` = 撃った文字 + 余り で、余りが撃つ前の値の後ろ側そのもの(`hello world` の先頭の語を選択して

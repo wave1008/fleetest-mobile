@@ -34,6 +34,21 @@ public enum IOSPhysicalRunningApps {
         bundleIDs(apps: apps, processesJSON: try processesJSON(udid: udid, timeout: timeout))
     }
 
+    /// udid → インストール済みアプリの控え。入れ直しで実行ファイルのパスが変わりうるので、控えで「居ない」と出た回だけ取り直して確かめる
+    private static let appsMemo = LockedValue<[String: [IOSPhysicalAppCatalog.App]]>([:])
+
+    /// 対象アプリのプロセスが居るか。**読めなければ nil**(居ないとは言わない)。**同期の外部コマンドを最大 3 本撃つ**
+    /// (協調スレッドプールから呼ぶなら外で包む)
+    public static func isRunning(udid: String, bundleID: String) -> Bool? {
+        func check(_ apps: [IOSPhysicalAppCatalog.App]) -> Bool? {
+            (try? running(udid: udid, apps: apps)).map { $0.contains(bundleID) }
+        }
+        if let cached = appsMemo.withLock({ $0[udid] }), check(cached) == true { return true }
+        guard let apps = try? IOSPhysicalAppCatalog.apps(udid: udid) else { return nil }
+        appsMemo.withLock { $0[udid] = apps }
+        return check(apps)
+    }
+
     private static func processesJSON(udid: String, timeout: Double) throws -> [String: Any] {
         let outputURL = TemporaryDirectory.url
             .appendingPathComponent("fleetest-devicectl-processes-\(UUID().uuidString).json")

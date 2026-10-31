@@ -18,7 +18,7 @@ final class ScreenRenderingRecoveryWiringTests: XCTestCase {
         let text = try Self.code("Sources/fleetest/ProfileRunOrchestrator.swift")
         XCTAssertTrue(text.contains("recoverRendering: {"))
         XCTAssertTrue(text.contains("ScreenRenderingRecoverer.recover("))
-        XCTAssertTrue(text.contains("unrecoveredDeviceNames: {"))
+        XCTAssertTrue(text.contains("unrecoveredDevices: {"))
     }
 
     func testBothSupplyLanesRunThePreRunRecoveryThroughTheLedger() throws {
@@ -36,6 +36,26 @@ final class ScreenRenderingRecoveryWiringTests: XCTestCase {
         XCTAssertLessThan(cleanup.lowerBound, recover.lowerBound)
         XCTAssertLessThan(recover.lowerBound, revive.lowerBound)
         XCTAssertTrue(text.contains("cause: .rendering,\n                                            failed: failed"), "切り離しは retireUnusable を通す")
+    }
+
+    /// 中断中は回復も revive も撃たない(キューは中断後も残る = `hasItems` だけでは門にならない)
+    func testRecoveryAndReviveAreGatedOnTheInterruption() throws {
+        let text = try Self.code("Sources/FTCore/RunOrchestrator.swift")
+        let recover = try XCTUnwrap(text.range(of: "let recoverRendering, revives < MAX_WORKER_REVIVES"))
+        XCTAssertTrue(String(text[recover.upperBound...].prefix(200)).contains("await !stoppedByUser()"))
+        let revive = try XCTUnwrap(text.range(of: "guard revives < MAX_WORKER_REVIVES, await queue.hasItems()"))
+        XCTAssertTrue(String(text[revive.upperBound...].prefix(120)).contains("await !stoppedByUser()"))
+    }
+
+    /// 供給の2レーン(と呼び手 5 箇所)は中断を渡す。渡し忘れは run の前の回復が中断後も続く
+    func testSupplyLanesReceiveTheInterruption() throws {
+        let lanes = try Self.code("Sources/fleetest/ProfileSupplyLanes.swift")
+        XCTAssertEqual(lanes.components(separatedBy: "isStopped: isStopped").count - 1, 2)
+        let api = try Self.code("Sources/fleetest/ApiRunCommand.swift")
+        let supply = try Self.code("Sources/fleetest/ProfileRunner+Supply.swift")
+        let calls = api.components(separatedBy: "isStopped: { interruptState.isStopped }").count - 1
+            + supply.components(separatedBy: "isStopped: { interruptState.isStopped }").count - 1
+        XCTAssertEqual(calls, 6)
     }
 
     /// 切り離しは緑と素の赤だけ・中断中は撃たない・ブリッジが答えるときだけ(順序が崩れると既存の仕分けを横取りする)

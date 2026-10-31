@@ -221,7 +221,12 @@ enum DeviceInventory {
             // **「動いているのに MCP からは触れない」を行から読めるようにする**(H-3)。
             // iOS の操作系はブリッジ越しなので、ブリッジが無い機は udid を渡しても port を渡しても
             // 動かない。行の見た目は他と同じなので、書かないと利用者は「なぜか効かない」を踏む
-            parts.append("no bridge — not drivable from MCP until `fleetest bridge up`")
+            // 台帳に居る実機はランナーが生きたままトンネルだけ消えていることがある = udid を渡した呼び出しが開き直す。
+            // 仮想デバイスも udid を渡した呼び出しが起動する(他のセッションが使っていなければ)。確定は呼び出して初めて分かる
+            let upCommand = "`fleetest bridge up --device \(row.identifier ?? "<udid>")" + (row.physical ? " --physical" : "") + "`"
+            parts.append("no bridge listening on this Mac — a call that passes this udid tries to "
+                + (row.physical ? "re-open its USB tunnel (if the runner is still alive)" : "start one")
+                + "; if that fails: " + upCommand)
         }
         // **捨てた本数は黙らない**(Row.unattributedByName)。同名の機が2台以上あると、
         // udid を申告しないブリッジはどちらのものか決められない

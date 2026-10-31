@@ -19,6 +19,8 @@ extension MCPServer {
         var snapshot: SnapshotResponse
         do {
             snapshot = try await freshSnapshot(snapshotDriver, args: args)
+            // 上がる途中の木を「いまの画面」として渡すと、続く手が上がる前の配置で欄を撃つ(印が無ければ何も読まない)
+            snapshot = try await consumePendingTypeKeyboardCheck(snapshot, driver: snapshotDriver, args: args)
         } catch {
             // ホーム画面/システム UI を読もうとして詰まった形なら、読む方法まで返す
             let hint = Self.springboardHint(error, bridge: bridges[Self.sessionKey(args)])

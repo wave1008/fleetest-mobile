@@ -1044,6 +1044,8 @@ struct RunScenarios: AsyncParsableCommand {
         let failedCount: Int
         let skippedCount: Int
         let interrupted: Bool
+        // 並列経路だけが持つ離脱・振り直しの記録(逐次経路は離脱しない = nil)
+        let parallelSummary: RunSummary?
         do {
             // Android の宛先は供給の前に1回決める(serial 省略で複数台なら断る = 生の adb エラーにしない)
             let androidSerial = items.contains(where: { ($0.info.platform ?? resolvedPlatform) == "android" })
@@ -1055,8 +1057,9 @@ struct RunScenarios: AsyncParsableCommand {
                                                       settings: ScenarioExecutionSettings(noProfileSettings),
                                                       homeOnStart: noProfileSettings.homeOnStart,
                                                       recorder: recorder, interruptState: interruptState)
+                parallelSummary = nil
             } else {
-                (failedCount, skippedCount, interrupted) = await runParallel(items, project: testProject,
+                (failedCount, skippedCount, interrupted, parallelSummary) = await runParallel(items, project: testProject,
                                                 iosPorts: iosPorts, androidSerial: androidSerial,
                                                 reportDir: reportDirPath,
                                                 settings: ScenarioExecutionSettings(noProfileSettings),
@@ -1081,6 +1084,9 @@ struct RunScenarios: AsyncParsableCommand {
         // ドキュメントの実効値(noProfileSettings)をそのまま使う(--profile 経路と同じ
         // DeviceIndependentRunSettings を通す。ProfileResolver.resolve の宣言参照)
         let slowWorkers = recorder.finish(total: items.count, passed: items.count - failedCount - skippedCount, failed: failedCount,
+                        degradedWorkers: parallelSummary?.degradedWorkers ?? [],
+                        freezeRetries: parallelSummary?.freezeRetries ?? [],
+                        workerAnomalies: parallelSummary?.workerAnomalies ?? [],
                         // --performance は --profile 専用(ヘルプ参照)。この経路は素通りするので false
                         performanceMode: false,
                         fmSettings: noProfileFMSettings,
@@ -1538,7 +1544,7 @@ struct RunScenarios: AsyncParsableCommand {
                              homeOnStart: Bool,
                              recordingConfig: VideoRecordingConfig?,
                              recorder: RunRecorder?, interruptState: RunInterruptState
-    ) async -> (failed: Int, skipped: Int, interrupted: Bool) {
+    ) async -> (failed: Int, skipped: Int, interrupted: Bool, summary: RunSummary) {
         let defaultPlatform = resolvedPlatform
         let items = LPTOrdering.apply(rawItems, project: project, defaultPlatform: defaultPlatform,
                                       enabled: !common.noLPT,
@@ -1623,7 +1629,15 @@ struct RunScenarios: AsyncParsableCommand {
             }
         }
         let result = await summary
-        return (result.failed, result.skipped, result.interrupted)
+        if !result.degradedWorkers.isEmpty {
+            ConsoleOut.out("⚠️ Degraded or dropped workers (\(result.degradedWorkers.count)):")
+            for entry in result.degradedWorkers { ConsoleOut.out("   - \(entry)") }
+        }
+        if !result.freezeRetries.isEmpty {
+            ConsoleOut.out("🔁 Results discarded and requeued (\(result.freezeRetries.count)):")
+            for entry in result.freezeRetries { ConsoleOut.out("   - \(entry)") }
+        }
+        return (result.failed, result.skipped, result.interrupted, result)
     }
 }
 

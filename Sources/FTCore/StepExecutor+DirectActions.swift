@@ -128,7 +128,7 @@ extension StepExecutor {
         var unchanged = 0
         var reachedEdge = false
         var sawUnsettled = false
-        let limit = max(1, step.maxSwipes ?? FlowStep.defaultMaxEdgeSwipes)
+        let limit = max(0, step.maxSwipes ?? FlowStep.defaultMaxEdgeSwipes)
         var hintJumps = 0
         var sentSwipes = 0
         // 見えている中身が最後に変わった時刻(端を確定してよいかの起点)。nil = 一度も変わっていない
@@ -165,6 +165,7 @@ extension StepExecutor {
         var probeFlush = false
         // 短いドラッグの始点にする「動いた中身」の #id(ref は撮るたびに振り直されるので id で控える。EdgeProbe.path)
         var probeAnchorIDs: Set<String> = []
+        var startScreen: FTRect?
         for _ in 0..<limit {
             let settled: (signature: String, snapshot: SnapshotResponse, settled: Bool, changed: Bool)
             if let carried {
@@ -174,6 +175,15 @@ extension StepExecutor {
             }
             carried = nil
             if !settled.settled { sawUnsettled = true }
+            // **探索の途中で画面の大きさが変わった(端末が回った)なら、端とは言わず止める**(scrollTo と同じ。座標系が替わると
+            // 容器・始点の前提が崩れ、潰れた容器へ上限まで払い続けて ok を返していた)
+            if let startScreen, startScreen != settled.snapshot.screen {
+                return StepOutcome(status: failed(.notFound,
+                    "\(step.action ?? "scrollToEdge") stopped after \(sentSwipes) swipe(s): the screen size changed during the swipes"
+                    + " (the device was probably rotated), so the layout and the scroll area moved and the end of the list is"
+                    + " not known — take a fresh snapshot and scroll again"))
+            }
+            startScreen = startScreen ?? settled.snapshot.screen
             let region = edgeContentRegion(step: step, in: settled.snapshot)
             let contentSignature = Self.edgeSignature(settled.snapshot, contentRegion: region)
             // **ドライバが「確かに動かした」と申告した直後(previous == nil)は戻りを数えない**: 飛ぶたびに同じ並びになる
@@ -711,8 +721,15 @@ extension StepExecutor {
             return StepOutcome(status: .failed("the keyboard was not closed: \(tried), and"
                 + " sending Enter failed too"))
         }
-        let afterEnter = try await awaitKeyboardClosed(within: step.timeout ?? tunables.defaultTimeout, phase: &phase)
-        let enterNote = "sent Enter, which also fires the field's return-key action (search, submit or moving to the next field)"
+        var afterEnter = try await awaitKeyboardClosed(within: step.timeout ?? tunables.defaultTimeout, phase: &phase)
+        // Enter の直後の1回の読みは、キーボードが出たままでも枠を申告しない瞬間がある(複数行の欄で閉じていないのに閉じたと読んだ)。
+        // 閉じたと読んだら、閉じるアニメーションの長さより空けてもう一度読み、まだ出ていれば失敗にする
+        if !KeyboardWait.isShown(afterEnter) {
+            try await Task.sleep(for: .seconds(Self.keyboardClosedConfirmSeconds))
+            afterEnter = try await freshSnapshot(.afterOwnMove)
+        }
+        let enterNote = "sent Enter, which also fires the field's return-key action (search, submit or moving to the next field;"
+            + " in a multi-line field it inserts a newline)"
         guard !KeyboardWait.isShown(afterEnter) else {
             return StepOutcome(status: .failed("the keyboard is still shown: \(tried), and \(enterNote)"
                 + " did not close it either"))
@@ -851,6 +868,10 @@ extension StepExecutor {
     /// 背景を叩いた後、キーボードが閉じるのを待つ上限(秒)。**根拠**: iOS のキーボードが閉じるアニメーションは約 0.3 秒で、
     /// 閉じる作りのアプリはその直後の木で消える(閉じた瞬間に抜ける)。**尽きたときの発話**: 「叩いても閉じなかった」として Enter へ進む
     static let keyboardCloseAfterTapWaitSeconds: Double = 1.5
+
+    /// Enter の後に「閉じた」と読んでから読み直すまでの間(秒)。**根拠**: 上の閉じるアニメーション約 0.3 秒より長く空ける。
+    /// **尽きたときの発話**: 読み直しでまだ出ていれば「Enter でも閉じなかった」と失敗にする
+    static let keyboardClosedConfirmSeconds: Double = 0.5
 
     /// 木に載る要素の最も上の y(画面の内側だけ)。木に載らないステータスバーより下を叩くための境
     static func topmostElementY(_ snapshot: SnapshotResponse) -> Double? {

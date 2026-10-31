@@ -205,9 +205,10 @@ enum ProfileRunOrchestrator {
             recoverRendering: { worker, state, log in
                 await ScreenRenderingRecoverer.recover(worker, state: state, repoRoot: repoRoot, locale: resolved.locale, log: log)
             },
-            unrecoveredDeviceNames: {
-                UnrecoveredDeviceStore.list(stateDir: repoRoot.appendingPathComponent(".fleetest")).map(\.name)
+            unrecoveredDevices: {
+                UnrecoveredDeviceStore.list(stateDir: repoRoot.appendingPathComponent(".fleetest"))
             },
+            excludedBeforeRun: { ScreenRenderingRecoverer.excludedBeforeRun.withLock { $0 } },
             recheckRunner: { worker, maxStepSnapshotMs, log in
                 await RunnerMidRunRecheck.recheck(worker: worker, maxStepSnapshotMs: maxStepSnapshotMs,
                                                   repoRoot: repoRoot, log: log)

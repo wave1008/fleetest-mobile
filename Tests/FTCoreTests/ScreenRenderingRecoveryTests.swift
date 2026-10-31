@@ -132,9 +132,53 @@ final class ScreenRenderingRecoveryTests: XCTestCase {
         XCTAssertTrue(UnrecoveredDeviceStore.isPublished(stateDir: dir, key: "K2", bootTime: boot))
     }
 
+    func testScreenStatePublishedBeforeTheMachineBootIsIgnored() throws {
+        let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let published = Date(timeIntervalSince1970: 1000)
+        DeviceScreenStateStore.publish(stateDir: dir, key: "K", state: .blank, now: published)
+        let now = published.addingTimeInterval(60)
+        XCTAssertNil(DeviceScreenStateStore.current(stateDir: dir, key: "K", now: now, bootTime: published.addingTimeInterval(30)))
+        XCTAssertEqual(DeviceScreenStateStore.current(stateDir: dir, key: "K", now: now, bootTime: published.addingTimeInterval(-30)), .blank)
+        XCTAssertEqual(DeviceScreenStateStore.current(stateDir: dir, key: "K", now: now, bootTime: nil), .blank, "起動時刻が読めなければ古さで落とさない")
+    }
+
+    /// run の前の点検で撃って戻らず除外した台はレーンに入らないが、この run の結果 = 再起動を勧める
+    func testClosingNoticeCountsDevicesExcludedBeforeTheRunAsThisRuns() {
+        let entries = [UnrecoveredDeviceStore.Entry(key: "K1", name: "a", at: 0),
+                       UnrecoveredDeviceStore.Entry(key: "K2", name: "z", at: 0)]
+        let text = UnrecoveredDeviceStore.closingNotice(entries, used: [], excludedBeforeRun: ["K1"])!
+        XCTAssertTrue(text.contains("did not bring the screen back on a "), text)
+        XCTAssertTrue(text.contains("restarting this machine"), text)
+        XCTAssertTrue(text.contains("not used by this run): z"), text)
+    }
+
+    func testClosingNoticeSeparatesDevicesThisRunDidNotUse() {
+        let text = UnrecoveredDeviceStore.closingNotice(names: ["a"], notUsedByThisRun: ["z"])!
+        XCTAssertTrue(text.contains("did not bring the screen back on a "), text)
+        XCTAssertTrue(text.contains("not used by this run): z"), text)
+        let only = UnrecoveredDeviceStore.closingNotice(names: [], notUsedByThisRun: ["z"])!
+        XCTAssertFalse(only.contains("restarting this machine"), "使っていない台について再起動を勧めない: \(only)")
+    }
+
+    func testTheOtherLaneIsNamedByLabelNotByKey() {
+        var book = RenderingLaneBook()
+        book.join(laneKey: "UDID-A", platform: "ios", label: "iPhone-01(ios:8123)")
+        book.join(laneKey: "UDID-B", platform: "ios", label: "iPhone-02(ios:8124)")
+        _ = book.decide(laneKey: "UDID-A", platform: "ios", scenarioID: "S", state: .textless)
+        XCTAssertEqual(book.decide(laneKey: "UDID-B", platform: "ios", scenarioID: "S", state: .textless),
+                       .keepReportedByOtherLane(lane: "iPhone-01(ios:8123)"))
+    }
+
+    func testRecoveredPhraseNamesTheStageThatFired() {
+        XCTAssertEqual(ScreenRenderingRecovery.recoveredPhrase(.displaySleepWake), "sleep/wake")
+        XCTAssertEqual(ScreenRenderingRecovery.recoveredPhrase(.displayServerRestart), "restarting the display server")
+        XCTAssertEqual(ScreenRenderingRecovery.recoveredPhrase(.deviceRestart), "the restart")
+    }
+
     func testClosingNoticeStatesOnlyTheMeasuredFact() {
-        XCTAssertNil(UnrecoveredDeviceStore.closingNotice(names: []))
-        let text = UnrecoveredDeviceStore.closingNotice(names: ["a", "b"])!
+        XCTAssertNil(UnrecoveredDeviceStore.closingNotice(names: [], notUsedByThisRun: []))
+        let text = UnrecoveredDeviceStore.closingNotice(names: ["a", "b"], notUsedByThisRun: [])!
         XCTAssertTrue(text.contains("did not bring the screen back on a, b"))
         XCTAssertTrue(text.contains("restarting this machine is recommended"))
     }

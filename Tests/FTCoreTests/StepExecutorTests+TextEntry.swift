@@ -1281,6 +1281,22 @@ extension StepExecutorTests {
         ref: 1, type: "textView", identifier: "field_phone", label: "電話番号", value: nil, placeholder: nil, enabled: true,
         frame: FTRect(x: 16, y: 619, width: 370, height: 65), depth: 1)
 
+    /// いま焦点を持つ欄は、キーボードの下でも閉じずにそのまま打つ(ドライバは焦点の欄にはタップしない。
+    /// 複数行の欄は副作用の無い閉じ方が無く、断ると打てる場面が失敗になる)。type 以外は従来どおり閉じてから
+    func testTypeIntoTheFocusedFieldUnderTheKeyboardTypesWithoutClosingIt() async throws {
+        var focusedField = Self.phoneUnderKeyboard
+        focusedField.focused = true
+        let log = CallLog()
+        let primary = FakeAppDriver(name: "primary", log: log, snapshotElements: [[focusedField]])
+        primary.keyboardFrame = FTRect(x: 0, y: 538, width: 402, height: 336)
+        primary.tapProbeAnswer = TapProbeResponse(background: true, receiver: "UIView", reason: nil)
+        let executor = StepExecutor(driver: primary, isAndroid: false, tunables: RunTunables(defaultTimeout: 0.2),
+                                    uiFramework: .compose)
+        let outcome = await executor.execute(FlowStep(action: "type", locator: FlowLocator(id: "field_phone"), text: "x"))
+        XCTAssertTrue(log.entries.contains { $0.hasPrefix("primary.type(") }, "焦点の欄に打っていない: \(log.entries) \(outcome.status)")
+        XCTAssertTrue(primary.coordinateTaps.isEmpty, "閉じるために叩いた")
+    }
+
     /// キーボードの上に見えている欄へは従来どおり打つ(門は覆われた欄だけ)
     func testTypeIntoAFieldAboveTheKeyboardStillTypes() async throws {
         let log = CallLog()

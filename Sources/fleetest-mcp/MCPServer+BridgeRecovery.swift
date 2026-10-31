@@ -155,6 +155,7 @@ extension MCPServer {
             heldByAnotherSession: heldByAnotherSession)
         else {
             if heldByAnotherSession {
+                BridgeRecoveryFailureLedger.recordHeld(key: udid)
                 Self.logStderr("bridge recovery: not starting an xcuitest bridge for \(udid): another session (a fleetest run"
                     + " or another MCP session) is using this device")
             }
@@ -211,6 +212,7 @@ extension MCPServer {
                   injected: injected, heldByAnotherSession: heldByAnotherSession)
         else {
             if heldByAnotherSession {
+                BridgeRecoveryFailureLedger.recordHeld(key: udid)
                 Self.logStderr(Self.skippedForAnotherSessionMessage(
                     action: "rechecking/restarting", udid: udid, port: port))
             }
@@ -271,8 +273,26 @@ enum BridgeRecoveryFailureLedger {
         return now.timeIntervalSince(entry.at) < retryCooldownSeconds
     }
 
+    /// 他のセッションが使っているので起動し直さなかった時刻(失敗ではないので `entries` と別。再挑戦を止めない)
+    private static let heldAt = LockedValue<[String: Date]>([:])
+
+    static func recordHeld(key: String, now: Date = Date()) {
+        heldAt.withLock { $0[key] = now }
+    }
+
     /// 「no running bridge」へ添える1文。止めている間だけ(間隔を過ぎた失敗は次の呼び出しで再挑戦されるので言わない)
     static func note(key: String, now: Date = Date()) -> String {
+        heldNote(key: key, now: now) + failureNote(key: key, now: now)
+    }
+
+    /// 自動の起動し直しを見送った理由(別のセッションがそのデバイスを使っている)。見送った直後の呼び出しにだけ言う
+    private static func heldNote(key: String, now: Date) -> String {
+        guard let at = heldAt.withLock({ $0[key] }), now.timeIntervalSince(at) < retryCooldownSeconds else { return "" }
+        return " Its XCUITest bridge was not restarted automatically: another session (a fleetest run or another MCP session)"
+            + " is using this device. Stop that session first, or run `fleetest bridge up` yourself."
+    }
+
+    private static func failureNote(key: String, now: Date) -> String {
         guard let entry = entry(key: key), now.timeIntervalSince(entry.at) < retryCooldownSeconds else { return "" }
         let ago = max(0, Int(now.timeIntervalSince(entry.at).rounded()))
         return " An automatic restart of its XCUITest bridge was tried \(ago)s ago and failed: \(entry.detail)."

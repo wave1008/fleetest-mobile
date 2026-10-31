@@ -613,6 +613,8 @@ final class MCPAuditFixes20260812Round17Tests: XCTestCase {
                                recordSnapshot: { _, _, _ in })
         server.settleWaitSeconds = 0
         _ = try await server.call(tool: "ft_snapshot", args: [:])
+        // キーボードの出現待ちの読みはこのテストの数える対象の外(待ちは KeyboardWait のテストが固定)
+        server.sessions[MCPServer.sessionKey([:]), default: DeviceSession()].keyboardKnownAbsent = true
         driver.scriptedSnapshots = [
             Self.textFieldScreen(value: "old"),   // verifiedRef の撮り直し
             Self.textFieldScreen(value: ""),      // 消去の後に欄を見つけ直す読み(relocateAfterClear)

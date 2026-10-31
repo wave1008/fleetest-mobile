@@ -20,7 +20,15 @@ extension MCPServer {
                explicit: nil, connected: AndroidSerialResolver.connectedSerials()) {
             return text(await Self.androidFleetStatus(devices.map(\.serial)))
         }
-        let status = try await driver(args).status()
+        let statusDriver = try await driver(args)
+        let status: StatusResponse
+        do {
+            status = try await statusDriver.status()
+        } catch DriverError.bridgeUnreachable where statusDriver is AndroidDriver {
+            // 読み取りなので撃ち直してよい。withBridge は死んだクライアントを捨てて投げるので、2回目は起動し直して答える
+            // (撃ち直さないと、次の snapshot が自力で戻るのに状態確認の道具だけが毎回「bridge up」で失敗する)
+            status = try await statusDriver.status()
+        }
         // **宛先とセッションの意味まで出す**: 「どこに繋がっているか」が見えないと、
         // 既定ポートの死・はぐれデバイスの誤掴み・ブリッジ再起動によるセッション消失が
         // どれも「応答はしているのに操作できない」に見える(フィードバック #2/#8)
@@ -42,7 +50,12 @@ extension MCPServer {
         // ブリッジの session が下から出たアプリへ付け替わり、`foregroundNote` は付け替え後の session を前面と照合して yes と答えていた。
         // ft_snapshot の「NOT the app you launched」と同じ事実を言う)
         let foreground: String
-        if let launched = launchedBundleIDs[statusKey], let current = status.sessionBundleID, current != launched {
+        if let launched = launchedBundleIDs[statusKey], let current = status.sessionBundleID, current != launched,
+           current == "com.android.systemui" {
+            foreground = " / foreground: no (the session points at \(current), system UI (the notification shade, quick settings, the lock screen"
+                + " or a system dialog) drawn over \(launched) — the app is usually still running underneath, not crashed;"
+                + " ft_snapshot says which one it is, ft_navigate back closes a shade and keeps the app's state)"
+        } else if let launched = launchedBundleIDs[statusKey], let current = status.sessionBundleID, current != launched {
             foreground = " / foreground: no (the session now points at \(current), not \(launched), the app this session"
                 + " launched — \(launched) may have crashed or been left; ft_snapshot says which, ft_launch \(launched) to come back)"
         } else if let covering = try? await driver(args).systemUICovering(), covering.covering,
@@ -347,11 +360,6 @@ extension MCPServer {
 
     /// udid → 実機か(答えが出た回だけ控える。udid の実機/Simulator はプロセスの生存中に変わらない)
     private static let physicalIOSUDIDMemo = LockedValue<[String: Bool]>([:])
-    /// 実機の udid → インストール済みアプリの控え(resume の「走っていたか」用。`IOSPhysicalRunningApps.running` の doc =
-    /// 一覧は滅多に変わらないので呼び手が控えを渡す)。入れ直しで実行ファイルのパスが変わりうるので、控えで「居ない」と
-    /// 出た回だけ取り直して確かめる(`appWasRunning`)
-    private static let physicalAppsMemo = LockedValue<[String: [IOSPhysicalAppCatalog.App]]>([:])
-
     /// この呼び出しの宛先が実機の iOS か。判らなければ false(断定しない側)。
     /// 実機の記録(`BridgeDeviceRecord`。実機の経路でだけ書かれる)があれば外部コマンドを撃たない。無ければ
     /// `SimulatorCatalog.isPhysical`(simctl の一覧を先に見る = Simulator なら devicectl を撃たない。どちらも同期の外部コマンド
@@ -380,15 +388,7 @@ extension MCPServer {
         guard isPhysical else {
             return await Self.runOffCooperativePool(name: "fleetest-mcp-was-running") { SimulatorAppProcess.isRunning(udid: udid, bundleID: bundleID) }
         }
-        return await Self.runOffCooperativePool(name: "fleetest-mcp-was-running") { () -> Bool? in
-            func check(_ apps: [IOSPhysicalAppCatalog.App]) -> Bool? {
-                (try? IOSPhysicalRunningApps.running(udid: udid, apps: apps)).map { $0.contains(bundleID) }
-            }
-            if let cached = Self.physicalAppsMemo.withLock({ $0[udid] }), check(cached) == true { return true }
-            guard let apps = try? IOSPhysicalAppCatalog.apps(udid: udid) else { return nil }
-            Self.physicalAppsMemo.withLock { $0[udid] = apps }
-            return check(apps)
-        }
+        return await Self.runOffCooperativePool(name: "fleetest-mcp-was-running") { IOSPhysicalRunningApps.isRunning(udid: udid, bundleID: bundleID) }
     }
 
     func ftOpenUrl(_ args: [String: Any]) async throws -> [[String: Any]] {

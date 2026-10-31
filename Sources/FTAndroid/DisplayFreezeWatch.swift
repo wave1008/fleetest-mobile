@@ -184,7 +184,8 @@ public actor DisplayFreezeWatch {
             nudge: { worker in await productionNudge(worker) },
             restore: { worker, appID in await productionRestore(worker, appID: appID) },
             repair: { worker, stillFrozen, log in
-                await productionRepair(worker, stillFrozen: stillFrozen, repoRoot: repoRoot, locale: locale, log: log)
+                await productionRepair(worker, stillFrozen: stillFrozen, sleepWakeMeasurable: true,
+                                       repoRoot: repoRoot, locale: locale, log: log)
             },
             baseline: .files(in: repoRoot.appendingPathComponent(".fleetest/display-freeze")))
     }
@@ -243,11 +244,15 @@ public actor DisplayFreezeWatch {
         ConsoleOut.err("[display-freeze] \(worker.label): could not bring \(appID) back to the front after the check")
     }
 
-    static func productionRepair(_ worker: RunWorker, stillFrozen: @Sendable () async -> Bool, repoRoot: URL,
-                                 locale: String, log: @escaping @Sendable (String) -> Void) async -> WorkerRecoveryKind? {
+    /// `sleepWakeMeasurable`: sleep/wake の効きを絵で測れるか(Android だけ)。測れない状態(文字消え = 絵が一様にならない)では
+    /// sleep/wake を撃たずゲストの再起動へ進む
+    static func productionRepair(_ worker: RunWorker, stillFrozen: @Sendable () async -> Bool, sleepWakeMeasurable: Bool,
+                                 repoRoot: URL, locale: String,
+                                 log: @escaping @Sendable (String) -> Void) async -> WorkerRecoveryKind? {
         if worker.platform == "android" {
             guard let serial = worker.connection.serial else { return nil }
-            return await repairEmulator(serial: serial, label: worker.label, stillFrozen: stillFrozen, locale: locale, log: log)
+            return await repairEmulator(serial: serial, label: worker.label, stillFrozen: stillFrozen,
+                                        sleepWakeMeasurable: sleepWakeMeasurable, locale: locale, log: log)
         }
         guard let udid = worker.connection.udid else { return nil }
         // 先にこの機のブリッジを止める(掴んだまま落とすと shutdown がランナーの teardown を待つ。recoverFrozenIOSWorkers と同じ)
@@ -257,21 +262,34 @@ public actor DisplayFreezeWatch {
         }
         log("🔁 \(worker.label): rebooting the simulator (shutdown → boot)")
         _ = try? Shell.run(["xcrun", "simctl", "shutdown", udid])
-        try? SimulatorBoot.ensureBooted(udid: udid, log: log)
+        do {
+            try SimulatorBoot.ensureBooted(udid: udid, log: log)
+        } catch {
+            // 起動を確かめられなかったのに「戻った」と言わない・再起動した種類も返さない
+            log("⚠️ \(worker.label): could not boot the simulator again — \(error.localizedDescription)")
+            return nil
+        }
         log("✅ \(worker.label): simulator is back")
         return .deviceRestart
     }
 
     /// Emulator の回復: sleep/wake → ゲストの再起動 → 停止と起動。撃った段を返す
     static func repairEmulator(serial: String, label: String, stillFrozen: @Sendable () async -> Bool,
-                               locale: String, log: @escaping @Sendable (String) -> Void) async -> WorkerRecoveryKind? {
-        log("🔧 \(label): sleep/wake to re-compose the display")
-        _ = await AndroidHealthProbe.repairBlankDisplay(serial: serial)
-        if await !stillFrozen() {
-            log("✅ \(label): the display is drawing again after sleep/wake")
-            return .displaySleepWake
+                               sleepWakeMeasurable: Bool, locale: String,
+                               log: @escaping @Sendable (String) -> Void) async -> WorkerRecoveryKind? {
+        let reason: String
+        if sleepWakeMeasurable {
+            log("🔧 \(label): sleep/wake to re-compose the display")
+            _ = await AndroidHealthProbe.repairBlankDisplay(serial: serial)
+            if await !stillFrozen() {
+                log("✅ \(label): the display is drawing again after sleep/wake")
+                return .displaySleepWake
+            }
+            reason = "sleep/wake did not restore the display"
+        } else {
+            reason = "the screen cannot be measured after sleep/wake"
         }
-        log("🔁 \(label): sleep/wake did not restore the display — restarting the guest (adb reboot;"
+        log("🔁 \(label): \(reason) — restarting the guest (adb reboot;"
             + " waiting up to \(Int(ProfileWorkerFactory.blankRebootTimeoutSeconds))s for boot)")
         if await ProfileWorkerFactory.rebootGuest(serial: serial, timeout: ProfileWorkerFactory.blankRebootTimeoutSeconds) {
             log("✅ \(label): the guest restarted")
@@ -279,10 +297,17 @@ public actor DisplayFreezeWatch {
         }
         guard let avdID = EmulatorControl.avdName(serial: serial) else {
             log("⚠️ \(label): could not confirm the guest restart, and the AVD name is unknown — not restarting the emulator")
-            return .deviceRestart
+            // 消えたデバイスに「再起動した」を返さない(呼び手が回復済み・マシンの再起動の案内を作る)
+            return deviceIsGone(serial: serial) ? nil : .deviceRestart
         }
         log("🔁 \(label): could not confirm the guest restart — stopping and starting the emulator (\(avdID))")
-        _ = await ProfileWorkerFactory.stopAndStartEmulator(serial: serial, avd: avdID, label: label, locale: locale, log: log)
-        return .deviceRestart
+        let restarted = await ProfileWorkerFactory.stopAndStartEmulator(serial: serial, avd: avdID, label: label, locale: locale, log: log)
+        return restarted == nil && deviceIsGone(serial: serial) ? nil : .deviceRestart
+    }
+
+    /// adb の一覧に載っていない(消えた)か。adb 自体が答えないときは false(消えたと言わない)
+    static func deviceIsGone(serial: String) -> Bool {
+        guard let states = try? AndroidDeviceCatalog.listedSerialStates() else { return false }
+        return states[serial] == nil
     }
 }

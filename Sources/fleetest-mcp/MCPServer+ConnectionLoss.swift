@@ -91,7 +91,9 @@ extension MCPServer {
             case .stillUnclear:
                 return Self.deliveryUnknownNote(mayHaveTakenEffect: mayHaveTakenEffect)
             case .vanished:
-                return connectionLostAndForget(key: key, connection: connection, running: running)
+                // 実機で Mac 側の待受(iproxy)が残っているなら、消えたのはランナーのほう(トンネルは開き直しで直らない)
+                return connectionLostAndForget(key: key, connection: connection, running: running,
+                                               macEndStillListening: bound)
                     + Self.deliveryUnknownNote(mayHaveTakenEffect: mayHaveTakenEffect)
             }
         default:
@@ -115,7 +117,8 @@ extension MCPServer {
     /// iOS の2分岐(bridgeConnectionRefused/.vanished)の共通尾部(掃討で統合): 記憶を
     /// 捨てて、今の状況を添えたメッセージを組む
     func connectionLostAndForget(key: String, connection: String,
-                                 running: [BridgeDiscovery.Found]) -> String {
+                                 running: [BridgeDiscovery.Found],
+                                 macEndStillListening: Bool = false) -> String {
         // **udid は忘れる前に読む**(レビュー指摘)。`forgetConnection` は
         // `forgetDeviceState` 経由で `udids[key]` も消すようになったので、後から読むと
         // 常に nil = 「同じ機のブリッジを先に挙げる」案内が**黙って死んでいた**
@@ -126,11 +129,12 @@ extension MCPServer {
         }
         // **実機で接続拒否 = この Mac 側の待ち受け(USB トンネル iproxy)が無い**ことしか言えない。ランナーの生死は確かめていない
         // (トンネルだけが消えた形では udid を名指しして呼ぶだけで張り直され、ランナーもセッションも生きていた)
-        let tunnelOnly = udid.flatMap { SimulatorCatalog.isPhysical(udid: $0) } == true
+        let physical = udid.flatMap { SimulatorCatalog.isPhysical(udid: $0) } == true
         forgetConnection(key)
         return Self.connectionLostMessage(connection: connection, running: running,
             sameDevice: Self.deviceName(forUDID: udid, in: running), bridge: bridge,
-            udid: udid, tunnelOnly: tunnelOnly)
+            udid: udid, tunnelOnly: physical && !macEndStillListening,
+            physicalRunnerGone: physical && macEndStillListening)
     }
 
     /// Android(serial 経由のブリッジ)の死活。**iOS のような安価な「待受しているか」判定が無い**
@@ -231,8 +235,10 @@ extension MCPServer {
                 + " for the screen to settle, can block the bridge for tens of seconds); the"
                 + " connection was not dropped."
             guard mayHaveTakenEffect else { return busy + " Retry the call." }
-            return busy + " The action may already have been performed — take an ft_snapshot and"
-                + " check before repeating it (repeating ft_type would type the text twice)."
+            // 固まった USB トンネルは切れた接続の要求も保持し、戻った瞬間に端末へ運ぶ(実測: 応答の後ろ最大4.5分)。ここで確かめても足りない
+            return busy + " The action may already have been performed, or may still be performed later if the"
+                + " connection was stuck and recovers — take an ft_snapshot and check before repeating it, and check"
+                + " again a few seconds later if the screen did not change (repeating ft_type would type the text twice)."
         }
         return "\nThe in-app bridge behind \(connection) is not answering — it only answers while"
             + " the app it is injected into is in the foreground. Bring it back with ft_launch,"
@@ -331,7 +337,8 @@ extension MCPServer {
     /// in-app ブリッジは対象アプリの中に居るので、XCUITest のランナーとは死に方も戻し方も違う
     static func connectionLostMessage(connection: String, running: [BridgeDiscovery.Found],
                                       sameDevice: String? = nil, bridge: String?,
-                                      udid: String? = nil, tunnelOnly: Bool = false) -> String {
+                                      udid: String? = nil, tunnelOnly: Bool = false,
+                                      physicalRunnerGone: Bool = false) -> String {
         let now = running.isEmpty
             ? "no iOS bridge is running now"
             : "running bridges now: \(Self.runningBridgesSummary(running, sameDevice: sameDevice))"
@@ -342,7 +349,15 @@ extension MCPServer {
         }
         // 戻し方は udid を名指しして言う(引数なしの `bridge up` は既定の端末を起こす = 別の機になりうる)
         let target = udid.map { "udid \($0)" } ?? "the device's udid"
-        let bridgeUp = "`fleetest bridge up --device \(udid ?? "<udid>")`"
+        // 実機は --physical が無いと名前引きされて必ず失敗する(bridgeUpSuggestion と同じ)
+        let bridgeUp = "`fleetest bridge up --device \(udid ?? "<udid>")"
+            + (tunnelOnly || physicalRunnerGone ? " --physical" : "") + "`"
+        if physicalRunnerGone {
+            return "\nThe USB tunnel (iproxy) on this Mac's end of \(connection) is still listening, but the XCUITest runner"
+                + " behind it is gone (its xcodebuild is no longer running), so re-opening the tunnel will not help."
+                + " \(now). Start the runner with \(bridgeUp), then ft_launch your app again."
+                + " This session's remembered device was dropped — pass \(target)."
+        }
         if tunnelOnly {
             return "\nNothing is listening on this Mac's end of \(connection) — on a physical device that is the USB tunnel"
                 + " (iproxy), and the XCUITest runner itself was not checked: it may well still be running."

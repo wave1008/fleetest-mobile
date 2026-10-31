@@ -348,15 +348,23 @@ extension MCPServer {
         let key = Self.sessionKey(args)
         guard let pending = pendingTypeKeyboardChecks[key] else { return fresh }
         pendingTypeKeyboardChecks[key] = nil
+        let knownAbsent = KeyboardWait.knownAbsent(
+            current: sessions[key]?.keyboardKnownAbsent ?? false, before: pending.before?.keyboardFrame,
+            after: fresh.keyboardFrame, screen: fresh.screen, waitExhausted: false)
+        sessions[key, default: DeviceSession()].keyboardKnownAbsent = knownAbsent
         guard KeyboardWait.shouldAwaitAppearance(
             isAndroid: driver is AndroidDriver, before: pending.before?.keyboardFrame,
-            after: fresh.keyboardFrame, screen: fresh.screen, typedNewline: pending.typedNewline) else { return fresh }
+            after: fresh.keyboardFrame, screen: fresh.screen, typedNewline: pending.typedNewline,
+            keyboardKnownAbsent: knownAbsent) else { return fresh }
         var read = fresh
         let deadline = ContinuousClock.now + .milliseconds(Int(KeyboardWait.appearSeconds * 1000))
         while ContinuousClock.now < deadline, !KeyboardWait.onScreen(read.keyboardFrame, screen: read.screen) {
             try await Task.sleep(for: .milliseconds(Int(KeyboardWait.pollSeconds * 1000)))
             read = try await freshSnapshot(driver, args: args)
         }
+        sessions[key, default: DeviceSession()].keyboardKnownAbsent = KeyboardWait.knownAbsent(
+            current: knownAbsent, before: pending.before?.keyboardFrame, after: read.keyboardFrame,
+            screen: read.screen, waitExhausted: true)
         return read
     }
 
@@ -683,6 +691,8 @@ extension MCPServer {
             let (effectiveArgs, inheritedNote) = inheritingSnapshotFilters(args)
 
             var snapshot = try await freshSnapshot(snapshotDriver, args: args)
+            // 直前の type のキーボードが上がりきる前の木を操作後の木として返さない(印が無ければ何も読まない)
+            snapshot = try await consumePendingTypeKeyboardCheck(snapshot, driver: snapshotDriver, args: args)
             var settleNote = ""
             var waitNote = ""
             // **waitFor は settle-lite の代わり**(併用しない): 待つ理由が同じ(木がまだ
@@ -983,6 +993,8 @@ extension MCPServer {
     /// `keyboardCoordinateWarning`)。DSL の tap は据え置き(注記のみ)
     static func keyboardRefusal(_ target: ElementInfo, keyboardOcclusion: KeyboardOcclusion) -> String? {
         guard let advisory = keyboardOcclusion.advisory(for: target) else { return nil }
+        // いま焦点を持つ欄への ft_type は、ドライバがタップせずに打つので断らない(DSL の reachPastKeyboard と同じ)
+        if Self.currentTool == "ft_type", target.focused == true { return nil }
         return "refusing to act on \(RefGuard.describe(target)): \(advisory). On XCUITest the finger"
             + " would press a key and type into the focused field; the in-app bridge rejects it (422)."
             + " Close the keyboard with ft_hide_keyboard (it sends no Enter; ft_navigate back on Android), or"
@@ -1111,8 +1123,9 @@ extension MCPServer {
         else { return "" }
         return " (warning: the platform cannot find \(RefGuard.describe(found)) at all, even though"
             + " the tree just listed it — the app is no longer the one being queried (the app"
-            + " switcher is open, or another app came to the front), and the tree still shows what"
-            + " was there before. This tap almost certainly did not reach the app."
+            + " switcher is open, another app came to the front, or the device's screen is off or locked),"
+            + " and the tree still shows what was there before. This tap almost certainly did not reach the app,"
+            + " so \"done\" here only means the tap was sent."
             + " Check with ft_screenshot, and bring the app back before operating it)"
     }
 
@@ -1574,9 +1587,10 @@ extension MCPServer {
             case .passed, .passedViaFallback, .healed:
                 reason = "could not confirm the result"
             }
-            throw MCPError(scrollFrameLabelNote + "scrollTo \"\(selectorText)\": \(reason)"
-                + "\n\nCould not take a snapshot after the search: "
-                + ((error as? LocalizedError)?.errorDescription ?? "\(error)"))
+            // 元のエラーを抱えたまま投げる(MCPError に畳むと、接続断の案内 = 届いたか分からない・記憶の破棄が出ない)
+            throw MCPAnnotatedError(underlying: error, suffix: "",
+                                    prefix: scrollFrameLabelNote + "scrollTo \"\(selectorText)\": \(reason)"
+                                        + "\n\nCould not take a snapshot after the search: ")
         }
         // **半開きシートは自分で広げて1度だけやり直す**。この形は失敗文で
         // 「グラバーを上へ引け」と案内済みだったが、**案内できるなら自分でできる** ——

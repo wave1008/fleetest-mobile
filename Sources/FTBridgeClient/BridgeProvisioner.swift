@@ -114,8 +114,11 @@ public enum BridgeProvisionerError: Error, LocalizedError {
                 + " — not stopping it, because that would break the other workspace's runs."
                 + " Stop it from there (`fleetest bridge down --port \(port)` in that workspace) and run again"
         case .unresponsiveBridgeHeldByAnotherSession(let name, let port):
+            // 「別のセッション」は印(lease)を持つ誰か —— 自分の MCP も含む。固まったトンネルも無応答で同じに見えるので出口を添える
             return RunnerAccessibilityHealth.deviceHeldByAnotherSessionMessage(
                 device: name, what: "restarting the bridge on port \(port), which is not answering right now")
+                + ". If no other session is actually driving it (a stuck bridge or USB tunnel looks the same),"
+                + " `fleetest bridge down --port \(port) --force` stops it and the next `bridge up` starts a fresh one"
         }
     }
 }

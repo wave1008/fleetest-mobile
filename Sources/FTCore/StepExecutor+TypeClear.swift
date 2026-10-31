@@ -103,6 +103,9 @@ extension StepExecutor {
                 }
             case .done, .unverifiable:
                 return nil
+            case .whitespaceAltered:
+                noteCodesThisStep.insert(.typeWhitespaceAltered)
+                return nil
             case .resend where valueAtLastResend == actual:
                 // **追送しても値が動かなければ2回目は撃たない**(撃つたびに重複しうる。実測
                 // `ap` → `apapapapap`)。値は入力を映しているのに正しくない = 失敗
@@ -390,6 +393,10 @@ extension StepExecutor {
         let occlusion = KeyboardOcclusion.resolve(reported: snapshot.keyboardFrame, in: snapshot.elements,
                                                   screen: snapshot.screen)
         guard occlusion.advisory(for: element) != nil else { return nil }
+        // **いま焦点を持つ欄へ打つのに、キーボードの下かどうかは関係ない**: ドライバは焦点の欄にはタップせずに打つ
+        // (XCUITest = alreadyFocusedInput・in-app = 座標を使わない)。人も焦点の欄にはそのまま打てる。
+        // 複数行の欄はキーボードを閉じる副作用の無い手段が無く(hideKeyboard は改行を入れる)、ここで断ると打てる場面を失敗にする
+        if action == "type", element.focused == true, KeyboardWait.isShown(snapshot) { return nil }
         let nothing = "nothing was " + (action == "type" ? "typed" : action == "clearInput" ? "cleared" : "tapped")
         let note: String
         switch try await closeKeyboardWithoutSideEffects(step: step, phase: &phase) {

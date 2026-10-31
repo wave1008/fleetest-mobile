@@ -26,9 +26,25 @@ public final class SessionRecoveryDriver: AppDriver {
     /// 「ランナーのセッションが失われた」になり無用な activate を撃つ。スナップショットの正規化は残す
     private let readsConflictAsSessionLoss: Bool
 
-    public init(base: AppDriver, readsConflictAsSessionLoss: Bool = true) {
+    /// 回復の activate を撃つ前に「アプリのプロセスが居るか」を聞く口(true = 居る / false = 居ない / nil = 判定できない)。
+    /// 居ないなら activate は**冷間起動**になり、画面は最初に戻る(呼び手は元の画面のつもりで次を撃つ = 別の画面を押して成功と言う)。
+    /// だから居ないと確かめられたら activate を撃たず、起動していないことを返す。nil は従来どおり activate する
+    /// (判定できないことで正当な回復を赤にしない)。無指定(nil)= 判定しない(run 側は従来どおり)
+    private let appIsRunning: (@Sendable (String) async -> Bool?)?
+
+    public init(base: AppDriver, readsConflictAsSessionLoss: Bool = true,
+                appIsRunning: (@Sendable (String) async -> Bool?)? = nil) {
         self.base = base
         self.readsConflictAsSessionLoss = readsConflictAsSessionLoss
+        self.appIsRunning = appIsRunning
+    }
+
+    /// アプリのプロセスが居ないと確かめられたときだけ非 nil(activate を撃たない理由)
+    private func appNotRunningMessage() async -> String? {
+        guard let appIsRunning, let lastBundleID, await appIsRunning(lastBundleID) == false else { return nil }
+        return "the XCUITest runner has no session and the app \(lastBundleID) is not running"
+            + " (it crashed or was terminated). Not relaunching it here: a relaunch starts from the first screen,"
+            + " so this step would act on a screen you did not read. Start it with ft_launch / launchApp"
     }
 
     private func isSessionLost(_ error: Error) -> Bool {
@@ -93,6 +109,7 @@ public final class SessionRecoveryDriver: AppDriver {
                     + " session yet (or it was terminated)."
                     + " Launch it first (DSL: launchApp / MCP: ft_launch)")
             }
+            if let dead = await appNotRunningMessage() { throw DriverError.badResponse(status: 409, body: dead) }
             await recover()
             return try await operation()
         }
@@ -330,6 +347,7 @@ public final class SessionRecoveryDriver: AppDriver {
         guard isSessionLost(error) else { throw error }
         // launch 前(lastBundleID なし)は張り直す相手が分からない。実際に張り直したときだけ
         // 「復帰します」と言う(していないのに言うと切り分けを誤らせる)。
+        if let dead = await appNotRunningMessage() { throw DriverError.badResponse(status: 409, body: dead) }
         let recovered = lastBundleID != nil
         if recovered { await recover() }
         throw DriverError.badResponse(status: 409, body:

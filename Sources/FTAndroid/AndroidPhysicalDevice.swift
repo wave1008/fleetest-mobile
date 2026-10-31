@@ -21,6 +21,15 @@ public enum AndroidPhysicalDevice {
     /// 待たずに launch すると初回シナリオだけが 500 で落ちる(8 run 中 1 件の flake だった)
     private static let unlockTimeoutSeconds = 20.0
 
+    /// 解除を待ち切れなかった(読めたうえでロックのまま = PIN・パターン)端末の時刻。`wakeIfAsleep` は MCP の呼び出しごと・
+    /// シナリオごとに撃たれるので、控えが無いと毎回 `unlockTimeoutSeconds` を払って全ての道具が 20 秒余計にかかった
+    private static let unlockFailedAt = LockedValue<[String: Date]>([:])
+
+    /// 待ち切れた失敗の後に、同じ端末の解除をもう一度待つまでの間隔[秒]。根拠: 自動の起動し直しの失敗の再挑戦間隔
+    /// (`BridgeRecoveryFailureLedger.retryCooldownSeconds` = 60)と揃える。間隔の間も、利用者が手で解除すれば
+    /// `screenAwakeAndUnlocked` が先に true を返すので待たずに進む。尽きたときの発話は `lockedStillMessage`
+    static let unlockRetryCooldownSeconds: TimeInterval = 60
+
     /// 画面を起こし、ロック画面を解除し、run 中に再消灯しないようにする。
     /// 解除できなくても throw しない(混在プロファイルの iOS 側を殺さない。launch の 500 で顕在化する)
     public static func prepareForRun(serial: String,
@@ -60,7 +69,19 @@ public enum AndroidPhysicalDevice {
             lastCheckReadable = resumed != nil
             try? await Task.sleep(nanoseconds: 500_000_000)
         }
+        if lastCheckReadable { unlockFailedAt.withLock { $0[serial] = Date() } }
         log(unlockFailureMessage(serial: serial, lastCheckReadable: lastCheckReadable))
+    }
+
+    static func inUnlockCooldown(failedAt: Date?, now: Date) -> Bool {
+        guard let failedAt else { return false }
+        return now.timeIntervalSince(failedAt) < unlockRetryCooldownSeconds
+    }
+
+    /// 間隔の間は待たずに返すときの文言(解除できないと分かっている端末へ、道具ごとに 20 秒の待ちを払わない)
+    static func lockedStillMessage(serial: String) -> String {
+        "⚠️ \(serial): the lock screen could not be cleared a moment ago (a PIN/pattern lock cannot be cleared over adb),"
+            + " so it was not waited for again — unlock the device by hand, or set it to no lock"
     }
 
     /// adb が端末へ届かないときの文言(get-state が非ゼロ)
@@ -86,6 +107,10 @@ public enum AndroidPhysicalDevice {
     @discardableResult
     public static func wakeIfAsleep(serial: String, log: (String) -> Void = { _ in }) async -> Bool {
         guard screenAwakeAndUnlocked(serial: serial) == false else { return false }
+        if inUnlockCooldown(failedAt: unlockFailedAt.withLock({ $0[serial] }), now: Date()) {
+            log(lockedStillMessage(serial: serial))
+            return false
+        }
         log("⚠️ \(serial): the screen was off or locked — waking and unlocking it before continuing"
             + " (the tool does not keep the screen on; the device's own settings decide when it turns off)")
         // **成功の「✔」行は流さない**: シナリオの子では stderr の1行が結果の errorLogs(上限5件)の1枠を

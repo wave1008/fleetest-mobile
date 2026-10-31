@@ -39,6 +39,8 @@ struct DeviceSession {
     /// 直前の ft_type の後にキーボードの出現を待つ印(次の ref 操作の `verifiedRef` が消化する。
     /// type 以外の操作を挟んだら `recordInteraction` が捨てる = `lastTapTarget` と同じ寿命)
     var pendingTypeKeyboardCheck: PendingTypeKeyboardCheck?
+    /// 打った後に上限まで待ってもキーボードが現れなかったと観測済みか(`KeyboardWait.shouldAwaitAppearance` の iOS・申告なしの待ちを止める)
+    var keyboardKnownAbsent = false
     /// **直前の `ft_tap` が叩いた要素**。ref なし `ft_type` が「叩いた欄へ焦点が
     /// 立たなかった」形を救うための材料(DSL の `StepExecutor.lastTapTarget` と同じ役)。
     /// tap / type 以外の操作(`recordInteraction`)で消える —— 間に別の操作を挟んだ type は

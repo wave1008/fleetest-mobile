@@ -214,12 +214,12 @@ extension ProfileRunner {
         let androidTask = Task {
             try await ProfileSupplyLanes.android(
                 resolved: resolved, supplyLease: supplyLease, supplyStage: progress,
-                triage: triageBox) { ConsoleOut.out($0) }
+                triage: triageBox, isStopped: { interruptState.isStopped }) { ConsoleOut.out($0) }
         }
         let iosTask: Task<[RunWorker], Never>? = resolved.iosDevices.isEmpty ? nil : Task {
             await ProfileSupplyLanes.ios(
                 resolved: resolved, supplyLease: supplyLease, supplyStage: progress,
-                triage: triageBox) { ConsoleOut.out($0) }
+                triage: triageBox, isStopped: { interruptState.isStopped }) { ConsoleOut.out($0) }
         }
         handedOver = true
         return PreparedSupply(
