@@ -12,9 +12,9 @@ final class CheckedInt32ScanTests: XCTestCase {
     /// Sources からの相対パス → 行番号 → 許す理由
     private static let allowed: [String: [Int: String]] = [
         "FTEmulatorGrpc/EmulatorGrpcSession.swift": [
-            78: "fromX/toX は呼び出し前に既に checkedInt32 を通った Int32。progress は"
+            86: "fromX/toX は呼び出し前に既に checkedInt32 を通った Int32。progress は"
                 + " (0,1] なので補間結果は [min(fromX,toX), max(fromX,toX)] に収まり Int32 の外へ出ない",
-            79: "同上(fromY/toY)",
+            87: "同上(fromY/toY)",
         ],
     ]
 

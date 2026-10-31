@@ -156,7 +156,7 @@ test("コピーで「コピーしました」の短命ツールチップが出�
   banner(document).querySelector(".banner-copy")
     .dispatchEvent(new window.MouseEvent("click", { bubbles: true }));
 
-  const tip = document.querySelector('[role="status"]');
+  const tip = document.querySelector('.hover-tip[role="status"]');
   assert.ok(tip, "確認ツールチップの要素が居る");
   assert.equal(tip.style.display, "block");
   assert.match(tip.textContent, /コピーしました/);
