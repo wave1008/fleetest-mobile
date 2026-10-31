@@ -70,6 +70,13 @@ function sendDevices(window, specs) {
     frozen: spec.frozen === true, screenState: spec.screenState,
   }));
   window.dispatchEvent(new window.MessageEvent("message", { data: { type: "devices", devices } }));
+  // 印は絵についての状態 = 絵が届いている形で見る(`withoutFrame` は「接続中」のまま)
+  for (const device of devices) {
+    if (device.state === "connected" && !specs[Number(device.id.slice(1))].withoutFrame) {
+      window.dispatchEvent(new window.MessageEvent("message", {
+        data: { type: "frame", device: device.id, jpegBase64: "AAAA", width: 100, height: 200 } }));
+    }
+  }
 }
 
 function sendFrame(window, deviceId, jpegBase64) {

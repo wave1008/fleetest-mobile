@@ -1484,7 +1484,6 @@ html.select-all-guard * {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding-left: 12px; /* 左下の点灯マーク(.tile > .run-lamp)とチップを重ねない */
   flex: 0 0 18px;
   height: 18px;
   overflow: hidden;
@@ -1725,8 +1724,8 @@ html.select-all-guard * {
 }
 .run-lamp[data-on="1"] { opacity: 1; pointer-events: auto; }
 .tile { position: relative; }
-/* タイルは左下(ユーザー指定)。低いペインでもタイルの枠の中に見える */
-.tile > .run-lamp { left: 8px; top: auto; bottom: 9px; }
+/* タイルも左上(ユーザー指定)。padding 8px + (マシン名の段 16px − 8px) / 2 */
+.tile > .run-lamp { left: 8px; top: 12px; }
 @media (prefers-reduced-motion: reduce) {
   .run-lamp { transition: none; }
 }

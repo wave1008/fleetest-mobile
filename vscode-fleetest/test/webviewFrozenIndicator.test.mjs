@@ -66,6 +66,13 @@ function sendDevices(window, specs) {
     frozen: spec.frozen === true, screenState: spec.screenState,
   }));
   window.dispatchEvent(new window.MessageEvent("message", { data: { type: "devices", devices } }));
+  // 印は絵についての状態 = 絵が届いている形で見る(`withoutFrame` は「接続中」のまま)
+  for (const device of devices) {
+    if (device.state === "connected" && !specs[Number(device.id.slice(1))].withoutFrame) {
+      window.dispatchEvent(new window.MessageEvent("message", {
+        data: { type: "frame", device: device.id, jpegBase64: "AAAA", width: 100, height: 200 } }));
+    }
+  }
 }
 
 const visibleFrozenBadges = (document) =>
@@ -94,6 +101,16 @@ test("白紙・文字消えも同じ場所に出し、凍結を優先する", (t
   const badges = [...document.querySelectorAll("#grid .frame-wrap .badge-frozen")];
   assert.deepEqual(badges.map((el) => el.textContent), ["○", "T", "❄️"]);
   assert.ok(badges.every((el) => el.style.display !== "none"));
+});
+
+test("接続中(絵が来ていない)には白紙・文字消え・凍結のどれも出さず、絵が届いたら出す", (t) => {
+  const { window, document } = createWebview();
+  t.after(() => window.close());
+  const specs = [{ screenState: "blank" }, { screenState: "textless" }, { frozen: true }];
+  sendDevices(window, specs.map((spec) => ({ ...spec, withoutFrame: true })));
+  assert.equal(visibleFrozenBadges(document), 0);
+  sendDevices(window, specs);
+  assert.equal(visibleFrozenBadges(document), 3);
 });
 
 test("画面が描き直されてもバッジが枠に残る", (t) => {

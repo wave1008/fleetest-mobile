@@ -380,7 +380,7 @@ function createTile(device) {
   // 実行中/キュー待ち/録画中のバッジはタイル左下(フッター先頭)。録画は実行中の右(ユーザー指定)。
   footer.append(runningBadge, recordingBadge, queuedBadge, stateBadge, spacer, renderBadge);
 
-  // 点灯マーク(タイルの左下。拡大表示は左上)。**段の中に入れない** —— 段はグリッドビューの見出しへ複製される
+  // 点灯マーク(タイルも拡大表示も左上)。**段の中に入れない** —— 段はグリッドビューの見出しへ複製される
   // (renderMirrorHeader)ので、中に入れると拡大表示に二重に出る。絶対配置なので中央寄せの段を動かさない
   const lampEl = document.createElement('span');
   lampEl.className = 'run-lamp';
@@ -592,6 +592,8 @@ function renderFrameContent(entry) {
     entry.placeholderEl.append(labelSpan);
     entry.frameWrapEl.appendChild(entry.placeholderEl);
   }
+  // 印は絵の有無で変わる(screenBadgeKeys)
+  paintScreenBadge(entry.frozenBadgeEl, entry);
   renderMirror(entry);
 }
 
@@ -607,24 +609,28 @@ function renderMirror(entry) {
   renderMirrorHeader(entry, mirror);
   renderMirrorFrame(entry, mirror);
   // 枠の中身は上で貼り直されるので、その後に足す
-  paintScreenBadge(mirror.frozenEl, entry.device);
+  paintScreenBadge(mirror.frozenEl, entry);
   mirror.frameEl.appendChild(mirror.frozenEl);
 }
 
 /**
  * 絵の真ん中に出す画面の状態(タイルと拡大表示で共有)。未接続の機は出さない(Swift 側も接続断で記憶を捨てる)。
- * 重なったら重いほう(デバイス全体 → アプリの領域 → 文字だけ)を出す
+ * 重なったら重いほう(デバイス全体 → アプリの領域 → 文字だけ)を出す。
+ * **どれも絵についての状態**なので、絵が来ていない「接続中」には出さない
  */
-function screenBadgeKeys(device) {
+function screenBadgeKeys(entry) {
+  const device = entry.device;
   if (device.state !== 'connected') return null;
+  if (entry.frameWrapEl.contains(entry.placeholderEl)
+      && entry.placeholderEl.textContent === t('wvMonitor.tile.connecting')) return null;
   if (device.frozen) return ['wvMonitor.tile.frozen', 'wvMonitor.tile.frozenTitle'];
   if (device.screenState === 'blank') return ['wvMonitor.tile.blank', 'wvMonitor.tile.blankTitle'];
   if (device.screenState === 'textless') return ['wvMonitor.tile.textless', 'wvMonitor.tile.textlessTitle'];
   return null;
 }
 
-function paintScreenBadge(el, device) {
-  const keys = screenBadgeKeys(device);
+function paintScreenBadge(el, entry) {
+  const keys = screenBadgeKeys(entry);
   el.style.display = keys ? 'inline-block' : 'none';
   if (keys && (el.textContent !== t(keys[0]) || el.dataset.tip !== t(keys[1]))) {
     el.textContent = t(keys[0]);
@@ -639,7 +645,7 @@ export function renderingCountsOf(machine) {
   const counts = { frozen: 0, blank: 0, textless: 0 };
   for (const entry of tiles.values()) {
     if ((entry.device.machine || '') !== machine) continue;
-    const keys = screenBadgeKeys(entry.device);
+    const keys = screenBadgeKeys(entry);
     if (keys === null) continue;
     counts[keys[0].split('.').pop()] += 1;
   }
@@ -887,7 +893,7 @@ function renderMeta(entry) {
   entry.nameEl.className = 'tile-name tile-name-' + entry.device.platform;
   setHoverTip(entry.nameEl, entry.device.name + ' (' + entry.device.platform + ')');
   entry.recordingBadgeEl.style.display = entry.device.recording ? 'inline-block' : 'none';
-  paintScreenBadge(entry.frozenBadgeEl, entry.device);
+  paintScreenBadge(entry.frozenBadgeEl, entry);
   // 実機は署名・接続の前提がシミュレータ/エミュレータと違うので取り違えないよう明示する
   entry.kindBadgeEl.style.display = entry.device.kind === 'physical' ? 'inline-block' : 'none';
   // **手元も含めて必ず出す**(ユーザー決定)—— どの機械のデバイスかは全タイルで同じ形で

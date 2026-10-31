@@ -465,7 +465,10 @@ test("Rendering 列: 0 の種類は出さず、全部 0 なら空欄。種類ご
     device("f", "m2", { screenState: "textless" }),
     device("g", "m3", { screenState: "blank" }),
     device("h", "m3", { frozen: true, state: "offline" }),
+    device("i", "m3", { frozen: true }),
   ] });
+  // 「i」は絵が来ていない = 接続中。Rendering 列にも数えない
+  for (const id of "abcdefg") send({ type: "frame", device: id, jpegBase64: "AAAA", width: 100, height: 200 });
   send(sample("m2"));
   send(sample("m3"));
   send(sample(""));
