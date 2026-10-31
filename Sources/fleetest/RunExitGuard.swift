@@ -37,7 +37,7 @@ final class RunExitGuard {
         } catch {
             // 供給の完了を待つ間、落ちた理由が出ないと止まって見える(赤の run の ExitCode は理由を持たない・中断は受けた時に言っている)
             if exit.settle != nil, !(error is ExitCode), !(error is RunInterruptedBeforeStartError) {
-                log("→ Stopping the device supply before cleaning up: \(error.localizedDescription)")
+                log("→ Stopping, then cleaning up: \(error.localizedDescription)")
             }
             await exit.finish()
             throw error

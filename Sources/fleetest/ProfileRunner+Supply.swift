@@ -188,14 +188,13 @@ extension ProfileRunner {
         // (スクリプトが受け取るデバイス一覧を、この run が実際に使うデバイスと一致させる)。
         // 終了スクリプトは close() で撃つ。プロセスごと殺された場合は lease が残り、次の run と
         // `fleetest hooks reap` が代わりに撃つ
-        let hookStateDir = (try? RepoRoot.find())?.appendingPathComponent(".fleetest")
         let reportDir = reportDirOverride.map { URL(fileURLWithPath: $0) } ?? resolved.reportDir
         // 以下で作るものは cleanup に積む。途中で throw したら積んだ分だけ片付ける(作り終えたら PreparedSupply.close() が持つ)
         let cleanup = SupplyCleanup { ConsoleOut.out($0) }
         var handedOver = false
         defer { if !handedOver { cleanup.run() } }
         // 失敗の証跡の置き場は run の記録(無ければレポートの出力先)
-        try Self.prepareEnvironment(resolved: resolved, stateDir: hookStateDir, cleanup: cleanup,
+        try Self.prepareEnvironment(resolved: resolved, stateDir: leaseStateDir, cleanup: cleanup,
                                     failureLogDir: failureLogDir ?? reportDir, supplyProgress: supplyProgress,
                                     interruptState: interruptState) { ConsoleOut.out($0) }
 

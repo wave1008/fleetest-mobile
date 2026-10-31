@@ -72,8 +72,7 @@ final class RunEarlySupplyWiringTests: XCTestCase {
         XCTAssertTrue(lines.contains("runExit.settle = { await prepared.settle() }"))
         XCTAssertTrue(lines.contains("runExit.close = { prepared.close() }"))
         XCTAssertFalse(lines.contains { $0.hasPrefix("defer") && $0.contains("prepared.close()") })
-        let mark = try XCTUnwrap(lines.firstIndex(of: "runExit.supplyAbandon.mark()"), "Android の失敗で iOS の供給を止めていない")
-        XCTAssertEqual(lines[mark + 1], "await prepared.settle()")
+        XCTAssertFalse(lines.contains("await prepared.settle()"), "結果を書く前に iOS の供給を待っている")
     }
 
     /// iOS のレーンはインストールの前で止まる(ここを過ぎると数分かかる供給を出口が待つ)

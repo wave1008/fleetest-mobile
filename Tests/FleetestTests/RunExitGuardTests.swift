@@ -87,7 +87,7 @@ final class RunExitGuardTests: XCTestCase {
             $0.settle = {}
             throw ValidationError("no scenarios")
         }
-        XCTAssertEqual(logged, ["→ Stopping the device supply before cleaning up: no scenarios"])
+        XCTAssertEqual(logged, ["→ Stopping, then cleaning up: no scenarios"])
     }
 
     /// 中断は受けた時に言っているので、待つ前の行を出さない

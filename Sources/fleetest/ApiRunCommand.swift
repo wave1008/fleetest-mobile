@@ -367,7 +367,7 @@ struct ApiRunCommand: AsyncParsableCommand {
         // 本数ぶんに削られた外のデバイスが照合されず、同じ打鍵で `fleetest run --dry-run` だけが警告した
         var commandCheckDevices: [CommandTargetCheck.Device] = []
         if let (resolvedAll, full) = preResolvedProfile {
-            // リモートディスパッチは別途ミラー前のローカル側で同じ呼び出しを行う(RemoteRunDispatcher.prepareWorkspace)
+            // リモートディスパッチはミラー前のローカル側で別の実装が行う(RemoteRunDispatcher.prepareWorkspace)
             if !dryRun { try ProfileRunner.prepareWorkspace(resolvedAll) { logStderr($0) } }
             // **回す本数を超える台数を用意しない**(ResolvedProfile.limitingDevices)。
             // ここではシナリオ一覧がまだ無い(ビルドと並行に解決するため。下の先行構築のコメント参照)
@@ -445,7 +445,6 @@ struct ApiRunCommand: AsyncParsableCommand {
         defer { responseTrace?.cleanup() }
         if let resolved = resolvedProfile, !dryRun {
             let hookStateDir = (try? RepoRoot.find())?.appendingPathComponent(".fleetest")
-            // **サーバーの起動と開始スクリプトは dry-run で撃たない**(`fleetest run` の dry-run 分岐と同じ)
             try ProfileRunner.prepareEnvironment(
                 resolved: resolved, stateDir: hookStateDir, cleanup: cleanup,
                 failureLogDir: reportDir.map { URL(fileURLWithPath: $0) } ?? resolved.reportDir,

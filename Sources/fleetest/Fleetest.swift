@@ -934,10 +934,13 @@ struct RunScenarios: AsyncParsableCommand {
                                 servicesWarnings: [],
                                 // resolve 前の失敗で計測モードかどうかを断定できない
                                 responseMeasurement: nil,
+                                interrupted: error is RunInterruptedBeforeStartError,
                                 abortReason: error.localizedDescription)
-                // JUnit を書かないと CI の取り込みが「レポートが無い」で止まり、落ちた理由は標準出力にしか残らない
-                try? writeJUnitIfRequested(project: testProject, recorder: recorder,
-                                           abortedBeforeStart: (items, error.localizedDescription))
+                // JUnit を書かないと CI の取り込みが「レポートが無い」で止まり、落ちた理由は標準出力にしか残らない(中断は CI の失敗ではない)
+                if !(error is RunInterruptedBeforeStartError) {
+                    try? writeJUnitIfRequested(project: testProject, recorder: recorder,
+                                               abortedBeforeStart: (items, error.localizedDescription))
+                }
                 throw error
             }
             let failedCount = runSummary.failed

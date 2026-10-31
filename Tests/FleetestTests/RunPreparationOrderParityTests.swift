@@ -66,11 +66,20 @@ final class RunPreparationOrderParityTests: XCTestCase {
     }
 
     /// 結果を書いた後に片付ける(終了スクリプトに上限が無いので、先に片付けると刺さった回の run.json が残らない)
-    func testTheCliRunWritesTheResultBeforeTheExitGuardCleansUp() throws {
+    func testNoEntryPointCleansUpBeforeWritingTheResult() throws {
+        for path in ["Sources/fleetest/Fleetest.swift", "Sources/fleetest/ApiRunCommand.swift", "Sources/fleetest/ProfileRunner.swift"] {
+            // 出口への登録(`runExit.settle = …`)は片付けではない
+            let lines = try code(path).filter { !$0.hasPrefix("runExit.settle = ") && !$0.hasPrefix("runExit.close = ") }
+            XCTAssertFalse(lines.contains { $0.contains("runExit.finish") || $0.contains(".settle()") || $0.contains("prepared.close()") },
+                           "\(path): 本体の中で片付けている(`RunExitGuard` の出口は結果の後)")
+        }
+    }
+
+    /// 中断は全件失敗の CI レポートにしない・run.json には中断と残す
+    func testAnInterruptionBeforeTheRunIsRecordedAsAnInterruption() throws {
         let lines = try code("Sources/fleetest/Fleetest.swift")
-        XCTAssertFalse(lines.contains { $0.contains("settleAndClose") })
-        let run = try XCTUnwrap(lines.firstIndex { $0.hasPrefix("try await RunExitGuard.run(log:") })
-        let finish = try XCTUnwrap(lines.firstIndex { $0.hasPrefix("recorder.finish(total: items.count") })
-        XCTAssertLessThan(run, finish, "本体は RunExitGuard の内側で結果を書く")
+        XCTAssertTrue(lines.contains("interrupted: error is RunInterruptedBeforeStartError,"))
+        let junit = try XCTUnwrap(lines.firstIndex { $0.hasPrefix("try? writeJUnitIfRequested(project: testProject, recorder: recorder,") })
+        XCTAssertEqual(lines[junit - 1], "if !(error is RunInterruptedBeforeStartError) {")
     }
 }

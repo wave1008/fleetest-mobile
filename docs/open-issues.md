@@ -809,6 +809,20 @@
 
 - レーンが見るのは段の境目だけ。ビルド中に2回目の中断を送ると `exit(143)` で片付けとロックの解放が飛ぶ。始まった run の控えは orchestrator の終了が消すので、片付けの間マシンが空いて見える。`fleetest run` で Android の供給が失敗した回は控えが残る(死んだ pid は読み手が弾く)
 
+### OI-99 `fleetest run` の供給失敗は、サービスのログと servicesWarnings を run の記録に残さない
+- 状態: 経路確定
+- 確認: コミット未記録(2026-11-01)
+- 経緯: 発見: api run の合流のレビュー
+
+- 片付けが結果の後になり catch の時点でサービスは動いているので読める。`api run` は catch で `saveLogs` と `servicesWarnings` を記録する。CLI は `servicesWarnings: []` のまま
+
+### OI-100 供給のタスクの起動は run と api run に二重のまま
+- 状態: 経路確定
+- 確認: コミット未記録(2026-11-01)
+- 経緯: 発見: api run の合流のレビュー
+
+- 環境の準備は `prepareEnvironment` の1箇所になったが、死活確認から lease・レーンの起動までは `prepareSupply` と `ApiRunCommand` に別々にある。ログの出力先(`logSupply`)・`wipeStatus`・FM の警告と `RunEnvironment.apply` の位置が違う。同名の `RemoteRunDispatcher.prepareWorkspace` も別実装
+
 ## 設計判断で据え置いているもの(直さないと決めた。症状が出たら見直す)
 
 ### OI-22 描画崩壊の判定は自前描画とフレームワーク不明のアプリだけ

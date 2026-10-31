@@ -390,15 +390,8 @@ enum ProfileRunner {
 
         // Android のレーンは開始前に揃える。iOS(ブリッジ供給=数十秒かかりうる)は lateWorkers として
         // 分離し、Android を供給完了待ちにしない(api run の並列経路と同じ方針)
-        let workers: [RunWorker]
-        do {
-            workers = try await prepared.androidTask.value
-        } catch {
-            // 片付けは iOS の準備が終わってから(PreparedSupply.settle の宣言)。もう要らないので段の境目で止める
-            runExit.supplyAbandon.mark()
-            await prepared.settle()
-            throw error
-        }
+        // 失敗しても iOS の準備はここで待たない(結果を先に書く。待つのも止めるのも RunExitGuard)
+        let workers = try await prepared.androidTask.value
         let iosDevicesExist = prepared.iosTask != nil
 
         // performanceMode では iOS の late join をやめて開始前に揃える。**理由は計測の歪みではなく
