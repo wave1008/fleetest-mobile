@@ -135,6 +135,7 @@ if (command === "list-devices") {
       dsl: cmd === "tap" ? 'tap("#mock")' : null,
       dslSelector: cmd === "tap" ? "#mock" : null,
       bridgeStarting: false,
+      deliveryUnknown: false,
     });
     emitSnapshot();
   });

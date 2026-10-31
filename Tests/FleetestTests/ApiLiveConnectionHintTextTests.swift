@@ -1,6 +1,5 @@
 import XCTest
 import FTBridgeClient
-import FTCore
 @testable import fleetest
 
 /// LIVE-1/LIVE-2: ライブ操作の失敗ヒントの文言選択(純粋関数だけ)。判定そのもの
@@ -57,14 +56,6 @@ final class ApiLiveConnectionHintTextTests: XCTestCase {
         XCTAssertEqual(ApiLiveServe.withDeliveryNote("m", deliveryUnknown: false), "m")
         XCTAssertEqual(ApiLiveServe.withDeliveryNote("m", deliveryUnknown: true), "m" + ApiLiveServe.deliveryUnknownHint)
         XCTAssertTrue(ApiLiveServe.deliveryUnknownHint.contains("check the screen"))
-    }
-
-    /// 立てると拡張が文言を差し替え、配達の注記が人に届かない
-    func testAnUnknownDeliveryDoesNotReportTheBridgeAsStarting() {
-        let context = DriverErrorContext(bridge: .iosXCUITest, physicalDevice: false)
-        XCTAssertFalse(ApiLiveServe.reportsBridgeStarting(true, after: DriverError.bridgeUnreachable(context: context, detail: "")))
-        XCTAssertTrue(ApiLiveServe.reportsBridgeStarting(true, after: DriverError.bridgeConnectionRefused(context: context, detail: "")))
-        XCTAssertFalse(ApiLiveServe.reportsBridgeStarting(false, after: DriverError.bridgeConnectionRefused(context: context, detail: "")))
     }
 
     /// 4状態それぞれ違う文言を返すこと(丸めて同じ文言に潰すと状態を見分けた意味が無い)

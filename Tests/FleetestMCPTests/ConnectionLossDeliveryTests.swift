@@ -80,6 +80,19 @@ final class ConnectionLossDeliveryTests: XCTestCase {
         XCTAssertTrue(MCPServer.executorFailure(StepOutcome(status: .failed("x"), thrownDriverError: refused)) is MCPError)
     }
 
+    /// 接続拒否の他は抱える(覆い・a11y 停止の案内も dispatcher が underlying から決める)
+    func testExecutorFailureKeepsTheCasesThatCarryGuidance() {
+        for cause: DriverError in [.notDelivered(context: iosContext, detail: ""), .badResponse(status: 500, body: ""), .systemAlertBlocked(detail: "")] {
+            XCTAssertTrue(MCPServer.executorFailure(StepOutcome(status: .failed("x"), thrownDriverError: cause)) is MCPAnnotatedError, "\(cause)")
+        }
+    }
+
+    /// 閉じなかったと確定した失敗(応答あり)では別の手を勧める
+    func testAHideKeyboardThatWasAnsweredStillSuggestsEnter() async {
+        let text = await failingHideKeyboardOnIOS(DriverError.badResponse(status: 500, body: "nope"))
+        XCTAssertTrue(text.contains("pressEnter"), text)
+    }
+
     /// 接続断では閉じたかも分からないので、Enter を勧めない
     func testAHideKeyboardThatLostTheConnectionDoesNotSuggestEnter() async {
         let text = await failingHideKeyboardOnIOS(DriverError.bridgeUnreachable(context: iosContext, detail: "connection lost"))

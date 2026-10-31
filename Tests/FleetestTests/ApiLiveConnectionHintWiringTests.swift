@@ -62,7 +62,7 @@ final class ApiLiveConnectionHintWiringTests: XCTestCase {
         XCTAssertEqual(code.components(separatedBy: "operated: true, port: port)").count - 1, 1)
         XCTAssertEqual(code.components(separatedBy: "operated: false, port: port)").count - 1, 2)
         XCTAssertTrue(code.contains("retrySafe: !deliveryUnknown"))
-        XCTAssertTrue(code.contains("Self.reportsBridgeStarting(await bridgeStartingFlag(starter), after: error)"))
+        XCTAssertTrue(code.contains("deliveryUnknown: (error as? DriverError)?.deliveryIsUnknown == true"), "拡張へ事実を運んでいない")
         let perform = try XCTUnwrap(code.range(of: "try await perform(command: command"))
         let operated = try XCTUnwrap(code.range(of: "operated: true, port: port)"))
         XCTAssertLessThan(perform.lowerBound, operated.lowerBound)

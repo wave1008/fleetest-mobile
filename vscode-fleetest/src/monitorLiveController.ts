@@ -883,7 +883,7 @@ export class MonitorLiveController implements vscode.Disposable {
     // **bridgeStarting は常に false**(この経路は自動起動とは無関係の host 側の障害
     // [プロセス終了・応答タイムアウト]なので、デバイスが起動中かどうかは分からない・関係ない)
     this.settlePendingServeRequest({
-      action: pending.expectsAction ? { ok: false, error: message, bridgeStarting: false, dsl: null, dslSelector: null } : undefined,
+      action: pending.expectsAction ? { ok: false, error: message, bridgeStarting: false, deliveryUnknown: false, dsl: null, dslSelector: null } : undefined,
       snapshot: { ok: false, error: message, bridgeStarting: false },
     });
   }
@@ -914,7 +914,7 @@ export class MonitorLiveController implements vscode.Disposable {
       const message = serveUnavailableMessage();
       // serve プロセス自体が居ない(bridgeStarting とは無関係の host 側の障害)
       return Promise.resolve({
-        action: command.cmd === "refresh" ? undefined : { ok: false, error: message, bridgeStarting: false, dsl: null, dslSelector: null },
+        action: command.cmd === "refresh" ? undefined : { ok: false, error: message, bridgeStarting: false, deliveryUnknown: false, dsl: null, dslSelector: null },
         snapshot: { ok: false, error: message, bridgeStarting: false },
       });
     }
@@ -1014,8 +1014,9 @@ export class MonitorLiveController implements vscode.Disposable {
       const { action, snapshot } = await this.sendServeCommand(command);
       if (action && !action.ok) {
         // 自動起動が進行中の失敗はエラーとして出さない —— 撃ち直しはしない
-        // (利用者が画面の復帰を見てから自分でやり直す。interruption-no-resend-policy と同じ理由)
-        if (action.bridgeStarting) {
+        // (利用者が画面の復帰を見てから自分でやり直す。interruption-no-resend-policy と同じ理由)。
+        // 届いたか分からない失敗は差し替えない(「表示されたら操作して」は効いた操作の二重押しを勧めてしまう)
+        if (action.bridgeStarting && !action.deliveryUnknown) {
           this.postActionError(t("live.bridgeStartingActionNotice"), true);
         } else {
           this.postActionError(action.error);

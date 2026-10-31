@@ -169,7 +169,9 @@ export function withDslSelector(label: string, selector: string | null | undefin
   return `${label}(${JSON.stringify(selector)})`;
 }
 
-export type LiveActionResult = (LiveOkResult | LiveErrorResult) & LiveActionDsl;
+/** 操作の失敗だけが持つ欄。true = 届いたか分からない(契約: ApiLiveCommand.swift 冒頭) */
+export type LiveActionError = LiveErrorResult & { readonly deliveryUnknown: boolean };
+export type LiveActionResult = (LiveOkResult | LiveActionError) & LiveActionDsl;
 
 function isLiveRect(value: unknown): value is LiveRect {
   if (!isRecord(value)) {
@@ -252,8 +254,9 @@ export function parseLiveActionResult(value: unknown): LiveActionResult | undefi
   if (isLiveOkResult(value)) {
     return { ok: true, bridgeStarting: value.bridgeStarting, dsl, dslSelector, ...app };
   }
-  if (isLiveErrorResult(value)) {
-    return { ok: false, error: value.error, bridgeStarting: value.bridgeStarting, dsl, dslSelector, ...app };
+  if (isLiveErrorResult(value) && typeof value.deliveryUnknown === "boolean") {
+    return { ok: false, error: value.error, bridgeStarting: value.bridgeStarting,
+      deliveryUnknown: value.deliveryUnknown, dsl, dslSelector, ...app };
   }
   return undefined;
 }

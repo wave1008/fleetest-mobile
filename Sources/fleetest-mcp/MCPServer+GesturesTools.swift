@@ -230,14 +230,13 @@ extension MCPServer {
         }
     }
 
-    /// StepExecutor へ委ねた手の失敗を投げる形へ。**届いたか分からない失敗だけ `DriverError` を抱える**(`MCPError` に畳むと配達の注記が消える)。
-    /// 接続拒否は包まない: 接続の記憶が残れば次の呼び出しが起動し直せる。ここで復帰の撃ち直しへ渡さないのは、手が途中まで届いていることがあるから
+    /// StepExecutor へ委ねた手の失敗を投げる形へ。**投げられた `DriverError` は抱える**(`MCPError` に畳むと配達・覆い・a11y 停止の案内が消える)。
+    /// **接続拒否だけ包まない**: 包むと接続の記憶が消え、次の呼び出しが起動し直せない。復帰の撃ち直しへ渡さないのは、手が途中まで届いていることがあるから
     static func executorFailure(_ outcome: StepOutcome, prefix: String = "", suffix: String = "") -> Error {
         let message = prefix + failureReason(outcome) + suffix
-        if let cause = outcome.thrownDriverError, cause.deliveryIsUnknown {
-            return MCPAnnotatedError(underlying: cause, suffix: "", fullMessage: message)
-        }
-        return MCPError(message)
+        guard let cause = outcome.thrownDriverError else { return MCPError(message) }
+        if case .bridgeConnectionRefused = cause { return MCPError(message) }
+        return MCPAnnotatedError(underlying: cause, suffix: "", fullMessage: message)
     }
 
     /// ft_hide_keyboard と replace の引き直しが共有する閉じ方の実行器。iOS はキーボードの上の空きを叩く・Android は戻るキー。
@@ -290,8 +289,8 @@ extension MCPServer {
         }
         let outcome = await executor.execute(FlowStep(action: "hideKeyboard"))
         guard StepExecutor.isSuccess(outcome.status) else {
-            // 閉じなかったと確定した失敗だけ別の手を勧める(接続断では閉じたかも分からない・Enter は送信や検索を走らせる)
-            throw Self.executorFailure(outcome, prefix: "hideKeyboard failed: ", suffix: isAndroid || outcome.thrownDriverError != nil ? ""
+            // 届いたか分からない失敗では別の手を勧めない(閉じたかも分からない・Enter は送信や検索を走らせる)
+            throw Self.executorFailure(outcome, prefix: "hideKeyboard failed: ", suffix: isAndroid || outcome.thrownDriverError?.deliveryIsUnknown == true ? ""
                 : " — ft_type pressEnter: true may close it, but Return also fires the field's action"
                     + " (submit, search or moving to the next field)")
         }

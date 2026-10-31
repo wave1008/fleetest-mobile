@@ -56,7 +56,7 @@ test("runAction: action の失敗は bridgeStarting のときだけ中立の案�
   );
   assert.match(
     body,
-    /if \(action\.bridgeStarting\) \{\s*\n\s*this\.postActionError\(t\("live\.bridgeStartingActionNotice"\), true\)/,
+    /if \(action\.bridgeStarting && !action\.deliveryUnknown\) \{\s*\n\s*this\.postActionError\(t\("live\.bridgeStartingActionNotice"\), true\)/,
     "action.bridgeStarting のときは live.bridgeStartingActionNotice を neutral:true で出すこと",
   );
   assert.match(body, /\} else \{\s*\n\s*this\.postActionError\(action\.error\);/,

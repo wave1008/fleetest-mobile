@@ -82,6 +82,8 @@
 //   本人確認で断った行)は null。
 //   dslSelector: **必須(値は null 可)**。dsl の行が対象に書いたセレクタ(`#MapsSearchTextField` 等)。拡張は操作の列に
 //   `("…")` で添える(dsl の行から切り出さない)。座標の行・対象を取らない行・dsl が null なら null。
+//   deliveryUnknown: **必須(actionResult だけ)**。操作が届いたか分からない失敗か(`DriverError.deliveryIsUnknown`)。拡張は true なら
+//   起動中でも error を見せる(中立の案内「表示されたら操作して」へ差し替えると、効いた操作を人が二重に押す)。
 //   bridgeStarting: **必須**。`LiveBridgeAutoStarter` が自動起動を進行中(.starting)かどうかを
 //   イベントの時点で読んだ値(starter が無ければ常に false)。ok の真偽を問わず全イベントに載る
 //   (annotated が noteConnectionRefused() で idle→starting へ遷移させ得るため、失敗イベントでは
@@ -328,7 +330,7 @@ struct ApiLiveServe: AsyncParsableCommand {
                     logStderr(refusal)
                     let starting = await bridgeStartingFlag(starter)
                     emitLine(ApiLiveActionResultEvent(ok: false, error: refusal, app: follower?.sessionTarget,
-                                                      dsl: nil, dslSelector: nil, bridgeStarting: starting))
+                                                      dsl: nil, dslSelector: nil, bridgeStarting: starting, deliveryUnknown: false))
                     await followFrontmost(follower, driver: driver)
                     await emitObservation(driver: driver, starter: starter, follower: follower, port: port,
                                           staleFrameTracker: staleFrameTracker, screenMemo: screenMemo,
@@ -741,7 +743,7 @@ struct ApiLiveServe: AsyncParsableCommand {
                 return
             }
             emitLine(ApiLiveActionResultEvent(ok: false, error: decodeError, app: follower?.sessionTarget,
-                                              dsl: nil, dslSelector: nil, bridgeStarting: starting))
+                                              dsl: nil, dslSelector: nil, bridgeStarting: starting, deliveryUnknown: false))
             await followFrontmost(follower, driver: driver)
             await emitObservation(driver: driver, starter: starter, follower: follower, port: port,
                                   staleFrameTracker: staleFrameTracker, screenMemo: screenMemo,
@@ -775,15 +777,15 @@ struct ApiLiveServe: AsyncParsableCommand {
                 if let humanLabel { deviceLease?.recordHumanOperation(label: humanLabel, ok: true, at: operatedAt) }
                 emitLine(ApiLiveActionResultEvent(ok: true, error: nil, app: follower?.sessionTarget,
                                                   dsl: rendered?.line, dslSelector: rendered?.selector,
-                                                  bridgeStarting: await bridgeStartingFlag(starter)))
+                                                  bridgeStarting: await bridgeStartingFlag(starter), deliveryUnknown: false))
             } catch {
                 if let humanLabel { deviceLease?.recordHumanOperation(label: humanLabel, ok: false, at: operatedAt) }
                 let message = await annotated(error, starter: starter, triggering: true, operated: true, port: port)
                 // **annotated の後で読む**: noteConnectionRefused() が idle→starting へ遷移させ得るため
-                let starting = Self.reportsBridgeStarting(await bridgeStartingFlag(starter), after: error)
+                let starting = await bridgeStartingFlag(starter)
                 emitLine(ApiLiveActionResultEvent(ok: false, error: message, app: follower?.sessionTarget,
                                                   dsl: rendered?.line, dslSelector: rendered?.selector,
-                                                  bridgeStarting: starting))
+                                                  bridgeStarting: starting, deliveryUnknown: (error as? DriverError)?.deliveryIsUnknown == true))
             }
         }
         // **観測の直前にもう一度追従させる**: 直前の操作で前面が変わっている(ホームへ戻った・
@@ -833,11 +835,6 @@ struct ApiLiveServe: AsyncParsableCommand {
         deliveryUnknown ? message + deliveryUnknownHint : message
     }
 
-    /// 操作の失敗で `bridgeStarting` を立てるか。**届いたか分からない失敗では立てない**: 拡張は立っていると文言を
-    /// `live.bridgeStartingActionNotice`(表示されたら操作して)へ差し替え、配達の注記が人に届かない(monitorLiveController.ts)
-    static func reportsBridgeStarting(_ starting: Bool, after error: Error) -> Bool {
-        starting && (error as? DriverError)?.deliveryIsUnknown != true
-    }
 
     private func guidance(
         _ error: Error, starter: LiveBridgeAutoStarter?, triggering: Bool, retrySafe: Bool, port: UInt16
@@ -935,8 +932,8 @@ struct ApiLiveServe: AsyncParsableCommand {
             // 言えるのは「答えなかった」事実と、最も多い理由(忙しい)まで
             return " The device is still connected, but its bridge did not answer a status check in time —"
                 + " most likely it is busy (for example, waiting for the screen to settle can take tens of"
-                + " seconds). " + (retrySafe ? "Wait a moment and try again" : "Wait a moment")
-                + (retrySafe ? "; if the next try reports" : "; if the bridge then reports")
+                + " seconds). " + (retrySafe ? "Wait a moment and try again; if the next try reports"
+                                             : "Wait a moment; if the bridge then reports")
                 + " the connection as refused, the bridge has exited."
         case .notBound:
             return " Nothing is listening on this device's bridge port anymore. Run"
@@ -1805,8 +1802,10 @@ private struct ApiLiveActionResultEvent: Encodable {
     let dslSelector: String?
     /// LiveBridgeAutoStarter.isStarting(ファイル冒頭プロトコル・bridgeStartingFlag 参照)
     let bridgeStarting: Bool
+    /// 操作が届いたか分からない失敗か(ファイル冒頭プロトコル参照)
+    let deliveryUnknown: Bool
 
-    private enum CodingKeys: String, CodingKey { case kind, ok, error, app, dsl, dslSelector, bridgeStarting }
+    private enum CodingKeys: String, CodingKey { case kind, ok, error, app, dsl, dslSelector, bridgeStarting, deliveryUnknown }
 
     func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
@@ -1817,6 +1816,7 @@ private struct ApiLiveActionResultEvent: Encodable {
         try container.encode(dsl, forKey: .dsl)
         try container.encode(dslSelector, forKey: .dslSelector)
         try container.encode(bridgeStarting, forKey: .bridgeStarting)
+        try container.encode(deliveryUnknown, forKey: .deliveryUnknown)
     }
 }
 

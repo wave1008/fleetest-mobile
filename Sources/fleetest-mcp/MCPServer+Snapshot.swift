@@ -1655,7 +1655,8 @@ extension MCPServer {
             guard !StepExecutor.isSuccess(outcome.status) else { throw error }
             let reason = Self.failureReason(outcome)
             // 元のエラーを抱えたまま投げる(MCPError に畳むと、接続断の案内 = 届いたか分からない・記憶の破棄が出ない)
-            throw MCPAnnotatedError(underlying: error, suffix: "",
+            // 探索の手が投げた case を優先する(届いたか分からないスワイプの配達の注記を、撮れなかった理由で消さない)
+            throw MCPAnnotatedError(underlying: outcome.thrownDriverError ?? error, suffix: "",
                                     prefix: scrollFrameLabelNote + "scrollTo \"\(selectorText)\": \(reason)"
                                         + "\n\nCould not take a snapshot after the search: ")
         }
@@ -1804,13 +1805,7 @@ extension MCPServer {
         // そのまま利用者に見える(実害)
         guard StepExecutor.isSuccess(outcome.status) else {
             // ここに来る時点で outcome.status は failed/skipped/inconclusive のいずれか
-            let reason: String
-            switch outcome.status {
-            case .failed(let message), .skipped(let message), .inconclusive(let message):
-                reason = Self.scrollFailureReason(message, sheetRescued: !sheetNote.isEmpty)
-            case .passed, .passedViaFallback, .healed:
-                reason = "could not confirm the result"
-            }
+            let reason = Self.scrollFailureReason(Self.failureReason(outcome), sheetRescued: !sheetNote.isEmpty)
             // **失敗の応答にも、成功経路と同じ「木が別のアプリのものだ」を付ける**(アプリが落ちて別のアプリが前面に出た回、
             // 失敗文だけが的外れな対処を言っていた)。同じ判定・同じ文言(switchedAppNote)
             let failedLaunched = launchedBundleIDs[Self.sessionKey(args)]

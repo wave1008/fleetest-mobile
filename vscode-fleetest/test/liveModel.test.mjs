@@ -222,6 +222,13 @@ test("parseLiveSnapshotResult: bridgeStarting が欠落/非boolean なら undefi
 
 // ---- parseLiveActionResult ----
 
+test("parseLiveActionResult: 失敗は deliveryUnknown を必須で運ぶ", () => {
+  const base = { ok: false, error: "x", bridgeStarting: true, dsl: null, dslSelector: null };
+  assert.equal(parseLiveActionResult(base), undefined, "欠落は読めない(版の食い違い)");
+  assert.equal(parseLiveActionResult({ ...base, deliveryUnknown: true }).deliveryUnknown, true);
+  assert.equal(parseLiveActionResult({ ...base, deliveryUnknown: false }).deliveryUnknown, false);
+});
+
 test("parseLiveActionResult: {ok:true} を { ok: true, bridgeStarting, dsl } に正規化する", () => {
   assert.deepEqual(parseLiveActionResult({ ok: true, bridgeStarting: false, dsl: null, dslSelector: null }), {
     ok: true, bridgeStarting: false, dsl: null, dslSelector: null,
@@ -232,18 +239,19 @@ test("parseLiveActionResult: {ok:true} を { ok: true, bridgeStarting, dsl } に
 });
 
 test("parseLiveActionResult: {ok:false,error} をそのまま返す", () => {
-  assert.deepEqual(parseLiveActionResult({ ok: false, error: "失敗しました", bridgeStarting: false, dsl: null, dslSelector: null }), {
+  assert.deepEqual(parseLiveActionResult({ ok: false, error: "失敗しました", bridgeStarting: false, deliveryUnknown: false, dsl: null, dslSelector: null }), {
     ok: false,
     error: "失敗しました",
     bridgeStarting: false,
+    deliveryUnknown: false,
     dsl: null, dslSelector: null,
   });
 });
 
 test("parseLiveActionResult: 失敗した操作でも dsl(撃つ前に組めた行)を落とさない", () => {
   assert.deepEqual(
-    parseLiveActionResult({ ok: false, error: "x", bridgeStarting: false, dsl: "tap(x: 120, y: 340)", dslSelector: null }),
-    { ok: false, error: "x", bridgeStarting: false, dsl: "tap(x: 120, y: 340)", dslSelector: null },
+    parseLiveActionResult({ ok: false, error: "x", bridgeStarting: false, deliveryUnknown: false, dsl: "tap(x: 120, y: 340)", dslSelector: null }),
+    { ok: false, error: "x", bridgeStarting: false, deliveryUnknown: false, dsl: "tap(x: 120, y: 340)", dslSelector: null },
   );
 });
 
@@ -320,18 +328,18 @@ test("parseLiveServeEvent: kind=actionResult の成功/失敗を判別する", (
     result: { ok: true, bridgeStarting: false, dsl: null, dslSelector: null },
   });
   assert.deepEqual(
-    parseLiveServeEvent({ kind: "actionResult", ok: false, error: "失敗しました", bridgeStarting: false, dsl: null, dslSelector: null }),
+    parseLiveServeEvent({ kind: "actionResult", ok: false, error: "失敗しました", bridgeStarting: false, deliveryUnknown: false, dsl: null, dslSelector: null }),
     {
       kind: "actionResult",
-      result: { ok: false, error: "失敗しました", bridgeStarting: false, dsl: null, dslSelector: null },
+      result: { ok: false, error: "失敗しました", bridgeStarting: false, deliveryUnknown: false, dsl: null, dslSelector: null },
     },
   );
 });
 
 test("parseLiveServeEvent: actionResult の bridgeStarting(自動起動が進行中か)を落とさない", () => {
-  assert.deepEqual(parseLiveServeEvent({ kind: "actionResult", ok: false, error: "x", bridgeStarting: true, dsl: null, dslSelector: null }), {
+  assert.deepEqual(parseLiveServeEvent({ kind: "actionResult", ok: false, error: "x", bridgeStarting: true, deliveryUnknown: false, dsl: null, dslSelector: null }), {
     kind: "actionResult",
-    result: { ok: false, error: "x", bridgeStarting: true, dsl: null, dslSelector: null },
+    result: { ok: false, error: "x", bridgeStarting: true, deliveryUnknown: false, dsl: null, dslSelector: null },
   });
 });
 
@@ -353,11 +361,11 @@ test("parseLiveServeEvent: actionResult の app(操作を撃った先)を落と�
   );
   assert.deepEqual(
     parseLiveServeEvent({
-      kind: "actionResult", ok: false, error: "x", app: "com.apple.springboard", bridgeStarting: false, dsl: null, dslSelector: null,
+      kind: "actionResult", ok: false, error: "x", app: "com.apple.springboard", bridgeStarting: false, deliveryUnknown: false, dsl: null, dslSelector: null,
     }),
     {
       kind: "actionResult",
-      result: { ok: false, error: "x", bridgeStarting: false, dsl: null, dslSelector: null, app: "com.apple.springboard" },
+      result: { ok: false, error: "x", bridgeStarting: false, deliveryUnknown: false, dsl: null, dslSelector: null, app: "com.apple.springboard" },
     },
   );
   // app が文字列でない/無い形では欄自体を作らない(undefined の欄で deepEqual を割らない)
