@@ -10,6 +10,17 @@ public enum EmulatorGrpcSession {
 
     public static let defaultTimeout: Duration = .seconds(10)
 
+    /// ジェスチャの前の `getStatus` が失敗した = **タッチを1つも送っていない**と確定している印。
+    /// これだけが adb へ撃ち直してよい根拠(`EmulatorControl.GestureDelivery`)。接続の失敗も、ここで同じ接続の RPC として出る
+    public struct GestureNotStarted: Error {
+        public let cause: any Error
+        public init(cause: any Error) { self.cause = cause }
+    }
+
+    /// 失敗後の up の期限。loopback の単発 RPC(接続 ~ms)なので、固まった Emulator を待ち続けない上限として置く。
+    /// 尽きたら指が残るが、元の失敗はそのまま呼び手へ返す
+    static let fingerReleaseTimeout: Duration = .seconds(2)
+
     /// PNG スクリーンショット(adb screencap -p の代替。実測 48ms vs 140〜250ms)。
     /// 注意: blank 判定に PNG バイト数を使わないこと(emulator 側エンコーダは一様黒でも
     /// 51KB を出す=adb 較正の 30KB 閾値をすり抜ける。判定はホスト側でデコードして画素一様性で
@@ -62,25 +73,27 @@ public enum EmulatorGrpcSession {
         try await withController(endpoint: endpoint,
                                  timeout: .milliseconds(durationMs + 10_000)) { client, metadata, options in
             func touch(_ x: Int32, _ y: Int32, pressure: Int32) async throws {
-                var t = Android_Emulation_Control_Touch()
-                t.x = x
-                t.y = y
-                t.identifier = 0
-                t.pressure = pressure
-                var event = Android_Emulation_Control_TouchEvent()
-                event.touches = [t]
-                _ = try await client.sendTouch(event, metadata: metadata, options: options)
+                _ = try await client.sendTouch(touchEvent(x: x, y: y, pressure: pressure),
+                                               metadata: metadata, options: options)
             }
-            let steps = max(2, durationMs / 16)
-            try await touch(fromX, fromY, pressure: 1)
-            for i in 1...steps {
-                let progress = Double(i) / Double(steps)
-                try await touch(Int32((Double(fromX) + Double(toX - fromX) * progress).rounded()),
-                                Int32((Double(fromY) + Double(toY - fromY) * progress).rounded()),
-                                pressure: 1)
-                try await Task.sleep(for: .milliseconds(durationMs / steps))
+            try await requireController(client, metadata: metadata, options: options)
+            var last = (x: fromX, y: fromY)
+            do {
+                let steps = max(2, durationMs / 16)
+                try await touch(fromX, fromY, pressure: 1)
+                for i in 1...steps {
+                    let progress = Double(i) / Double(steps)
+                    last = (Int32((Double(fromX) + Double(toX - fromX) * progress).rounded()),
+                            Int32((Double(fromY) + Double(toY - fromY) * progress).rounded()))
+                    try await touch(last.x, last.y, pressure: 1)
+                    try await Task.sleep(for: .milliseconds(durationMs / steps))
+                }
+                last = (toX, toY)
+                try await touch(toX, toY, pressure: 0)
+            } catch {
+                await releaseFinger(endpoint: endpoint, x: last.x, y: last.y)
+                throw error
             }
-            try await touch(toX, toY, pressure: 0)
         }
     }
 
@@ -89,20 +102,48 @@ public enum EmulatorGrpcSession {
                                  durationMs: Int) async throws {
         try await withController(endpoint: endpoint,
                                  timeout: .milliseconds(durationMs + 10_000)) { client, metadata, options in
-            var t = Android_Emulation_Control_Touch()
-            t.x = x
-            t.y = y
-            t.identifier = 0
-            t.pressure = 1
-            var down = Android_Emulation_Control_TouchEvent()
-            down.touches = [t]
-            _ = try await client.sendTouch(down, metadata: metadata, options: options)
-            try await Task.sleep(for: .milliseconds(durationMs))
-            t.pressure = 0
-            var up = Android_Emulation_Control_TouchEvent()
-            up.touches = [t]
-            _ = try await client.sendTouch(up, metadata: metadata, options: options)
+            try await requireController(client, metadata: metadata, options: options)
+            do {
+                _ = try await client.sendTouch(touchEvent(x: x, y: y, pressure: 1), metadata: metadata, options: options)
+                try await Task.sleep(for: .milliseconds(durationMs))
+                _ = try await client.sendTouch(touchEvent(x: x, y: y, pressure: 0), metadata: metadata, options: options)
+            } catch {
+                await releaseFinger(endpoint: endpoint, x: x, y: y)
+                throw error
+            }
         }
+    }
+
+    private static func touchEvent(x: Int32, y: Int32, pressure: Int32) -> Android_Emulation_Control_TouchEvent {
+        var touch = Android_Emulation_Control_Touch()
+        touch.x = x
+        touch.y = y
+        touch.identifier = 0
+        touch.pressure = pressure
+        var event = Android_Emulation_Control_TouchEvent()
+        event.touches = [touch]
+        return event
+    }
+
+    private static func requireController(
+        _ client: Android_Emulation_Control_EmulatorController.Client<HTTP2ClientTransport.Posix>,
+        metadata: Metadata, options: CallOptions
+    ) async throws {
+        do {
+            _ = try await client.getStatus(.init(), metadata: metadata, options: options)
+        } catch {
+            throw GestureNotStarted(cause: error)
+        }
+    }
+
+    /// 途中で失敗したジェスチャの指を上げる(up を送らないと identifier が残り、次の入力に重なる)。**別の接続・別のタスクで送る** ——
+    /// 失敗の原因が接続の切断でも、呼び手のタスクの取り消しでも届くように。失敗は黙る(元の失敗のほうを返す)
+    public static func releaseFinger(endpoint: EmulatorEndpoint, x: Int32, y: Int32) async {
+        await Task {
+            try? await withController(endpoint: endpoint, timeout: fingerReleaseTimeout) { client, metadata, options in
+                _ = try await client.sendTouch(touchEvent(x: x, y: y, pressure: 0), metadata: metadata, options: options)
+            }
+        }.value
     }
 
     /// getStatus.booted(sys.boot_completed の代替候補。semantics 差があるため

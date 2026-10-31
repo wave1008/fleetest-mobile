@@ -219,13 +219,20 @@ public func removeApp(_ appID: String? = nil,
 
 /// appIs のポーリング(PollBackoff の再利用はコピペ禁止の契約。
 /// Sources/FTCore/PollBackoff.swift 参照)。waitSeconds==0 でも初回照会は必ず1回行う
-private func pollForegroundMatch(driver: AppDriver, target: String,
-                                 waitSeconds: Double) async throws -> Bool {
+func pollForegroundMatch(waitSeconds: Double, isForeground: () async throws -> Bool) async throws -> Bool {
     let deadline = Date().addingTimeInterval(waitSeconds)
     var backoff = PollBackoff()
     while true {
-        if try await driver.isAppForeground(bundleID: target) { return true }
-        if Date() >= deadline { return false }
+        var unreadable: ForegroundUnreadable?
+        do {
+            if try await isForeground() { return true }
+        } catch let error as ForegroundUnreadable {
+            unreadable = error   // 遷移の途中でも読めない。期限までに読めなければ「読めなかった」を投げる
+        }
+        if Date() >= deadline {
+            if let unreadable { throw unreadable }
+            return false
+        }
         try await Task.sleep(for: backoff.nextDelay())
     }
 }
@@ -244,8 +251,15 @@ public func appIs(_ appID: String, waitSeconds: Double? = nil,
     let driver = core.homeScreenDriver
     core.performCustom(description: "appIs \"\(appID)\"", command: "appIs", file: file, line: line,
                        isAssertion: true) {
-        let matched = try await pollForegroundMatch(
-            driver: driver, target: appID, waitSeconds: waitSeconds)
+        let matched: Bool
+        do {
+            matched = try await pollForegroundMatch(waitSeconds: waitSeconds) {
+                try await driver.isAppForeground(bundleID: appID)
+            }
+        } catch is ForegroundUnreadable {
+            throw FTCommandError.message("appIs \"\(appID)\": the foreground app could not be read"
+                + " within \(FTSeconds.format(waitSeconds))s")
+        }
         guard !matched else { return }
         var message = "appIs \"\(appID)\" did not hold within \(FTSeconds.format(waitSeconds))s"
         // try? はネストした Optional を1段へ平坦化する(SE-0230): throw でも nil 返却でも actual は
@@ -369,15 +383,24 @@ private let tapAppIconLibraryDragSpeed = 120.0
 /// 信用できない)—— 検知が弱まるだけで、誤って赤にはならない
 private func waitForAppForeground(driver: AppDriver, bundleID: String,
                                   waitSeconds: Double) async throws -> Bool? {
+    try await pollForegroundArrival(waitSeconds: waitSeconds) { try await driver.isAppForeground(bundleID: bundleID) }
+}
+
+/// **`ForegroundUnreadable` は「問えなかった」でなく「前面に来ていない」に数える**(ドライバは答えており、起動の失敗で
+/// 可視のアプリ窓が無い形もこれ。nil へ畳むと tapAppIcon が判定材料なしとして緑になる)
+func pollForegroundArrival(waitSeconds: Double, isForeground: () async throws -> Bool) async throws -> Bool? {
     let deadline = Date().addingTimeInterval(waitSeconds)
     var backoff = PollBackoff()
     var answered = false
     while true {
         try Task.checkCancellation()
-        if let foreground = try? await driver.isAppForeground(bundleID: bundleID) {
+        do {
+            let foreground = try await isForeground()
             answered = true
             if foreground { return true }
-        }
+        } catch is ForegroundUnreadable {
+            answered = true
+        } catch {}
         if Date() >= deadline { return answered ? false : nil }
         try await Task.sleep(for: backoff.nextDelay())
     }

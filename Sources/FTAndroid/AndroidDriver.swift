@@ -195,6 +195,19 @@ public final class AndroidDriver: AppDriver {
                 + " was performed is unknown\(result.tail.isEmpty ? "" : " (\(result.tail))")")
     }
 
+    /// gRPC のジェスチャが済んだか。false = 送っていないので adb で撃ってよい。途中の失敗は「届いたか分からない」で投げ、撃ち直さない
+    static func gestureFinished(_ delivery: EmulatorControl.GestureDelivery, verb: String,
+                                context: DriverErrorContext) throws -> Bool {
+        switch delivery {
+        case .performed: return true
+        case .notSent: return false
+        case .deliveryUnknown(let detail):
+            throw DriverError.bridgeUnreachable(context: context,
+                detail: "\(verb) was cut off: the emulator gRPC call failed after sending may have started, so whether"
+                    + " it was performed is unknown (\(detail))")
+        }
+    }
+
     /// `adb shell input keyevent` の送出。**終了コードが 0 以外は「届いたか分からない」**: 接続が切れた後も端末側の `input` は
     /// キーを撃ち終えることがあり、`error: closed` は終了コード 1 でも届いていた回がある(実測: back 2/2 が届いていた)。
     /// 255 だけを見る長押し・ドラッグ(`shellInputCutOff`)と違い、終了コードだけでは送る前の失敗(1)と送った後の切断(1 か 255)を
@@ -424,7 +437,14 @@ public final class AndroidDriver: AppDriver {
     /// ホスト側で dumpsys を引く(ブリッジはアプリ内 a11y ツリーしか見えず、他プロセスの
     /// window は見えない。AndroidForegroundWindows と同じ制約)
     public func isAppForeground(bundleID: String) async throws -> Bool {
-        try await foregroundAppID() == bundleID
+        try Self.isForeground(bundleID: bundleID, front: await foregroundAppID())
+    }
+
+    /// **前面を読めないときは「前面でない」と答えず投げる**(`ForegroundUnreadable`)。false に畳むと、呼び手は
+    /// 「読めない」を「別のアプリが前面」と断定する。遷移の途中でも読めない
+    static func isForeground(bundleID: String, front: String?) throws -> Bool {
+        guard let front else { throw ForegroundUnreadable() }
+        return front == bundleID
     }
 
     public func foregroundAppID() async throws -> String? {
@@ -1367,10 +1387,10 @@ public final class AndroidDriver: AppDriver {
         let fromYi = try Self.checkedInt32(fromY, field: "fromY")
         let toXi = try Self.checkedInt32(toX, field: "toX")
         let toYi = try Self.checkedInt32(toY, field: "toY")
-        if let serial, await EmulatorControl.drag(serial: serial,
-                                      fromX: fromXi, fromY: fromYi,
-                                      toX: toXi, toY: toYi,
-                                      durationMs: durationMs) {
+        if let serial, try await Self.gestureFinished(
+            EmulatorControl.drag(serial: serial, fromX: fromXi, fromY: fromYi,
+                                 toX: toXi, toY: toYi, durationMs: durationMs),
+            verb: "drag", context: androidContext()) {
             return
         }
         let result = try adb(["shell", "input", "swipe",
@@ -1415,8 +1435,9 @@ public final class AndroidDriver: AppDriver {
                              Int(BridgeAPI.gestureSecondsCeiling * 1000))
         let xi = try Self.checkedInt32(x, field: "x")
         let yi = try Self.checkedInt32(y, field: "y")
-        if let serial, await EmulatorControl.longPress(serial: serial, x: xi,
-                                           y: yi, durationMs: durationMs) {
+        if let serial, try await Self.gestureFinished(
+            EmulatorControl.longPress(serial: serial, x: xi, y: yi, durationMs: durationMs),
+            verb: "long-press", context: androidContext()) {
             return
         }
         let px = String(xi)

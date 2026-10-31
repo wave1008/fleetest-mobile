@@ -224,6 +224,7 @@ public protocol AppDriver {
     func screenshot() async throws -> Data
     func terminate() async throws
     /// フォアグラウンドのアプリが bundleID(iOS)/ package(Android)と一致しているか(DSL の appIs)。
+    /// **前面を読めないときは false でなく `ForegroundUnreadable` を投げる**(false は「別のものが前面」の断定)。
     /// **プロトコル要件として宣言すること**(install(packagePath:) と同じ理由)
     func isAppForeground(bundleID: String) async throws -> Bool
     /// **OS のシステム UI(SpringBoard のアラート)が載っているか**。分からないドライバは nil。
@@ -381,6 +382,13 @@ public enum DriverErrorMessage {
 /// 読まない定数を足すと dylib/ランナーの指紋が無意味に動く(`WebViewDOMSnapshot.swift` と同じ規律)
 public enum AndroidBridgeErrorPrefix {
     public static let noActiveWindowRoot = "no-active-window-root:"
+}
+
+/// 前面のアプリを読めなかった(`AppDriver.isAppForeground`)。**false(別のアプリが前面)と区別する**。
+/// 画面遷移の途中でも起きるので、待つ呼び手は読み直す
+public struct ForegroundUnreadable: Error, LocalizedError, Equatable {
+    public init() {}
+    public var errorDescription: String? { "the foreground app could not be read" }
 }
 
 public enum DriverError: Error, LocalizedError {

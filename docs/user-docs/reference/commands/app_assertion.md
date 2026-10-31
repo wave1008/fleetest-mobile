@@ -22,6 +22,7 @@ appIs("com.example.maps")
 - Write the bundle ID / package name directly — there is no nickname mechanism.
 - On Android, a failure includes the actual foreground package name in the message. On iOS there
   is no way to read the foreground bundle ID, so a failure message does not include it.
+- While the foreground app cannot be read on Android, `appIs` keeps waiting; if it stays unreadable until `waitSeconds`, the failure says it could not be read.
 
 ### Link
 - [index](../../index.md)

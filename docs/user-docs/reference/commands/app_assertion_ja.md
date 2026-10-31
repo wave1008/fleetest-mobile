@@ -22,6 +22,7 @@ appIs("com.example.maps")
 - ニックネーム機構は無く、bundle ID / package 名を直接書きます。
 - Android は失敗時に実際のフォアグラウンド package 名をメッセージへ含めます。iOS は前面の
   bundle ID を取得する手段が無いため、失敗メッセージには含まれません。
+- Android で前面のアプリを読めない間は待ち続け、`waitSeconds` まで読めなければ「読めなかった」という失敗になります。
 
 ### Link
 - [index](../../index_ja.md)

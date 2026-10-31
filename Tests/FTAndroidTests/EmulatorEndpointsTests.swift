@@ -205,6 +205,35 @@ final class EmulatorEndpointsTests: XCTestCase {
     /// FT_LIVE_EMULATOR_INPUT=1 でのみ実行)。**これが見るのは送出の成否だけ** —
     /// 効いたかは見ない(キー系はまさにそこで無音 no-op を見逃した。AndroidDriver.home())。
     /// touch 合成が実際に効くことは E2E が毎日通す
+    /// 途中で取り消したドラッグの指が残らない(up を送らないと identifier が残り、次の入力に重なる)
+    func testLiveCancelledDragReleasesTheFinger() async throws {
+        try XCTSkipUnless(ProcessInfo.processInfo.environment["FT_LIVE_EMULATOR_INPUT"] == "1",
+                          "FT_LIVE_EMULATOR_INPUT=1 のときのみ(対象機のホーム画面を操作する)")
+        try await SharedResource.androidEmulatorHost.locked {
+            let endpoints = EmulatorEndpoints.all()
+            try XCTSkipIf(endpoints.isEmpty, "稼働中エミュレータなし")
+            let serial = endpoints[0].serial
+            func touches() throws -> String {
+                let result = try Shell.run(["adb", "-s", serial, "shell", "dumpsys", "input"])
+                return result.output.components(separatedBy: "\n")
+                    .first { $0.contains("TouchStates") } ?? ""   // 触れている間は TouchStatesByDisplay:・無いと TouchStates: <no displays touched>
+            }
+            let drag = Task {
+                _ = try await EmulatorControl.drag(serial: serial, fromX: 540, fromY: 1200,
+                                                   toX: 540, toY: 800, durationMs: 6000)
+            }
+            try await Task.sleep(for: .seconds(2))
+            let during = try touches()
+            XCTAssertTrue(during.contains("TouchStates") && !during.contains("<no displays touched>"),
+                          "途中は指が触れているはず(検出の対照): \(during)")
+            drag.cancel()
+            _ = await drag.result
+            try await Task.sleep(for: .seconds(1))
+            let after = try touches()
+            XCTAssertTrue(after.contains("<no displays touched>"), after)
+        }
+    }
+
     func testLiveInputSmoke() async throws {
         try XCTSkipUnless(ProcessInfo.processInfo.environment["FT_LIVE_EMULATOR_INPUT"] == "1",
                           "FT_LIVE_EMULATOR_INPUT=1 のときのみ(対象機のホーム画面を操作する)")
@@ -212,11 +241,11 @@ final class EmulatorEndpointsTests: XCTestCase {
             let endpoints = EmulatorEndpoints.all()
             try XCTSkipIf(endpoints.isEmpty, "稼働中エミュレータなし")
             let serial = endpoints[0].serial
-            let dragged = await EmulatorControl.drag(serial: serial, fromX: 540, fromY: 1200,
+            let dragged = try await EmulatorControl.drag(serial: serial, fromX: 540, fromY: 1200,
                                                      toX: 540, toY: 800, durationMs: 300)
-            XCTAssertTrue(dragged, "drag 送出失敗(\(serial))")
-            let pressed = await EmulatorControl.longPress(serial: serial, x: 540, y: 1200, durationMs: 400)
-            XCTAssertTrue(pressed, "longPress 送出失敗(\(serial))")
+            XCTAssertEqual(dragged, .performed, "drag 送出失敗(\(serial))")
+            let pressed = try await EmulatorControl.longPress(serial: serial, x: 540, y: 1200, durationMs: 400)
+            XCTAssertEqual(pressed, .performed, "longPress 送出失敗(\(serial))")
         }
     }
 

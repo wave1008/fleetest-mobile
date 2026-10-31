@@ -487,7 +487,7 @@ withScrollDown {
 | `imageIs(label, waitSeconds:)` | 要素の**画像**のラベル検証。**対象は直前に掴んだ要素**。要素の枠で切ったスクリーンショットを DefaultClassifier(プロジェクトの `vision/classifiers/DefaultClassifier/` 以下の見本画像で学習。ラベル = 親フォルダの相対パスを `_` でつないだもの)に掛け、1位のラベルの最後の `[` 以降が `label` を含めば通る。見本が無い・`label` を含むラベルの見本が無いときは待たずに失敗。失敗文言に分類されたラベルと確信度が出る |
 | `keyboardIsShown(waitSeconds:)` / `keyboardIsNotShown(waitSeconds:)` | ソフトキーボードの表示/非表示の検証。開閉はアニメーションを伴うためタイムアウトまでポーリングする。**「非表示」を確定できるのは iOS の in-app ブリッジと Android だけ** — iOS の XCUITest ブリッジは「キーボードを見た/不明」しか言えないため、`keyboardIsNotShown` は失敗する(キーボードが見えていれば「keyboard is still shown」、見ていなければ「cannot determine the keyboard state」。不明を非表示と読んで嘘の成功にしない設計) |
 | `screenLooksLike("画面の説明文")` | FM による**見た目の**画面検証(スクリーンショットと説明文の照合)。**アサーションには数えない**(これしか無い `expectation` / `verify` / シナリオには「アサーションが無い」警告が出る。落ちたときの中断は他の検証と同じ)。実行プロファイルで `screenLooksLike:false` の場合はスキップ(素通り)。**スクショがステータスバー以外真っ黒なら判定せずに見送る**(注記 `blank-screenshot`。FM は黒い絵を必ず「一致しない」と読む。凍結の根拠にはしない = 回復は撃たない。撮り直しだけが黒なら 1 枚目の不一致を返す) |
-| `appIs(id, waitSeconds: 15)` | フォアグラウンドのアプリが `id`(iOS=bundle ID / Android=package 名)と一致することの検証。**ニックネーム機構は無く ID を直接書く**。`waitSeconds` までポーリング。**Android は失敗時に actual の package 名をメッセージへ含める**(iOS は前面 bundle ID を取得する手段が無いため含まれない) |
+| `appIs(id, waitSeconds: 15)` | フォアグラウンドのアプリが `id`(iOS=bundle ID / Android=package 名)と一致することの検証。**ニックネーム機構は無く ID を直接書く**。`waitSeconds` までポーリング。**Android は失敗時に actual の package 名をメッセージへ含める**(iOS は前面 bundle ID を取得する手段が無いため含まれない)。**Android で前面を読めない間は待ち続け、期限まで読めなければ「読めなかった」の失敗**(別のアプリが前面とは言わない) |
 
 > `screenLooksLike` とテキストの可視性検証の FM 段(`requireVisible` / `fmTextVisibilityCheck`)は FM に画像を渡すため
 > **macOS 27+ が必要**。macOS 26 では自動でスキップ/素通りになる(現在の可否は `fleetest doctor`)。
