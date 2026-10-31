@@ -823,6 +823,21 @@
 
 - 環境の準備は `prepareEnvironment` の1箇所になったが、死活確認から lease・レーンの起動までは `prepareSupply` と `ApiRunCommand` に別々にある。ログの出力先(`logSupply`)・`wipeStatus`・FM の警告と `RunEnvironment.apply` の位置が違う。同名の `RemoteRunDispatcher.prepareWorkspace` も別実装
 
+### OI-101 「再起動しても戻らないデバイスがあります」の1行がデバイスを名指ししない
+- 状態: 経路確定
+- 確認: コミット未記録(2026-11-01)
+- 経緯: 発見: 回帰の最中の利用者の報告
+
+- モニター上部の1行は台数だけ。どの台かは `.fleetest/screen-unrecovered-<key>.json` か run のログを見ないと分からない。`rebootAdvised` の台の名前を1行に出す(run の最後のログは `UnrecoveredDeviceStore.closingNotice` が名前を持つ)
+
+### OI-102 Android の古い絵で、分類器の checkIsOFF が別の画面を判定して緑になりうる
+- 状態: 再現済み
+- 確認: コミット未記録(2026-11-01)
+- 経緯: 発見: 回帰の E2E-Android(モニターの配信あり)の `チェック状態を分類器とa11yの両方で判定できること`
+
+- 判定に渡った絵が前のシナリオのスクロール画面のままで、`checkIsON #radio_a` が OFF と判定して赤(同じ1本は再実行で6台とも緑)。同じ絵で先の `checkIsOFF` の2手は緑だった可能性が高い(推測)= OFF の期待は古い絵で誤った緑になりうる。OI-4 の型
+- 手がかり: `judgmentCapture` が木の世代と絵の鮮度を確かめる。`StaleFrameDetector` が効く条件を調べる
+
 ## 設計判断で据え置いているもの(直さないと決めた。症状が出たら見直す)
 
 ### OI-22 描画崩壊の判定は自前描画とフレームワーク不明のアプリだけ
