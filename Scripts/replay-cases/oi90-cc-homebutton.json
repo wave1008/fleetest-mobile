@@ -1,0 +1,28 @@
+{
+  "id": "oi90-cc-homebutton",
+  "finding": "コントロールセンターが開いていても ft_status が覆いと言わない(ホームボタン機 SE3。触れない SBSwitcherWindow:Main が OR 述語の firstMatch に当たって nil)",
+  "platform": "ios",
+  "redConfirmed": true,
+  "redNote": "直しを外した版で SE3 5/5 が /systemui/covering = {\"covering\":false}(ft_status は foreground: yes)。ホームボタン機の端末でだけ回す(Face ID 機では下端のスワイプが別の操作)",
+  "setup": [
+    ["ft_launch", {"bundleId": "com.apple.Preferences"}]
+  ],
+  "reset": [
+    ["ft_launch", {"bundleId": "com.apple.Preferences", "resume": true}]
+  ],
+  "resetSeconds": 1,
+  "rounds": 5,
+  "forms": [
+    {
+      "name": "下端から上げた CC の ft_status",
+      "steps": [
+        ["ft_drag", {"fromX": 187, "fromY": 664, "toX": 187, "toY": 200}],
+        ["$wait", {"seconds": 2}],
+        ["ft_status", {}]
+      ],
+      "allowErrors": true,
+      "replyOnly": true,
+      "replyExpect": ["Control Center"]
+    }
+  ]
+}

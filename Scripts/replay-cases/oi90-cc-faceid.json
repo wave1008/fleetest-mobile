@@ -1,0 +1,28 @@
+{
+  "id": "oi90-cc-faceid",
+  "finding": "コントロールセンターが開いていても ft_status が覆いと言わない(Face ID 機・Simulator。SBSwitcherWindow:Main が OR 述語の firstMatch に当たって nil。CC の木はスライダー無しで cc-root-folder-view だけ)",
+  "platform": "ios",
+  "redConfirmed": true,
+  "redNote": "直しを外した版(probeSystemUICovering が firstMatch)で Simulator 6/6 が /systemui/covering = {\"covering\":false}。このケースの 2周目以降は resume で CC が閉じる前提",
+  "setup": [
+    ["ft_launch", {"bundleId": "com.ftester.e2ex.ios"}]
+  ],
+  "reset": [
+    ["ft_launch", {"bundleId": "com.ftester.e2ex.ios", "resume": true}]
+  ],
+  "resetSeconds": 1,
+  "rounds": 5,
+  "forms": [
+    {
+      "name": "右上から降ろした CC の ft_status",
+      "steps": [
+        ["ft_drag", {"fromX": 390, "fromY": 2, "toX": 390, "toY": 500}],
+        ["$wait", {"seconds": 2}],
+        ["ft_status", {}]
+      ],
+      "allowErrors": true,
+      "replyOnly": true,
+      "replyExpect": ["Control Center"]
+    }
+  ]
+}

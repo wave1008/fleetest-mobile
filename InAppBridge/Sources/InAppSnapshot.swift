@@ -171,13 +171,23 @@ enum InAppSnapshot {
         // isAccessibilityElement で、その中の id つきの View(pointerEvents="none" の欄)が丸ごと消えていた
         // (XCUITest の木には出る = 型セレクタも id もブリッジで食い違う)
         if let view = node as? UIView, view.isAccessibilityElement, included { return }
-        let children = axChildren(node)
+        let children = modalChildOnly(axChildren(node))
         let childClip = isScrollableContainer(node) == true
             ? (clip ?? .infinite).intersection(nodeFrame) : clip
         for child in children {
             collect(child, depth: depth + 1, screen: screen, front: front, clip: childClip,
                     flutter: flutter, visited: &visited, gathered: &gathered)
         }
+    }
+
+    /// 兄弟に可視の `accessibilityViewIsModal` な view があれば、その view と手前の兄弟だけを残す(XCUITest / VoiceOver と同じ。
+    /// 規則と実測は `BridgeAPI.visibleModalChildStart`)
+    private static func modalChildOnly(_ children: [NSObject]) -> [NSObject] {
+        let views = children.map { $0 as? UIView }
+        let modal = BridgeAPI.visibleModalChildStart(
+            isModal: views.map { $0?.accessibilityViewIsModal ?? false },
+            isVisible: views.map { $0.map { !$0.isHidden && $0.alpha >= 0.01 } ?? false })
+        return modal.map { Array(children[$0...]) } ?? children
     }
 
     private static func axChildren(_ node: NSObject) -> [NSObject] {

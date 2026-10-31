@@ -109,7 +109,7 @@ final class TapTargetAdvisoryTests: XCTestCase {
     func testSystemUICoveringMarkersAreTheMeasuredSet() {
         let markers = BridgeAPI.systemUICoveringMarkers
         XCTAssertEqual(Set(markers),
-                       ["cc-brightness-slider", "cc-volume-slider", "SBCoverSheetWindow",
+                       ["cc-brightness-slider", "cc-volume-slider", "cc-root-folder-view", "SBCoverSheetWindow",
                         "SBSwitcherWindow"],
                        "デバイス上で「素の状態に出ない・その面で出る」を測った集合。増減は再測定してから")
         // **ローカライズされる名前を混ぜない**(同時に出る mode-おやすみモード 等)

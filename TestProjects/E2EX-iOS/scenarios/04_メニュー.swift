@@ -64,4 +64,31 @@ class メニューを操作できること {
             }
         }
     }
+
+
+    // メニューの間、背面の Picker は木から外れる(in-app の木が accessibilityViewIsModal を見なかった頃は
+    // tap が背面へ届き、2つ目のメニューが開いた)
+    @Test("メニューが開いている間は背面の欄が木から外れる")
+    func S0030() {
+        scenario {
+            scene(1, "開いている間") {
+                condition {
+                    launchApp()
+                    tap("#nav_menu")
+                }.action {
+                    tap("#btn_open_menu")
+                    exist("#menu_item_share")
+                }.expectation {
+                    notExist("#field_fruit")
+                }
+            }
+            scene(2, "選んだら戻る") {
+                action {
+                    tap("#menu_item_share")
+                }.expectation {
+                    exist("#field_fruit")
+                }
+            }
+        }
+    }
 }

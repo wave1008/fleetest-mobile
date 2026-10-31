@@ -85,4 +85,79 @@ class ダイアログの変種を操作できること {
             }
         }
     }
+
+
+    // 模態の間、背面の要素は木に出ない(XCUITest / VoiceOver と同じ。in-app の木が accessibilityViewIsModal を見なかった頃は
+    // 背面のボタンへの tap が本当に押され、exist / notExist も逆になった)
+    @Test("確認ダイアログの間は背面のボタンが木から外れる")
+    func S0050() {
+        scenario {
+            scene(1, "開いている間") {
+                condition {
+                    launchApp()
+                    tap("#nav_dialogs", scroll: .down)
+                }.action {
+                    tap("#btn_action_sheet")
+                    exist("ライブラリから選ぶ")
+                }.expectation {
+                    notExist("#btn_alert")
+                }
+            }
+            scene(2, "閉じたら戻る") {
+                action {
+                    tap("ライブラリから選ぶ")
+                }.expectation {
+                    exist("#btn_alert")
+                }
+            }
+        }
+    }
+
+    @Test("全画面ダイアログの間は背面のボタンが木から外れる")
+    func S0060() {
+        scenario {
+            scene(1, "開いている間") {
+                condition {
+                    launchApp()
+                    tap("#nav_dialogs", scroll: .down)
+                }.action {
+                    tap("#btn_fullscreen")
+                    exist("#txt_fullscreen_title")
+                }.expectation {
+                    notExist("#btn_alert")
+                }
+            }
+            scene(2, "閉じたら戻る") {
+                action {
+                    tap("#btn_fullscreen_save")
+                }.expectation {
+                    exist("#btn_alert")
+                }
+            }
+        }
+    }
+
+    @Test("アラートの間は背面のボタンが木から外れる")
+    func S0070() {
+        scenario {
+            scene(1, "開いている間") {
+                condition {
+                    launchApp()
+                    tap("#nav_dialogs", scroll: .down)
+                }.action {
+                    tap("#btn_alert")
+                    exist("OK")
+                }.expectation {
+                    notExist("#btn_fullscreen")
+                }
+            }
+            scene(2, "閉じたら戻る") {
+                action {
+                    tap("OK")
+                }.expectation {
+                    exist("#btn_fullscreen")
+                }
+            }
+        }
+    }
 }

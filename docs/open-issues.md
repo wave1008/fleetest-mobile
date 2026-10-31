@@ -737,11 +737,6 @@
 - 確認: コミット未記録(2026-10-31)
 - 経緯: 発見: 10/31 の探索(a F2・p F14・p F3・p F4・mxa F4・mxa F5。所見は作業ログの findings-*.md)
 
-- **iOS のコントロールセンターが覆いとして検出されない**(Simulator の iOS 27: `/systemui/covering` が `{"covering":false}` 6/6・
-  SE3 実機 iOS 26.6: ft_status が `foreground: yes` 5/5)。目印 `BridgeAPI.systemUICoveringMarkers` の `cc-brightness-slider` /
-  `cc-volume-slider` が Simulator の CC に無い(木は「コントロールを追加」「電源」等)・SE3 は `probeSystemUICovering` が OR 述語の
-  firstMatch 1件だけ見るため、常に hittable な `SBSwitcherWindow:Main` が先に当たり cc-* に届かない疑い(推測)。
-  **直すにはランナー(BridgeRouter)の変更 = ブリッジの版上げが要る**ので、この回は触らない。CC の下の ft_tap(ref) は `done`(実際は CC が閉じるだけ)
 - **scrollToBottom / scrollToTop は、始める前に前面を離れていた形を拾わない**: Android の木のセッションは前面と一緒に替わるので、始点の木がランチャーなら
   「対象のアプリ」が分からない(拾えるのは送りの途中で離れた形だけ)。`StepExecutor` はシナリオが起動したアプリの bundle ID を持っていない
   (`noteAppLaunched` は引数なし)ので、事実で答えるには起動の経路から bundle ID を運ぶ設計が先(10/31 の調査で確認。実装していない)
@@ -750,11 +745,6 @@
 - 確認: コミット未記録(2026-10-31)
 - 経緯: 発見: 10/31 の探索的テスト(所見は作業ログの findings-inapp.md / findings-mxa.md)
 
-- SwiftUI の confirmationDialog・全画面カバー・アラート・メニューの背面のボタンへの tap が in-app で本当に押される(XCUITest は「cannot resolve」で赤)。
-  confirmationDialog の背面は `hitAreaMiss` が nil(hit view が要素の祖先/子孫に当たる形か・未確認)、全画面カバー中の exist/notExist には注記が付かない、
-  メニュー中の Picker への tap が「scrolled」と言って緑(inapp F1〜F3)。直す手は2つ: in-app の木を前面の窓/提示中のコントローラで刈る(exist/notExist も XCUITest と揃う・
-  SwiftUI のホスティングの構造を実スナップショットで採ってから)/ `reaches` の祖先方向を窓全体を覆う容器では許さない。
-  どちらも hit view の実体を採らずに入れると、緑の普通の tap を赤にするおそれがあるので入れていない
 - Flutter で `tap(欄A); tap(値の入った欄B); type("x")` が in-app で「focus is not on the tapped element」(7回中6回・xcuitest は緑)。
   受け口が 1x1 で動かず(`movedSinceTap` false)、叩いた要素が入力欄と申告されないと `FocusLanding.landed` が外れる。F6 の救済が焦点の立った欄へ ref 付きで撃ち直す形の実害(inapp F9)
 - CMP(iOS)の複数行へ別の欄を挟んで打ち足すと文字が先頭に入る・clearInput が 4 周で不発(XCUITest ランナーの `tapFieldEndIfHittable` が複数行の縦の中央を押す疑い。mxa F9)

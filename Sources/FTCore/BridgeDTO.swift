@@ -44,7 +44,7 @@ public enum BridgeAPI {
     /// - ソースの分割・コメントだけの変更は指紋の貼り替えだけでよい(版は据え置き)
     /// - **撤去した版の番号は再利用しない**(37・48 は欠番): その版が稼働中の環境を確実に入れ替えるため
     /// 各版で何を変えたかは `git log -L '/bridgeProtocolVersion =/,+1:Sources/FTCore/BridgeDTO.swift'` で引く
-    public static let bridgeProtocolVersion = 238
+    public static let bridgeProtocolVersion = 239
 
     /// `ErrorResponse.reason` の値: ref が指していた要素が、撃つ時点でもう同じ場所に居ない(古い ref)。
     /// **何も撃たずに断った**ことを保証する(422)。ホストは新しい木から引き直して撃ち直してよい。
@@ -115,9 +115,12 @@ public enum BridgeAPI {
     /// **素の状態 6 件 → コントロールセンター 56 件 → 通知センター 9 件**。
     /// 素の状態にはここに挙げた識別子が**1つも無い**ので、存在そのものが信号になる。
     ///
-    /// - `cc-brightness-slider` / `cc-volume-slider`: コントロールセンター。`cc-` 接頭辞は
+    /// - `cc-brightness-slider` / `cc-volume-slider`: コントロールセンター(SE3)。`cc-` 接頭辞は
     ///   CC 固有で**ローカライズされない**(同時に出る `mode-おやすみモード` のような
     ///   ローカライズされる名前は使わない)
+    /// - `cc-root-folder-view`: コントロールセンターの根。**Simulator(iPhone 17 Pro / iOS 27.0)の CC には
+    ///   スライダーが無く**(木は「コントロールを追加」「電源」とこの根だけ)、SE3 では3つとも出る。
+    ///   閉じかけの CC に根だけが残る瞬間が SE3 であった(スライダー 0 件・根 hittable)
     /// - `SBCoverSheetWindow`: 通知センター(カバーシート)。ロック画面もこれなので、
     ///   **ロック中もアプリは覆われている**という意味で正しい
     /// - `SBSwitcherWindow`: アプリスイッチャー(タスク一覧)。**アプリは前面と答え続ける**
@@ -125,11 +128,25 @@ public enum BridgeAPI {
     ///   ので、ここに無いとライブ操作の前面追従がアプリへ activate を撃ち、
     ///   **開いたスイッチャーが閉じてアプリに戻る**
     ///
+    /// **窓 `SBSwitcherWindow:Main` は CC・通知センターが開いていても木に居続け、木の順で最初に来る**
+    /// (実測 2026-11-01: Simulator は常に isHittable=false・SE3 は平常時 true、CC を開くと false)。
+    /// OR 述語の `firstMatch` 1件で判定すると、触れないこの窓が先に当たって `nil` を返し
+    /// **CC が覆いと言えなかった**(Simulator 6/6・SE3 5/5)。**目印は `coveringCandidateOrder` の順に1つずつ見る**
+    ///
     /// **iOS の版が変わると識別子は変わりうる**。増減させるときは実機で
     /// 「素の状態に出ないこと」と「その面で出ること」の両方を測ること
     public static let systemUICoveringMarkers: [String] = [
-        "cc-brightness-slider", "cc-volume-slider", "SBCoverSheetWindow", "SBSwitcherWindow",
+        "cc-brightness-slider", "cc-volume-slider", "cc-root-folder-view", "SBCoverSheetWindow", "SBSwitcherWindow",
     ]
+
+    /// 一致した要素の identifier を、覆いの判定で調べる順に並べた添字。**スイッチャーの窓は最後**
+    /// (常に木に居て触れる/触れないが状況で変わるので、他の面が先に言えるときは他を採る)。
+    /// それ以外は木の順のまま(安定)
+    public static func coveringCandidateOrder(identifiers: [String]) -> [Int] {
+        let indices = Array(identifiers.indices)
+        return indices.filter { !identifiers[$0].hasPrefix(appSwitcherMarkerPrefix) }
+            + indices.filter { identifiers[$0].hasPrefix(appSwitcherMarkerPrefix) }
+    }
     /// `systemUICoveringMarkers` のうちアプリスイッチャーの窓。**この窓だけは「触れる」では足りず、
     /// 中にカード(`appSwitcherCardPrefix`)が載っているときだけ覆いと見る**(BridgeRouter.handleSystemUICovering。
     /// ホームボタン機はアプリが前面でも窓を isHittable と答える。実測 iPhone SE3)
@@ -154,6 +171,20 @@ public enum BridgeAPI {
                                                  windowWidth: Double, windowHeight: Double) -> Bool {
         guard cardWidth > 0, cardHeight > 0 else { return false }
         return cardWidth < windowWidth - 1 || cardHeight < windowHeight - 1
+    }
+
+    /// **`accessibilityViewIsModal` の view が兄弟の中にあるとき、AX が見せる子の先頭の添字**(その view と、それより手前
+    /// = 後ろの兄弟だけが残り、奥の兄弟は AX から外れる。旗付きが複数なら最後のもの)。無ければ nil。
+    /// **旗付き以降を全部残す**のは、popover 形式の確認ダイアログが旗付きの暗幕(`_UIPopoverDimmingView`)の**次の兄弟**に
+    /// 本体を載せるため(旗付きの1つだけを残すと選択肢が木から消える。実測)。
+    /// in-app の木はこれを知らず、確認ダイアログ・全画面カバー・アラート・メニューの背面の要素を木に載せ続けて
+    /// exist / tap が XCUITest と逆になった(実測 2026-11-01 Simulator iOS 27.0 / E2EX-iOS: 4形とも背面の兄弟
+    /// `UITransitionView` / `_UIContextMenuContainerView` が `accessibilityViewIsModal == true`。
+    /// 確認ダイアログは popover 形式で hitTest が背面のボタンに当たる = hit view では見分けられない)。
+    /// 見えない(hidden / alpha < 0.01)view の旗は数えない(メニューの出入りで alpha 0 の旗付き view が残る)
+    public static func visibleModalChildStart(isModal: [Bool], isVisible: [Bool]) -> Int? {
+        precondition(isModal.count == isVisible.count)
+        return isModal.indices.last { isModal[$0] && isVisible[$0] }
     }
 
     /// 下端のホームインジケータの帯(pt)。Face ID iPhone の下端セーフエリアは 34pt。ここを叩くと
