@@ -10,6 +10,9 @@ public enum KeyboardWait {
     public static let appearSeconds: Double = 1.5
     /// 撮り直しの間隔(秒)。根拠: 表示の中央値 0.2 秒の間に 1〜2 回見る
     public static let pollSeconds: Double = 0.15
+    /// キーボードが木から消えるのを待つ読み直しの間隔(秒)。`pollSeconds`(出現の実測)・`FocusWait.pollSeconds` とは文脈が別で、
+    /// 同じ値でも流用しない。根拠: Android の木は閉じた後も数秒キーボードを申告するので、これより細かく読んでも早まらず往復だけ増える
+    public static let goneRereadSeconds: Double = 0.15
 
     /// 隠れたキーボードは nil ではなく画面外(y が画面の下端以上)の矩形で申告されることがある。
     /// `StepExecutor.keyboardOnScreen` はここへ転送する(同じ判定を2つ持たない)

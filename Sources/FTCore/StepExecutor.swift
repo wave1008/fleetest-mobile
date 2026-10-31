@@ -1084,12 +1084,7 @@ public final class StepExecutor {
         var ocrMs = 0
     }
 
-    /// ContinuousClock の Duration → 整数ミリ秒(秒成分×1000 + attoseconds成分。
-    /// 1ms = 1e15 attoseconds)。StepExecutor+Assert.swift からも使うため internal。
-    static func ms(_ duration: Duration) -> Int {
-        let (seconds, attoseconds) = duration.components
-        return Int(seconds) * 1000 + Int(attoseconds / 1_000_000_000_000_000)
-    }
+    static func ms(_ duration: Duration) -> Int { continuousClockMilliseconds(duration) }
 
     // MARK: - アクション
 

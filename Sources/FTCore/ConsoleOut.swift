@@ -39,8 +39,7 @@ public enum ConsoleOut {
     }
 
     private static func recordBlocked(_ duration: Duration) {
-        let ms = Int(duration.components.seconds) * 1000
-            + Int(duration.components.attoseconds / 1_000_000_000_000_000)
+        let ms = continuousClockMilliseconds(duration)
         meter.withLock {
             $0.blockedMs += ms
             $0.longestBlockMs = max($0.longestBlockMs, ms)

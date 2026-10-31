@@ -424,7 +424,7 @@ public enum ProfileWorkerFactory {
         let elapsed = clock.now - start
         return ResidualSystemAlertClearing.clearedMessage(
             label: worker.label, alert: alert,
-            seconds: Double(elapsed.components.seconds) + Double(elapsed.components.attoseconds) / 1e18)
+            seconds: durationSeconds(elapsed))
     }
 
     /// `/systemalert` を 5 秒で打ち切る(固まったブリッジに各シナリオの前で待たされない。打ち切り = 判定しない)

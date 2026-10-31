@@ -77,8 +77,5 @@ public enum DeadlineExclusion {
         }
     }
 
-    static func ms(_ duration: Duration) -> Int {
-        let (seconds, attoseconds) = duration.components
-        return Int(seconds) * 1000 + Int(attoseconds / 1_000_000_000_000_000)
-    }
+    static func ms(_ duration: Duration) -> Int { continuousClockMilliseconds(duration) }
 }

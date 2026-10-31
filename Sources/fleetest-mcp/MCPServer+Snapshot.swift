@@ -762,8 +762,7 @@ extension MCPServer {
             } else if let beforeAction, Self.looksUnchanged(beforeAction, snapshot) {
                 // 撮り直しの段は分ける(「操作の後の読み」が平均 0.94s で、待ちと読みのどちらか分からなかった = 計測)
                 SlowCallWatchdog.mark("re-reading: the tree looked unchanged")
-                try await Task.sleep(nanoseconds: UInt64(max(0, settleWaitSeconds) * 1_000_000_000))
-                let reread = try await freshSnapshot(snapshotDriver, args: args)
+                let reread = try await rereadAfterGrace(snapshotDriver, args: args)
                 if Self.looksUnchanged(snapshot, reread) {
                     stillUnchanged = true
                     settleNote = "note: the tree still looked unchanged after a short re-read"
@@ -780,8 +779,7 @@ extension MCPServer {
                 SlowCallWatchdog.mark("re-reading: a list was still empty")
                 // **木は変わったのに中身がまだ来ていない**形(emptyLoadingScroller 参照)。
                 // 待ちも回数も settle-lite と同じ = 1回きりの短い猶予しか払わない
-                try await Task.sleep(nanoseconds: UInt64(max(0, settleWaitSeconds) * 1_000_000_000))
-                let reread = try await freshSnapshot(snapshotDriver, args: args)
+                let reread = try await rereadAfterGrace(snapshotDriver, args: args)
                 let name = RefGuard.describe(empty)
                 if Self.emptyLoadingScroller(in: reread) == nil {
                     settleNote = "note: \(name) was still empty right after the action, so the tree"
@@ -799,8 +797,7 @@ extension MCPServer {
                 SlowCallWatchdog.mark("re-reading: nothing readable yet")
                 // **何も読めない木**(全要素がレイアウト専用 = 遷移の途中)。黙って返すと読み手は空の木から次の一手を
                 // 探す(実測: Apple マップで全画面シートを閉じた直後の木が layout-only の1行だけ)。猶予は settle-lite と同じ1回
-                try await Task.sleep(nanoseconds: UInt64(max(0, settleWaitSeconds) * 1_000_000_000))
-                let reread = try await freshSnapshot(snapshotDriver, args: args)
+                let reread = try await rereadAfterGrace(snapshotDriver, args: args)
                 settleNote = Self.looksBlank(reread)
                     ? "note: the screen still had nothing readable after a short re-read wait — a transition may"
                         + " still be running; use ft_snapshot waitFor: <something you expect on the next screen>.\n"
@@ -2007,5 +2004,13 @@ extension MCPServer {
                                       collapsingBulk: collapsingBulk,
                                       interactiveOnly: treeArgs["interactiveOnly"] as? Bool == true,
                                       unit: Self.coordinateUnit(scrollDriver)))
+    }
+}
+
+extension MCPServer {
+    /// settle-lite の1回の読み直し(`settleWaitSeconds` だけ待って撮る)
+    func rereadAfterGrace(_ driver: AppDriver, args: [String: Any]) async throws -> SnapshotResponse {
+        try await Task.sleep(nanoseconds: UInt64(max(0, settleWaitSeconds) * 1_000_000_000))
+        return try await freshSnapshot(driver, args: args)
     }
 }

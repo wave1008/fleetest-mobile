@@ -237,8 +237,7 @@ public struct FMServeClient: Sendable {
                 return FMServeWire.RetirementResponse(identity: target, outcome: .busy)
             }
             var attempt = self
-            attempt.deadlineSeconds = min(deadlineSeconds,
-                Double(remaining.components.seconds) + Double(remaining.components.attoseconds) / 1e18)
+            attempt.deadlineSeconds = min(deadlineSeconds, durationSeconds(remaining))
             let response = try await attempt.retire(FMServeWire.RetirementRequest(target: target))
             guard response.controlVersion == FMServeWire.retirementProtocolVersion,
                   response.identity.serverVersion == target.serverVersion,

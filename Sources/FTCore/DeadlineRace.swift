@@ -13,13 +13,20 @@ public enum DeadlineRace {
     public static func first<T: Sendable>(
         seconds: Double, _ op: @escaping @Sendable () async throws -> T
     ) async -> T? {
+        await first(seconds: seconds, onTimeout: nil) { try? await op() }
+    }
+
+    /// 期限が先なら `onTimeout` を返す形(録画の待ちなど、期限切れの値を呼び手が決める。投げない op)
+    static func first<T: Sendable>(
+        seconds: Double, onTimeout: T, _ op: @escaping @Sendable () async -> T
+    ) async -> T {
         let settled = DeadlineGuard()
         // 敗者を残さないため相互キャンセルする(op が先に終わったら満期スリーパーを cancel。
         // 残すと呼び出し毎に seconds 秒のスリーパー task が居座る)。
         let timeoutBox = DeadlineTaskBox()
-        return await withCheckedContinuation { (cont: CheckedContinuation<T?, Never>) in
+        return await withCheckedContinuation { (cont: CheckedContinuation<T, Never>) in
             let opTask = Task {
-                let result = try? await op()
+                let result = await op()
                 if await settled.claim() {
                     timeoutBox.cancel()
                     cont.resume(returning: result)
@@ -29,7 +36,7 @@ public enum DeadlineRace {
                 try? await Task.sleep(nanoseconds: UInt64(max(0, seconds) * 1_000_000_000))
                 if await settled.claim() {
                     opTask.cancel()
-                    cont.resume(returning: nil)
+                    cont.resume(returning: onTimeout)
                 }
             })
         }
@@ -52,8 +59,7 @@ private actor DeadlineGuard {
 /// (ThreadSanitizer が実測で競合を報告)。素の `var` だと競合そのものに加え、
 /// **代入前に op が勝つと cancel を取りこぼしスリーパーが seconds 秒居座る**
 /// (この箱を置いた目的が消える)ため、**先に来た cancel を覚えて後から来た task に適用する**。
-/// `@unchecked Sendable` の根拠は lock(素の可変参照ではない)。
-/// 同型の RecordingSupport.raceWithDeadline は前方参照を持たない = この箱が要らない
+/// `@unchecked Sendable` の根拠は lock(素の可変参照ではない)
 final class DeadlineTaskBox: @unchecked Sendable {
     private let lock = NSLock()
     private var task: Task<Void, Never>?

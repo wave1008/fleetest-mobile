@@ -463,7 +463,7 @@ public enum ScenarioHost {
               let waited = await awaitOCRModelCompile(), waited >= .seconds(1),
               ocrCompileWaitReported.withLock({ reported in defer { reported = true }; return !reported })
         else { return }
-        log("⏳ waited \(continuousClockMs(waited) / 1000)s for the OCR model to finish compiling"
+        log("⏳ waited \(continuousClockMilliseconds(waited) / 1000)s for the OCR model to finish compiling"
             + " before starting scenarios (first run after a rebuild)")
     }
 
@@ -684,7 +684,7 @@ public enum ScenarioHost {
             if let recording, let builder {
                 let fileName = recording.recorder.record(builder.build(
                     passed: false, timedOut: false, startedAt: startedAt,
-                    durationMs: continuousClockMs(clock.now - clockStart), packageRoot: packageRoot(),
+                    durationMs: continuousClockMilliseconds(clock.now - clockStart), packageRoot: packageRoot(),
                     humanOperations: humanOperations()))
                 eventLog?.finish(fileBase: fileName)
             }
@@ -900,7 +900,7 @@ public enum ScenarioHost {
                     guard now < deadline else { break }
                     try? await Task.sleep(until: deadline, clock: clock)
                     guard !Task.isCancelled else { return }
-                    let extraMs = Self.continuousClockMs(await extensionTracker.extra)
+                    let extraMs = continuousClockMilliseconds(await extensionTracker.extra)
                     guard extraMs > grantedExtraMs else { break }
                     deadline += .milliseconds(extraMs - grantedExtraMs)
                     grantedExtraMs = extraMs
@@ -1063,7 +1063,7 @@ public enum ScenarioHost {
             if let recording, let builder {
                 let fileName = recording.recorder.record(builder.build(
                     passed: false, timedOut: true, startedAt: startedAt,
-                    durationMs: continuousClockMs(clock.now - clockStart), packageRoot: packageRoot(),
+                    durationMs: continuousClockMilliseconds(clock.now - clockStart), packageRoot: packageRoot(),
                     humanOperations: humanOperations()))
                 eventLog?.finish(fileBase: fileName)
             }
@@ -1081,7 +1081,7 @@ public enum ScenarioHost {
             let operations = humanOperations()
             let record = builder.build(
                 passed: result, timedOut: false, startedAt: startedAt,
-                durationMs: continuousClockMs(clock.now - clockStart), packageRoot: packageRoot(),
+                durationMs: continuousClockMilliseconds(clock.now - clockStart), packageRoot: packageRoot(),
                 humanOperations: operations)
             let fileName = recording.recorder.record(record)
             eventLog?.finish(fileBase: fileName)
@@ -1211,12 +1211,6 @@ public enum ScenarioHost {
                 return String(decoding: buffer, as: UTF8.self)
             }
         }
-    }
-
-    /// ContinuousClock の Duration → 整数ミリ秒(秒成分×1000 + attoseconds成分。1ms = 1e15 attoseconds)
-    static func continuousClockMs(_ duration: Duration) -> Int {
-        let (seconds, attoseconds) = duration.components
-        return Int(seconds) * 1000 + Int(attoseconds / 1_000_000_000_000_000)
     }
 
     /// カレントディレクトリから上に辿って Package.swift を持つディレクトリを探す。

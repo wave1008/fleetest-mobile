@@ -316,7 +316,7 @@ extension MCPServer {
                 return " (warning: the element list still reports the keyboard after"
                     + " \(Self.secondsText(cap)) — elements it covered may still be missing from the tree)"
             }
-            try? await Task.sleep(for: .seconds(FocusWait.pollSeconds))
+            try? await Task.sleep(for: .seconds(KeyboardWait.goneRereadSeconds))
         }
     }
 

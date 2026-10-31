@@ -632,9 +632,7 @@ struct ApiMonitorCommand: AsyncParsableCommand {
     /// = 状態の確認 1.3 秒 + 確認 2 秒 + 撮影 2 秒 + 待ち 2 秒)。処理が interval を超えても**最低
     /// `minimumCycleGap` は空ける** —— 混雑して処理が長い機械で、休まず回り続けて負荷を足さないため
     static func sleepBeforeNextCycle(interval: Double, elapsed: Duration) -> Double {
-        let elapsedSeconds = Double(elapsed.components.seconds)
-            + Double(elapsed.components.attoseconds) / 1e18
-        return max(interval - elapsedSeconds, minimumCycleGap)
+        return max(interval - durationSeconds(elapsed), minimumCycleGap)
     }
 
     /// 周回の間の最低の空き(秒)。0.5 = 既定の interval(2 秒)の 1/4。処理が interval を超える混雑時でも

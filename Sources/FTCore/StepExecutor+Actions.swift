@@ -15,7 +15,7 @@ extension StepExecutor {
     static var defaultLocatorRetrySeconds: Double {
         var backoff = PollBackoff()
         let total = (0..<defaultLocatorRetryAttempts).reduce(Duration.zero) { sum, _ in sum + backoff.nextDelay() }
-        return Double(total.components.seconds) + Double(total.components.attoseconds) / 1e18
+        return durationSeconds(total)
     }
 
     /// 既定の短い待ち(`waitSeconds:` 省略)のまま見つからなかったときだけ、延ばし方を添える。
@@ -1435,7 +1435,7 @@ extension StepExecutor {
         let deadline = clock.now + .milliseconds(Int(cap * 1000))
         while clock.now < deadline, Self.keyboardOnScreen(snapshot.keyboardFrame, screen: snapshot.screen) {
             let waitStart = clock.now
-            try await Task.sleep(for: .milliseconds(Int(FocusWait.pollSeconds * 1000)))
+            try await Task.sleep(for: .milliseconds(Int(KeyboardWait.goneRereadSeconds * 1000)))
             phase.waitMs += Self.ms(clock.now - waitStart)
             let start = clock.now
             snapshot = try await freshSnapshot(.afterOwnMove)

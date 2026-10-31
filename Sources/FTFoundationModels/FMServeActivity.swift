@@ -46,7 +46,7 @@ final class FMServeActivity: Sendable {
         fileprivate func rejectForRetirement() { progress.withLock { $0.rejectedForRetirement = true } }
 
         static func seconds(_ duration: Duration) -> Double {
-            Double(duration.components.seconds) + Double(duration.components.attoseconds) / 1e18
+            durationSeconds(duration)
         }
     }
 

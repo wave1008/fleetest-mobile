@@ -45,7 +45,7 @@ public final class FastLaunchDriver: AppDriver {
         let clock = ContinuousClock()
         let actionStart = clock.now
         try launchViaCoreSimOrSimctl(bundleID: bundleID)
-        let actionMs = continuousClockMs(clock.now - actionStart)
+        let actionMs = continuousClockMilliseconds(clock.now - actionStart)
         let waitStart = clock.now
         // **ランナーが前面と見るまで、接続だけで待つ**(attach = ランナー側の
         // `wait(for: .runningForeground, timeout: 5)`。待ち切れなくても XCTest の失敗を記録しない)。
@@ -56,12 +56,12 @@ public final class FastLaunchDriver: AppDriver {
         // その事実を注記に残す —— 次にランナーが落ちたとき、この形だったかが記録から分かる
         let activatedBeforeForeground = try await attachMissedForeground(bundleID: bundleID)
         lastLaunchTimingValue = LaunchTiming(
-            actionMs: actionMs, waitMs: continuousClockMs(clock.now - waitStart),
+            actionMs: actionMs, waitMs: continuousClockMilliseconds(clock.now - waitStart),
             activatedBeforeForeground: activatedBeforeForeground)
         // activate = プロキシ接続+前面化+初回整定(冒頭コメントの attachOnly 不採用理由を参照)
         try await base.activate(bundleID: bundleID)
         lastLaunchTimingValue = LaunchTiming(
-            actionMs: actionMs, waitMs: continuousClockMs(clock.now - waitStart),
+            actionMs: actionMs, waitMs: continuousClockMilliseconds(clock.now - waitStart),
             activatedBeforeForeground: activatedBeforeForeground)
     }
 

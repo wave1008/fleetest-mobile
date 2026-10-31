@@ -1935,9 +1935,3 @@ public final class FTDriveCore {
     }
 }
 
-/// Duration → 整数ミリ秒(1ms = 1e15 attoseconds)。StepExecutor.ms と同じ計算式だが、
-/// FTCore 側は private でモジュールを跨いで参照できないためここに複製している(要同期)
-func continuousClockMilliseconds(_ duration: Duration) -> Int {
-    let (seconds, attoseconds) = duration.components
-    return Int(seconds) * 1000 + Int(attoseconds / 1_000_000_000_000_000)
-}
