@@ -314,6 +314,28 @@ extension StepExecutorTests {
                        "一発で一致すれば追送/削除は要らない")
     }
 
+    /// secure 欄は読み返さない: 焦点を取り戻して置き換わった欄(`••`)と既存値の伏せ字(`•••`)を比べると、`•` を本文として打ち直す
+    func testSecureFieldIsNotReadBackAfterReplacement() async throws {
+        func secure(_ value: String) -> ElementInfo {
+            var element = inputField(ref: 1, id: "field", value: value)
+            element.type = "secureTextField"
+            return element
+        }
+        let log = CallLog()
+        let primary = FakeAppDriver(name: "primary", log: log,
+                                    snapshotElements: [[secure("•••")], [secure("••")]])
+        primary.verifiesTypedText = false
+        let executor = StepExecutor(driver: primary, isAndroid: false, tunables: RunTunables())
+        let outcome = await executor.execute(
+            FlowStep(action: "type", locator: FlowLocator(id: "field"), text: "de"))
+
+        guard case .passed = outcome.status else {
+            return XCTFail("secure 欄は passed を期待したが \(outcome.status) だった")
+        }
+        XCTAssertEqual(log.entries.filter { $0.hasPrefix("primary.type(") }.count, 1)
+        XCTAssertFalse(log.entries.contains { $0.contains("clearInput") || $0.contains("•") }, "\(log.entries)")
+    }
+
     /// 1回目の読みが前方一致で止まる(取りこぼし)場合: 足りない分だけ追送して成功すること
     func testTypeResendsMissingCharactersOnPartialCommit() async throws {
         let log = CallLog()

@@ -18,7 +18,23 @@ public enum SimulatorBoot {
         }
     }
 
-    /// ブート済みなら約 200ms で返る。Shutdown なら枠を待って boot し、完了まで待つ(上限は simctl 任せ = 完了は観測で決まる)
+    /// `bootstatus -b` の上限(秒)。simctl 自身には上限が無く、launchd_sim だけ残って SpringBoard が上がらない起動では
+    /// 永久に返らない(枠も run も止まる)。根拠: 枠なしの8台同時でも3分強 → 枠は2台なのでその3倍あれば正常な起動は切らない
+    static let bootTimeoutSeconds: Double = 600
+
+    /// 期限切れは起動が途中で止まった形。Shutdown へ戻してから失敗にする(残すと次の bootstatus も同じ所で止まる)
+    static func bootWithinLimit(udid: String, run: (Double) throws -> Shell.Result,
+                                shutdown: () -> Void) throws -> Shell.Result {
+        do {
+            return try run(bootTimeoutSeconds)
+        } catch ShellError.timedOut {
+            shutdown()
+            throw Error.failed(udid: udid, detail: "did not finish booting within \(Int(bootTimeoutSeconds))s;"
+                + " the simulator was shut down")
+        }
+    }
+
+    /// ブート済みなら約 200ms で返る。Shutdown なら枠を待って boot し、完了まで待つ(上限は `bootTimeoutSeconds`)
     public static func ensureBooted(udid: String, log: (String) -> Void) throws {
         // Booted なら SimulatorPosterCache が自ら気付いて何もしない(DS-12.4.2)
         SimulatorBootCleanup.beforeBoot(udid: udid)
@@ -31,7 +47,12 @@ public enum SimulatorBoot {
                 (try? SimulatorCatalog.devices())?.first(where: { $0.udid == udid })
                     .map { $0.booted || $0.transitioning } ?? false
             },
-            boot: { try Shell.run(["xcrun", "simctl", "bootstatus", udid, "-b"]) })
+            boot: {
+                try bootWithinLimit(
+                    udid: udid,
+                    run: { try Shell.run(["xcrun", "simctl", "bootstatus", udid, "-b"], timeout: $0) },
+                    shutdown: { _ = try? Shell.run(["xcrun", "simctl", "shutdown", udid], timeout: 30) })
+            })
     }
 
     /// 枠の判断だけを切り出した本体(状態読みと起動を注入してテストする)。

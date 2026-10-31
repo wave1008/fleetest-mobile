@@ -12,7 +12,7 @@ public enum SimulatorBootSlots {
     /// 5台の一斉起動で空きメモリが 59.5GB → 0.7GB に尽き FM が死んだ → MN-97。設定・環境変数の口は置かない
     public static let concurrency = 2
 
-    /// 待ちの上限は置かない(`bootstatus -b` 自体に上限が無い。持ち主が死ねば flock が外れる)。
+    /// 待ちの上限は置かない(持ち主の起動は `SimulatorBoot.bootTimeoutSeconds` で終わり、死ねば flock が外れる)。
     /// 200ms は枠が空いてから気付くまでの遅れの上限で、起動 1 台(数十秒)に対して無視できる
     static let pollIntervalMicroseconds: UInt32 = 200_000
 

@@ -47,6 +47,8 @@ extension StepExecutor {
     func verifyTypedText(_ driver: AppDriver, element: ElementInfo, expected: String,
                                  typedOnly: String,
                                  phase: inout PhaseAccumulator) async throws -> String? {
+        // secure 欄は伏せ字しか読めず、`expected` の既存値も伏せ字。ここで比べると `•` を本文として打ち直す(isMaskedInput)
+        guard !TypeReadback.isMaskedInput(element) else { return nil }
         let clock = ContinuousClock()
         // var: OCR のコンパイルを待った分だけ後ろへずらす(アプリの応答ではない待ちを予算から引かない)
         var deadline = Date().addingTimeInterval(Self.typeVerifyBudgetSeconds)

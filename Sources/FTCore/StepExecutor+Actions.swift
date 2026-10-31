@@ -1011,8 +1011,8 @@ extension StepExecutor {
                 ? (priorValue.isEmpty ? nil : "replaced the field's prior content")
                 : (priorValue.isEmpty ? nil
                     : element.type == "secureTextField"
-                        ? "the field already holds a value; type appends, so the result will not"
-                            + " simply be what you typed. Call clearInput first if you meant to replace it"
+                        ? "the field already holds a value; a masked field may append or replace it,"
+                            + " so the result may not be what you typed. Call clearInput first if you meant to replace it"
                         // **連結後の値を予告しない**(MCP 側の同名警告と同じ理由)——
                         // 空欄のヒント文字列が `value` に載り `placeholder` が来ないアプリ
                         // (Google メッセージの宛先欄が witness)では前の値が実在の内容ではなく、

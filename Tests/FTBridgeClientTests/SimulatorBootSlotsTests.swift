@@ -105,6 +105,38 @@ final class SimulatorBootSlotsTests: XCTestCase {
         XCTAssertEqual(bootSawRelease.withLock { $0 }, true, "booted a shutdown simulator before a slot was freed")
     }
 
+    func testBootTimeoutIsPinned() {
+        XCTAssertEqual(SimulatorBoot.bootTimeoutSeconds, 600)
+    }
+
+    func testStalledBootShutsDownAndFails() {
+        var limit: Double?
+        var shutdowns = 0
+        XCTAssertThrowsError(try SimulatorBoot.bootWithinLimit(
+            udid: "U",
+            run: { seconds in
+                limit = seconds
+                throw ShellError.timedOut(args: ["xcrun"], seconds: seconds)
+            },
+            shutdown: { shutdowns += 1 })) { error in
+            guard case SimulatorBoot.Error.failed(let udid, let detail) = error else {
+                return XCTFail("unexpected \(error)")
+            }
+            XCTAssertEqual(udid, "U")
+            XCTAssertTrue(detail.contains("did not finish booting within 600s"), detail)
+        }
+        XCTAssertEqual(limit, SimulatorBoot.bootTimeoutSeconds)
+        XCTAssertEqual(shutdowns, 1)
+    }
+
+    func testNormalBootDoesNotShutDown() throws {
+        var shutdowns = 0
+        let result = try SimulatorBoot.bootWithinLimit(
+            udid: "U", run: { _ in Shell.Result(status: 0, output: "") }, shutdown: { shutdowns += 1 })
+        XCTAssertEqual(result.status, 0)
+        XCTAssertEqual(shutdowns, 0)
+    }
+
     func testNonZeroStatusThrowsFailed() {
         XCTAssertThrowsError(try SimulatorBoot.run(
             udid: "U",
