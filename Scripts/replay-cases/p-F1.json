@@ -1,0 +1,36 @@
+{
+  "id": "p-F1",
+  "finding": "Android のシェード(ロック画面と同じ NotificationShade 窓)の下で ft_launch resume:true が「Activated」と成功を返すが、アプリは前面に来ていない(p F1/F10)",
+  "platform": "android",
+  "redNote": "直しを外した版での赤は未確認(このセッションはデバイスを触れない)。PIN のロック画面そのもの(p F1)は自動操作で作れないので、同じ NotificationShade 窓が焦点を持つシェードで代用している。シェードは画面上端からの ft_drag で開くため、画面高が 1500px 未満の端末では終点を下げること",
+  "setup": [
+    ["ft_launch", { "bundleId": "com.ftester.e2e.android" }]
+  ],
+  "reset": [
+    ["ft_navigate", { "target": "back" }],
+    ["ft_launch", { "bundleId": "com.ftester.e2e.android" }],
+    ["ft_drag", { "fromX": 540, "fromY": 1, "toX": 540, "toY": 1500 }]
+  ],
+  "resetSeconds": 1,
+  "rounds": 10,
+  "forms": [
+    {
+      "name": "シェードの下で ft_launch resume(アプリは走っている)",
+      "steps": [
+        ["ft_launch", { "bundleId": "com.ftester.e2e.android", "resume": true }]
+      ],
+      "allowErrors": true,
+      "replyOnly": true,
+      "replyReject": ["resumed without relaunching", "Activated:"]
+    },
+    {
+      "name": "シェードの下で ft_launch resume(snapshotAfter 付き)",
+      "steps": [
+        ["ft_launch", { "bundleId": "com.ftester.e2e.android", "resume": true, "snapshotAfter": true }]
+      ],
+      "allowErrors": true,
+      "replyOnly": true,
+      "replyReject": ["resumed without relaunching", "Activated:"]
+    }
+  ]
+}

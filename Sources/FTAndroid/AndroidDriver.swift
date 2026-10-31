@@ -188,6 +188,23 @@ public final class AndroidDriver: AppDriver {
         }
     }
 
+    /// 協調スレッドプールの外で同期の仕事(adb)を走らせる。座標ジェスチャの adb は期限の読めない同期呼び出しで、
+    /// プール上で待つと凍結した端末1台が他の端末の呼び出しまで塞ぐ(探索 b F2)
+    static func offCooperativePool<T: Sendable>(_ work: @escaping @Sendable () throws -> T) async throws -> T {
+        try await withCheckedThrowingContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                continuation.resume(with: Result { try work() })
+            }
+        }
+    }
+
+    /// 座標ジェスチャの入口の門。gRPC を撃つ前に1回だけ撃つ(凍結した端末は gRPC の `getStatus` も adb も返らない)。
+    /// 断りは notDelivered(何も送っていない)
+    func requireDeviceAnswersOffPool() async throws {
+        let driver = UncheckedTransfer(self)  // 呼び手は完了まで await で止まる = self の利用は常に1本
+        try await Self.offCooperativePool { try driver.value.requireDeviceAnswers() }
+    }
+
     /// `adb shell input swipe` が **adb 自身の失敗(終了コード 255 = 送った後に接続が切れた)** で終わったときの「届いたか分からない」。
     /// 端末側の `input` は adb が切れた後も走り続けるので、長押し・ドラッグは完走して届いていることがある
     /// (「failed」と断定して撃ち直すと二重に効く)。終了コードで決める(文言の一致では決めない)。
@@ -568,9 +585,24 @@ public final class AndroidDriver: AppDriver {
         // monkey は intent 送信のみで遷移完了を待たないため、直後の snapshot が遷移前の画面を
         // 掴まないよう整定を待つ(settleViaBridge)
         await settleViaBridge()
+        // **intent を送れたことは前面に来たことではない**: ロック画面・通知シェードの下ではアプリが前面に来ず、成功と返すと
+        // 呼び手は「戻した」と読んで先へ進む。シェードの窓が入力フォーカスを持つなら断る(読めなければ黙る = 従来どおり)
+        if let displays = try? adbAnswering(["shell", "dumpsys", "window", "displays"]),
+           displays.status == 0, let refusal = Self.activateBlockedByShade(bundleID: bundleID, displaysDumpsys: displays.output) {
+            throw DriverError.badResponse(status: 409, body: refusal)
+        }
         restoreStateIfNeeded()  // 状態保持の前面化なので refs は維持(空の状態で persist して消さない)
         currentPackage = bundleID
         persistState()
+    }
+
+    /// activate の直後にシェード・クイック設定・ロック画面の窓が入力フォーカスを持っていれば断りの文。そうでなければ nil。
+    /// ロック画面と通知シェードは窓名(NotificationShade)から分けられないので両方を名指しする
+    static func activateBlockedByShade(bundleID: String, displaysDumpsys: String) -> String? {
+        guard AndroidForegroundWindows.inputFocusHeldByShade(dumpsys: displaysDumpsys) else { return nil }
+        return "the launch intent for \(bundleID) was sent, but the app did not come to the front: the notification shade,"
+            + " quick settings or the lock screen holds the input focus (a PIN lock cannot be dismissed by the tool)."
+            + " Close the shade (ft_navigate back) or unlock the device, then bring the app back."
     }
 
     /// タスク一覧(最近使ったアプリ)を開く。**gRPC の名前付きキーは使わない**(理由は home())。
@@ -1416,16 +1448,17 @@ public final class AndroidDriver: AppDriver {
         let fromYi = try Self.checkedInt32(fromY, field: "fromY")
         let toXi = try Self.checkedInt32(toX, field: "toX")
         let toYi = try Self.checkedInt32(toY, field: "toY")
+        try await requireDeviceAnswersOffPool()
         if let serial, try await Self.gestureFinished(
             EmulatorControl.drag(serial: serial, fromX: fromXi, fromY: fromYi,
                                  toX: toXi, toY: toYi, durationMs: durationMs),
             verb: "drag", context: androidContext()) {
             return
         }
-        let result = try adb(["shell", "input", "swipe",
-                              String(fromXi), String(fromYi),
-                              String(toXi), String(toYi),
-                              String(durationMs)])
+        let swipeArgs = ["shell", "input", "swipe", String(fromXi), String(fromYi),
+                         String(toXi), String(toYi), String(durationMs)]
+        let driver = UncheckedTransfer(self)
+        let result = try await Self.offCooperativePool { try driver.value.adb(swipeArgs) }
         guard result.status == 0 else {
             if let cut = Self.shellInputCutOff(result, verb: "drag", context: androidContext()) { throw cut }
             throw DriverError.badResponse(status: Int(result.status),
@@ -1464,6 +1497,7 @@ public final class AndroidDriver: AppDriver {
                              Int(BridgeAPI.gestureSecondsCeiling * 1000))
         let xi = try Self.checkedInt32(x, field: "x")
         let yi = try Self.checkedInt32(y, field: "y")
+        try await requireDeviceAnswersOffPool()
         if let serial, try await Self.gestureFinished(
             EmulatorControl.longPress(serial: serial, x: xi, y: yi, durationMs: durationMs),
             verb: "long-press", context: androidContext()) {
@@ -1471,7 +1505,9 @@ public final class AndroidDriver: AppDriver {
         }
         let px = String(xi)
         let py = String(yi)
-        let result = try adb(["shell", "input", "swipe", px, py, px, py, String(durationMs)])
+        let pressArgs = ["shell", "input", "swipe", px, py, px, py, String(durationMs)]
+        let driver = UncheckedTransfer(self)
+        let result = try await Self.offCooperativePool { try driver.value.adb(pressArgs) }
         guard result.status == 0 else {
             if let cut = Self.shellInputCutOff(result, verb: "long-press", context: androidContext()) { throw cut }
             throw DriverError.badResponse(status: Int(result.status),

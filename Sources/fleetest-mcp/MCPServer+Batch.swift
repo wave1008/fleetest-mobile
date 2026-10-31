@@ -988,7 +988,11 @@ extension MCPServer {
     static func batchDeliveryUnknownNote(failureKind: StepFailureKind?, thrown: DriverError?) -> String {
         switch thrown {
         case .notDelivered?, .bridgeConnectionRefused?: return ""
-        case .deliveryUnknown?, .bridgeUnreachable?: break
+        case .deliveryUnknown?, .bridgeUnreachable?:
+            // 投げられた case が「届いたか不明」と決めている: 「拒否なら送っていない」の留保は付けない
+            // (本文の「nothing is listening」と語が重なり、届いた手を未送信と読ませた)
+            return "\n   (the connection to the driver failed during this step, and whether it was delivered is unknown —"
+                + " it may already have been performed. Check the screen before repeating it; do not simply run the step again)"
         default:
             guard failureKind == .driverUnreachable else { return "" }
         }

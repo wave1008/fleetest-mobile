@@ -17,6 +17,23 @@ public enum EmulatorGrpcSession {
         public init(cause: any Error) { self.cause = cause }
     }
 
+    /// タッチを送り始めた後に失敗した印。`fingerReleased == false` = 指を上げる up も届かず、指が画面に残っている可能性がある
+    /// (残った指は別プロセスの次の gRPC ジェスチャを1回まるごと吸った: 探索 b F1)。`EmulatorControl.delivery` が文言にする
+    public struct GestureInterrupted: Error {
+        public let cause: any Error
+        public let fingerReleased: Bool
+        public init(cause: any Error, fingerReleased: Bool) {
+            self.cause = cause
+            self.fingerReleased = fingerReleased
+        }
+    }
+
+    /// gRPC の失敗の code と message(`ErrorText.user` は RPCError を NSError の既定の文へ落とし中身が読めない)。gRPC の失敗でなければ nil
+    public static func rpcFailureText(_ error: any Error) -> String? {
+        guard let rpc = error as? RPCError else { return nil }
+        return "gRPC \(rpc.code): \(rpc.message)"
+    }
+
     /// 失敗後の up の期限。loopback の単発 RPC(接続 ~ms)なので、固まった Emulator を待ち続けない上限として置く。
     /// 尽きたら指が残るが、元の失敗はそのまま呼び手へ返す
     static let fingerReleaseTimeout: Duration = .seconds(2)
@@ -91,8 +108,8 @@ public enum EmulatorGrpcSession {
                 last = (toX, toY)
                 try await touch(toX, toY, pressure: 0)
             } catch {
-                await releaseFinger(endpoint: endpoint, x: last.x, y: last.y)
-                throw error
+                let released = await releaseFinger(endpoint: endpoint, x: last.x, y: last.y)
+                throw GestureInterrupted(cause: error, fingerReleased: released)
             }
         }
     }
@@ -108,8 +125,8 @@ public enum EmulatorGrpcSession {
                 try await Task.sleep(for: .milliseconds(durationMs))
                 _ = try await client.sendTouch(touchEvent(x: x, y: y, pressure: 0), metadata: metadata, options: options)
             } catch {
-                await releaseFinger(endpoint: endpoint, x: x, y: y)
-                throw error
+                let released = await releaseFinger(endpoint: endpoint, x: x, y: y)
+                throw GestureInterrupted(cause: error, fingerReleased: released)
             }
         }
     }
@@ -137,12 +154,16 @@ public enum EmulatorGrpcSession {
     }
 
     /// 途中で失敗したジェスチャの指を上げる(up を送らないと identifier が残り、次の入力に重なる)。**別の接続・別のタスクで送る** ——
-    /// 失敗の原因が接続の切断でも、呼び手のタスクの取り消しでも届くように。失敗は黙る(元の失敗のほうを返す)
-    public static func releaseFinger(endpoint: EmulatorEndpoint, x: Int32, y: Int32) async {
+    /// 失敗の原因が接続の切断でも、呼び手のタスクの取り消しでも届くように。up が届いたか(true)を返す。失敗しても投げない(元の失敗を呼び手へ返す)
+    @discardableResult
+    public static func releaseFinger(endpoint: EmulatorEndpoint, x: Int32, y: Int32) async -> Bool {
         await Task {
-            try? await withController(endpoint: endpoint, timeout: fingerReleaseTimeout) { client, metadata, options in
-                _ = try await client.sendTouch(touchEvent(x: x, y: y, pressure: 0), metadata: metadata, options: options)
-            }
+            do {
+                try await withController(endpoint: endpoint, timeout: fingerReleaseTimeout) { client, metadata, options in
+                    _ = try await client.sendTouch(touchEvent(x: x, y: y, pressure: 0), metadata: metadata, options: options)
+                }
+                return true
+            } catch { return false }
         }.value
     }
 

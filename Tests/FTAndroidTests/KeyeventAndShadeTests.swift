@@ -130,6 +130,19 @@ final class KeyeventAndShadeTests: XCTestCase {
             dumpsys: "  Window #1 Window{a u0 NotificationShade}:\n    isVisible=true"))
     }
 
+    /// ft_launch resume: シェード・ロック画面が入力フォーカスを持つなら「Activated」と言わず断る(探索 p F1/F10)
+    func testActivateIsRefusedWhileTheShadeHoldsTheFocus() {
+        let blocked = AndroidDriver.activateBlockedByShade(
+            bundleID: "com.app", displaysDumpsys: "  mCurrentFocus=Window{a u0 NotificationShade}")
+        XCTAssertNotNil(blocked)
+        XCTAssertTrue(blocked?.contains("did not come to the front") == true, blocked ?? "")
+        XCTAssertNil(AndroidDriver.activateBlockedByShade(
+            bundleID: "com.app", displaysDumpsys: "  mCurrentFocus=Window{a u0 com.app/com.app.Main}"))
+        // 行が読めない(ヘッズアップで窓だけ可視)は断らない
+        XCTAssertNil(AndroidDriver.activateBlockedByShade(
+            bundleID: "com.app", displaysDumpsys: "  Window #1 Window{a u0 NotificationShade}:\n    isVisible=true"))
+    }
+
     func testUnlockCooldownIsPinnedAndGatesTheWait() {
         XCTAssertEqual(AndroidPhysicalDevice.unlockRetryCooldownSeconds, 60)
         let now = Date()

@@ -52,6 +52,15 @@ final class AndroidBridgeHeldByAnotherSessionMessageTests: XCTestCase {
         XCTAssertFalse(text.contains("Cannot reach the driver"), "到達不能の決まり文句で包まれている")
     }
 
+    /// 端末が adb shell に答えないなら、別のセッションの話より先にそれを言う(探索 b F5)
+    func testASilentAdbShellIsStatedBeforeTheOtherSession() {
+        let text = AndroidBridgeHeldByAnotherSession(serial: "emulator-5562", runningVersion: nil, adbShellSilent: true).localizedDescription
+        XCTAssertTrue(text.hasPrefix("the device emulator-5562 did not answer adb shell"), text)
+        XCTAssertTrue(text.contains("another session"), text)
+        let plain = AndroidBridgeHeldByAnotherSession(serial: "emulator-5562", runningVersion: nil).localizedDescription
+        XCTAssertFalse(plain.contains("adb shell"), plain)
+    }
+
     /// **答えた版違いを「応答しない」と言わない**(実機 Pixel 4a: 別のセッションの v109 が答えているのに "is not answering")
     func testARunningOlderBridgeIsNotCalledUnanswering() {
         let text = AndroidBridgeHeldByAnotherSession(serial: "14141JEC204922", runningVersion: 109).localizedDescription

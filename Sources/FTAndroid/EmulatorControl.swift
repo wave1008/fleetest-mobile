@@ -131,8 +131,25 @@ public enum EmulatorControl {
             return .notSent
         } catch {
             if error is CancellationError || Task.isCancelled { throw CancellationError() }
+            if let interrupted = error as? EmulatorGrpcSession.GestureInterrupted {
+                if interrupted.cause is CancellationError { throw CancellationError() }
+                return .deliveryUnknown(detail: describe(interrupted))
+            }
             return .deliveryUnknown(detail: ErrorText.user(error))
         }
+    }
+
+    /// 途中で切れたジェスチャの文言。**指を上げられなかった事実を言う**(残った指は次の gRPC ジェスチャを吸う)。
+    /// gRPC の失敗は code と message を出す(NSError の既定の文では中身が読めない)
+    static func describe(_ interrupted: EmulatorGrpcSession.GestureInterrupted) -> String {
+        let cause = grpcFailureText(interrupted.cause)
+        guard !interrupted.fingerReleased else { return cause }
+        return cause + "; the release of the touch (finger up) did not reach the emulator either, so a finger may still be"
+            + " pressed on the screen and may swallow the next touch gesture — look at the screen before relying on the next one"
+    }
+
+    static func grpcFailureText(_ error: any Error) -> String {
+        EmulatorGrpcSession.rpcFailureText(error) ?? ErrorText.user(error)
     }
 
     private static func isFailed(pid: Int32) -> Bool {

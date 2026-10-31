@@ -13,6 +13,47 @@ final class GestureDeliveryTests: XCTestCase {
         guard case .deliveryUnknown = outcome else { return XCTFail("\(outcome)") }
     }
 
+    /// up が届かず指が残った事実を応答に載せる(届いた回は載せない)
+    func testUnreleasedFingerIsStatedInTheDetail() async throws {
+        let stuck = try await EmulatorControl.delivery {
+            throw EmulatorGrpcSession.GestureInterrupted(cause: SendFailure(), fingerReleased: false)
+        }
+        guard case .deliveryUnknown(let detail) = stuck else { return XCTFail("\(stuck)") }
+        XCTAssertTrue(detail.contains("finger may still be pressed"), detail)
+        let released = try await EmulatorControl.delivery {
+            throw EmulatorGrpcSession.GestureInterrupted(cause: SendFailure(), fingerReleased: true)
+        }
+        guard case .deliveryUnknown(let detail2) = released else { return XCTFail("\(released)") }
+        XCTAssertFalse(detail2.contains("finger"), detail2)
+    }
+
+    func testInterruptedByCancellationRethrows() async {
+        do {
+            _ = try await EmulatorControl.delivery {
+                throw EmulatorGrpcSession.GestureInterrupted(cause: CancellationError(), fingerReleased: false)
+            }
+            XCTFail("投げ直すはず")
+        } catch { XCTAssertTrue(error is CancellationError, "\(error)") }
+    }
+
+    /// ソース走査: 座標の drag / long-press は gRPC の前に端末の応答を確かめ、adb の swipe を協調プールに載せない(探索 b F2)
+    func testCoordinateGesturesGateOnDeviceAnswerAndLeaveThePool() throws {
+        let url = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().appendingPathComponent("Sources/FTAndroid/AndroidDriver.swift")
+        let source = try String(contentsOf: url, encoding: .utf8)
+        for signature in ["public func drag(fromX", "public func press(x: Double, y: Double, duration: Double)"] {
+            let start = try XCTUnwrap(source.range(of: signature), signature)
+            let body = String(source[start.lowerBound...].prefix(2500))
+            let end = body.range(of: "\n    }\n")?.lowerBound ?? body.endIndex
+            let region = String(body[..<end])
+            guard let gate = region.range(of: "requireDeviceAnswersOffPool()"),
+                  let grpc = region.range(of: "EmulatorControl.") else { return XCTFail("\(signature): 門か gRPC が見当たらない") }
+            XCTAssertTrue(gate.lowerBound < grpc.lowerBound, "\(signature): 門が gRPC より後ろにある")
+            XCTAssertTrue(region.contains("offCooperativePool"), "\(signature): adb の swipe が協調プール上")
+            XCTAssertFalse(region.contains("try adb(["), "\(signature): 同期の adb を直に撃っている")
+        }
+    }
+
     func testCompletedSendIsPerformed() async throws {
         let outcome = try await EmulatorControl.delivery {}
         XCTAssertEqual(outcome, .performed)

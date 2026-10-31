@@ -281,12 +281,16 @@ extension AndroidDriver {
         // 断ると、双方の MCP が「相手が使っている」と断り合い、ブリッジが居ないまま回復しなかった(`pidof` が空 = false。
         // 読めなかった(nil)は居ないと言えないので従来どおり断る)
         if let serial, let stateDir = (try? RepoRoot.find())?.appendingPathComponent(".fleetest"),
-           RunnerAccessibilityHealth.hasForeignLeaseUnlessOwnRun(key: serial, stateDir: stateDir),
-           probed != nil || Self.isBridgeRunning(serial: serial, timeout: Self.deviceAnswerTimeoutSeconds) != false {
-            if let (client, version, _) = probed, version == Self.expectedBridgeVersionCode {
-                return client
+           RunnerAccessibilityHealth.hasForeignLeaseUnlessOwnRun(key: serial, stateDir: stateDir) {
+            let running = probed != nil ? true : Self.isBridgeRunning(serial: serial, timeout: Self.deviceAnswerTimeoutSeconds)
+            if running != false {
+                if let (client, version, _) = probed, version == Self.expectedBridgeVersionCode {
+                    return client
+                }
+                // probed が無く pidof も読めない(nil)= adb shell が期限内に答えなかった。別のセッションの話より先にそれを言う
+                throw AndroidBridgeHeldByAnotherSession(serial: serial, runningVersion: probed?.1,
+                                                        adbShellSilent: running == nil)
             }
-            throw AndroidBridgeHeldByAnotherSession(serial: serial, runningVersion: probed?.1)
         }
 
         // sys.boot_completed は起動直後でも既に 1 なのでゲートに使えない(ProfileWorkerFactory の
@@ -781,11 +785,21 @@ public struct AndroidBridgeHeldByAnotherSession: Error, LocalizedError {
     /// 探りに答えたブリッジの版(nil = 準備のできた状態で答えなかった = 応答しない・起動中・版を申告しない、を区別できない)。**答えた版違いを「応答しない」と言わない**(実機 Pixel 4a: 別の
     /// MCP セッションが使う v109 が答えているのに、v110 を期待する側が "is not answering" と出していた)
     public let runningVersion: Int?
+    /// 探りにも `pidof` にも答えなかった = 端末が `adb shell` に答えない(凍結の可能性)。別のセッションの話より先に言う
+    public let adbShellSilent: Bool
+    public init(serial: String, runningVersion: Int?, adbShellSilent: Bool = false) {
+        self.serial = serial
+        self.runningVersion = runningVersion
+        self.adbShellSilent = adbShellSilent
+    }
     public var errorDescription: String? {
         let state = runningVersion.map {
             "is running another version (\($0); this build expects \(AndroidDriver.expectedBridgeVersionCode))"
         } ?? "did not answer as ready"
-        return "the Android bridge on \(serial) \(state), and it was not restarted: another session"
+        let silent = adbShellSilent
+            ? "the device \(serial) did not answer adb shell within \(Int(AndroidDriver.deviceAnswerTimeoutSeconds))s (the device may be frozen; nothing was sent to it). "
+            : ""
+        return silent + "the Android bridge on \(serial) \(state), and it was not restarted: another session"
             + " (a fleetest run or an MCP session) is using this device, and restarting it would take that"
             + " session's bridge down. Wait for that session to finish, or drive another device"
     }

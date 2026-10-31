@@ -116,7 +116,7 @@ extension MCPServer {
     /// 読むだけのツールには付けない(撃ち直しても害が無い)。busy の文言は自前で同じことを言う
     static func deliveryUnknownNote(mayHaveTakenEffect: Bool) -> String {
         guard mayHaveTakenEffect else { return "" }
-        return "\nThe connection was cut after the request may already have been sent, so it is unknown whether"
+        return "\nThe request may already have been sent (the connection was cut, or the device gave no confirmation), so it is unknown whether"
             + " this action was performed — take an ft_snapshot and check the screen before repeating it"
             + " (repeating a tap, type or swipe that did go through would do it twice)."
     }
