@@ -461,13 +461,13 @@ test("再起動しても戻らないデバイスの案内は、どの台かを�
   send({ type: "devices", devices: [device("Pixel 9-05", { rebootAdvised: true }), device("Pixel 9-06", {}),
     device("Pixel 9-07", { machine: "M1Max", rebootAdvised: true })] });
   assert.ok(advice.classList.contains("visible"));
-  assert.equal(advice.textContent, "⚠️ マシンの再起動をおすすめします(対象: ローカル、M1Max)。"
-    + "次のデバイスは再起動しても画面が戻りませんでした: Pixel 9-05、Pixel 9-07 (M1Max)");
+  assert.equal(advice.textContent, "⚠️ デバイスを再起動しても画面の描画が回復しませんでした: Pixel 9-05、Pixel 9-07 (M1Max)。"
+    + "マシンの再起動をおすすめします(対象マシン: ローカル、M1Max)");
   assert.doesNotMatch(advice.textContent, /Pixel 9-06/);
   // 1マシンの全台が落ちても上部の1行を伸ばさない
   send({ type: "devices", devices: ["a", "b", "c", "d", "e"].map((name) => device(name, { machine: "M1Max", rebootAdvised: true })) });
-  assert.equal(advice.textContent, "⚠️ マシンの再起動をおすすめします(対象: M1Max)。"
-    + "次のデバイスは再起動しても画面が戻りませんでした: a (M1Max)、b (M1Max)、c (M1Max)、ほか2台");
+  assert.equal(advice.textContent, "⚠️ デバイスを再起動しても画面の描画が回復しませんでした: a (M1Max)、b (M1Max)、c (M1Max)、ほか2台。"
+    + "マシンの再起動をおすすめします(対象マシン: M1Max)");
   send({ type: "devices", devices: [device("Pixel 9-05", {})] });
   assert.ok(!advice.classList.contains("visible"));
 });
