@@ -396,6 +396,15 @@ id _Nullable FTCurrentTextReceiver(void) {
     return ftClearTarget();
 }
 
+void FTMoveCursorToEndInFirstResponder(void) {
+    id responder = ftClearTarget();
+    if (ftIsFlutterApp() || ![responder conformsToProtocol:@protocol(UITextInput)]) return;
+    id<UITextInput> input = (id<UITextInput>)responder;
+    UITextPosition *end = input.endOfDocument;
+    UITextRange *range = end ? [input textRangeFromPosition:end toPosition:end] : nil;
+    if (range) input.selectedTextRange = range;
+}
+
 BOOL FTClearTextInFirstResponder(void) {
     id responder = ftClearTarget();
     if (!responder) return NO;

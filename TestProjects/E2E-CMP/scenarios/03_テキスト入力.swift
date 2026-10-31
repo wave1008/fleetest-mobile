@@ -240,7 +240,7 @@ class テキスト入力が正しくechoされること {
             }
             scene(2, "消す") {
                 condition {
-                    type("#field_password", "q")
+                    type("#field_single", "q")
                 }.action {
                     clearInput("#field_multiline")
                 }.expectation {

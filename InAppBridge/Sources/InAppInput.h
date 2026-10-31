@@ -62,6 +62,9 @@ NSString *FTFirstResponderDiagnostics(void);
 /// 現在の first responder のテキストを空にする。クリアできたら YES。first responder が
 /// 無い/どの入力プロトコルにも該当しない場合は NO(呼び出し側は 409 で xcuitest フォールバックへ)。
 BOOL FTClearTextInFirstResponder(void);
+/// カーソルを文書の末尾へ置く。Compose Multiplatform の欄は焦点を取り戻すとカーソルが先頭へ戻り、insertText: が先頭に入る
+/// (XCUITest 側の Cmd+↓ と対。TypeReadback.needsCursorAtEndAfterRefocus)。Flutter は状態が Dart 側なので触らない
+void FTMoveCursorToEndInFirstResponder(void);
 
 /// アクセシビリティを自動化用に活性化する(_AXSSetAutomationEnabled)。これをしないと
 /// SwiftUI の AX ツリーが materialize されず、accessibilityFrame が zero・label が空になる

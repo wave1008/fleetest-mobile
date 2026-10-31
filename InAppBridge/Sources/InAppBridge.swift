@@ -1013,6 +1013,12 @@ final class FTInAppBridge {
         return nil
     }
 
+    /// このタップで受け口が別のビューへ移ったか。main で呼ぶ(タップの後)
+    private static func tapMovedFocus(before: ReceiverMark?) -> Bool {
+        guard let view = FTCurrentTextReceiver() as? UIView else { return false }
+        return before?.id != ObjectIdentifier(view)
+    }
+
     /// この ref 付き type のタップで**焦点を取り戻した**(タップ前の受け口が別のビュー)secure 欄に、既に文字があるか。
     /// タップ前から焦点がその欄にあれば追記が本物の動き(false)。main で呼ぶ(タップの後)
     private static func refocusedSecureFieldHasText(before: ReceiverMark?) -> Bool {
@@ -1032,6 +1038,7 @@ final class FTInAppBridge {
         // 焦点を取り戻した secure 欄は、本物の最初の打鍵で全消しされてから入る。insertText: はその経路を通らず
         // 追記になる(inapp F5)ので、同じ状況だけ挿入の直前に空にして本物と揃える
         var replacesSecureText = false
+        var refocused = false
         if let ref = req.ref {
             try requireExpectedRef(ref, expect: req.expect)
             var point = CGPoint.zero
@@ -1046,6 +1053,7 @@ final class FTInAppBridge {
             try requireFocusMoved(ref: ref, tapped: point, before: before, landedByPriorTap: landedByPriorTap,
                                   action: "type")
             replacesSecureText = mainSync { Self.refocusedSecureFieldHasText(before: before) }
+            refocused = mainSync { Self.tapMovedFocus(before: before) }
         }
         // 末尾の改行1つは本文と分けて **pressEnter と同じ経路**へ流す(「type の末尾改行 = pressEnter」が
         // 契約。Compose は "\n" 完全一致の insertText でだけ IME アクションに変換し、UITextField は
@@ -1061,6 +1069,7 @@ final class FTInAppBridge {
         var enterFired = true
         try performWithSettle(operation: "the text input") { _ in
             if replacesSecureText { _ = FTClearTextInFirstResponder() }
+            if refocused { FTMoveCursorToEndInFirstResponder() }
             if hasTrailingNewline {
                 inserted = FTInsertTextIntoFirstResponder(main)
                 enterFired = FTPressEnterOnComposeFirstResponder()
