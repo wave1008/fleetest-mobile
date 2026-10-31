@@ -71,6 +71,9 @@ sample images.
   checked state (elements that report none are still judged by the classifier). The choice is shown on the step in the report.
   `checkIsOFF` takes the same argument; when omitted, the run profile decides.
 - Steps judged from the image carry the note `check-state-classified` in the results.
+- When accessibility and the classifier disagree, the step does not decide right away: it retakes the screenshot and reads again
+  (up to 7.5 seconds), because the screen image can lag behind. If they still disagree, the classifier's answer is used and the
+  step carries the note `check-state-disagreed`.
 - Each judgement also re-checks two of your own samples (one per label). If the classifier gets one of them wrong,
   its answer is not used and the checked state comes from accessibility only (note `check-state-classifier-failed`).
   This happens when Vision / Core ML on the Mac is temporarily misbehaving. If it persists, reboot the Mac.

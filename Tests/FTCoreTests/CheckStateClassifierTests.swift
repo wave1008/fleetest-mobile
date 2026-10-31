@@ -311,7 +311,9 @@ final class CheckStateClassifierTests: XCTestCase {
         func type(ref: Int?, text: String) async throws {}
         func swipe(_ direction: FTSwipeDirection) async throws {}
         func press(ref: Int, duration: Double) async throws {}
-        func screenshot() async throws -> Data { screenPNG }
+        /// 先に返す絵(古い絵の再現)。尽きたら `screenPNG`
+        var staleFrames: [Data] = []
+        func screenshot() async throws -> Data { staleFrames.isEmpty ? screenPNG : staleFrames.removeFirst() }
         func terminate() async throws {}
     }
 
@@ -321,6 +323,7 @@ final class CheckStateClassifierTests: XCTestCase {
         let executor = StepExecutor(driver: driver, isAndroid: false, tunables: RunTunables())
         executor.visionClassifierProjectRoot = projectRoot
         executor.preferCheckStateClassifier = prefer
+        executor.checkStateRetakeDelays = []   // 割れた形の撮り直しは下の専用のテストが見る
         return await executor.execute(FlowStep(assert: assert, locator: FlowLocator(id: "cb"), timeout: 0,
                                                preferCheckStateClassifier: stepPrefer))
     }
@@ -384,6 +387,59 @@ final class CheckStateClassifierTests: XCTestCase {
         let noSamples = await run("checked", a11y: element(type: "button"), imageOn: true, projectRoot: nil, prefer: true)
         XCTAssertFalse(passed(noSamples))
         XCTAssertFalse(noSamples.notes.contains(.checkStateClassified))
+    }
+
+    // MARK: - a11y と画像が割れたとき(古い絵)
+
+    /// 実際はオンの要素で、前のシナリオの絵が返っている間だけ画像がオフに見える形(E2E-Android の実測)。
+    /// 古い絵で `checkIsOFF` を緑にしない
+    func testAStaleOffImageDoesNotPassCheckIsOffOnAnOnElement() async throws {
+        let root = try Self.makeProject()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let driver = ImageDriver(element: element(type: "switch", value: "1"), screenPNG: Self.checkboxPNG(on: true, shift: 2))
+        driver.staleFrames = [Self.checkboxPNG(on: false, shift: 2), Self.checkboxPNG(on: false, shift: 2)]
+        let executor = StepExecutor(driver: driver, isAndroid: false, tunables: RunTunables())
+        executor.visionClassifierProjectRoot = root
+        executor.preferCheckStateClassifier = true
+        executor.checkStateRetakeDelays = [0, 0, 0, 0]
+        let outcome = await executor.execute(FlowStep(assert: "notChecked", locator: FlowLocator(id: "cb"), timeout: 0))
+        XCTAssertFalse(passed(outcome), "古い絵で誤った緑になった: \(outcome.status)")
+        XCTAssertEqual(driver.staleFrames.count, 0, "新しい絵まで撮り直していない")
+        XCTAssertFalse(outcome.notes.contains(.checkStateDisagreed), "絵が追いつけば割れていない")
+    }
+
+    /// 同じ形の逆向き: 古い絵のせいで `checkIsON` を赤にしない(E2E-Android の赤)
+    func testAStaleOffImageDoesNotFailCheckIsOnOnAnOnElement() async throws {
+        let root = try Self.makeProject()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let driver = ImageDriver(element: element(type: "switch", value: "1"), screenPNG: Self.checkboxPNG(on: true, shift: 2))
+        driver.staleFrames = [Self.checkboxPNG(on: false, shift: 2)]
+        let executor = StepExecutor(driver: driver, isAndroid: false, tunables: RunTunables())
+        executor.visionClassifierProjectRoot = root
+        executor.preferCheckStateClassifier = true
+        executor.checkStateRetakeDelays = [0, 0, 0, 0]
+        let outcome = await executor.execute(FlowStep(assert: "checked", locator: FlowLocator(id: "cb"), timeout: 0))
+        XCTAssertTrue(passed(outcome), "\(outcome.status)")
+    }
+
+    /// 撮り直しが尽きても割れていれば分類器を採り、割れた事実を残す(a11y が信用できない部品のための指定を変えない)
+    func testAPersistentDisagreementTakesTheClassifierAndSaysSo() async throws {
+        let root = try Self.makeProject()
+        defer { try? FileManager.default.removeItem(at: root) }
+        let driver = ImageDriver(element: element(type: "switch", value: "0"), screenPNG: Self.checkboxPNG(on: true, shift: 2))
+        let executor = StepExecutor(driver: driver, isAndroid: false, tunables: RunTunables())
+        executor.visionClassifierProjectRoot = root
+        executor.preferCheckStateClassifier = true
+        executor.checkStateRetakeDelays = [0, 0]
+        let outcome = await executor.execute(FlowStep(assert: "checked", locator: FlowLocator(id: "cb"), timeout: 0))
+        XCTAssertTrue(passed(outcome), "\(outcome.status)")
+        XCTAssertTrue(outcome.notes.contains(.checkStateDisagreed))
+    }
+
+    /// 既定の待ちを固定する(差し替え口で明示する他のテストが既定を通らない)。絵の遅れの実測と同じ列
+    func testTheRetakeDelaysDefaultToTheStaleScreenshotDelays() {
+        let executor = StepExecutor(driver: ImageDriver(element: element(type: "switch"), screenPNG: Data()), isAndroid: false, tunables: RunTunables())
+        XCTAssertEqual(executor.checkStateRetakeDelays, [0.5, 1, 2, 4])
     }
 
     // MARK: - 推論の対照(壊れた推論の答えを使わない)

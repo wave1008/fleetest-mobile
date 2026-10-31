@@ -1109,6 +1109,9 @@ public final class StepExecutor {
     /// `preferCheckStateClassifier`。**既定 true**)。false なら状態を報告しない要素にだけ使う
     public var preferCheckStateClassifier = true
     /// 分類器名 → 読み込み結果(プロセスで1回。nil の値 = 見本が無い・学習に失敗した)
+    /// a11y と分類器の答えが割れたときに撮り直す前の待ち(秒)。根拠は `FindImage.staleRetryDelays` と同じ
+    /// (絵が追いつく時間の実測)。尽きたら分類器の答えを採る(`check-state-disagreed`)。テストだけ差し替える
+    var checkStateRetakeDelays: [Double] = FindImage.staleRetryDelays
     var visionClassifiersLoaded: [String: VisionClassifier.Model?] = [:]
     /// 分類器名 → 学習・読み込みに失敗した理由(失敗文言へ添える)
     public var visionClassifierErrors: [String: String] = [:]

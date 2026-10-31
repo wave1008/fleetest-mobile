@@ -823,13 +823,14 @@
 
 - 環境の準備は `prepareEnvironment` の1箇所になったが、死活確認から lease・レーンの起動までは `prepareSupply` と `ApiRunCommand` に別々にある。ログの出力先(`logSupply`)・`wipeStatus`・FM の警告と `RunEnvironment.apply` の位置が違う。同名の `RemoteRunDispatcher.prepareWorkspace` も別実装
 
-### OI-102 Android の古い絵で、分類器の checkIsOFF が別の画面を判定して緑になりうる
-- 状態: 再現済み
+### OI-102 分類器の鮮度の残り: a11y が状態を報告しない要素は古い絵を見分けられず、シナリオの最初の絵の古さも検知しない
+- 状態: 経路確定
 - 確認: コミット未記録(2026-11-01)
-- 経緯: 発見: 回帰の E2E-Android(モニターの配信あり)の `チェック状態を分類器とa11yの両方で判定できること`
+- 経緯: 発見: 回帰の E2E-Android(モニターの配信あり)。a11y と割れたときの撮り直しは入れた
 
-- 判定に渡った絵が前のシナリオのスクロール画面のままで、`checkIsON #radio_a` が OFF と判定して赤(同じ1本は再実行で6台とも緑)。同じ絵で先の `checkIsOFF` の2手は緑だった可能性が高い(推測)= OFF の期待は古い絵で誤った緑になりうる。OI-4 の型
-- 手がかり: `judgmentCapture` が木の世代と絵の鮮度を確かめる。`StaleFrameDetector` が効く条件を調べる
+- 割れたら撮り直すのは a11y が状態を報告する要素だけ。報告しない要素の `checkIsON/OFF` と imageIs は比べる相手が無い
+- `StaleFrameDetector.judge` は「絵が同じで木が変わった」を見るので、シナリオの最初の1枚(前のシナリオの絵)は基準が無く拾えない
+- 再生ケースは無い: MCP は分類器を通らず、古い絵を DSL の実行へ注入する口も無い(赤は `CheckStateClassifierTests` の差し替えドライバで確かめた)
 
 ## 設計判断で据え置いているもの(直さないと決めた。症状が出たら見直す)
 

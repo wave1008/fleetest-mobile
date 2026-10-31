@@ -291,6 +291,9 @@ public enum StepNote: String, Sendable, Codable, CaseIterable {
     /// CheckStateClassifier の見本画像はあるのに、学習か読み込みに失敗した、または推論の対照が外れて
     /// 答えを使わなかった(`VisionClassifier.ClassifyError`)。どちらも a11y だけで判定した
     case checkStateClassifierFailed = "check-state-classifier-failed"
+    /// 撮り直しても a11y と CheckStateClassifier の答えが割れたままだったので、分類器の答えで判定した。
+    /// 絵が古いままの可能性も、a11y の報告が誤っている可能性も区別できないので、割れた事実だけを残す
+    case checkStateDisagreed = "check-state-disagreed"
     /// 見本画像はあるのに分類器(CheckStateClassifier / DefaultClassifier)を**学習・読み込みできなかった**
     /// (`StepExecutor.loadedVisionClassifier`)。上の推論の対照外れ(負荷の下の揺らぎで起き、次の推論で戻る)と違い、
     /// 設定・環境で決まって run の中で戻らない。**checkIsON/OFF は黙って a11y へ倒れ、a11y で読める部品では緑のまま**
@@ -424,6 +427,9 @@ public enum StepNote: String, Sendable, Codable, CaseIterable {
         case .holdEndedBeforeBlock:
             return "the hold's block ran longer than holdSeconds, so the finger was already up for"
                 + " the rest of it"
+        case .checkStateDisagreed:
+            return "accessibility and CheckStateClassifier kept disagreeing after retaking the screenshot,"
+                + " so the check state came from CheckStateClassifier"
         case .checkStateClassifierFailed:
             return "CheckStateClassifier could not be trained or loaded, or its answer could not be trusted,"
                 + " so the check state came from accessibility only"

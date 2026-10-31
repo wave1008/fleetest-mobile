@@ -1738,6 +1738,7 @@ extension StepExecutor {
         var lastSnapshot: SnapshotResponse?
         // 一度でも上限に当たったら以後は最初から天井で撮る(exists と同じ latch)
         var needsCeiling = false
+        var retakeDelays = checkStateRetakeDelays[...]
         while true {
             let start = clock.now
             if needsCeiling { driver.raiseElementLimitOnNextSnapshot(BridgeAPI.maxSnapshotElementsCeiling) }
@@ -1760,7 +1761,8 @@ extension StepExecutor {
             if let (element, fallback) = LocatorResolver.resolve(step: step, in: snapshot,
                                                       strictForAssert: true) {
                 found = true
-                var state = checkState(of: element, step: step)
+                let accessibilityState = checkState(of: element, step: step)
+                var state = accessibilityState
                 lastClassification = nil
                 if let classifier, prefersClassifier || state == .unknown {
                     if let result = await classifyCheckState(element, screen: snapshot.screen,
@@ -1769,6 +1771,18 @@ extension StepExecutor {
                         state = result.state
                         lastClassification = result.classification
                         noteCodesThisStep.insert(.checkStateClassified)
+                        // **割れたら緑でも赤でも決めない**: 絵は木より遅れる(前のシナリオの画面が返ることがある)ので、撮り直して読み直す。
+                        // 待ちは締め切りの判定より先 = 古い絵の答えで緑にも赤にもしない。尽きたら分類器を採る
+                        // (`prefer: classifier` は a11y が信用できない部品のための指定)
+                        if accessibilityState != .unknown, state != .unknown, state != accessibilityState {
+                            if let delay = retakeDelays.popFirst() {
+                                let waitStart = clock.now
+                                try await Task.sleep(for: .milliseconds(Int(delay * 1000)))
+                                phase.waitMs += Self.ms(clock.now - waitStart)
+                                continue
+                            }
+                            noteCodesThisStep.insert(.checkStateDisagreed)
+                        }
                     } else if classifierFailureThisStep != nil {
                         // 答えを使わなかった = a11y の読みのまま判定する
                         noteCodesThisStep.insert(.checkStateClassifierFailed)
