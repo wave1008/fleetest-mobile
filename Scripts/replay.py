@@ -174,7 +174,7 @@ def run_case(mcp, target, case, rounds_override, record=None):
                 print(f"   周 {i}: {'; '.join(problems)}")
         else:
             print(f"✅ {label}: 0/{rounds}(95% 上限 {upper_bound(rounds):.1%})")
-            if not case.get("redConfirmed"):
+            if not case.get("redConfirmed") and case.get("suite") != "baseline":
                 print(f"   ⚠️ 直しを外した版で赤を確かめていないケース: この緑は直った証拠にならない。{case.get('redNote', '')}")
     return failed_forms
 
